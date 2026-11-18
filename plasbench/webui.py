@@ -1538,6 +1538,11 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, {"checks": project.env_checks()})
             if route == "tools":
                 return self.jsend(200, {"tools": project.tools()})
+            # BEGIN workflow steps
+            if route == "workflow":
+                from . import workflow_steps
+                return self.jsend(200, workflow_steps.payload(project.root, workflow_steps.current_values(project.settings())))
+            # END workflow steps
             if route == "intake/defaults":
                 return self.jsend(200, project.intake_defaults())
             if route == "intake/template":

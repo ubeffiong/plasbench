@@ -518,6 +518,83 @@ body.gd-open #gdrawer{transform:none}
 .top .tbtn .badge{margin-left:2px}
 @media print{.top,.rail,#console,#gdrawer{display:none}}
 </style>
+<style id="wf-style">
+/* BEGIN workflow steps: On / Off colour rule and the Workflow view.
+   One rule for the whole window: On is GREEN with a tick, Off is PLUM with a cross and a dashed outline (never colour alone: the word and the shape say it too).
+   An item at its DEFAULT shows its default state in that state's colour; an item changed from its default also carries a "changed" tag.
+   Green "?" help, warnings (amber) and errors (red) keep their meaning. Contrast of every pair is at least 4.5:1 (test/test_workflow_ui.py computes it). */
+:root{--on:#1e7a3c;--on-bg:#e5f2e9;--on-solid:#1e7a3c;--on-ink:#ffffff;--off:#8e2a6f;--off-bg:#f8e6f1;--off-solid:#8e2a6f;--off-ink:#ffffff}
+:root[data-theme=dark]{--on:#4fb26d;--on-bg:#1b2e22;--on-solid:#4fb26d;--on-ink:#0f1a13;--off:#e58bc4;--off-bg:#3a1b2e;--off-solid:#e58bc4;--off-ink:#2a0f20}
+.onoff{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;line-height:18px;padding:0 8px 0 6px;border-radius:9px;white-space:nowrap}
+.onoff.on{background:var(--on-bg);color:var(--on);border:1px solid var(--on)}
+.onoff.off{background:var(--off-bg);color:var(--off);border:1px dashed var(--off);border-radius:3px}
+.onoff.auto{background:var(--on-bg);color:var(--on);border:1px dotted var(--on)}
+.onoff.fixed{background:var(--surface-2);color:var(--fg-2);border:1px solid var(--line)}
+.onoff .ico{width:12px;height:12px}
+.chgtag{display:inline-flex;align-items:center;font-size:11px;font-weight:600;line-height:16px;padding:0 6px;border-radius:2px;border:1px solid var(--info);color:var(--info);background:var(--info-soft);white-space:nowrap}
+/* the existing on / off controls */
+.switch span{background:var(--off-solid)}.switch input:checked+span{background:var(--on-solid)}
+.tri button.on{background:var(--on-solid);color:var(--on-ink)}
+.tri button.on[data-val=""]{background:var(--primary);color:#fff}
+.tri button.on[data-val=""].def-on{background:var(--on-solid);color:var(--on-ink)}
+.tri button.on[data-val=""].def-off{background:var(--off-solid);color:var(--off-ink)}
+.tri button.on.off{background:var(--off-solid);color:var(--off-ink)}
+.tri button[data-val=on]:not(.on){color:var(--on)}.tri button.off:not(.on){color:var(--off)}
+.tri button[data-val=""].def-on:not(.on){color:var(--on)}.tri button[data-val=""].def-off:not(.on){color:var(--off)}
+.tri button[data-val=on]::before,.tri button.def-on::before{content:"\2713\00a0"}.tri button.off::before,.tri button.def-off::before{content:"\00d7\00a0"}
+b[data-flagtxt]{text-transform:capitalize;font-weight:600}b[data-flagtxt].ok-t{color:var(--on)}b[data-flagtxt].mut{color:var(--off)}
+b[data-flagtxt].ok-t::before{content:"\2713\00a0"}b[data-flagtxt].mut::before{content:"\00d7\00a0"}
+select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-left:4px solid var(--off)}
+.tog.chg .tx b::after,.chgtag.inl{margin-left:6px}
+/* the Workflow view */
+.wfroot{margin:0 0 14px}
+.wfbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin-bottom:10px}
+.wfbar .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
+.wfbar .seg button{font:inherit;font-size:12.5px;border:0;border-left:1px solid var(--line);background:transparent;color:var(--fg-2);padding:4px 12px;cursor:pointer}
+.wfbar .seg button:first-child{border-left:0}.wfbar .seg button[aria-pressed=true]{background:var(--primary);color:#fff}
+.wfsum{border:1px solid var(--line);border-left:4px solid var(--primary);border-radius:var(--radius);background:var(--surface);padding:10px 14px;margin-bottom:10px}
+.wfsum .big{font-size:15px}.wfsum .sub{color:var(--mut);font-size:12.5px;margin-top:3px}
+.wfsum details{margin-top:6px;font-size:12.5px}.wfsum summary{cursor:pointer;color:var(--primary)}
+.wfext{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px;font-size:12.5px}
+.wfext b{margin-right:2px}
+.wfstrip{display:flex;flex-wrap:wrap;gap:4px 0;list-style:none;margin:0 0 12px;padding:0;align-items:stretch}
+.wfstrip li{display:flex;align-items:center}
+.wfstrip a{display:block;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--fg);text-decoration:none;padding:3px 9px;font-size:12.5px;line-height:1.3}
+.wfstrip a small{display:block;color:var(--mut);font-size:11px}
+.wfstrip a:hover,.wfstrip a:focus-visible{border-color:var(--primary)}
+.wfstrip li+li::before{content:"\2192";color:var(--faint);padding:0 6px}
+.wfchain{list-style:none;margin:0;padding:0}
+.wfstep{position:relative;margin:0 0 0 18px;padding:0 0 16px 22px;border-left:3px solid var(--line)}
+.wfstep:last-child{border-left-color:transparent;padding-bottom:0}
+.wfstep::before{content:"";position:absolute;left:-3px;bottom:2px;width:3px;height:14px;background:transparent}
+.wfstep:not(:last-child)::after{content:"\2193";position:absolute;left:-10px;bottom:-1px;font-size:14px;line-height:1;color:var(--faint);background:var(--bg);width:18px;text-align:center}
+.wfn{position:absolute;left:-17px;top:0;width:31px;height:31px;border-radius:50%;background:var(--primary);color:#fff;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;border:3px solid var(--bg)}
+.wfcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+.wfhead{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;padding:8px 12px;border-bottom:1px solid var(--line-2)}
+.wfhead h3{margin:0;font-size:14.5px}.wfhead p{margin:0;color:var(--mut);font-size:12.5px;flex:1 1 220px}.wfhead .cnt{font-size:12px;color:var(--mut)}
+.wfitems{list-style:none;margin:0;padding:0}
+.wfi{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:flex-start;padding:7px 12px;border-bottom:1px solid var(--line-2);border-left:4px solid var(--line)}
+.wfi:last-child{border-bottom:0}
+.wfi.on,.wfi.auto{border-left-color:var(--on)}.wfi.off{border-left-color:var(--off)}
+.wfi .sw{flex:none;min-width:76px}
+.wfi button.sw{font:inherit;background:transparent;border:0;padding:0;cursor:pointer;border-radius:9px}
+.wfi button.sw:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wfi .tx{flex:1 1 260px;min-width:0}.wfi .tx b{font-weight:600}.wfi .tx .d{color:var(--mut);font-size:12.5px}
+.wfi .cost{font-size:12px;color:var(--fg-2);margin-top:2px}.wfi .cost .nm{color:var(--mut)}
+.wfi .bdg{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.wfb{display:inline-flex;align-items:center;gap:3px;font-size:11px;line-height:16px;padding:0 6px;border-radius:2px;border:1px solid var(--line);color:var(--fg-2);background:var(--surface-2)}
+.wfb.need{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+.wfb .ico{width:11px;height:11px}
+.wfi .rst{font:inherit;font-size:11.5px;border:0;background:transparent;color:var(--primary);cursor:pointer;padding:0 4px;text-decoration:underline}
+.wfi.demo{opacity:.85}
+.wfadd{border-top:1px solid var(--line-2);font-size:12.5px}.wfadd summary{cursor:pointer;padding:6px 12px;color:var(--primary)}
+.wfadd ul{list-style:none;margin:0;padding:0 12px 8px}.wfadd li{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;padding:3px 0}
+.wfadd li span.c{color:var(--mut);flex:1 1 180px}
+.wfmore{border-top:1px solid var(--line-2);font-size:12.5px;color:var(--mut)}.wfmore summary{cursor:pointer;padding:6px 12px}.wfmore ul{list-style:none;margin:0;padding:0 12px 8px}
+.wflegend{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:12.5px;color:var(--fg-2);margin-bottom:10px}
+@media (max-width:640px){.wfstep{margin-left:14px;padding-left:16px}.wfi .sw{min-width:0}.wfhead p{flex-basis:100%}}
+/* END workflow steps */
+</style>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -2957,6 +3034,7 @@ function renderWizard() {
   $("#wbody").innerHTML = html;
   $("#wprev").disabled = W.step === 0; $("#wnext").hidden = W.step === WSTEPS.length - 1;
   bindWizard();
+  if (typeof wfAfterWizard === "function") wfAfterWizard();   // workflow steps: the Workflow view of the tool step
 }
 function wizDefaultStudy() {
   const W = S.wiz, V = W.values;
@@ -2998,6 +3076,7 @@ function wizEnv() {
   if (n(E.connections) && Number(E.connections) > 0) d.ENA_DOWNLOAD_CONNECTIONS = String(E.connections);
   if (E.console_log === false) d.RUN_CONSOLE_LOG = "0";
   if (n(E.log_runs) && Number(E.log_runs) > 0) d.LOG_RETENTION_RUNS = String(E.log_runs);
+  if (S.wiz.wf) Object.assign(d, S.wiz.wf);   // workflow steps: per-run on / off of items that have no command-line flag
   return d;
 }
 const envPrefix = env => env && Object.keys(env).length ? Object.entries(env).map(([k, v]) => `${k}=${quote(String(v))}`).join(" ") + " " : "";
@@ -4552,6 +4631,333 @@ document.addEventListener("click", e => { if (!e.target.closest(".search")) $("#
   getRuns().then(r => $("#s_runs").textContent = r.length ? `${r.length} found` : "None yet").catch(() => {});
   getTools().then(t => { const real = t.filter(x => x.source !== "demo"); $("#s_tools").textContent = `${real.filter(x => x.installed).length} of ${real.length} installed`; }).catch(() => {});
 })();
+</script>
+<script id="wf-script">
+/* BEGIN workflow steps: the Workflow view on the Tools page and in the New benchmark wizard (tool step).
+   The chain comes from GET /api/workflow (plasbench/workflow_steps.py, config/workflow_steps.tsv). It never keeps a second copy of any setting: on the Tools page a toggle writes
+   the same saved setting as the list switch and the Settings page (POST /api/settings); in the wizard it writes the same per-run state as the tool buttons (S.wiz.values, S.wizEnv). */
+/* ==WF-PURE-BEGIN== (no DOM here: test/test_workflow_ui.py runs this block under node, on the same cases as plasbench/workflow_steps.py) */
+const WF_NUM = ["time_min", "mem_gb", "disk_gb", "one_off_gb"];
+const wfRound = x => Math.round(x * 1000) / 1000;
+function wfDefaultState(it) { return ["on", "off", "auto", "demo"].includes(it.default) ? it.default : "off"; }
+/* The state of an item given the value of its setting ('' / null = the default). A core item is always on; an item with no setting or flag stays at its default. */
+function wfStateOf(it, value) {
+  if (it.kind === "core") return "on";
+  if (it.kind === "demo") return "demo";
+  if (it.kind === "separate") return wfDefaultState(it);
+  if (value == null || value === "") return wfDefaultState(it);
+  if (!it.setting_key && !it.cli_flag) return wfDefaultState(it);
+  if (value === (it.off_value || "0") || value === "off") return "off";
+  if (value === "auto") return "auto";
+  return "on";
+}
+function wfIsChanged(it, value) { return it.kind !== "core" && it.kind !== "demo" && wfStateOf(it, value) !== wfDefaultState(it); }
+const wfCounts = s => s === "on" || s === "auto";
+const wfById = rows => Object.fromEntries(rows.map(r => [r.item_id, r]));
+/* The items `id` needs (directly or through others) that are off, nearest first. Core items count as on. */
+function wfMissingRequires(rows, states, id) {
+  const idx = wfById(rows), found = [], seen = new Set();
+  const walk = n => { for (const q of (idx[n].requires || [])) { if (seen.has(q) || !idx[q]) continue; seen.add(q); walk(q);
+    if (idx[q].kind !== "core" && !wfCounts(states[q] ?? wfDefaultState(idx[q]))) found.push(q); } };
+  walk(id); return found;
+}
+/* The items that are on and need `id` (directly or through others). */
+function wfDependentsOn(rows, states, id) {
+  const idx = wfById(rows), direct = {};
+  for (const r of rows) for (const q of (r.requires || [])) (direct[q] = direct[q] || []).push(r.item_id);
+  const out = [], stack = [id], seen = new Set([id]);
+  while (stack.length) for (const d of (direct[stack.pop()] || [])) { if (seen.has(d)) continue; seen.add(d); stack.push(d); if (wfCounts(states[d] ?? wfDefaultState(idx[d]))) out.push(d); }
+  return out;
+}
+/* The estimate of a selection: time and disk add up and scale with the number of isolates; memory is the largest single item and does not scale; a one-off database download
+   adds up and does not scale. not_measured lists the enabled items with no figure per field: they are never counted as zero. */
+function wfEstimate(rows, states, isolates) {
+  const total = {time_min: 0, mem_gb: 0, disk_gb: 0, one_off_gb: 0}, missing = {time_min: [], mem_gb: [], disk_gb: [], one_off_gb: []};
+  for (const r of rows) {
+    if (r.kind === "demo" || r.kind === "separate") continue;
+    const s = r.kind === "core" ? "on" : (states[r.item_id] ?? wfDefaultState(r));
+    if (!wfCounts(s)) continue;
+    for (const k of WF_NUM) {
+      const v = r[k];
+      if (v == null) { if (k !== "one_off_gb") missing[k].push(r.item_id); continue; }
+      total[k] = k === "mem_gb" ? Math.max(total[k], v) : total[k] + v;
+    }
+  }
+  const n = Math.max(1, Math.floor(isolates || 1));
+  return {isolates: n, time_min: wfRound(total.time_min * n), mem_gb: wfRound(total.mem_gb), disk_gb: wfRound(total.disk_gb * n), one_off_gb: wfRound(total.one_off_gb), not_measured: missing, label: "estimated"};
+}
+const wfDefaultStates = rows => Object.fromEntries(rows.map(r => [r.item_id, wfDefaultState(r)]));
+function wfDelta(rows, states, isolates) {
+  const a = wfEstimate(rows, states, isolates), b = wfEstimate(rows, wfDefaultStates(rows), isolates);
+  return {time_min: wfRound(a.time_min - b.time_min), mem_gb: wfRound(a.mem_gb - b.mem_gb), disk_gb: wfRound(a.disk_gb - b.disk_gb), one_off_gb: wfRound(a.one_off_gb - b.one_off_gb), isolates: a.isolates, label: "estimated"};
+}
+/* The optional items and alternative tools that are off: the "What can I add?" list. */
+function wfAddable(rows, states) {
+  return rows.filter(r => (r.kind === "optional" || r.kind === "alternative") && (r.setting_key || r.cli_flag) && !wfCounts(states[r.item_id] ?? wfDefaultState(r)));
+}
+function wfFmtTime(min) { if (min < 1 && min > 0) return "under a minute"; if (min < 90) return `${wfRound(Math.round(min * 10) / 10)} min`; return `${wfRound(Math.round(min / 6) / 10)} h`; }
+function wfFmtGB(gb) { return gb < 1 ? `${Math.round(gb * 1000)} MB` : `${wfRound(Math.round(gb * 10) / 10)} GB`; }
+/* "adds about 14.4 min, peaks at 4.4 GB memory and uses 0.6 GB disk" for the estimate; a missing figure is named, never zero. */
+function wfEstimateText(est) {
+  const nm = est.not_measured, part = (v, k, f, word) => (nm[k].length ? `at least ${f(v)}` : f(v)) + word;
+  const bits = [];
+  bits.push(est.time_min > 0 || !nm.time_min.length ? part(est.time_min, "time_min", wfFmtTime, "") : "time not measured");
+  bits.push(est.mem_gb > 0 || !nm.mem_gb.length ? part(est.mem_gb, "mem_gb", wfFmtGB, " peak memory") : "memory not measured");
+  bits.push(est.disk_gb > 0 || !nm.disk_gb.length ? part(est.disk_gb, "disk_gb", wfFmtGB, " disk") : "disk not measured");
+  return bits;
+}
+/* ==WF-PURE-END== */
+
+const WF = {view: "workflow", data: null, per: 1, vals: {}, busy: false, open: new Set(), loading: null};
+try { const v = localStorage.getItem("pb_wfview"); if (v === "list" || v === "workflow") WF.view = v; } catch (e) { /* the page works without storage */ }
+const wfDest = it => (it.cli_flag || "").replace(/^--/, "").replace(/-/g, "_");
+const wfRows = () => WF.data ? WF.data.steps.flatMap(s => s.items).concat(wfUserItems()) : [];
+function wfUserItems() {
+  return ((typeof S !== "undefined" && S.user && S.user.tools) || []).map(u => ({step_id: "tools", item_id: "user:" + u.name, label: u.display || u.name, kind: "alternative", user: true, name: u.name,
+    description: `Your own tool: ${(u.task || "").replace(/_/g, " ")} · ${(u.track || "").replace(/_/g, " ")} · ${u.mode || ""}`, setting_key: "", cli_flag: "--tool", default: "off", requires: [],
+    needs_database: "", needs_internet: "no", needs_input: "", time_min: null, mem_gb: null, disk_gb: null, one_off_gb: null, evidence: "not_measured",
+    basis: "Not measured. PlasBench cannot know what a tool you added costs."}));
+}
+/* The saved value of an item's setting: a tool's saved switch (the Tools page list), else the value the server sent for the setting. */
+function wfSaved(it) {
+  if (it.user) { const list = String(WF.vals.USER_TOOLS || "").split(/[,\s]+/).filter(Boolean); return list.includes("all") || list.includes(it.name) ? "1" : ""; }
+  const row = (S.tools || []).find(t => t.tool === it.item_id && t.run_flag);
+  if (row && row.enabled != null) return row.enabled ? (it.on_value || "1") : (it.off_value || "0");
+  return it.setting_key ? (WF.vals[it.setting_key] ?? "") : "";
+}
+/* The value in force: in the wizard a per-run choice first, then what is saved. */
+function wfValue(it, ctx) {
+  if (ctx === "wizard") {
+    if (it.user) return (S.wiz.values.user_tools || []).includes(it.name) ? "1" : "";
+    const d = it.cli_flag && !it.user ? wfDest(it) : "", v = d ? S.wiz.values[d] : "";
+    if (v === "on") return it.on_value || "1"; if (v === "off") return it.off_value || "0";
+    const e = S.wiz.wf; if (e && it.setting_key && it.setting_key in e) return e[it.setting_key];
+  }
+  return wfSaved(it);
+}
+function wfOverridden(it, ctx) {
+  if (ctx === "wizard") {
+    if (it.user) return (S.wiz.values.user_tools || []).includes(it.name);
+    const d = it.cli_flag && !it.user ? wfDest(it) : ""; if (d && (S.wiz.values[d] === "on" || S.wiz.values[d] === "off")) return true;
+    const e = S.wiz.wf; return !!(e && it.setting_key && it.setting_key in e);
+  }
+  return !it.user && !!it.setting_key && wfSaved(it) !== "" && wfSaved(it) !== wfCfgDefault(it);
+}
+const wfCfgDefault = it => it.default === "auto" ? "auto" : it.default === "on" ? (it.on_value || "1") : (it.off_value || "0");
+function wfStates(ctx) { const o = {}; for (const it of wfRows()) o[it.item_id] = wfStateOf(it, wfValue(it, ctx)); return o; }
+
+/* ---- drawing ---- */
+const wfPill = (s, label) => s === "on" ? `<span class="onoff on">${icon("check")}${label || "On"}</span>` : s === "auto" ? `<span class="onoff auto">${icon("check")}${label || "Auto"}</span>` :
+  s === "off" ? `<span class="onoff off">${icon("x")}${label || "Off"}</span>` : `<span class="onoff fixed">${label || "No switch"}</span>`;
+function wfCost(it, per) {
+  const f = (v, k, fn, word) => v == null ? `<span class="nm">${word} not measured</span>` : `${fn(v * (k === "mem_gb" ? 1 : per))} ${word}`.trim();
+  if (it.time_min == null && it.mem_gb == null && it.disk_gb == null && it.one_off_gb == null) return `<span class="nm">Added cost: not measured</span>`;
+  const parts = [f(it.time_min, "time_min", wfFmtTime, "time"), f(it.mem_gb, "mem_gb", wfFmtGB, "peak memory"), f(it.disk_gb, "disk_gb", wfFmtGB, "disk")];
+  if (it.one_off_gb != null) parts.push(`one-off ${wfFmtGB(it.one_off_gb)} database download`);
+  const ev = {measured: "measured", documented: "documented", not_measured: "not measured"}[it.evidence] || it.evidence;
+  return `Adds about ${parts.join(" · ")} <span class="nm">per ${per > 1 ? per + " isolates" : "isolate"}, estimated (${ev})</span>`;
+}
+function wfBadges(it, states, idx) {
+  const b = [];
+  if (it.needs_database) b.push(`<span class="wfb" title="${esc(it.needs_database)}">${icon("db")}needs database</span>`);
+  if (it.needs_internet === "yes") b.push(`<span class="wfb">${icon("cloud")}needs internet</span>`); else if (it.needs_internet === "first_use") b.push(`<span class="wfb" title="It downloads its own data the first time it runs">${icon("cloud")}internet on first use</span>`);
+  for (const q of (it.requires || [])) { const r = idx[q]; if (!r || r.kind === "core") continue; const off = !wfCounts(states[q]); b.push(`<span class="wfb ${off && wfCounts(states[it.item_id]) ? "need" : ""}" title="${off ? "That step is off" : "That step is on"}">${icon("chev")}needs ${esc(r.label)}</span>`); }
+  if (it.needs_input) b.push(`<span class="wfb">${icon("file")}needs ${esc(it.needs_input.replace(/_/g, " "))}</span>`);
+  return b.length ? `<div class="bdg">${b.join("")}</div>` : "";
+}
+function wfTip(it, per) {
+  const choices = [["Added cost", (wfCost(it, per)).replace(/<[^>]*>/g, "")], ["Evidence", it.basis]];
+  if (it.needs_database) choices.push(["Needs database", it.needs_database]);
+  if (it.needs_internet !== "no") choices.push(["Needs internet", it.needs_internet === "yes" ? "Yes." : "On first use only."]);
+  if ((it.requires || []).length) choices.push(["Needs earlier", it.requires.join(", ")]);
+  return {summary: it.description, choices, default: wfDefaultState(it), flag: it.cli_flag || "", setting: it.setting_key || "", when: ""};
+}
+function wfItemHTML(it, states, ctx, idx, per) {
+  const s = states[it.item_id], value = wfValue(it, ctx), changed = wfIsChanged(it, value), id = "wfc_" + it.item_id.replace(/[^A-Za-z0-9_]/g, "_");
+  let sw;
+  if (it.kind === "core") sw = `<span class="sw">${wfPill("on", "Always on")}</span>`;
+  else if (it.kind === "separate" || it.kind === "demo") sw = `<span class="sw">${wfPill("fixed", it.kind === "demo" ? "Demo only" : "Own command")}</span>`;
+  else sw = `<button type="button" class="sw" role="switch" aria-checked="${wfCounts(s)}" id="${id}" data-wftoggle="${esc(it.item_id)}" aria-label="${esc(it.label)}: ${s === "auto" ? "auto, runs when its inputs exist" : wfCounts(s) ? "on" : "off"}. Press to turn ${wfCounts(s) ? "off" : "on"}">${wfPill(s)}</button>`;
+  const rst = (changed || wfOverridden(it, ctx)) && it.kind !== "core" ? `<button type="button" class="rst" data-wfreset="${esc(it.item_id)}" title="${ctx === "wizard" ? "Use the saved setting for this run" : "Back to the default"}">${ctx === "wizard" ? "use saved" : "default"}</button>` : "";
+  return `<li class="wfi ${s}" id="wfi_${esc(id)}">${sw}<div class="tx"><b>${esc(it.label)}</b> ${it.user ? `<span class="tag user">your tool</span> ` : ""}${changed ? `<span class="chgtag" title="Different from its default (${wfDefaultState(it)})">changed</span> ` : ""}${rst}${tipBtn(wfTip(it, per), it.label)}
+    <div class="d">${esc(it.description)}</div><div class="cost">${wfCost(it, per)}</div>${wfBadges(it, states, idx)}</div></li>`;
+}
+function wfStepHTML(step, rows, states, ctx, per) {
+  const idx = wfById(rows), items = rows.filter(r => r.step_id === step.id), shown = items.filter(r => r.kind !== "demo"), demo = items.filter(r => r.kind === "demo");
+  const on = shown.filter(r => r.kind !== "core" && r.kind !== "separate" && wfCounts(states[r.item_id])).length, tog = shown.filter(r => r.kind === "optional" || r.kind === "alternative").length;
+  const add = wfAddable(items, states);
+  return `<span class="wfn" aria-hidden="true">${esc(step.stage)}</span><div class="wfcard"><div class="wfhead"><h3>${esc(step.name)}</h3><p>${esc(step.blurb)}${step.script ? ` <span class="mono small">${esc(step.script)}</span>` : ""}</p>${tog ? `<span class="cnt">${on} of ${tog} on</span>` : ""}</div>
+    <ul class="wfitems">${shown.map(it => wfItemHTML(it, states, ctx, idx, per)).join("")}</ul>
+    ${add.length ? `<details class="wfadd" data-wfopen="add_${esc(step.id)}" ${WF.open.has("add_" + step.id) ? "open" : ""}><summary>What can I add here? (${add.length})</summary><ul>${add.map(it =>
+      `<li>${wfPill("off")}<b>${esc(it.label)}</b><span class="c">${wfCost(it, per)}</span><button type="button" class="btn sec sm" data-wftoggle="${esc(it.item_id)}">Turn on</button></li>`).join("")}</ul></details>` : ""}
+    ${demo.length ? `<details class="wfmore" data-wfopen="demo_${esc(step.id)}" ${WF.open.has("demo_" + step.id) ? "open" : ""}><summary>Demo methods (${demo.length}): used only by the offline demo</summary><ul>${demo.map(it => `<li>${esc(it.label)}</li>`).join("")}</ul></details>` : ""}</div>`;
+}
+const wfHash = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return String(h); };
+function wfRender(host) {
+  if (!host) return;
+  const ctx = host.dataset.ctx, rows = wfRows(), per = WF.per;
+  const aeId = document.activeElement && host.contains(document.activeElement) ? document.activeElement.id : "";
+  const bar = `<div class="wfbar"><div class="seg" role="group" aria-label="View">${[["workflow", "Workflow"], ["list", "List"]].map(([k, l]) => `<button type="button" data-wfview="${k}" aria-pressed="${WF.view === k}">${l}</button>`).join("")}</div>
+    ${WF.view === "workflow" ? `<div class="seg" role="group" aria-label="Estimate for">${[[1, "Per isolate"], [10, "Per 10 isolates"]].map(([n, l]) => `<button type="button" data-wfper="${n}" aria-pressed="${per === n}">${l}</button>`).join("")}</div>` : ""}
+    ${wizTip("workflow_view")}</div>`;
+  if (!WF.data) { setIfChanged(host, bar + `<div class="mut small">${WF.loadError ? esc(WF.loadError) : "Loading the workflow…"}</div>`); return; }
+  if (WF.view !== "workflow") { setIfChanged(host, bar); return; }
+  const states = wfStates(ctx), est = wfEstimate(rows, states, per), dl = wfDelta(rows, states, per), bits = wfEstimateText(est), nmAll = new Set([].concat(...["time_min", "mem_gb", "disk_gb"].map(k => est.not_measured[k])));
+  const idx = wfById(rows), name = id => (idx[id] || {label: id}).label;
+  const sign = v => (v > 0 ? "+" : v < 0 ? "-" : "") ;
+  const deltaTxt = rows.some(r => wfIsChanged(r, wfValue(r, ctx))) ? `Compared with the defaults: ${sign(dl.time_min)}${wfFmtTime(Math.abs(dl.time_min))}, ${sign(dl.disk_gb)}${wfFmtGB(Math.abs(dl.disk_gb))} disk${dl.mem_gb ? `, peak memory ${sign(dl.mem_gb)}${wfFmtGB(Math.abs(dl.mem_gb))}` : ""}${[...nmAll].some(i => wfIsChanged(idx[i], wfValue(idx[i], ctx))) ? " (counting only what has a figure)" : ""}.` : "Nothing is changed from the defaults.";
+  const sum = `<div class="wfsum" role="status" aria-live="polite"><div class="big">This selection adds about <b>${esc(bits[0])}</b>, <b>${esc(bits[1])}</b> and <b>${esc(bits[2])}</b> per ${per > 1 ? per + " isolates" : "isolate"}. <span class="tag">estimated</span>${wizTip("workflow_estimate")}</div>
+    <div class="sub">${esc(deltaTxt)}${est.one_off_gb ? ` One-off database downloads: ${esc(wfFmtGB(est.one_off_gb))}.` : ""} Memory is the largest single tool, not a sum.</div>
+    ${nmAll.size ? `<details data-wfopen="nm" ${WF.open.has("nm") ? "open" : ""}><summary>${nmAll.size} selected ${nmAll.size === 1 ? "item has" : "items have"} no figure yet (not measured, so left out of the totals)</summary><div class="small mut">${[...nmAll].map(i => esc(name(i))).join(", ")}</div></details>` : ""}</div>`;
+  const extras = rows.filter(r => (r.kind === "optional" || r.kind === "alternative") && r.default === "off" && wfCounts(states[r.item_id])), dropped = rows.filter(r => (r.kind === "optional" || r.kind === "alternative") && r.default === "on" && !wfCounts(states[r.item_id]));
+  const ext = `<div class="wfext"><b>Enabled extras</b> ${extras.length ? extras.map(r => `<span class="onoff on">${icon("check")}${esc(r.label)}</span>`).join(" ") : `<span class="mut">none: only the default chain</span>`}
+    ${dropped.length ? ` <b style="margin-left:8px">Turned off</b> ${dropped.map(r => `<span class="onoff off">${icon("x")}${esc(r.label)}</span>`).join(" ")}` : ""}</div>`;
+  const legend = `<div class="wflegend">${wizTip("workflow_colours")}<span>${wfPill("on")} runs</span><span>${wfPill("off")} skipped</span><span><span class="chgtag">changed</span> differs from its default</span><span class="mut">An item at its default shows its default colour.</span></div>`;
+  const steps = WF.data.steps.slice().sort((a, b) => a.order - b.order);
+  const strip = `<ol class="wfstrip" aria-label="The chain, in order">${steps.map(s => { const it = rows.filter(r => r.step_id === s.id && r.kind !== "demo" && r.kind !== "core" && r.kind !== "separate"), n = it.filter(r => wfCounts(states[r.item_id])).length;
+    return `<li><a href="#wfs_${esc(s.id)}" data-wfjump="${esc(s.id)}">${esc(s.name)}<small>${it.length ? `${n} of ${it.length} on` : "always runs"}</small></a></li>`; }).join("")}</ol>`;
+  const head = bar + sum + ext + legend + strip;
+  let top = host.querySelector(".wfhd"), list = host.querySelector("ol.wfchain");
+  if (!top || !list) { host.innerHTML = `<div class="wfhd"></div><ol class="wfchain" aria-label="Workflow steps"></ol>`; top = host.querySelector(".wfhd"); list = host.querySelector("ol.wfchain"); }
+  setIfChanged(top, head);
+  const items = steps.map(s => { const html = wfStepHTML(s, rows, states, ctx, per); return {key: s.id, sig: wfHash(html), html}; });
+  applyKeyed(list, items, it => `<li class="wfstep" id="wfs_${esc(it.key)}">${it.html}</li>`);
+  if (aeId) { const b = document.getElementById(aeId); if (b && document.activeElement !== b) b.focus({preventScroll: true}); }
+}
+async function wfLoad(force) {
+  if (WF.data && !force) return WF.data;
+  if (WF.loading) return WF.loading;
+  WF.loading = (async () => {
+    try { const d = await api("workflow"); WF.data = d; WF.loadError = ""; WF.vals = {}; for (const s of d.steps) for (const it of s.items) if (it.setting_key) WF.vals[it.setting_key] = it.value ?? ""; }
+    catch (e) { WF.loadError = "The workflow could not be loaded: " + e.message; }
+    finally { WF.loading = null; }
+    return WF.data; })();
+  return WF.loading;
+}
+function wfRenderAll() { $$("[data-ctx].wfroot").forEach(h => wfRender(h)); }
+
+/* ---- changing a setting: the SAME stores the rest of the window uses ---- */
+async function wfApply(ctx, changes) {          // changes: [[item, "on"|"off"|"default"]]
+  if (ctx === "wizard") {
+    const V = S.wiz.values, E = S.wiz; E.wf = E.wf || {};
+    for (const [it, to] of changes) {
+      const saved = wfSaved(it), want = to === "default" ? null : to === "on" ? (it.on_value || "1") : (it.off_value || "0");
+      if (it.user) { const l = (V.user_tools || []).filter(n => n !== it.name); if (to === "on") l.push(it.name); V.user_tools = l; continue; }
+      const d = it.cli_flag ? wfDest(it) : "";
+      if (d) V[d] = want == null || want === wfNorm(it, saved) ? "" : to;
+      else if (it.setting_key) { if (want == null || want === wfNorm(it, saved)) delete E.wf[it.setting_key]; else E.wf[it.setting_key] = want; }
+    }
+    if (!Object.keys(E.wf).length) delete E.wf;
+    return;
+  }
+  const set = {}, rows = wfRows();
+  for (const [it, to] of changes) {
+    if (it.user) { const idxs = (S.user.tools || []).map(u => u.name); let l = String(WF.vals.USER_TOOLS || "").split(/[,\s]+/).filter(Boolean); if (l.includes("all")) l = idxs.slice();
+      l = l.filter(n => n !== it.name); if (to === "on") l.push(it.name); set.USER_TOOLS = l.length ? l.join(",") : null; WF.vals.USER_TOOLS = l.join(","); continue; }
+    if (!it.setting_key) continue;
+    set[it.setting_key] = to === "default" ? null : to === "on" ? (it.on_value || "1") : (it.off_value || "0");
+  }
+  if (!Object.keys(set).length) return;
+  await api("settings", {changes: set});
+  for (const [k, v] of Object.entries(set)) {
+    const it = rows.find(r => r.setting_key === k); if (!it) continue;
+    WF.vals[k] = v == null ? wfCfgDefault(it) : v;
+    const row = (S.tools || []).find(t => t.tool === it.item_id && t.run_flag); if (row) row.enabled = wfStateOf(it, WF.vals[k]) !== "off";
+  }
+  S.settings = null; if (typeof renderToolTable === "function" && S.tools) renderToolTable();
+}
+const wfNorm = (it, v) => v === "" || v == null ? wfCfgDefault(it) : v;
+async function wfToggle(host, id, forceTo) {
+  const ctx = host.dataset.ctx, rows = wfRows(), idx = wfById(rows), it = idx[id]; if (!it || WF.busy) return;
+  const states = wfStates(ctx), cur = states[id], to = forceTo || (wfCounts(cur) ? "off" : "on"), changes = [[it, to]];
+  if (to === "on") {
+    const miss = wfMissingRequires(rows, states, id);
+    if (miss.length) {
+      const names = miss.map(m => idx[m].label);
+      const r = await modalDialog({title: "This needs an earlier step", bodyHTML: `<p><b>${esc(it.label)}</b> needs ${names.map(n => `<b>${esc(n)}</b>`).join(", ")}, which ${miss.length === 1 ? "is" : "are"} off. Without ${miss.length === 1 ? "it" : "them"} ${esc(it.label)} is skipped or fails.</p><p>Turn ${miss.length === 1 ? "it" : "them"} on as well?</p>`,
+        buttons: [{id: "cancel", label: "Cancel"}, {id: "only", label: "Turn on only " + it.label}, {id: "both", label: `Turn on ${names.join(", ")} and ${it.label}`, primary: true}], cancelId: "cancel", defaultId: "both"});
+      if (r.id === "cancel") return; if (r.id === "both") for (const m of miss.slice().reverse()) changes.unshift([idx[m], "on"]);
+    }
+  } else {
+    const deps = wfDependentsOn(rows, states, id);
+    if (deps.length) {
+      const names = deps.map(m => idx[m].label);
+      const r = await modalDialog({title: "Other steps need this one", danger: true, bodyHTML: `<p>${names.map(n => `<b>${esc(n)}</b>`).join(", ")} ${deps.length === 1 ? "is" : "are"} on and ${deps.length === 1 ? "needs" : "need"} <b>${esc(it.label)}</b>.</p><p>If you turn ${esc(it.label)} off ${deps.length === 1 ? "that one" : "those"} will be skipped or fail.</p>`,
+        buttons: [{id: "cancel", label: "Cancel"}, {id: "only", label: "Turn off only " + it.label}, {id: "all", label: `Turn off ${it.label} and ${names.join(", ")}`, danger: true}], cancelId: "cancel", defaultId: "cancel"});
+      if (r.id === "cancel") return; if (r.id === "all") for (const m of deps) changes.push([idx[m], "off"]);
+    }
+  }
+  await wfCommit(host, changes);
+}
+async function wfCommit(host, changes) {
+  const ctx = host.dataset.ctx; WF.busy = true;
+  try {
+    await wfApply(ctx, changes);
+    if (ctx === "wizard") { const keep = document.activeElement && document.activeElement.id; renderWizard(); if (keep) { const b = document.getElementById(keep); if (b) b.focus({preventScroll: true}); } }
+    else { wfRenderAll(); toast(changes.length === 1 ? `${changes[0][0].label}: ${changes[0][1] === "default" ? "back to its default" : changes[0][1]}. Saved for this computer.` : `${changes.length} items changed. Saved for this computer.`, "ok"); }
+  } catch (e) { toast(e.message, "bad"); wfRenderAll(); }
+  finally { WF.busy = false; }
+}
+function wfBind(host) {
+  host.addEventListener("click", e => {
+    const v = e.target.closest("[data-wfview]"); if (v) { WF.view = v.dataset.wfview; try { localStorage.setItem("pb_wfview", WF.view); } catch (x) { /* optional */ } wfApplyView(); return; }
+    const p = e.target.closest("[data-wfper]"); if (p) { WF.per = +p.dataset.wfper; wfRenderAll(); return; }
+    const t = e.target.closest("[data-wftoggle]"); if (t) { wfToggle(host, t.dataset.wftoggle); return; }
+    const r = e.target.closest("[data-wfreset]"); if (r) { const it = wfById(wfRows())[r.dataset.wfreset]; if (it) wfCommit(host, [[it, "default"]]); return; }
+    const j = e.target.closest("[data-wfjump]"); if (j) { e.preventDefault(); const el = document.getElementById("wfs_" + j.dataset.wfjump); if (el) { el.scrollIntoView({block: "start"}); const b = el.querySelector("button.sw, summary"); if (b) b.focus({preventScroll: true}); } }
+  });
+  host.addEventListener("toggle", e => { const k = e.target.dataset && e.target.dataset.wfopen; if (k) { e.target.open ? WF.open.add(k) : WF.open.delete(k); } }, true);
+}
+function wfApplyView() {                                   // show the workflow or the existing list, in whichever page is open
+  const tools = $("#v_tools > .card"); if (tools) tools.hidden = WF.view === "workflow";
+  const wb = $("#wbody"); if (wb) [...wb.children].forEach(c => { const h = c.querySelector && c.querySelector(".hd h3"); if (h && /^(Built-in tools|Your own tools)/.test(h.textContent)) c.hidden = WF.view === "workflow" && !!$("#wbody .wfroot"); });
+  wfRenderAll();
+}
+/* ---- mounting ---- */
+async function wfMountTools() {
+  const v = $("#v_tools"); if (!v || v.hidden) return;
+  let host = $("#wfx_tools");
+  if (!host) { host = document.createElement("section"); host.id = "wfx_tools"; host.className = "wfroot"; host.dataset.ctx = "tools"; v.querySelector(".vhead").after(host); wfBind(host); }
+  try { await getTools(); await getUser(); await getSchema(); } catch (e) { /* the list reports its own error */ }
+  wfRender(host); await wfLoad(true); wfApplyView();
+}
+function wfAfterWizard() {                                  // called at the end of renderWizard()
+  const W = S.wiz; if (!W || W.step !== 1 || W.source === "demo" || W.source === "meta") return;
+  const body = $("#wbody"); if (!body) return;
+  const host = document.createElement("section"); host.className = "wfroot"; host.dataset.ctx = "wizard"; body.prepend(host); wfBind(host);
+  wfDecorateWizard(); wfApplyView();
+  if (!WF.data) wfLoad().then(() => { if (document.body.contains(host)) { wfRender(host); wfDecorateWizard(); } });
+}
+/* ---- the existing On / Off controls get the same colours, labels and "changed" marks without being redrawn ---- */
+function wfDecorateWizard() {
+  const rows = wfRows(), idx = {}; rows.forEach(r => { if (r.cli_flag) idx[wfDest(r)] = r; });
+  $$("#wbody .tri button[data-wtool]").forEach(b => { const it = idx[b.dataset.wtool]; if (!it) return;
+    if (b.dataset.val === "") { b.classList.toggle("def-on", wfStateOf(it, wfSaved(it)) !== "off"); b.classList.toggle("def-off", wfStateOf(it, wfSaved(it)) === "off"); }
+    const tog = b.closest(".tog"); if (tog) { const ov = S.wiz.values[b.dataset.wtool], ch = ov === "on" || ov === "off" ? wfStateOf(it, ov === "on" ? (it.on_value || "1") : (it.off_value || "0")) !== wfDefaultState(it) : wfIsChanged(it, wfSaved(it));
+      tog.classList.toggle("chg", ch); const bold = tog.querySelector(".tx b"); if (bold && !bold.querySelector(".chgtag")) { if (ch) bold.insertAdjacentHTML("beforeend", ` <span class="chgtag">changed</span>`); } else if (bold && !ch) bold.querySelector(".chgtag")?.remove(); } });
+}
+function wfDecorateToolList() {
+  const rows = wfRows(); if (!rows.length) return;
+  $$("#tooltb input[data-flag]").forEach(inp => { const it = rows.find(r => r.setting_key === inp.dataset.flag); const b = $(`[data-flagtxt="${inp.dataset.flag}"]`); if (!it || !b) return;
+    const ch = wfIsChanged(it, inp.checked ? (it.on_value || "1") : (it.off_value || "0")), has = b.parentElement.querySelector(".chgtag");
+    if (ch && !has) b.insertAdjacentHTML("afterend", ` <span class="chgtag">changed</span>`); else if (!ch && has) has.remove(); });
+}
+function wfDecorateSelects() {
+  $$("#v_settings select[data-key], #v_addtool select, #v_commands select").forEach(sel => {
+    const opts = [...sel.options].map(o => o.value.toLowerCase()), flagLike = opts.some(v => ["on", "off", "yes", "no", "1", "0"].includes(v)); if (!flagLike) { delete sel.dataset.st; return; }
+    let v = sel.value.toLowerCase(); if (v === "") { const t = (sel.options[sel.selectedIndex] || {}).text || ""; v = /\((1|on|yes)\b/i.test(t) ? "1" : /\((0|off|no)\b/i.test(t) ? "0" : ""; }
+    const st = ["1", "on", "yes"].includes(v) ? "on" : ["0", "off", "no"].includes(v) ? "off" : ""; if (st) sel.dataset.st = st; else delete sel.dataset.st; });
+}
+(function wfWire() {
+  let raf = 0; const again = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { wfDecorateSelects(); wfDecorateToolList(); }); };
+  document.addEventListener("change", again);
+  for (const q of ["#tooltb", "#setlist", "#utsections", "#cmdform"]) { const el = $(q); if (el) new MutationObserver(again).observe(el, {childList: true, subtree: true}); }
+  window.addEventListener("hashchange", () => { if ((location.hash.slice(1) || "").split("/")[0] === "tools") wfMountTools(); });
+  const r = $("#toolsref"); if (r) r.addEventListener("click", () => setTimeout(wfMountTools, 50));
+  if ((location.hash.slice(1) || "").split("/")[0] === "tools") setTimeout(wfMountTools, 0);
+  again();
+})();
+/* END workflow steps */
 </script>
 </body>
 </html>

@@ -275,6 +275,10 @@ every input the report accepts, and that `plasbench analysis --list` reaches the
 `test/test_demo_end_to_end.py` runs the offline demo and asserts each layer reaches its table and its HTML section.
 **Status.** Fixed here. Before this, `derive_amr_truth.py` was reachable only from tests.
 
+### Q20c. What does each optional step or tool add, and how do I see the whole chain?
+**Answer.** On **Tools** and on **New benchmark** (step *Tools*), the **Workflow** view lays the run out as ordered steps (download, truth, assemble, tools, score, report, long-read tools, operational). Each tool or optional step has an On/Off switch, a one-line description, badges for what it needs (database, internet, an earlier step) and its added time, memory and disk per isolate; a bar at the top totals the selection and says *estimated*. Switching something that needs a disabled step offers to switch that on too. The figures are labelled: *measured* (real runs in `results_real_cohort1`: assembly, MOB-recon, Platon, plasmidSPAdes), *documented* (README or config.sh) or *not measured*, which is shown as such and left out of the total, never counted as zero. Off is plum with a cross and On is green with a tick; an item at its default shows its default state's colour and a *changed* tag marks what you altered.
+**Status.** Implemented here (`plasbench/workflow_steps.py`, `config/workflow_steps.tsv`; `test/test_workflow_steps.py`, `test/test_workflow_ui.py`). Most optional analyses have no timing yet.
+
 ### Q21. Is the per-plasmid side file safe against stale results?
 **Answer.** It is rewritten on each scoring run, but a tool removed from a later run leaves its old
 `*.per_plasmid.tsv` behind, and the stratifier globs the results directory. `scores.tsv` has the same

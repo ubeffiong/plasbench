@@ -817,6 +817,33 @@ A long run is quiet by nature, so PlasBench writes down what it is doing as it g
 - **Files.** In the study: `logs/run_<date>-<time>.log` (everything the run printed; `logs/run.latest.log` points at the newest; the newest `LOG_RETENTION_RUNS` = 20 are kept; `RUN_CONSOLE_LOG=0` turns it off), `logs/<isolate>.<step>.log` (each tool's own output) and `results/run_events.jsonl` (one JSON line per stage start and end, isolate step, command start and end with exit code and seconds, heartbeat and warning; names and numbers only, never environment variables or commands). `results/stage_timing.tsv` has the seconds per stage.
 - **A run that was cut off** (the terminal, WSL or the computer ended it) shows as *stopped* with the hint that re-running resumes: finished isolates and tool results are reused.
 
+## The workflow at a glance
+
+The window shows the whole run as one chain, in order, so you can see what each step does, what you can add to it and what it costs. Open it on **Tools** (what runs by default on this computer) or on **New benchmark**, step *Tools* (what runs this time), and choose **Workflow** at the top; **List** is the plain list. Both views change the same settings, so they always agree.
+
+```text
+0 Check and install -> 1 Download -> 2 Reference truth -> 3 QC, trim and assemble -> 4 Run the tools
+  -> 5 Score -> 6 Aggregate and report -> 7 Long-read and hybrid tools -> 8 Operational reconstruction
+  (and, separately, the Metagenomics track)
+```
+
+Each step is a card. Inside it every item says what it does in one line and shows a switch:
+
+- **Always on** items are the core of the stage and cannot be switched off. **Optional** steps (extra analyses) and **alternative tools** have a switch.
+- **On** is green with a tick; **Off** is plum with a cross and a dashed outline. The word is always written, so colour is never the only cue. **An item at its default shows its default state in that state's colour**: a tool that is off by default shows *Off* until you switch it on. An item you changed from its default also carries a **changed** tag, and a small *default* link puts it back (on New benchmark it is *use saved*). Green help marks, amber warnings and red errors keep their own meaning.
+- **Badges** show what an item needs: a database, the internet (always, or only the first time), an earlier step, or an input such as long reads.
+- Turning on something that needs an earlier step that is off offers to turn that on too; turning off a step others need warns you and offers to turn them off as well. Nothing is changed until you choose.
+- **What can I add here?** under each card lists the optional items that are off, with their cost and a *Turn on* button. **Enabled extras** at the top lists what you have switched on beyond the default chain (and what you switched off).
+- Your own tools (added with a manifest) appear under *Run the tools*, marked *your tool*.
+
+**The estimate.** The bar at the top says, for example, *this selection adds about 14.4 min, 4.4 GB peak memory and 630 MB disk per isolate, estimated*, and recalculates on every change; choose *Per 10 isolates* to scale it. Time and disk add up over the items that are on; memory is the largest single tool (they run one after another unless you raise the parallel settings); a one-off database download is shown separately. Every figure says where it comes from:
+
+- **measured**: taken from a real run in this repository (`results_real_cohort1`, 10 isolates). At present these are assembly (median 5.9 min), MOB-recon (0.9 min, 2.95 GB peak), Platon (1.0 min, 4.4 GB), plasmidSPAdes (median 6.6 min, mean 12.7 min, 3.8 GB) and the coverage baseline (under a second);
+- **documented**: a stated requirement or size, not re-measured (the 630 MB per isolate and the 2.9 GB and 2.7 GB databases in the README, the 32 GB memory floor Plasmer documents);
+- **not measured**: no figure exists. The field is blank, the item is listed under the total as *not measured*, and the total says *at least*; it is never counted as zero.
+
+Treat the numbers as a guide for planning time and disk. They depend on read depth (a very deep isolate can take many times the median) and on your computer. Where the window says *not measured*, run one isolate and look at `tool_status.tsv`, which records `runtime_seconds` and `peak_rss_kb` for every tool. The chain and its figures live in `config/workflow_steps.tsv`, one row per item, and `plasbench/workflow_steps.py` reads it; a test fails if a tool in the registry, a stage script or a setting is missing from it, so adding a tool means adding its row.
+
 ## Workflow
 
 `plasbench run` runs stages 0-6. Select stages explicitly to resume or iterate:
