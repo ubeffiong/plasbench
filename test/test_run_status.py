@@ -95,6 +95,18 @@ with tempfile.TemporaryDirectory() as tmp:
     check("diagnose lists the busiest process", "spades.py" in out and "pid    4400" in out, out)
     check("status (without diagnose) does not list processes", "spades.py" not in rs.render(s, diagnose=False))
 
+    # --- the window reads this summary: every field it uses must exist in the real thing (the panel was first written against guessed names) ---------------
+    page = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
+    contract = {"d.stage": s.get("stage"), "d.sample": s.get("sample"), "d.step": s.get("step"), "d.step_seconds": s.get("step_seconds"),
+                "pr.cpu_percent": s["processes"].get("cpu_percent"), "pr.rss_mb": s["processes"].get("rss_mb"), "pr.count": s["processes"].get("count"),
+                "mach.mem_avail_mb": s["machine"].get("mem_avail_mb"), "mach.swap_used_mb": s["machine"].get("swap_used_mb"), "mach.disk_free_gb": s["machine"].get("disk_free_gb"),
+                "v.ok": s["progress"]["download"].get("ok"), "v.rows": s["progress"]["download"].get("rows"),
+                "last_line": s["newest_log"].get("last_line"), "idle_seconds": s["newest_log"].get("idle_seconds")}
+    check("the page reads the real summary's field names", all(k in page for k in contract), [k for k in contract if k not in page])
+    check("and each of those fields has a value in a real summary", all(v is not None for v in contract.values()), [k for k, v in contract.items() if v is None])
+    check("a folder with no run does not get the Running chip (its state name contains 'run')", 'v === "no-run" ? ["No run here"' in page)
+    check("every state the summary can have is one the page names", {"running", "finished", "stopped", "no-run"} <= {"running", "finished", "stopped", "no-run"} and all(f'"{x}"' in page for x in ("running", "finished", "stopped", "no-run")))
+
     # --- the same run after the machine was switched off ---------------------------------------------------------------------------
     s2 = rs.summarize(results, log_dir=logs, data_dir=data, now=NOW + 7200, procs=[], mach={"mem_avail_mb": 6000, "disk_free_gb": 40})
     check("a lock with a stale heartbeat and no live process is STOPPED, not running", s2["state"] == "stopped", s2["state"])

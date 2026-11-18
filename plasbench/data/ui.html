@@ -1442,7 +1442,7 @@ const WARN_EXPLAIN = "The run finished (the process exited normally, exit 0) but
 S.rs = S.rs || {};   // results folder -> {t, data, sig}
 const rsPick = (o, ...keys) => { for (const k of keys) if (o && o[k] != null && o[k] !== "") return o[k]; return null; };
 const rsState = d => { const v = String(rsPick(d, "state", "status") || "").toLowerCase();
-  return /run/.test(v) && !/not/.test(v) ? ["Running", "run"] : /finish|complete|done/.test(v) ? ["Finished", "ok"] : /stop|cut|interrupt|cancel/.test(v) ? ["Stopped: cut off", "bad"] : ["Not running", ""]; };
+  return v === "running" ? ["Running", "run"] : v === "finished" ? ["Finished", "ok"] : v === "stopped" ? ["Stopped: cut off", "bad"] : v === "no-run" ? ["No run here", ""] : ["Not running", ""]; };
 const rsDur = s => s == null || isNaN(s) ? "" : fmtDur(+s);
 const rsBytes = n => n == null || isNaN(n) ? "" : fmtGBytes(+n);
 function rsHints(d) {
@@ -1456,11 +1456,11 @@ function rsHTML(path) {
   const e = S.rs[path]; if (!e) return `<div class="small mut">Loading the run status…</div>`;
   const d = e.data || {}, [chip, kind] = rsState(d), now = rsPick(d, "now", "current") || {}, mach = rsPick(d, "machine", "system") || {}, prog = rsPick(d, "progress", "counts") || {}, log = rsPick(d, "newest_log", "log") || {};
   if (d.error && (d.state === "no-run" || !d.state)) return `<div class="small mut">${esc("No run status is available: " + d.error)}</div>`;
-  const nowBits = [rsPick(now, "stage") != null ? `stage ${rsPick(now, "stage")}` : "", rsPick(now, "isolate", "sample") ? `isolate ${rsPick(now, "isolate", "sample")}` : "", rsPick(now, "step", "tool", "command") ? `step ${rsPick(now, "step", "tool", "command")}` : ""].filter(Boolean).join(", ");
-  const ran = rsDur(rsPick(now, "seconds", "running_seconds", "elapsed_seconds")), cpu = rsPick(d, "cpu_percent", "cpu"), mem = rsPick(d, "memory_bytes", "rss_bytes", "memory"), cpuC = rsPick(now, "cpu_percent"), memC = rsPick(now, "memory_bytes");
-  const procs = [cpu != null || cpuC != null ? `CPU ${Math.round(cpu ?? cpuC)}%` : "", mem != null || memC != null ? `memory ${rsBytes(mem ?? memC)}` : ""].filter(Boolean).join(" · ");
-  const machine = [rsPick(mach, "free_memory_bytes", "mem_free_bytes", "free_memory") != null ? `free memory ${rsBytes(rsPick(mach, "free_memory_bytes", "mem_free_bytes", "free_memory"))}` : "", rsPick(mach, "swap_used_bytes", "swap_bytes", "swap") != null ? `swap in use ${rsBytes(rsPick(mach, "swap_used_bytes", "swap_bytes", "swap"))}` : "", rsPick(mach, "disk_free_bytes", "free_disk_bytes", "disk_free") != null ? `free disk ${rsBytes(rsPick(mach, "disk_free_bytes", "free_disk_bytes", "disk_free"))}` : ""].filter(Boolean).join(" · ");
-  const counts = Object.entries(prog).filter(([, v]) => typeof v === "number" || typeof v === "string").map(([k, v]) => `${esc(k.replace(/_/g, " "))} ${esc(v)}`).join(" · ");
+  const pr = d.processes || {}, nowBits = [d.stage ? `stage ${d.stage}` : "", d.sample ? `isolate ${d.sample}` : "", (d.step || d.command) ? `step ${d.step || d.command}` : ""].filter(Boolean).join(", ");
+  const ran = rsDur(d.step_seconds), cpu = pr.count ? pr.cpu_percent : null, mem = pr.count ? pr.rss_mb * 1048576 : null;
+  const procs = [cpu != null ? `CPU ${Math.round(cpu)}% (${pr.count} processes)` : "", mem != null ? `memory ${rsBytes(mem)}` : ""].filter(Boolean).join(" · ");
+  const machine = [mach.mem_avail_mb != null ? `free memory ${rsBytes(mach.mem_avail_mb * 1048576)}` : "", mach.swap_used_mb != null ? `swap in use ${rsBytes(mach.swap_used_mb * 1048576)}` : "", mach.disk_free_gb != null ? `free disk ${mach.disk_free_gb} GB` : ""].filter(Boolean).join(" · ");
+  const counts = Object.entries(prog).filter(([, v]) => v && typeof v === "object").map(([k, v]) => `${esc(k)}: ${esc(v.ok)} of ${esc(v.rows)} ok${v.failed ? `, ${esc(v.failed)} failed` : ""}`).join(" · ");
   const logLine = rsPick(log, "last_line", "line"), logAge = rsPick(log, "age_seconds", "idle_seconds"), logName = rsPick(log, "name", "path", "file");
   const hints = rsHints(d);
   return `<div class="rs-row"><span class="badge ${kind === "ok" ? "ok" : kind === "bad" ? "bad" : kind === "run" ? "run" : ""}">${esc(chip)}</span>${nowBits ? ` <b>Now:</b> ${esc(nowBits)}${ran ? `; this command has run ${esc(ran)}` : ""}` : ""}</div>

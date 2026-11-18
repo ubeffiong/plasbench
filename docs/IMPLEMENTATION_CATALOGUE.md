@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 186 analysis modules, 28 registered tools and baselines (20 real tools), 212 registered
-outputs, 53 run switches, 373 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 188 analysis modules, 28 registered tools and baselines (20 real tools), 212 registered
+outputs, 54 run switches, 394 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -371,7 +371,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-186 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+188 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -595,6 +595,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `build_selection_report.py` | write cohorts/<name>.selection.json: how a cohort was selected. |
 | `check_prediction_fasta.py` | Stage-4 well-formedness check of a tool's prediction FASTA (audit AU-035). |
 | `data_nature.py` | Is this run made of synthetic (demo) data, real data, or a mix? A mix is refused, and a synthetic run says so inside its report. |
+| `download_progress.py` | How far a read download has got, for the run log. |
 | `intake.py` | Bring your own isolates: get the sheet right, point at your folders, check that PlasBench can see and use what you have. |
 | `performance_drivers.py` | What drives per-plasmid reconstruction accuracy? A multivariable, study-clustered regression per tool. |
 | `plsdb_novelty.py` | How novel is each truth plasmid against PLSDB, and does recovery depend on it? |
@@ -603,6 +604,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `relabel_cohort_provenance.py` | Recompute a cohort sheet's truth_assembly_strategy and truth_polish_reads from the sheet's own assembly_method and assembly_sequencing_technology columns. |
 | `resolve_contributed_cohort.py` | verify importer candidates against NCBI, run the |
 | `run_consistency.py` | Do the run tables agree before anything is ranked? |
+| `run_status.py` | What is this run doing right now, and why might it look stuck? |
 
 
 ## 7. Every output file and where the report shows it
@@ -835,6 +837,7 @@ These `RUN_*` settings in `config/config.sh` turn an analysis on or off (1 = on)
 | `RUN_RECOMMENDER_EVAL` | `1` | see the comment block above it in config/config.sh |
 | `RUN_AMR_PLACEMENT` | `1` | see the comment block above it in config/config.sh |
 | `RUN_ASSEMBLY_QC_GATE` | `1` | see the comment block above it in config/config.sh |
+| `RUN_TRUTH_EXCLUSION_SENSITIVITY` | `1` | see the comment block above it in config/config.sh |
 | `RUN_MOB_RECON` | `1` | see the comment block above it in config/config.sh |
 | `RUN_PLATON` | `1` | see the comment block above it in config/config.sh |
 | `RUN_PLASMIDSPADES` | `1` | see the comment block above it in config/config.sh |
