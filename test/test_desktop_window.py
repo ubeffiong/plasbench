@@ -14,6 +14,7 @@ import json
 import os
 import shutil
 import struct
+import time
 import subprocess
 import sys
 import tempfile
@@ -239,6 +240,12 @@ def main():
     check("an unknown shell is a 400", code == 400)
     code, body, _ = call("/api/platform")
     plat = json.loads(body)
+    for _ in range(300):   # the docker / wsl probes run in the background; a slow one answers {"pending": true} first (plasbench/loadcache.py)
+        if not plat.get("pending"):
+            break
+        time.sleep(0.1)
+        code, body, _ = call("/api/platform")
+        plat = json.loads(body)
     check("/api/platform gives info and a plan", code == 200 and plat["plan"]["mode"] in ("conda", "docker", "wsl"))
     code, body, _ = call("/api/terminal/run", {"command": "cd ~"})
     code, body, _ = call("/api/sessions")

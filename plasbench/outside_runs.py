@@ -60,6 +60,18 @@ def _matches_window_job(command: str, started: float | None, jobs) -> bool:
     return False
 
 
+def _record(folder: Path):
+    """study.json of a study, read again only when the file changes (None if it cannot be read)."""
+    from . import loadcache
+
+    def read():
+        try:
+            return json.loads((folder / "study.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+    return loadcache.memo(("study.json", str(folder)), loadcache.sig(folder / "study.json"), read)
+
+
 def outside_runs(studies_list, jobs=(), now: float | None = None) -> list:
     """One read-only entry per study whose latest run was started outside the window. `studies_list` is studies.list_studies(root); `jobs` the window's jobs."""
     out = []
@@ -67,9 +79,8 @@ def outside_runs(studies_list, jobs=(), now: float | None = None) -> list:
         if st.get("available") is False:
             continue
         folder = Path(st["path"])
-        try:
-            record = json.loads((folder / "study.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+        record = _record(folder)
+        if record is None:
             continue
         runs = record.get("runs") or []
         if not runs:

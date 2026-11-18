@@ -1588,7 +1588,7 @@ async function pollConsole(force) {
 function afterJob(j) {
   const n = j.argv[0];
   if (j.kind === "git") refreshGit();   // fetch, pull, push: the drawer and the page show the new state
-  if (["check","install-tools","install-conda","tools"].includes(n)) { S.env = null; S.tools = null; S.user = null; if (!$("#v_setup").hidden) loadSetup(true); }
+  if (["check","install-tools","install-conda","tools"].includes(n)) { S.env = null; S.tools = null; S.toolsStale = true; S.user = null; if (!$("#v_setup").hidden) loadSetup(true); }
   if (["run","demo","report","report-pdf"].includes(n)) { S.runs = null; if (!$("#v_runs").hidden) loadRuns(); if (!$("#v_home").hidden) loadHome(); }
 }
 setInterval(() => { pollConsole(); }, 1000);
@@ -1757,8 +1757,13 @@ $("#quitbtn").onclick = async () => {
 /* ===================================================================================================
    Shared loaders
    =================================================================================================== */
-async function getEnv(force) { if (!S.env || force) S.env = (await api("env")).checks; return S.env; }
-async function getTools(force) { if (!S.tools || force) S.tools = (await api("tools")).tools; return S.tools; }
+async function getEnv(force) { if (!S.env || force) S.env = (await api("env" + (force ? "?refresh=1" : ""))).checks; return S.env; }
+/* The server answers from its cache at once; `installed` is a PATH probe it fills in the background (row.checking, S.toolsPending). A forced or stale read (after an install or a
+   settings save) asks the server to probe again (?refresh=1), which also returns at once. */
+async function getTools(force) {
+  if (!S.tools || force || S.toolsStale) { const r = await api("tools" + (force || S.toolsStale ? "?refresh=1" : "")); S.toolsStale = false; S.tools = r.tools; S.toolsPending = r.pending || 0; }
+  return S.tools;
+}
 async function getUser(force) { if (!S.user || force) S.user = await api("usertools"); return S.user; }
 async function getSchema() { if (!S.schema) S.schema = await api("schema"); return S.schema; }
 async function getSettings(force) { if (!S.settings || force) S.settings = await api("settings"); return S.settings; }
@@ -1802,8 +1807,11 @@ async function loadHome() {
    =================================================================================================== */
 async function loadPlatform(force) {
   if (S.platform && !force) return renderPlatform(S.platform);
-  try { S.platform = await api("platform"); renderPlatform(S.platform); }
-  catch (e) { $("#pc_body").innerHTML = `<span class="mut">${esc(e.message)}</span>`; }
+  try {
+    S.platform = await api("platform" + (force ? "?refresh=1" : ""));
+    if (S.platform.pending) { $("#pc_body").innerHTML = `<span class="mut">Checking this computer…</span>`; S.platform = null; clearTimeout(S.platPoll); S.platPoll = setTimeout(() => { if (!$("#v_setup").hidden) loadPlatform(); }, 800); return; }
+    renderPlatform(S.platform);
+  } catch (e) { $("#pc_body").innerHTML = `<span class="mut">${esc(e.message)}</span>`; }
 }
 function renderPlatform({info, plan}) {
   const modeWord = {conda: "Tools run from the plasbench conda environment", docker: "Tools run in the Docker image", wsl: "Install and run inside WSL2"}[plan.mode] || plan.mode;
@@ -1895,40 +1903,55 @@ const TF = {q:"", chip:"all"};
 const TASK_LABEL = {binning_reconstruction: "Binning reconstruction", sequence_reassembly: "Sequence reassembly", classification: "Classification"};
 const taskLabel = t => TASK_LABEL[t] || String(t || "").replace(/_/g, " ");
 async function loadTools(force) {
-  try {
-    const tools = await getTools(force);
-    const real = tools.filter(t => t.source !== "demo");
-    const kp = [["Registered tools", real.length, "built-in and your own"], ["Installed here", real.filter(t => t.installed).length, "found on this computer"],
-                ["Binning reconstruction tools", real.filter(t => t.task === "binning_reconstruction").length, `${real.filter(t => t.task === "sequence_reassembly").length} sequence reassembly · ${real.filter(t => t.task === "classification").length} classification`],
-                ["Your own tools", real.filter(t => t.source === "user").length, "added with a manifest"]];
-    $("#toolkpis").innerHTML = kp.map(([l, v, d]) => `<div><label>${l}</label><b>${v}</b><span>${d}</span></div>`).join("");
-    const chips = [["all","All"],["binning_reconstruction","Binning reconstruction"],["sequence_reassembly","Sequence reassembly"],["classification","Classification"],["short_read","Short-read"],["long_read","Long-read"],["hybrid","Hybrid"],["installed","Installed"],["missing","Not installed"],["user","Your tools"],["demo","Demo"]];
-    $("#toolchips").innerHTML = chips.map(([k, l]) => `<button class="chip ${TF.chip === k ? "on" : ""}" data-chip="${k}">${l}</button>`).join("");
-    renderToolTable();
-    $("#s_tools").textContent = `${real.filter(t => t.installed).length} of ${real.length} installed`;
-  } catch (e) { toast(e.message, "bad"); }
+  try { await getTools(force); paintTools(); pollToolProbe(); } catch (e) { toast(e.message, "bad"); }
 }
-function renderToolTable() {
-  const q = TF.q.toLowerCase(), c = TF.chip;
-  const rows = S.tools.filter(t => (c === "all" ? t.source !== "demo" : c === "installed" ? t.installed : c === "missing" ? t.installed === false :
-      c === "user" ? t.source === "user" : c === "demo" ? t.source === "demo" : (t.task === c || t.track === c) && t.source !== "demo")
-    && (!q || [t.tool, t.display, t.description, t.method_class].join(" ").toLowerCase().includes(q)));
-  $("#tooltb").innerHTML = rows.map(t => `<tr>
+function paintTools() {
+  const tools = S.tools, real = tools.filter(t => t.source !== "demo");
+  const kp = [["Registered tools", real.length, "built-in and your own"], ["Installed here", real.filter(t => t.installed).length, "found on this computer"],
+              ["Binning reconstruction tools", real.filter(t => t.task === "binning_reconstruction").length, `${real.filter(t => t.task === "sequence_reassembly").length} sequence reassembly · ${real.filter(t => t.task === "classification").length} classification`],
+              ["Your own tools", real.filter(t => t.source === "user").length, "added with a manifest"]];
+  $("#toolkpis").innerHTML = kp.map(([l, v, d]) => `<div><label>${l}</label><b>${v}</b><span>${d}</span></div>`).join("");
+  const chips = [["all","All"],["binning_reconstruction","Binning reconstruction"],["sequence_reassembly","Sequence reassembly"],["classification","Classification"],["short_read","Short-read"],["long_read","Long-read"],["hybrid","Hybrid"],["installed","Installed"],["missing","Not installed"],["user","Your tools"],["demo","Demo"]];
+  $("#toolchips").innerHTML = chips.map(([k, l]) => `<button class="chip ${TF.chip === k ? "on" : ""}" data-chip="${k}">${l}</button>`).join("");
+  renderToolTable();
+  $("#s_tools").textContent = S.toolsPending ? "checking…" : `${real.filter(t => t.installed).length} of ${real.length} installed`;
+}
+/* The page is drawn from the server's cache at once; the "installed" probe finishes in the background, and this asks again until it has (at most ~30 s). */
+function pollToolProbe(n = 0) {
+  clearTimeout(S.toolPoll);
+  if (!S.toolsPending || n > 40) return;
+  S.toolPoll = setTimeout(async () => {
+    try { const r = await api("tools"); S.tools = r.tools; S.toolsPending = r.pending || 0; } catch { return; }
+    if (!$("#v_tools").hidden) paintTools();
+    pollToolProbe(n + 1);
+  }, 700);
+}
+/* Filtering: each tool's search text and row HTML are built once (they live on the tool object, which is replaced whenever the server sends new data), a keystroke is
+   debounced, and the table body is written once, and not at all when the result did not change. */
+const toolHay = t => t._hay || (t._hay = [t.tool, t.display, t.description, t.method_class].join(" ").toLowerCase());
+const toolShown = (t, c, q) => (c === "all" ? t.source !== "demo" : c === "installed" ? t.installed : c === "missing" ? t.installed === false :
+    c === "user" ? t.source === "user" : c === "demo" ? t.source === "demo" : (t.task === c || t.track === c) && t.source !== "demo") && (!q || toolHay(t).includes(q));
+function toolRowHtml(t) {
+  return t._row || (t._row = `<tr>
     <td><b>${esc(t.display)}</b> ${t.source === "user" ? `<span class="tag user">your tool</span>` : t.source === "demo" ? `<span class="tag">demo</span>` : ""}<div class="mut small">${esc(t.tool)} · ${esc(t.method_class || "")}</div>
       ${t.description ? `<div class="mut small" style="max-width:420px">${esc(t.description.slice(0, 160))}</div>` : ""}</td>
     <td><span class="tag ${t.task !== "classification" ? "rec" : "cls"}">${esc(taskLabel(t.task))}</span><div class="mut small" style="margin-top:3px">${esc((t.track || "").replace("_", " "))} · ${esc((t.input || "").replace(/_/g, " "))}</div></td>
-    <td>${t.installed === true ? `<span class="tag ok">${icon("check")}installed</span>` : t.installed === false ? `<span class="tag bad">not found</span>` : `<span class="mut small">–</span>`}</td>
+    <td>${t.checking ? `<span class="mut small">checking…</span>` : t.installed === true ? `<span class="tag ok">${icon("check")}installed</span>` : t.installed === false ? `<span class="tag bad">not found</span>` : `<span class="mut small">–</span>`}</td>
     <td class="small" style="max-width:260px">${esc(t.database || "–")}${t.database_release ? `<div class="mut">released ${esc(t.database_release)}</div>` : ""}</td>
     <td>${t.run_flag ? `<label class="switch" title="${esc(t.run_flag)}: ${t.enabled ? "on, so it runs unless you turn it off for a run" : "off, so it is skipped unless you turn it on for a run"}"><input type="checkbox" data-flag="${esc(t.run_flag)}" ${t.enabled ? "checked" : ""}><span></span></label> <b class="small ${t.enabled ? "ok-t" : "mut"}" data-flagtxt="${esc(t.run_flag)}">${t.enabled ? "on" : "off"}</b>` :
          t.source === "user" ? `<span class="mut small">--tool ${esc(t.tool)}</span>` : `<span class="mut small">–</span>`}</td>
     <td style="text-align:right;white-space:nowrap">${t.source === "user" ? `<button class="btn ghost sm" onclick="editUserTool(${jsq(t.tool)})">${icon("edit")}Edit</button>` : ""}
-      ${t.profile && t.installed === false ? `<button class="btn sec sm" data-run="${dattr(["install-tools", t.profile, "--yes"])}" data-label="Install ${esc(t.display)}">Install</button>` : ""}</td></tr>`).join("")
-    || `<tr><td colspan="6" class="mut">No tool matches.</td></tr>`;
+      ${t.profile && t.installed === false ? `<button class="btn sec sm" data-run="${dattr(["install-tools", t.profile, "--yes"])}" data-label="Install ${esc(t.display)}">Install</button>` : ""}</td></tr>`);
 }
-$("#toolq").oninput = e => { TF.q = e.target.value; renderToolTable(); };
+function renderToolTable() {
+  const q = TF.q.toLowerCase().trim(), c = TF.chip;
+  const html = S.tools.filter(t => toolShown(t, c, q)).map(toolRowHtml).join("") || `<tr><td colspan="6" class="mut">No tool matches.</td></tr>`;
+  if (html !== TF.last) { TF.last = html; $("#tooltb").innerHTML = html; }
+}
+$("#toolq").oninput = e => { TF.q = e.target.value; clearTimeout(TF.timer); TF.timer = setTimeout(renderToolTable, 120); };
 $("#toolchips").onclick = e => { const b = e.target.closest("[data-chip]"); if (!b) return; TF.chip = b.dataset.chip; $$("#toolchips .chip").forEach(x => x.classList.toggle("on", x === b)); renderToolTable(); };
 const showFlag = (f, on) => { const t = $(`[data-flagtxt="${f}"]`); if (t) { t.textContent = on ? "on" : "off"; t.classList.toggle("ok-t", on); t.classList.toggle("mut", !on); }
-  const row = (S.tools || []).find(x => x.run_flag === f); if (row) row.enabled = on; };
+  const row = (S.tools || []).find(x => x.run_flag === f); if (row) { row.enabled = on; row._row = null; } };
 $("#tooltb").onchange = async e => { const f = e.target.dataset.flag; if (!f) return;
   try { await api("settings", {changes: {[f]: e.target.checked ? "1" : "0"}}); showFlag(f, e.target.checked);
     toast(`${f}=${e.target.checked ? 1 : 0} saved for this computer: ${e.target.checked ? "runs by default" : "skipped by default"}`, "ok"); S.settings = null; }
@@ -2392,7 +2415,7 @@ async function utSave(install) {
     let r = await api("usertools/save", {text: $("#ut_text").value, overwrite: false});
     if (!r.ok && r.exists && await askConfirm({title: "Replace the saved tool?", danger: true, confirmLabel: "Replace it", body: `${r.path} already exists. Replacing it overwrites the saved manifest.`})) r = await api("usertools/save", {text: $("#ut_text").value, overwrite: true});
     if (!r.ok) { toast(r.problems?.join("; ") || "Not saved", "bad"); return; }
-    toast(`Saved ${r.path}`, "ok"); S.user = null; S.tools = null; $("#ut_where").textContent = r.path; await utLoadList();
+    toast(`Saved ${r.path}`, "ok"); S.user = null; S.tools = null; S.toolsStale = true; $("#ut_where").textContent = r.path; await utLoadList();
     if (install) confirmRun(["install-tools", UT.tool.name, "--yes"], `Install ${UT.tool.display_name || UT.tool.name}`);
   } catch (e) { toast(e.message, "bad"); }
 }
@@ -2540,7 +2563,7 @@ $("#setlist").addEventListener("click", e => { const k = e.target.dataset.clear;
 $("#set_reset").onclick = () => { SET.edits = {}; renderSettings(); };
 $("#set_save").onclick = async () => {
   const changes = Object.fromEntries(Object.entries(SET.edits).map(([k, v]) => [k, v === "" ? null : v]));
-  try { await api("settings", {changes}); SET.edits = {}; await loadSettings(true); S.env = null; S.tools = null; toast("Saved for this computer", "ok"); }
+  try { await api("settings", {changes}); SET.edits = {}; await loadSettings(true); S.env = null; S.tools = null; S.toolsStale = true; toast("Saved for this computer", "ok"); }
   catch (e) { toast(e.message, "bad"); }
 };
 
