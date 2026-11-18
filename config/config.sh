@@ -189,6 +189,9 @@ export ENA_DOWNLOAD_CONNECTIONS="${ENA_DOWNLOAD_CONNECTIONS:-4}"
 # Show the estimated download size and ask before stage 1 fetches anything (1, the default). 0 skips the question. It is never asked when there is no terminal
 # (the window, CI, a container), so those runs proceed.
 export DOWNLOAD_CONFIRM="${DOWNLOAD_CONFIRM:-1}"
+# Before stage 1 downloads, PlasBench asks ENA for the exact compressed size of each run that the cohort's lock file has no base count for, so the estimate is real and
+# names the largest read set. 0 skips the lookup (it is also skipped when READ_SOURCE=sra, which never uses ENA).
+export ENA_SIZE_LOOKUP="${ENA_SIZE_LOOKUP:-1}"
 # --- Run health and reliability ------------------------------------------------
 # Stage 4 exits with code 4 when every tool run failed, because there is nothing to score. 1 continues anyway with a warning (the report is then empty of results).
 export ALLOW_ALL_TOOLS_FAILED="${ALLOW_ALL_TOOLS_FAILED:-0}"

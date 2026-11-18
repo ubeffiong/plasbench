@@ -755,6 +755,27 @@ New files in a results folder: `.run.lock` and `.run.lock.heartbeat` (while a ru
 
 Exit codes of a stage: `0` success, `3` an adapter found no output from its tool, `4` every tool run failed. The window shows these as `failed`, `completed_with_warnings`, `stalled` and `retrying`.
 
+### Downloads: sizes, progress and the SRA Toolkit
+
+Stage 1 downloads each isolate's reference assembly and its paired reads.
+
+- **Before it starts**, PlasBench prints what it is about to fetch. For a sheet with no lock file it asks ENA for each run's exact compressed size, so the total is real and the **largest read set** is named; a set above `WARN_RUN_DOWNLOAD_GB` (default 5) is flagged as very large.
+- **While it runs**, the run log gets one progress line a minute per active download (`DOWNLOAD_PROGRESS_SECONDS`, 0 turns it off), for example `SRR123: mate 1 74.7%, mate 2 66.2% (7.1 of 9.5 GB)`. The reads come from the SRA Toolkit first and from ENA when that fails (`READ_SOURCE`). After `PREFETCH_FAIL_LIMIT` isolates in a row where the toolkit failed and ENA worked, the rest of the run goes to ENA first, and the log shows the toolkit's own last line as the reason.
+- **A limit.** `MAX_RUN_DOWNLOAD_GB` skips an isolate whose reads are larger; it is recorded as failed with the reason and retried when you raise the limit.
+- **A file that is not a cohort.** `plasbench run --cohort NAME` refuses a sheet that lacks the columns a run needs (the accession ledger, for example), once and before a study folder is made.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `READ_SOURCE` | `auto` | `auto`: SRA Toolkit, then ENA if it fails. `sra`: toolkit only. `ena`: ENA only, MD5-verified. |
+| `MAX_RUN_DOWNLOAD_GB` | blank | Skip an isolate whose reads exceed this many GB. Blank = no limit. |
+| `WARN_RUN_DOWNLOAD_GB` | `5` | Warn above this size (0 = never). |
+| `PREFETCH_FAIL_LIMIT` | `2` | Go to ENA first after this many toolkit failures in a row (0 = always try the toolkit first). |
+| `DOWNLOAD_PROGRESS_SECONDS` | `60` | How often a progress line is logged (0 = none). |
+| `ENA_DOWNLOAD_CONNECTIONS` | `4` | Parallel connections per ENA file. |
+| `DOWNLOAD_CONFIRM` | `1` | Show the estimate and ask before downloading (never asked without a terminal). |
+| `ENA_SIZE_LOOKUP` | `1` | `0` skips the ENA size lookup for the estimate. |
+| `ENA_PORTAL_URL` | ENA's file-report address | Point the lookup at a mirror. |
+
 ## Workflow
 
 `plasbench run` runs stages 0-6. Select stages explicitly to resume or iterate:
