@@ -7,6 +7,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 TMP="$(mktemp -d)"
+export PLATON_DB="$TMP"   # the stage-4 database pre-flight needs a database directory for the stubbed Platon
 export READ_SOURCE=sra
 trap 'rm -rf "$TMP"' EXIT
 
