@@ -184,7 +184,7 @@ inst = open(os.path.join(ROOT, "env", "install_tools.sh"), encoding="utf-8").rea
 check("env/install_tools.sh has an isolated, pinned multiqc profile (not in the `all` loop: optional)", "install_isolated multiqc MultiQC" in inst and "multiqc=1.25.2" in inst
       and "plascope quast utilities" in inst and " multiqc utilities" not in inst and "quast multiqc" not in inst)
 setup = open(os.path.join(ROOT, "scripts", "00_setup.sh"), encoding="utf-8").read()
-check("00_setup.sh checks multiqc as optional (required=0: warns, never fails)", "check_tool multiqc multiqc 0" in setup)
+check("00_setup.sh offers multiqc only when MULTIQC_REPORT=on, and only notes it in auto mode (a missing one never fails setup)", "check_tool multiqc multiqc 0" in setup and '== "on" ]]' in setup and "multiqc not installed (optional" in setup)
 agg = open(os.path.join(ROOT, "scripts", "06_aggregate.sh"), encoding="utf-8").read()
 check("stage 6 runs the step before the report is built, and a stop of it only warns", 0 < agg.index("run_multiqc.py") < agg.index("build_html_report.py") and "|| warn" in agg.split("run_multiqc.py")[1][:200])
 wiring = open(os.path.join(ROOT, "test", "test_install_wiring.py"), encoding="utf-8").read()

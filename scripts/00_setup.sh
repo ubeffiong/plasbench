@@ -263,9 +263,12 @@ fi
 if [[ "${RUN_QUAST_DIAGNOSTICS:-0}" -eq 1 ]]; then
     check_tool quast.py quast 0
 fi
-# MultiQC is an optional companion to the report's own QC panel (MULTIQC_REPORT; python/run_multiqc.py): a missing one only warns, never fails setup.
-if [[ "${MULTIQC_REPORT:-auto}" != "off" ]]; then
+# MultiQC is an optional companion to the report's own QC panel (MULTIQC_REPORT; python/run_multiqc.py). In the default `auto` mode a missing one is only noted: it must not
+# turn every setup into an "install now?" prompt that ends in a failure. With MULTIQC_REPORT=on the user asked for it, so a missing one is offered like any optional tool.
+if [[ "${MULTIQC_REPORT:-auto}" == "on" ]]; then
     check_tool multiqc multiqc 0
+elif [[ "${MULTIQC_REPORT:-auto}" != "off" ]]; then
+    if have multiqc; then log "  [ok]   multiqc (optional)"; else log "  [--]   multiqc not installed (optional; the report's own QC panel does not need it: plasbench install-tools multiqc)"; fi
 fi
 if [[ "${RUN_PROTEIN_ANNOTATION:-0}" -eq 1 ]]; then
     if [[ "$PROTEIN_ANNOTATION_ENGINE" == "bakta" ]]; then
