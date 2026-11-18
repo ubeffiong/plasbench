@@ -77,6 +77,14 @@ if [[ "$USER_PLAN" == ENV$'\t'* ]]; then
                 || { echo "ERROR: '${STEP[1]}' failed after installing $PROFILE" >&2; exit 1; }
             continue
         fi
+        # BUILD runs a url/local tool's build_command inside its source folder (STEP[2]), in the tool's environment when it has one.
+        if [[ "${STEP[0]}" == "BUILD" ]]; then
+            echo "  build in ${STEP[2]}: ${STEP[1]}"
+            BUILD_RUN=(bash -c "${STEP[1]}")
+            "$SOLVER_BIN" env list 2>/dev/null | awk '{print $1}' | grep -qx "$USER_ENV" && BUILD_RUN=("$SOLVER_BIN" run -n "$USER_ENV" bash -c "${STEP[1]}")
+            ( cd "${STEP[2]}" && "${BUILD_RUN[@]}" ) || { echo "ERROR: build_command failed in ${STEP[2]}" >&2; exit 1; }
+            continue
+        fi
         [[ "${STEP[0]}" == "{CONDA}" ]] && STEP[0]="$SOLVER_BIN"
         echo "  + ${STEP[*]}"
         "${STEP[@]}"

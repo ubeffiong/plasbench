@@ -275,6 +275,17 @@ every input the report accepts, and that `plasbench analysis --list` reaches the
 `test/test_demo_end_to_end.py` runs the offline demo and asserts each layer reaches its table and its HTML section.
 **Status.** Fixed here. Before this, `derive_amr_truth.py` was reachable only from tests.
 
+### Q20c. Can I add my own tool, one that does several tasks, or one I only have as a download or a folder?
+
+Yes, with one manifest (`plasbench tools new`, [docs/ADDING_TOOLS.md](docs/ADDING_TOOLS.md)). `task = classification, binning_reconstruction`
+declares a tool that does several: the command runs once per sample and the same output is converted for each task, so the tool
+appears in each task's own leaderboard (labelled with the task) and is never ranked across tasks. A task is only offered when the
+declared output can honestly produce it: bins give classification, labels give binning only as one flagged bin per plasmid contig,
+and a plasmid FASTA gives sequence reassembly only; anything else is a validation error that says what to add. The tool can come
+from conda, pip, an **https** URL (`method = url`, optionally pinned with a sha256; archives are extracted safely, nothing runs
+at validation) or a file or folder on this computer (`method = local`, copied with a recorded checksum by default). `format = auto`
+recognises the tool's output files by their content and fails loudly, listing what it saw, rather than guessing.
+
 ### Q21. Is the per-plasmid side file safe against stale results?
 **Answer.** It is rewritten on each scoring run, but a tool removed from a later run leaves its old
 `*.per_plasmid.tsv` behind, and the stratifier globs the results directory. `scores.tsv` has the same

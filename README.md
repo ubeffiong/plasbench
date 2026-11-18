@@ -2417,6 +2417,7 @@ ones you'll actually reach for most often; every command has more than shown her
 | `check` | Check configured tools/databases; offers to install what's missing. | `--yes` |
 | `install-conda` | Detect (or install) a conda-family manager. | `--yes`, `--prefix` |
 | `install-tools` | Install one dependency profile (`core`, `reconstruction`, `long-read`, `all`, ...). | *`profile`* (positional) |
+| `tools` | Add your own tool: `new NAME` (a commented manifest; `--task a,b` for several tasks, `--source installed\|conda\|pip\|url\|local\|script`, `--url`, `--sha256`, `--local-path`, `--output-format a,b\|auto`), `validate [NAME]` (per task: native, derived or not possible, with the fix; and the source), `list`, `show NAME`, `add PATH`, `install NAME`. `install-tools NAME` also installs a user tool, downloading an `https` source or copying a local folder. | *`--task`*, *`--source`*, *`--url`*, *`--sha256`*, *`--local-path`*, *`--output-format`* |
 | `init-local` | Register one of your own isolates: stages its files and appends a sample-sheet row. | *`--sample`*, *`--reads-1`/`--reads-2`*, `--reference`, `--samples` |
 | `intake` | Your own isolates in bulk: `template` (a sheet to fill in), `scan FOLDER...` (find isolates, change nothing), `stage FOLDER...` (place them, write the sheet), `check [--fix]` (the quick test). Guide: [docs/INPUT_GUIDE.md](docs/INPUT_GUIDE.md). | *`template\|scan\|stage\|check`*, `--data-dir`, `--samples`, `--fix` |
 | `validate-cohort` | Check a cohort sheet's schema, or verify it against NCBI online. | *`--samples`*, `--online`, `--write-lock`, `--verify-lock`, `--ledger` |
@@ -3866,6 +3867,15 @@ through the setup.
 
 **What you need:** a working PlasBench (Steps 1–9 above), and the tool's command line, or a folder of outputs you
 already produced from the same assemblies.
+
+**One tool, several tasks; where it comes from; what it writes.** `task = classification, binning_reconstruction` declares a tool that
+does several tasks: the command runs once per sample, each task becomes its own leaderboard row (`My tool (classification)`,
+`My tool (binning)`), and a task the tool's output cannot honestly produce is a validation error that says what to add (bins give
+classification; labels give binning only as one flagged bin per plasmid contig; a plasmid FASTA gives sequence reassembly only).
+`[install] method = url` downloads an **https** URL (archive, git repository or file; pin it with `sha256`) into `src/`, and
+`method = local` copies, or links, a tool already on your computer; `{src}` in the command is that folder. `format = auto` recognises
+the files the tool wrote by their content, and `format = contig_bins, contig_labels` declares several. Details, the derivation
+table and the safety rules for URLs: [docs/ADDING_TOOLS.md](docs/ADDING_TOOLS.md).
 
 **Prefer a form?** `plasbench ui` → **Add your own tool** fills in the same manifest from a form, checks it as you
 type, and saves and installs it ([The PlasBench window](#the-plasbench-window-no-command-line)). The steps below
