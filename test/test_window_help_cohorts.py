@@ -77,7 +77,9 @@ def main():
     from plasbench import cohort_info
     names = [p.stem for p in sorted((ROOT / "cohorts").glob("*.tsv"))]
     infos = {n: cohort_info.info(ROOT, n) for n in names}
-    check("every shipped cohort is summarised", all(i["summary"] for i in infos.values()), [n for n, i in infos.items() if not i["summary"]])
+    # The accession ledger sits in cohorts/ but is not a cohort (it has no organism or truth columns to summarise): it is flagged, not summarised.
+    check("the accession ledger is flagged as a ledger, not offered as a cohort", infos["accepted_accessions"]["kind"] == "ledger")
+    check("every shipped cohort is summarised", all(i["summary"] for i in infos.values() if i["kind"] != "ledger"), [n for n, i in infos.items() if i["kind"] != "ledger" and not i["summary"]])
     v1 = infos["public-v1"]
     check("public-v1: 10 isolates, lock present and matching", v1["n"] == 10 and v1["lock"]["present"] and v1["lock"]["matches_sheet"])
     check("public-v1: organisms, tiers, plasmids counted", v1["summary"]["species"] >= 1 and v1["summary"]["truth_quality_tier"]
