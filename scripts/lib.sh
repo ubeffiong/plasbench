@@ -274,7 +274,8 @@ _plasbench_run_exit_hooks() {
 start_console_log() {
     [[ "${RUN_CONSOLE_LOG:-1}" == "1" && -n "${LOG_DIR:-}" && -z "${_CONSOLE_LOG_FILE:-}" ]] || return 0
     mkdir -p "$LOG_DIR" 2>/dev/null || return 0
-    local file="$LOG_DIR/run_$(date +%Y%m%d-%H%M%S).log"
+    local file
+    file="$LOG_DIR/run_$(date +%Y%m%d-%H%M%S).log"
     : > "$file" 2>/dev/null || return 0
     ls -1t "$LOG_DIR"/run_*.log 2>/dev/null | tail -n +"$(( ${LOG_RETENTION_RUNS:-20} + 1 ))" | while read -r old; do rm -f "$old"; done
     _CONSOLE_LOG_FILE="$file"
