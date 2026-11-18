@@ -2411,6 +2411,8 @@ ones you'll actually reach for most often; every command has more than shown her
 | `import-mobilome-evidence` | Import MAP-compatible GFF3 as non-scoring mobilome context. | `--gff`, `--community`, `--sample`, `--out` |
 | `report` | Re-render the leaderboard/HTML report from scores already on disk — no re-running any tool. | Same input/output flags as `run` (`--results-dir`, `--cohort`, ...) |
 | `demo` | Offline synthetic demo — no data, no tools, no network. Good for "is my install even working." | none |
+| `status` | What a run is doing now: running, finished or cut off; the stage, isolate and step and for how long; progress; CPU and memory of its processes; the machine's memory and disk; the newest log; and plain hints (each with its evidence) when it looks stuck. | `--study`, `--results-dir`, `--json`, `--watch` |
+| `diagnose` | `status` plus the busiest processes of the run: the command to use when a run seems stuck. | `--study`, `--results-dir`, `--json`, `--watch` |
 | `test` | The full offline regression suite (what CI runs). | none |
 | `check` | Check configured tools/databases; offers to install what's missing. | `--yes` |
 | `install-conda` | Detect (or install) a conda-family manager. | `--yes`, `--prefix` |
