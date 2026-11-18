@@ -408,6 +408,7 @@ validate_sample_sheet() {
         /^[[:space:]]*#/ {next}
         /^[[:space:]]*$/ {next}
         !seen_header {seen_header=1; next}
+        {data_rows++}
         NF < 3 || $1 == "" || $2 == "" || $3 == "" {
             print "ERROR: invalid sample-sheet row " NR "; expected sample_id, assembly_accession, sra_run" > "/dev/stderr"
             bad=1; next
@@ -417,7 +418,10 @@ validate_sample_sheet() {
             bad=1; next
         }
         curated && (NF < 8 || $4 == "" || $5 == "" || $6 !~ /^[ABC]$/ || $7 == "" || $8 == "") {
-            print "ERROR: uncurated sample-sheet row " NR "; require organism, truth_technology, truth_quality_tier (A/B/C), biosample, bioproject" > "/dev/stderr"
+            # Name the first three rows, then count the rest: a sheet with the wrong kind of columns used to print one identical line per isolate.
+            n_uncurated++
+            if (n_uncurated <= 3)
+                print "ERROR: uncurated sample-sheet row " NR "; require organism, truth_technology, truth_quality_tier (A/B/C), biosample, bioproject" > "/dev/stderr"
             bad=1; next
         }
         seen_sample[$1]++ {
@@ -426,6 +430,10 @@ validate_sample_sheet() {
         }
         {count++}
         END {
+            if (n_uncurated > 3)
+                print "ERROR: ... and " (n_uncurated - 3) " more uncurated rows (" n_uncurated " of " data_rows " rows lack the curated columns)" > "/dev/stderr"
+            if (n_uncurated > 0 && n_uncurated == data_rows)
+                print "NOTE: not one row has the curated columns, so this file is probably not a cohort sheet (the accession ledger cohorts/accepted_accessions.tsv, for example, only lists accessions). Use a sheet from cohorts/ such as public-v4, or fill in the columns (docs/INPUT_GUIDE.md); REQUIRE_CURATED_METADATA=0 skips this check for a sheet that only has sample_id, assembly_accession and sra_run." > "/dev/stderr"
             if (bad) exit 2
             if (count == 0) {
                 print "ERROR: sample sheet has no data rows; add samples to config/accessions.tsv" > "/dev/stderr"

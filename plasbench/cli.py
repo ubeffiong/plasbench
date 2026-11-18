@@ -1210,14 +1210,25 @@ def main(argv=None):
             announce_report(meta_results / "metagenomics.report.html", args.open_report, not args.no_report_prompt)
     else:
         if args.cohort:
+            from . import sheetcheck
             cohort_path = root / "cohorts" / f"{args.cohort}.tsv"
+            # Only real benchmark sheets are offered: the accession ledger and the metagenomic tables sit in cohorts/ too.
+            available = sheetcheck.cohort_sheets(root / "cohorts") if (root / "cohorts").is_dir() else []
             if not cohort_path.is_file():
-                available = sorted(p.stem for p in (root / "cohorts").glob("*.tsv")) if (root / "cohorts").is_dir() else []
                 parser.error(
                     f"no such cohort '{args.cohort}' ({cohort_path} not found); "
                     f"available: {', '.join(available) if available else 'none'}"
                 )
+            # A file that is not a benchmark sheet (the accession ledger, for one) is refused here, once, before a study folder is made,
+            # instead of failing stage 0 with one error per row. REQUIRE_CURATED_METADATA=0 keeps the old behaviour.
+            problem = sheetcheck.refusal(cohort_path, available) if os.environ.get("REQUIRE_CURATED_METADATA", "1") != "0" else ""
+            if problem:
+                parser.error(problem)
             args.samples = cohort_path
+        elif args.samples and Path(args.samples).is_file():
+            from . import sheetcheck
+            if sheetcheck.is_ledger(sheetcheck.header(args.samples)):
+                parser.error(sheetcheck.refusal(args.samples, sheetcheck.cohort_sheets(root / "cohorts") if (root / "cohorts").is_dir() else []))
         if args.study and args.results_dir:
             parser.error("give --study or --results-dir, not both")
         # Every run keeps what it produces in its own study folder (plasbench/studies.py); downloads stay shared.
