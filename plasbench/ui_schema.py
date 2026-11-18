@@ -11,6 +11,7 @@ import contextlib
 import io
 from pathlib import Path
 
+from . import ui_help
 from .cli import build_parser
 
 # Where each command appears in the window. A command missing here still appears, under "More commands".
@@ -69,14 +70,14 @@ PATH_WORDS = {"dir", "path", "file", "out", "sheet", "samples", "manifest", "fas
               "ledger", "lock", "evidence", "predictions", "candidates", "contigs", "reference", "truth", "db", "reads"}
 
 
-def _arg(action, group):
+def _arg(action, group, command=""):
     kind = _kind(action)
     default = action.default
     if default is argparse.SUPPRESS:
         default = None
     if kind == "flag":
         default = bool(default) if isinstance(action, argparse._StoreFalseAction) else False
-    return {
+    out = {
         "dest": action.dest,
         "flags": list(action.option_strings),
         "positional": not action.option_strings,
@@ -90,6 +91,10 @@ def _arg(action, group):
         "negates": isinstance(action, argparse._StoreFalseAction),
         "group": group,
     }
+    entry = ui_help.ARGS.get(command, {}).get(action.dest)
+    out["choice_help"] = dict((entry or {}).get("choices") or {})
+    out["tooltip"] = ui_help.tooltip(entry, out)
+    return out
 
 
 def _describe(parser, name, help_text=""):
@@ -109,7 +114,7 @@ def _describe(parser, name, help_text=""):
                     seen.add(id(sub_parser))
                     subcommands.append(_describe(sub_parser, sub_name, helps.get(sub_name, "")))
                 continue
-            args.append(_arg(action, title))
+            args.append(_arg(action, title, name))
     return {"name": name, "help": help_text or "", "description": parser.description or "",
             "epilog": parser.epilog or "", "args": args, "subcommands": subcommands}
 
@@ -130,7 +135,8 @@ def schema():
     if rest:
         categories.append({"id": "more", "title": "More commands", "blurb": "Other commands.", "commands": rest})
     globals_ = [a for a in top["args"] if a["dest"] != "command"]
-    return {"commands": commands, "categories": categories, "global_args": globals_, "aliases": ALIASES}
+    return {"commands": commands, "categories": categories, "global_args": globals_, "aliases": ALIASES,
+            "wizard_help": {k: ui_help.tooltip(v) for k, v in ui_help.WIZARD.items()}}
 
 
 def validate_argv(argv):

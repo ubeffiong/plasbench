@@ -13,6 +13,15 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added
+- **The window explains every setup field.** An (i) button next to each field of the New benchmark wizard, the All commands forms and the Settings page opens (on hover, keyboard focus or tap; Escape closes it) the field's meaning, one line per option, its default, its command-line flag and setting name, and when to leave it empty. The text is written once in `plasbench/ui_help.py` and sent by `/api/schema` and `/api/settings`, so the page has none of its own.
+- **New benchmark, step Options:** a checkbox "Open the report in my browser when the run finishes" (`--open-report`; `--no-report-prompt` stays on, so the run never stops to ask), and a "Downloads and reliability" card that sends READ_SOURCE, MAX_RUN_DOWNLOAD_GB, WARN_RUN_DOWNLOAD_GB, PREFETCH_FAIL_LIMIT, TOOL_TIMEOUT_SECONDS, ALLOW_ALL_TOOLS_FAILED, NETWORK_RETRIES and ENA_DOWNLOAD_CONNECTIONS with the run. They show in the review command (`KEY=value plasbench run ...`) and in the Jobs list; a saved script cannot carry them. The Settings page gains a "Reliability and downloads" group.
+- **A quiet run is explained.** The "stalled" state now reads "No new output for N minutes. This is often normal while reads download or a tool assembles. Closing this window does NOT stop the run.", with **Check activity** (`GET /api/jobs/<id>/activity`: the files written most recently in the results and data folders, walk capped at 2000 entries or 2 s, symlinks not followed) and **Cancel**; when files are being written the chip reads "Working (quiet log)".
+
+### Changed
+- `POST /api/jobs` accepts `env` only for UPPER_SNAKE names that are Settings keys of `config/config.sh` or the download names above (not PATH, LD_PRELOAD and the like), with one-line values under 200 characters; anything else is a 400.
+- The accession ledger `cohorts/accepted_accessions.tsv` is marked `ledger` and no longer offered as a cohort; the Quit dialog says in one sentence what each choice does.
+
 ## [0.5.0] - 2026-11-18
 Scores change in this release (NMI/VI/ARI, AMR placement and gene recovery, empty-bin precision, truth provenance labels, interval clipping): see [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md) before comparing with a v0.4.1 result. It fixes the 53 findings of the independent audit of 17 November 2026 (42 fixed, 10 partial, 1 not fixed; per finding in [docs/AUDIT_2026_11_17_STATUS.md](docs/AUDIT_2026_11_17_STATUS.md)), adds public-v4, frozen QC thresholds, the interval decision, study management in the working directory and the truth-exclusion sensitivity, and ships a real-data evaluation (`results_real_cohort1/`, 10 isolates, three real tools). The full-suite QA result is in [docs/QA_RESULT_2026_11_18.md](docs/QA_RESULT_2026_11_18.md).
 

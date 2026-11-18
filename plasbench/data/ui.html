@@ -224,6 +224,15 @@ table.data tbody tr:hover td{background:var(--surface-2)}
 .field .help{grid-column:2;color:var(--mut);font-size:12px}
 .field.changed>label:after{content:"modified";font-size:11px;font-weight:400;color:var(--warn)}
 .field .reset{display:none}.field.changed .reset{display:inline-flex}
+.tipi{flex:none;display:inline-grid;place-items:center;width:18px;height:18px;padding:0;margin:0;border:1px solid var(--line);border-radius:50%;background:var(--surface-2);color:var(--mut);font:italic 700 11px/1 Georgia,serif;cursor:help;align-self:center}
+.tipi:hover,.tipi:focus-visible,.tipi[aria-expanded="true"]{background:var(--primary);color:#fff;border-color:var(--primary)}
+#tipbox{position:fixed;z-index:400;max-width:min(380px,calc(100vw - 24px));box-sizing:border-box;padding:10px 12px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 24px #0003;font-size:12.5px;line-height:1.45;overflow:auto;max-height:70vh}
+#tipbox[hidden]{display:none}#tipbox p{margin:0 0 6px}#tipbox dl{margin:0 0 6px;display:grid;grid-template-columns:auto 1fr;gap:3px 10px}#tipbox dt{font-weight:600}#tipbox dd{margin:0;color:var(--fg-2)}
+#tipbox .tmeta{color:var(--mut);font-size:12px;margin:2px 0 0}#tipbox .twhen{margin:6px 0 0;padding-top:6px;border-top:1px solid var(--line-2);color:var(--fg-2)}
+.stallnote{margin:8px 0 0;padding:8px 10px;border:1px solid var(--warn);border-left-width:3px;border-radius:4px;background:var(--surface-2);color:var(--fg);font-size:12.5px;line-height:1.45}
+.stallnote .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.stallnote ul{margin:6px 0 0;padding-left:18px;font-family:var(--mono,monospace);font-size:11.5px;word-break:break-all}
+#cstall{flex:none;padding:6px 12px;background:var(--term-head);color:var(--term-fg);border-bottom:1px solid var(--term-line);font-size:12px;max-height:40%;overflow:auto}
+#cstall[hidden]{display:none}#cstall button{margin-right:6px}#cstall ul{margin:4px 0 0;padding-left:18px;font-family:var(--mono,monospace);font-size:11.5px;word-break:break-all}
 .cmdline{display:flex;gap:8px;align-items:flex-start;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:7px 10px;font:12.5px/1.5 var(--mono);overflow:auto;color:var(--fg)}
 .cmdline .p{color:var(--mut);user-select:none}.cmdline code{background:transparent;border:0;color:inherit;padding:0;white-space:pre-wrap;word-break:break-all;flex:1}
 .note{display:flex;gap:10px;padding:8px 12px;border-radius:var(--radius);font-size:13px;border:1px solid var(--line);border-left-width:3px;background:var(--surface)}
@@ -884,6 +893,7 @@ body.gd-open #gdrawer{transform:none}
   <button id="cfollow" class="jobonly" aria-pressed="true">Follow</button>
   <button id="ctoggle"><svg class="ico sm"><use href="#i-chev"/></svg><span>Expand</span></button>
  </div>
+ <div id="cstall" class="jobonly" hidden></div>
  <pre id="clog" class="jobonly" aria-live="polite"></pre>
  <pre id="tlog" class="termonly" aria-live="polite"></pre>
  <pre id="slog" class="sessonly"></pre>
@@ -1034,6 +1044,7 @@ fasta_glob = plasmid_*.fasta
 
 <div id="connbar" hidden role="status"><span class="rt-spin" aria-hidden="true"></span><span id="connmsg">Connection to PlasBench lost. Retrying… Your runs keep going in the background.</span></div>
 <div id="toasts" aria-live="polite"></div>
+<div id="tipbox" role="tooltip" hidden></div>
 
 <script>
 "use strict";
@@ -1258,7 +1269,7 @@ function stageLine(s) {
 function sessCard(s) {
   const pr = s.progress || {}, open = S.sessOpen.has(s.id);
   const dur = fmtDur((s.ended || Date.now() / 1000) - s.started);
-  const chip = {ongoing: s.state === "cancelling" ? "Cancelling" : s.display_state === "stalled" ? "Stalled: no output for a while" : s.display_state === "retrying" ? "Retrying a failed tool" : "Running", completed: s.display_state === "completed_with_warnings" ? "Completed with warnings" : "Completed"}[s.group] || ({failed: "Failed", interrupted: "Interrupted", cancelled: "Cancelled"}[s.state] || s.state);
+  const chip = {ongoing: s.state === "cancelling" ? "Cancelling" : s.display_state === "stalled" ? (quietWorking(s.id, "stalled") ? "Working (quiet log)" : "No new output for a while") : s.display_state === "retrying" ? "Retrying a failed tool" : "Running", completed: s.display_state === "completed_with_warnings" ? "Completed with warnings" : "Completed"}[s.group] || ({failed: "Failed", interrupted: "Interrupted", cancelled: "Cancelled"}[s.state] || s.state);
   const pct = s.group === "completed" ? 100 : pr.percent;
   const bar = s.group === "ongoing" && pct == null ? `<div class="sbar ind"><i></i></div>` : `<div class="sbar"><i style="width:${pct == null ? (s.group === "attention" ? 8 : 0) : pct}%"></i></div>`;
   const run = s.run_index != null ? (S.runs || [])[s.run_index] : null;
@@ -1273,7 +1284,7 @@ function sessCard(s) {
   if (s.results) acts.push(`<button class="btn ghost sm" data-sa="folder" title="${esc(s.results)}">${icon("folder")}Folder</button>`);
   acts.push(`<button class="btn ghost sm" data-sa="details">${open ? "Hide details" : "Details"}</button>`);
   const stages = pr.known ? `<div class="stg">${pr.stages.map(x => `<span class="${x.done ? "d" : x.current ? "c" : ""}">${x.done ? "✓ " : x.current ? "● " : ""}${esc(x.name)}</span>`).join("")}</div>` : "";
-  const detail = open ? `<div class="det">${stages}<div class="mut" style="margin-top:6px">Command</div><div class="mono small" style="word-break:break-all">${esc(s.command)}</div>
+  const detail = open ? `<div class="det">${stages}<div class="mut" style="margin-top:6px">Command</div><div class="mono small" style="word-break:break-all">${esc(envPrefix(s.env) + s.command)}</div>
     ${s.results ? `<div class="mut" style="margin-top:6px">Results folder</div><div class="mono small" style="word-break:break-all">${esc(s.results)}</div>` : ""}
     ${s.resumes ? `<div class="mut" style="margin-top:6px">Resumes an earlier run (${esc(s.resumes)})</div>` : ""}${s.resumed_by ? `<div class="mut" style="margin-top:6px">Resumed as ${esc(s.resumed_by)}</div>` : ""}
     <div class="mut" style="margin-top:6px">Started ${esc(fmtTime(s.started))}${s.ended ? ` · ended ${esc(fmtTime(s.ended))}` : ""}${s.reattached ? " · found again after PlasBench restarted" : ""}</div>
@@ -1282,6 +1293,7 @@ function sessCard(s) {
     <div class="sm"><span>${esc(ago(s.started))}</span><span>${esc(dur)}${s.group === "ongoing" ? " so far" : ""}</span>${leaders ? `<span>${leaders}</span>` : ""}${why ? `<span class="bad-t">${esc(why)}</span>` : ""}</div></div></div>
     ${s.group === "completed" ? "" : bar}${stageLine(s) ? `<div class="small">${esc(stageLine(s))}${pct != null && s.group === "ongoing" ? ` · about ${pct}%` : ""}</div>` : ""}
     ${s.group !== "completed" && pr.last_line ? `<div class="last" title="${esc(pr.last_line)}">${esc(pr.last_line)}</div>` : ""}
+    ${s.group === "ongoing" && s.display_state === "stalled" ? `<div class="stallnote" role="status">${esc(STALL_TEXT(s.idle_seconds))}<div class="acts"><button class="btn sec sm" data-sa="activity">Check activity</button><button class="btn danger sm" data-sa="cancel">Cancel</button></div>${activityHTML(S.act[s.id])}<div class="small mut" style="margin-top:4px">Resume is offered under Needs attention after a cancel.</div></div>` : ""}
     <div class="acts">${acts.filter(Boolean).join("")}</div>${detail}</div>`;
 }
 function renderSessions() {
@@ -1302,6 +1314,7 @@ document.addEventListener("click", async e => {
   try {
     switch (b.dataset.sa) {
       case "log": showConsole(id, true); break;
+      case "activity": await checkActivity(id); break;
       case "cancel": if (confirm("Cancel this run? Finished work is kept and you can resume it later.")) { await api(`jobs/${id}/cancel`, {}); await refreshJobs(); refreshSessions(); } break;
       case "resume": { const j = await api(`jobs/${id}/resume`, {}); toast(`Resumed: ${s.label}`, "ok"); S.sessTab = "ongoing"; await refreshJobs(); showConsole(j.id, true); refreshSessions(); break; }
       case "rerun": confirmRun(s.argv, s.label.replace(/^Resumed: /, ""), s.env); break;
@@ -1377,7 +1390,36 @@ async function refreshJobs() {
   if ($("#pjbadge")) { $("#pjbadge").hidden = !nrun; $("#pjbadge").textContent = nrun; }
 }
 const WARN_EXPLAIN = "The run finished (the process exited normally, exit 0) but at least one tool run failed. Scores and the report cover only the tools that worked; the failed ones and their reasons are listed in tool_status.tsv and the console output.";
-const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted", stalled:"Stalled (no output; may still be working)", retrying:"Retrying a failed tool", completed_with_warnings:"Completed with warnings"})[s] || s;
+/* ---- a run that has printed nothing for a while: say what that means, and let the user look at what it is writing ---- */
+S.act = S.act || {};   // job id -> {status, files, t}: the last "Check activity" answer
+const stallMinutes = s => Math.max(1, Math.round((s || 0) / 60));
+const STALL_TEXT = secs => `No new output for ${stallMinutes(secs)} minute${stallMinutes(secs) === 1 ? "" : "s"}. This is often normal while reads download or a tool assembles. Closing this window does NOT stop the run.`;
+const quietWorking = (id, shown) => shown === "stalled" && S.act[id] && S.act[id].status === "active" && Date.now() - S.act[id].t < 600000;
+function activityHTML(a) {
+  if (!a) return "";
+  if (a.error) return `<div class="small bad-t">${esc(a.error)}</div>`;
+  const head = a.status === "active" ? `Files are being written (something changed in the last 3 minutes): the run is working, its log is just quiet.` : `Nothing has been written in the last 3 minutes. If this lasts, check the tool's own log, or cancel and resume.`;
+  const list = (a.files || []).slice(0, 8).map(f => `<li>${esc(f.path)} · ${esc(fmtSize(f.size))} · ${esc(fmtDur(f.age_seconds))} ago</li>`).join("");
+  return `<div class="small"><b>${esc(head)}</b></div>${list ? `<ul>${list}</ul>` : ""}${a.truncated ? `<div class="small mut">Only the first ${a.walked} entries were examined.</div>` : ""}`;
+}
+async function checkActivity(id) {
+  try { const a = await api(`jobs/${id}/activity`); S.act[id] = Object.assign(a, {t: Date.now()}); }
+  catch (e) { S.act[id] = {error: e.message, t: Date.now()}; }
+  renderSessions && renderSessions(); paintStall(); pollConsole(true);
+}
+function paintStall() {
+  const box = $("#cstall"); if (!box) return;
+  const id = S.consJob, st = S._stallJob;
+  if (!st || st.id !== id) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `<div>${esc(STALL_TEXT(st.idle))}</div><div style="margin-top:4px"><button data-st-act="activity">Check activity</button><button data-st-act="cancel">Cancel</button><span class="mut small">Cancel keeps finished work; Resume then appears under Runs &rarr; Needs attention.</span></div>${activityHTML(S.act[id])}`;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-st-act]"); if (!b || !$("#cstall").contains(b)) return;
+  if (b.dataset.stAct === "activity") checkActivity(S.consJob);
+  else $("#ccancel").click();
+});
+const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted", stalled:"No new output (may still be working)", working_quiet:"Working (quiet log)", retrying:"Retrying a failed tool", completed_with_warnings:"Completed with warnings"})[s] || s;
 function showConsole(id, expand) {
   if (id && id !== S.consJob) { S.consJob = id; S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; }
   $("#cjob").value = S.consJob || "";
@@ -1418,12 +1460,17 @@ async function pollConsole(force) {
     const waiting = running && /(\[[yY]\/[nN]\]|\[[yY]es\/[nN]o\]|\?|:)\s*$/.test(lastLine) && lastLine.trim().length > 3;
     if (waiting && !$("#cin").classList.contains("waiting")) { setConsole(true); setCTab("out"); toast("A command is waiting for your answer in the console", ""); $("#cintx").focus(); }
     $("#cin").classList.toggle("waiting", waiting);
-    const st = $("#cstate"); st.className = j.display_state || j.state; st.textContent = stateWord(j.display_state || j.state) + (j.exit != null && j.state !== "done" ? ` (exit ${j.exit})` : "");
+    const st = $("#cstate"); st.className = j.display_state || j.state;
+    const shown0 = quietWorking(j.id, j.display_state) ? "working_quiet" : (j.display_state || j.state);
+    st.textContent = stateWord(shown0) + (j.exit != null && j.state !== "done" ? ` (exit ${j.exit})` : "");
+    st.title = j.display_state === "stalled" ? STALL_TEXT(j.idle_seconds) : "";
+    if (j.display_state === "stalled") { const fresh = !S._stallJob || S._stallJob.id !== j.id; S._stallJob = {id: j.id, idle: j.idle_seconds}; if (fresh && !S.act[j.id]) checkActivity(j.id); paintStall(); }
+    else if (S._stallJob) { S._stallJob = null; paintStall(); }
     $("#ccancel").hidden = j.state !== "running";
     if (S.follow) $("#clog").scrollTop = $("#clog").scrollHeight;
     const wasRunning = S._lastState === "running"; S._lastState = j.state;
     const shown = j.display_state || j.state;
-    st.title = shown === "completed_with_warnings" ? WARN_EXPLAIN : "";
+    if (shown === "completed_with_warnings") st.title = WARN_EXPLAIN;
     if (wasRunning && j.state !== "running") {
       if (shown === "completed_with_warnings") toast(`${j.label}: finished, but some tool runs failed. ${WARN_EXPLAIN}`, "bad");
       else toast(`${j.label}: ${stateWord(shown).toLowerCase()}`, j.state === "done" ? "ok" : "bad");
@@ -1576,6 +1623,7 @@ function askQuit(running) {
     const d = document.createElement("dialog"); d.className = "card"; d.style.cssText = "max-width:480px;padding:0;border:1px solid var(--line)";
     d.innerHTML = `<div class="hd">${icon("alert", "ico")}<h3>${running.length > 1 ? running.length + " runs are" : "A run is"} still going</h3></div>
       <div class="bd"><p style="margin-top:0">${running.map(x => `<b>${esc(x)}</b>`).join("<br>")}</p>
+      <p><b>In one sentence:</b> Quit and keep running closes this window and PlasBench but leaves the run going in the background, while plain Quit (Stop and quit) cancels the run first and then closes PlasBench.</p>
       <p><b>Quit and keep running</b> closes the window and PlasBench but leaves the run going in the background. Start PlasBench again to follow it; it is listed under Runs &amp; reports.</p>
       <p><b>Stop and quit</b> cancels it. Finished work is kept, and you can resume the run later.</p></div>
       <div class="ft"><button class="btn ghost" data-c="">Cancel</button><button class="btn danger" data-c="stop">Stop and quit</button><button class="btn" data-c="keep">Quit and keep running</button></div>`;
@@ -2376,7 +2424,7 @@ function renderSettings() {
       // A location written as shell code in config.sh is shown as the path it means here, and a
       // database says whether it is installed, so "leave the default" is a choice you can see.
       const where = r.resolved ? `<div class="help">${r.found === true ? `<span class="ok-t">${icon("check")} Installed</span> at` : r.found === false ? `<span class="warn-t">${icon("info")} Not installed yet</span> at` : "Default location:"} <code>${esc(r.resolved)}</code>${r.found === false ? ` — install from <a href="#setup">Set up this computer</a> if you use this tool` : ""}</div>` : "";
-      return `<div class="field ${changed ? "changed" : ""}"><label>${esc(r.key)}${r.override != null && !changed ? ` <span class="tag rec">set here</span>` : ""}</label><div class="ctl">${ctl}${r.override != null || changed ? `<button class="btn ghost sm" data-clear="${r.key}" title="Back to the default">Default</button>` : ""}</div>
+      return `<div class="field ${changed ? "changed" : ""}"><label>${esc(r.key)}${r.override != null && !changed ? ` <span class="tag rec">set here</span>` : ""}${tipBtn(r.tooltip, r.key)}</label><div class="ctl">${ctl}${r.override != null || changed ? `<button class="btn ghost sm" data-clear="${r.key}" title="Back to the default">Default</button>` : ""}</div>
         <div class="help">${esc(r.comment || "")}${r.env ? ` <span class="tag warn">environment: ${esc(r.env.slice(0, 60))}</span>` : ""}</div>${r.override == null && !changed ? where : ""}</div>`; }).join("") + `</div></details>`; }).join("") || `<div class="bd mut">No setting matches.</div>`;
   const n = Object.keys(SET.edits).length; $("#set_save").disabled = $("#set_reset").disabled = !n; $("#set_n").textContent = n ? `(${n})` : "";
 }
@@ -2402,6 +2450,43 @@ function defaultWord(dest) {
   const t = (S.tools || []).find(x => x.tool === dest || x.tool === String(dest).replace(/-/g, "_"));
   return t && t.run_flag ? `default · ${t.enabled ? "on" : "off"}` : "default";
 }
+/* ---- help tooltip: an (i) button next to a label. Hover, keyboard focus and tap all open it; Escape closes it. One floating box (#tipbox, position:fixed) serves every field,
+   so no card can clip it. The text comes from the server (ui_help.py through /api/schema and /api/settings), never from this page. ---- */
+function tipBtn(t, label) {
+  if (!t || !(t.summary || (t.choices || []).length)) return "";
+  return `<button type="button" class="tipi" data-tip="${dattr(t)}" aria-label="Help: ${esc(label || "this field")}" aria-describedby="tipbox" aria-expanded="false">i</button>`;
+}
+const wizTip = k => tipBtn((S.schema?.wizard_help || {})[k], k.replace(/_/g, " "));
+const argTip = (cmd, dest) => { const a = command(cmd)?.args.find(x => x.dest === dest); return tipBtn(a?.tooltip, a ? argLabel(a) : dest); };
+function tipBody(t) {
+  const ch = (t.choices || []).map(([c, m]) => `<dt>${c === "" ? "(default)" : esc(c)}</dt><dd>${esc(m)}</dd>`).join("");
+  return `<p>${esc(t.summary)}</p>${ch ? `<dl>${ch}</dl>` : ""}<div class="tmeta">Default: <b>${esc(t.default || "none")}</b>${t.flag ? ` · Option: <code>${esc(t.flag)}</code>` : ""}${t.setting ? ` · Setting: <code>${esc(t.setting)}</code>` : ""}</div>${t.when ? `<div class="twhen">${esc(t.when)}</div>` : ""}`;
+}
+(function tipSetup() {
+  const box = $("#tipbox"); let cur = null, pinned = false;
+  const hide = () => { if (cur) cur.setAttribute("aria-expanded", "false"); cur = null; pinned = false; box.hidden = true; };
+  const show = (b, pin) => {
+    let t; try { t = JSON.parse(b.dataset.tip); } catch { return; }
+    if (cur && cur !== b) cur.setAttribute("aria-expanded", "false");
+    cur = b; pinned = !!pin; b.setAttribute("aria-expanded", "true");
+    box.innerHTML = tipBody(t); box.hidden = false;
+    const r = b.getBoundingClientRect(), w = box.offsetWidth, h = box.offsetHeight;
+    let left = Math.min(Math.max(12, r.left + r.width / 2 - w / 2), innerWidth - w - 12), top = r.bottom + 8;
+    if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 8);
+    box.style.left = left + "px"; box.style.top = top + "px";
+  };
+  document.addEventListener("mouseover", e => { const b = e.target.closest && e.target.closest(".tipi"); if (b && !pinned) show(b); });
+  document.addEventListener("mouseout", e => { if (!pinned && e.target.closest && e.target.closest(".tipi")) hide(); });
+  document.addEventListener("focusin", e => { const b = e.target.closest && e.target.closest(".tipi"); if (b && !pinned) show(b); });
+  document.addEventListener("focusout", e => { if (!pinned && e.target.closest && e.target.closest(".tipi")) hide(); });
+  document.addEventListener("click", e => {
+    const b = e.target.closest && e.target.closest(".tipi");
+    if (b) { e.preventDefault(); e.stopPropagation(); if (cur === b && pinned) hide(); else show(b, true); return; }
+    if (cur && !box.contains(e.target)) hide();
+  }, true);
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && cur) { const b = cur; hide(); b.focus(); } });
+  addEventListener("scroll", () => { if (cur && !pinned) hide(); }, true); addEventListener("resize", hide);
+})();
 function fieldHTML(a, values, prefix) {
   const id = `${prefix}_${a.dest}`, v = values[a.dest], flag = a.flags.find(f => f.startsWith("--")) || a.flags[0] || "";
   const changed = v !== undefined && v !== "" && v !== null && !(a.kind === "flag" && v === false);
@@ -2410,7 +2495,7 @@ function fieldHTML(a, values, prefix) {
   else if (a.kind === "choice") {
     if (a.choices.length === 2 && a.choices.includes("on") && a.choices.includes("off"))
       ctl = `<div class="tri" role="group" aria-label="${esc(argLabel(a))}">${["", "on", "off"].map(o => `<button type="button" data-dest="${a.dest}" data-val="${o}" class="${(v || "") === o ? "on" : ""} ${o === "off" ? "off" : ""}" ${o ? "" : `title="Use the setting saved for this computer"`}>${o || defaultWord(a.dest)}</button>`).join("")}</div>`;
-    else ctl = `<select id="${id}" data-dest="${a.dest}"><option value="">${a.default != null ? `default (${esc(a.default)})` : "— not set —"}</option>${a.choices.map(c => `<option ${String(v) === String(c) ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>`;
+    else ctl = `<select id="${id}" data-dest="${a.dest}"><option value="">${a.default != null ? `default (${esc(a.default)})` : "— not set —"}</option>${a.choices.map(c => `<option ${String(v) === String(c) ? "selected" : ""}${a.choice_help && a.choice_help[c] ? ` title="${esc(a.choice_help[c])}"` : ""}>${esc(c)}</option>`).join("")}</select>`;
   }
   else if (a.kind === "int" || a.kind === "float") ctl = `<input type="number" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${a.default != null ? "default " + esc(a.default) : ""}" ${a.kind === "float" ? 'step="any"' : ""}>`;
   else if (a.kind === "path") {
@@ -2428,7 +2513,7 @@ function fieldHTML(a, values, prefix) {
   }
   else if (a.kind === "list") ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(Array.isArray(v) ? v.join(" ") : v ?? "")}" placeholder="space separated${a.choices ? ": " + esc(a.choices.join(" ")) : ""}">`;
   else ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${a.default != null && a.default !== "" ? "default " + esc(a.default) : ""}">`;
-  return `<div class="field ${changed ? "changed" : ""}"><label for="${id}">${esc(argLabel(a))}${a.required ? `<span class="req">*</span>` : ""} <code>${esc(a.positional ? "<" + a.dest + ">" : flag)}</code></label>
+  return `<div class="field ${changed ? "changed" : ""}"><label for="${id}">${esc(argLabel(a))}${a.required ? `<span class="req">*</span>` : ""} <code>${esc(a.positional ? "<" + a.dest + ">" : flag)}</code>${tipBtn(a.tooltip, argLabel(a))}</label>
     <div class="ctl">${ctl}<button type="button" class="btn ghost sm reset" data-reset="${a.dest}" title="Back to the default">Reset</button></div>${a.help ? `<div class="help">${esc(a.help)}</div>` : ""}${dbStatusHTML(a.dest)}</div>`;
 }
 // Under a database field: whether a run will reuse an installed copy, and from where.
@@ -2544,7 +2629,8 @@ function renderWizard() {
   const run = wizRun(), V = W.values, byGroup = g => run.args.filter(a => a.group === g);
   let html = "";
   if (W.step === 0) {
-    const cohorts = S.cohorts.filter(c => !c.metagenomic);
+    const cohorts = S.cohorts.filter(c => !c.metagenomic && !c.ledger);
+    const chosenLedger = W.source === "cohort" && S.cohorts.find(c => c.name === V.cohort && c.ledger);
     html = `<div class="grid g2">
       ${[["demo","Offline demo","Six synthetic isolates. No downloads, about a minute; confirms everything works."],
          ["cohort","A bundled cohort","Public, NCBI-linked isolates with complete references. Downloads reads and assemblies."],
@@ -2553,24 +2639,24 @@ function renderWizard() {
          `<label class="choice ${W.source === k ? "on" : ""}"><input type="radio" name="wsrc" value="${k}" ${W.source === k ? "checked" : ""}><span><b>${t}</b><span>${d}</span></span></label>`).join("")}</div>
       <div class="card" style="margin-top:16px"><div class="bd" id="wsrcbody">${
         W.source === "demo" ? `<div class="note info">${icon("info", "ico")}<div>The demo runs <code>plasbench demo</code>: synthetic data, scored and reported. Tools and resources do not apply; press Next to review.</div></div>` :
-        W.source === "cohort" ? `<div class="field"><label>Cohort <span class="req">*</span></label><div class="ctl"><select id="wcoh">${cohorts.map(c => `<option value="${esc(c.name)}" ${V.cohort === c.name ? "selected" : ""}>${esc(c.name)} — ${c.rows} isolates${c.locked ? " · locked" : ""}</option>`).join("")}</select></div><div class="help">The cohort's sample sheet in cohorts/. Locked cohorts are verified against their recorded accessions.</div></div>` :
-        W.source === "sheet" ? `<div class="field"><label>Sample sheet <span class="req">*</span></label><div class="ctl"><input type="text" id="wsheet" value="${esc(V.samples || "")}" placeholder="config/my_isolates.tsv"><button class="btn sec sm" data-browse="wsheet" data-dir="0">Browse</button></div><div class="help">Columns sample_id, assembly_accession, sra_run (see Your own isolates).</div></div>
-          <div class="field"><label>Local inputs only</label><div class="ctl"><label class="switch"><input type="checkbox" id="wlocal" ${V.local_inputs ? "checked" : ""}><span></span></label></div><div class="help">Your reads and references are already on disk; never download.</div></div>` :
+        W.source === "cohort" ? `<div class="field"><label>Cohort <span class="req">*</span>${wizTip("cohort")}</label><div class="ctl"><select id="wcoh">${chosenLedger ? `<option value="${esc(V.cohort)}" selected>${esc(V.cohort)} — not a cohort sheet</option>` : ""}${cohorts.map(c => `<option value="${esc(c.name)}" ${V.cohort === c.name ? "selected" : ""}>${esc(c.name)} — ${c.rows} isolates${c.locked ? " · locked" : ""}</option>`).join("")}</select></div><div class="help">The cohort's sample sheet in cohorts/. Locked cohorts are verified against their recorded accessions.</div>${chosenLedger ? `<div class="note bad" style="margin-top:8px">${icon("x", "ico")}<div><b>Not a cohort sheet.</b> ${esc(V.cohort)} is the accession ledger (accessions only, no organism or truth columns): a run on it fails stage 0. Choose a cohort from the list.</div></div>` : ""}</div>` :
+        W.source === "sheet" ? `<div class="field"><label>Sample sheet <span class="req">*</span>${wizTip("sample_sheet")}</label><div class="ctl"><input type="text" id="wsheet" value="${esc(V.samples || "")}" placeholder="config/my_isolates.tsv"><button class="btn sec sm" data-browse="wsheet" data-dir="0">Browse</button></div><div class="help">Columns sample_id, assembly_accession, sra_run (see Your own isolates).</div></div>
+          <div class="field"><label>Local inputs only${wizTip("local_inputs")}</label><div class="ctl"><label class="switch"><input type="checkbox" id="wlocal" ${V.local_inputs ? "checked" : ""}><span></span></label></div><div class="help">Your reads and references are already on disk; never download.</div></div>` :
         `<div class="field"><label>Community sheet</label><div class="ctl"><input type="text" id="wsheet" value="${esc(V.samples || "")}" placeholder="meta_samples.tsv"><button class="btn sec sm" data-browse="wsheet" data-dir="0">Browse</button></div></div>
          <div class="field"><label>Predictions folder</label><div class="ctl"><input type="text" id="wpred" value="${esc(V.predictions_dir || "")}" placeholder="predictions_meta"><button class="btn sec sm" data-browse="wpred" data-dir="1">Browse</button></div><div class="help">&lt;tool&gt;/&lt;community&gt;.bins.tsv normalized outputs.</div></div>`}</div></div>
       ${W.source === "cohort" || W.source === "sheet" ? `<div class="card" style="margin-top:12px"><div class="hd"><h3>How many isolates</h3><span class="sub">optional</span></div><div class="bd">
-        <div class="field"><label for="w_max_isolates">Run only</label><div class="ctl"><input type="number" min="1" step="1" id="w_max_isolates" data-dest="max_isolates" value="${esc(V.max_isolates || "")}" placeholder="all" style="max-width:120px"><span class="mut small">isolates${W.source === "cohort" && cohorts.find(c => c.name === V.cohort) ? ` of ${cohorts.find(c => c.name === V.cohort).rows}` : ""}</span></div>
+        <div class="field"><label for="w_max_isolates">Run only${argTip("run", "max_isolates")}</label><div class="ctl"><input type="number" min="1" step="1" id="w_max_isolates" data-dest="max_isolates" value="${esc(V.max_isolates || "")}" placeholder="all" style="max-width:120px"><span class="mut small">isolates${W.source === "cohort" && cohorts.find(c => c.name === V.cohort) ? ` of ${cohorts.find(c => c.name === V.cohort).rows}` : ""}</span></div>
         <div class="help">Any number you choose. The isolates are a balanced selection: spread across species and studies, and across recent and older genomes, so a small run is a fair miniature of the cohort. The cohort file is not changed. Leave empty to run all of them.</div></div>
-        <div class="field"><label>Which isolates</label><div class="ctl"><select id="w_isolate_order" data-dest="isolate_order"><option value="">balanced (recommended)</option><option value="file" ${V.isolate_order === "file" ? "selected" : ""}>the first rows in the sheet</option></select></div></div></div></div>` : ""}
+        <div class="field"><label>Which isolates${argTip("run", "isolate_order")}</label><div class="ctl"><select id="w_isolate_order" data-dest="isolate_order"><option value="">balanced (recommended)</option><option value="file" ${V.isolate_order === "file" ? "selected" : ""}>the first rows in the sheet</option></select></div></div></div></div>` : ""}
       ${W.source !== "demo" ? `<div class="card" style="margin-top:12px"><div class="hd"><h3>Study folder</h3><span class="sub">everything this benchmark produces goes here</span></div><div class="bd">
-        <div class="field"><label for="wstudy">Study name</label><div class="ctl"><input type="text" id="wstudy" value="${esc(V.study || "")}" placeholder="${esc(wizDefaultStudy())}"></div>
+        <div class="field"><label for="wstudy">Study name${wizTip("study")}</label><div class="ctl"><input type="text" id="wstudy" value="${esc(V.study || "")}" placeholder="${esc(wizDefaultStudy())}"></div>
         <div class="help" id="wstudyhelp">${esc(studyWhere())}</div></div></div></div>` : ""}`;
   } else if (W.step === 1) {
     if (W.source === "demo" || W.source === "meta") html = `<div class="note info">${icon("info", "ico")}<div>${W.source === "demo" ? "The demo uses its own five synthetic methods." : "The metagenomics track scores the tools present in the predictions folder."} Press Next.</div></div>`;
     else {
       const tools = byGroup("tools").filter(a => a.kind === "choice");
       const known = Object.fromEntries(S.tools.map(t => [t.tool, t]));
-      html = `<div class="card"><div class="hd"><h3>Built-in tools</h3><span class="sub">default · on or default · off = the setting saved for this computer (Tools page); on / off override it for this run only</span>
+      html = `<div class="card"><div class="hd"><h3>Built-in tools ${wizTip("tool_state")}</h3><span class="sub">default · on or default · off = the setting saved for this computer (Tools page); on / off override it for this run only</span>
           <button class="btn ghost sm" id="wallon">All on</button><button class="btn ghost sm" id="walldef">All default</button></div><div class="bd"><div class="toggles">${tools.map(a => {
           const id = a.dest, t = known[id] || known[id.replace(/-/g, "_")], def = t?.enabled;
           return `<div class="tog"><div class="tx"><b>${esc(t?.display || argLabel(a))}</b><span>${esc(t ? `${t.task} · ${(t.track || "").replace("_", " ")}` : a.help.slice(0, 60))}${t ? ` · default ${def ? "on" : "off"}` : ""}${t?.installed === false ? ` · <span class="bad-t">not installed</span>` : ""}</span></div>
@@ -2596,8 +2682,25 @@ function renderWizard() {
       return s ? `${n} ${s.found ? "found" : "not installed"}` : n; }).join(" · ");
     const dbBlock = dbArgs.length ? `<details class="fgroup" ${dbArgs.some(a => V[a.dest]) ? "open" : ""}><summary>Use a different database copy (optional) <span class="n">— ${esc(dbSummary)}</span></summary><div class="fb">
         <p class="mut small" style="margin:0 0 10px">Leave these empty: each run uses the database where PlasBench installed it. Fill one in only to use another copy.</p>${dbArgs.map(a => fieldHTML(a, V, "w")).join("")}</div></details>` : "";
+    const E = S.wizEnv = S.wizEnv || {};
+    const ef = (id, label, tip, ctl, help) => `<div class="field"><label for="we_${id}">${label}${wizTip(tip)}</label><div class="ctl">${ctl}</div><div class="help">${help}</div></div>`;
+    const num = (id, ph, step) => `<input type="number" min="0" step="${step || "any"}" id="we_${id}" data-wenv="${id}" value="${esc(E[id] ?? "")}" placeholder="${esc(ph)}" style="max-width:140px">`;
+    const reportCard = W.source === "meta" ? `<div class="note info" style="margin-bottom:16px">${icon("info", "ico")}<div>The metagenomics track does not open a report by itself (the command opens reports of isolate runs only). The run still never stops to ask a question.</div></div>`
+      : `<div class="card" style="margin-bottom:16px"><div class="hd"><h3>When the run finishes</h3></div><div class="bd"><div class="field"><label for="wopen">Open the report in my browser when the run finishes${wizTip("open_report_run")}</label><div class="ctl"><label class="switch"><input type="checkbox" id="wopen" ${V.open_report ? "checked" : ""}><span></span></label></div>
+        <div class="help">Adds <code>--open-report</code>. The window always adds <code>--no-report-prompt</code> too${wizTip("no_report_prompt")}: the run never stops to ask a question.</div></div></div></div>`;
+    const dlCard = W.source === "cohort" || W.source === "sheet" ? `<details class="fgroup" style="margin-bottom:16px" ${Object.values(E).some(v => v !== "" && v != null && v !== false) ? "open" : ""}><summary>Downloads and reliability <span class="n">— optional; sent with this run only</span></summary><div class="fb">
+        <p class="mut small" style="margin:0 0 10px">These are environment settings for this run. Leave a box empty to keep the setting saved for this computer (Settings page, group Reliability and downloads).</p>
+        ${ef("read_source", "Read source", "read_source", `<select id="we_read_source" data-wenv="read_source"><option value="">default (auto)</option>${["auto", "sra", "ena"].map(c => `<option ${E.read_source === c ? "selected" : ""}>${c}</option>`).join("")}</select>`, "Where stage 1 gets short reads: auto, sra or ena.")}
+        ${ef("max_gb", "Largest read download per isolate, GB", "max_run_download_gb", num("max_gb", "no limit"), "Empty = no limit.")}
+        ${ef("warn_gb", "Warn above, GB", "warn_run_download_gb", num("warn_gb", "5"), "Empty = the default, 5.")}
+        ${ef("prefetch_limit", "Stop using the SRA Toolkit after N failures", "prefetch_fail_limit", num("prefetch_limit", "2", 1), "Empty = the default, 2.")}
+        ${ef("timeout_hours", "Tool time limit, hours", "tool_timeout_hours", num("timeout_hours", "no limit"), "Per tool per isolate; sent as seconds (hours x 3600). Empty = no limit.")}
+        ${ef("allow_all_failed", "Continue when every tool failed", "allow_all_tools_failed", `<label class="switch"><input type="checkbox" id="we_allow_all_failed" data-wenv="allow_all_failed" ${E.allow_all_failed ? "checked" : ""}><span></span></label>`, "Sets ALLOW_ALL_TOOLS_FAILED=1.")}
+        ${ef("retries", "Download retries", "network_retries", num("retries", "3", 1), "Empty = the default, 3.")}
+        ${ef("connections", "Parallel downloads per isolate", "ena_download_connections", num("connections", "4", 1), "Empty = the default, 4. Applies to ENA downloads.")}
+      </div></details>` : "";
     html = W.source === "demo" ? `<div class="card"><div class="bd">${fieldHTML(command("demo").args.find(a => a.dest === "open_report"), V, "w")}</div></div>` :
-      `<div class="card"><div class="hd"><h3>Stages</h3><span class="sub">leave all off to run the whole pipeline</span></div><div class="bd"><div class="chips" id="wstages">${
+      reportCard + dlCard + `<div class="card"><div class="hd"><h3>Stages ${wizTip("stages")}</h3><span class="sub">leave all off to run the whole pipeline</span></div><div class="bd"><div class="chips" id="wstages">${
         [["0","Check"],["1","Download"],["2","Truth"],["3","Assemble"],["4","Run tools"],["5","Score"],["6","Aggregate & report"],["7","Long-read tools"]].map(([s, l]) =>
         `<button type="button" class="chip ${(V.stages || []).includes(s) ? "on" : ""}" data-stage="${s}">${s} · ${l}</button>`).join("")}</div>
         <p class="mut small" style="margin:10px 0 0">Choose stages to resume or re-run part of a benchmark, e.g. 5 and 6 to re-score and rebuild the report.</p></div></div>
@@ -2607,7 +2710,7 @@ function renderWizard() {
     const argv = wizArgv();
     html = `<div class="card"><div class="hd"><h3>Review</h3></div><div class="bd">
       <div class="grid g2" style="margin-bottom:14px">${wizSummary().map(([k, v]) => `<div><div class="mut small">${esc(k)}</div><b>${esc(v)}</b></div>`).join("")}</div>
-      <div class="cmdline"><span class="p">$</span><code>${esc(cmdText(argv))}</code></div><div id="wverr" style="margin-top:10px"></div></div>
+      <div class="cmdline"><span class="p">$</span><code>${esc(envPrefix(wizEnv()) + cmdText(argv))}</code></div>${Object.keys(wizEnv()).length ? `<p class="mut small" style="margin:8px 0 0">The settings before the command are passed to this run only. <b>Save as a script</b> cannot carry them: the script holds the command alone.</p>` : ""}<div id="wverr" style="margin-top:10px"></div></div>
       <div class="ft"><button class="btn sec" id="wcopy">${icon("copy")}Copy command</button>${W.source !== "demo" ? `<button class="btn sec" id="wscript">${icon("file")}Save as a script</button>` : ""}<button class="btn lg" id="wstart">${icon("play")}Start benchmark</button></div></div>`;
   }
   $("#wbody").innerHTML = html;
@@ -2630,25 +2733,46 @@ function wizArgv() {
   if (W.source === "cohort") { delete vals.samples; } else { delete vals.cohort; }
   if (W.source === "meta") vals.mode = "metagenomics";
   vals.no_report_prompt = true;
+  vals.open_report = W.source !== "meta" && !!V.open_report;
   const run = wizRun(), argv = buildArgv(run, vals, ["run"]);
   for (const u of V.user_tools || []) argv.push("--tool", u);
   return argv;
 }
+/* The environment settings the "Downloads and reliability" card sends with the job (names match config/config.sh). */
+function wizEnv() {
+  const W = S.wiz, E = S.wizEnv || {}, d = {};
+  if (W.source !== "cohort" && W.source !== "sheet") return d;
+  const n = v => v !== "" && v != null && Number.isFinite(Number(v)) && Number(v) >= 0;
+  if (["auto", "sra", "ena"].includes(E.read_source)) d.READ_SOURCE = E.read_source;
+  if (n(E.max_gb)) d.MAX_RUN_DOWNLOAD_GB = String(E.max_gb);
+  if (n(E.warn_gb)) d.WARN_RUN_DOWNLOAD_GB = String(E.warn_gb);
+  if (n(E.prefetch_limit)) d.PREFETCH_FAIL_LIMIT = String(E.prefetch_limit);
+  if (n(E.timeout_hours) && Number(E.timeout_hours) > 0) d.TOOL_TIMEOUT_SECONDS = String(Math.round(Number(E.timeout_hours) * 3600));
+  if (E.allow_all_failed) d.ALLOW_ALL_TOOLS_FAILED = "1";
+  if (n(E.retries)) d.NETWORK_RETRIES = String(E.retries);
+  if (n(E.connections) && Number(E.connections) > 0) d.ENA_DOWNLOAD_CONNECTIONS = String(E.connections);
+  return d;
+}
+const envPrefix = env => env && Object.keys(env).length ? Object.entries(env).map(([k, v]) => `${k}=${quote(String(v))}`).join(" ") + " " : "";
 function wizSummary() {
   const W = S.wiz, V = W.values;
   const src = {demo:"Offline demo", cohort:`Cohort ${V.cohort || "(choose)"}`, sheet:`Sheet ${V.samples || "(choose)"}`, meta:"Metagenomics track"}[W.source];
   const on = Object.entries(V).filter(([k, v]) => v === "on").map(([k]) => k), off = Object.entries(V).filter(([k, v]) => v === "off").map(([k]) => k);
   return [["Isolates", src + (V.max_isolates ? ` (${V.max_isolates} only, ${V.isolate_order === "file" ? "the first rows" : "balanced"})` : "")], ["Study folder", W.source === "demo" ? "results_demo (the demo's own folder)" : (S.ws?.path || "") + (S.info?.sep || "/") + (V.study || wizDefaultStudy())], ["Tools changed for this run", [...on.map(t => "+" + t), ...off.map(t => "−" + t), ...(V.user_tools || []).map(u => "+" + u + " (yours)")].join(", ") || "defaults"],
-          ["Threads per tool", V.threads || "default"], ["Results folder", V.results_dir || "default (results/)"], ["Stages", (V.stages || []).join(" ") || "all"], ["Assembler", V.assembler || "default"]];
+          ["Threads per tool", V.threads || "default"], ["Results folder", V.results_dir || "default (results/)"], ["Stages", (V.stages || []).join(" ") || "all"], ["Assembler", V.assembler || "default"],
+          ["Open report when done", W.source === "demo" ? (V.open_report ? "yes" : "no") : W.source === "meta" ? "not for the metagenomics track" : V.open_report ? "yes" : "no"],
+          ["Downloads and reliability", Object.entries(wizEnv()).map(([k, v]) => `${k}=${v}`).join(", ") || "defaults"]];
 }
 function bindWizard() {
   const W = S.wiz, V = W.values;
-  $$("[name=wsrc]").forEach(r => r.onchange = () => { W.source = r.value; if (r.value === "cohort" && !V.cohort) V.cohort = S.cohorts.find(c => !c.metagenomic)?.name; renderWizard(); });
+  $$("[name=wsrc]").forEach(r => r.onchange = () => { W.source = r.value; if (r.value === "cohort" && !V.cohort) V.cohort = S.cohorts.find(c => !c.metagenomic && !c.ledger)?.name; renderWizard(); });
   if ($("#wcoh")) { if (!V.cohort) V.cohort = $("#wcoh").value; $("#wcoh").onchange = e => { V.cohort = e.target.value; if ($("#wstudy")) { $("#wstudy").placeholder = wizDefaultStudy(); $("#wstudyhelp").textContent = studyWhere(); } }; }
   if ($("#wsheet")) $("#wsheet").oninput = e => { V.samples = e.target.value; if ($("#wstudy")) { $("#wstudy").placeholder = wizDefaultStudy(); $("#wstudyhelp").textContent = studyWhere(); } };
   if ($("#wstudy")) $("#wstudy").oninput = e => { V.study = e.target.value.trim(); $("#wstudyhelp").textContent = studyWhere(); };
   if ($("#wpred")) $("#wpred").oninput = e => V.predictions_dir = e.target.value;
   if ($("#wlocal")) $("#wlocal").onchange = e => V.local_inputs = e.target.checked;
+  if ($("#wopen")) $("#wopen").onchange = e => V.open_report = e.target.checked;
+  $$("[data-wenv]").forEach(i => { const f = () => { (S.wizEnv = S.wizEnv || {})[i.dataset.wenv] = i.type === "checkbox" ? i.checked : i.value; }; i.oninput = f; i.onchange = f; });
   $$("[data-wtool]").forEach(b => b.onclick = () => { V[b.dataset.wtool] = b.dataset.val; b.parentElement.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); });
   $$("[data-wuser]").forEach(c => c.onchange = () => { const s = new Set(V.user_tools || []); c.checked ? s.add(c.dataset.wuser) : s.delete(c.dataset.wuser); V.user_tools = [...s]; });
   if ($("#wallon")) $("#wallon").onclick = () => { $$("[data-wtool]").forEach(b => { if (b.dataset.val === "on") b.click(); }); };
@@ -2658,9 +2782,11 @@ function bindWizard() {
   if (W.step === WSTEPS.length - 1) {
     const argv = wizArgv();
     api("validate", {argv}).catch(e => ({ok: false, message: "Could not check this command line (" + e.message + "). Start is disabled until PlasBench answers."})).then(v => { $("#wverr").innerHTML = v.ok ? `<div class="note ok">${icon("check", "ico")}<div>The command line is valid.</div></div>` : `<div class="note bad">${icon("x", "ico")}<div>${esc(v.message)}</div></div>`; $("#wstart").disabled = !v.ok; });
-    $("#wcopy").onclick = () => copyText(cmdText(argv), "Command copied");
-    if ($("#wscript")) $("#wscript").onclick = () => { const p = prompt("Save the run as a bash script (relative to the PlasBench folder):", "run_benchmark.sh"); if (p) confirmRun([...argv, "--write-script", p], "Write the run as a script"); };
-    $("#wstart").onclick = async () => { const j = await startJob(argv, W.source === "demo" ? "Offline demo" : `Benchmark: ${wizSummary()[0][1]}`); if (j) toast("Started. Follow it in the console; results appear on Runs & reports.", "ok"); };
+    const wenv = wizEnv();
+    $("#wcopy").onclick = () => copyText(envPrefix(wenv) + cmdText(argv), "Command copied");
+    if ($("#wscript")) $("#wscript").onclick = () => { if (Object.keys(wenv).length && !confirm("The saved script cannot carry the Downloads and reliability settings. Add these lines at the top of the script if you want them:\n\n" + Object.entries(wenv).map(([k, v]) => `export ${k}=${quote(String(v))}`).join("\n") + "\n\nSave the script without them?")) return;
+      const p = prompt("Save the run as a bash script (relative to the PlasBench folder):", "run_benchmark.sh"); if (p) confirmRun([...argv, "--write-script", p], "Write the run as a script"); };
+    $("#wstart").onclick = async () => { const j = await startJob(argv, W.source === "demo" ? "Offline demo" : `Benchmark: ${wizSummary()[0][1]}`, wenv); if (j) toast("Started. Follow it in the console; results appear on Runs & reports.", "ok"); };
   }
 }
 $("#wsteps").onclick = e => { const b = e.target.closest("[data-ws]"); if (b) { S.wiz.step = +b.dataset.ws; renderWizard(); } };
@@ -2834,9 +2960,9 @@ async function loadCohorts() {
   const cs = await getCohorts();
   $("#s_cohorts").textContent = `${cs.filter(c => !c.metagenomic).length} isolate · ${cs.filter(c => c.metagenomic).length} metagenomic`;
   $("#cohtb").innerHTML = cs.map(c => `<tr data-coh="${esc(c.name)}"${S.coh === c.name ? ' class="sel"' : ""}><td><a href="javascript:void 0" onclick="cohortInfo(${jsq(c.name)})"><b>${esc(c.name)}</b></a><div class="mut small">${esc(c.path)}</div></td><td>${c.rows}</td>
-    <td>${c.locked ? `<span class="tag ok">${icon("check")}locked</span>` : `<span class="tag">unlocked</span>`}</td><td>${c.metagenomic ? "metagenomic" : "isolate"}</td>
+    <td>${c.locked ? `<span class="tag ok">${icon("check")}locked</span>` : `<span class="tag">unlocked</span>`}</td><td>${c.ledger ? `<span class="tag warn" title="Accession ledger: accessions only, not a benchmark sheet">ledger</span>` : c.metagenomic ? "metagenomic" : "isolate"}</td>
     <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" onclick="cohortInfo(${jsq(c.name)})">${icon("info")}Details</button> ${c.selection ? `<button class="btn sec sm" onclick="selectionReport(${jsq(c.name)})">Selection report</button> ` : ""}${c.metagenomic ? "" : `<button class="btn sec sm" data-run="${dattr(["validate-cohort", "--samples", c.path])}" data-label="Validate ${esc(c.name)}">Validate</button>
-      <button class="btn sec sm" onclick="benchCohort(${jsq(c.name)})">${icon("play")}Benchmark</button>`}</td></tr>`).join("");
+      ${c.ledger ? "" : `<button class="btn sec sm" onclick="benchCohort(${jsq(c.name)})">${icon("play")}Benchmark</button>`}`}</td></tr>`).join("");
 }
 /* cohort details: what is in it, from the sheet, its lock and cohorts/README.md (nothing is downloaded) */
 const NCBI = [[/^GC[AF]_\d+\.\d+$/, "https://www.ncbi.nlm.nih.gov/datasets/genome/"], [/^[SED]RR\d+$/, "https://www.ncbi.nlm.nih.gov/sra/"],
@@ -3764,7 +3890,7 @@ $("#runadd").onclick = () => pickPath(true, async p => { try { await api("runs/a
 function renderJobs() {
   const st = s => `<span class="status ${s === "done" ? "ok" : s === "running" || s === "cancelling" ? "run" : s === "failed" || s === "interrupted" ? "bad" : "idle"}">${icon(s === "done" ? "check" : s === "running" ? "play" : s === "cancelled" ? "stop" : "x")}</span>`;
   $("#jobtb").innerHTML = S.jobs.map(j => `<tr><td><div class="row">${st(j.state)}<span>${stateWord(j.display_state || j.state)}${j.exit != null && j.state !== "done" ? ` <span class="mut small">exit ${j.exit}</span>` : ""}</span></div></td>
-    <td><b>${esc(j.label)}</b><div class="mono small mut" style="word-break:break-all">${esc(j.command)}</div></td><td class="small">${fmtTime(j.started)}</td>
+    <td><b>${esc(j.label)}</b><div class="mono small mut" style="word-break:break-all">${esc(envPrefix(j.env) + j.command)}</div></td><td class="small">${fmtTime(j.started)}</td>
     <td class="small">${fmtDur((j.ended || Date.now() / 1000) - j.started)}</td>
     <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" onclick="showConsole(${jsq(j.id)}, true)">Log</button>
      ${j.state === "running" ? `<button class="btn danger sm" onclick="cancelJob(${jsq(j.id)})">Cancel</button>` : `${j.kind === "git" || !j.argv.length ? "" : `<button class="btn ghost sm" data-run="${dattr(j.argv)}" data-label="${esc(j.label)}">Run again</button>`}<button class="btn ghost icon sm" title="Remove" onclick="delJob(${jsq(j.id)})">${icon("trash")}</button>`}</td></tr>`).join("")
