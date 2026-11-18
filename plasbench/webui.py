@@ -1676,6 +1676,11 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "isolates/scan/status":
                 return self.jsend(200, iso_scans().status(q.get("id", "")))
             # -- END scan a folder for isolates --
+            # BEGIN workflow steps
+            if route == "workflow":
+                from . import workflow_steps
+                return self.jsend(200, workflow_steps.payload(project.root, workflow_steps.current_values(project.settings())))
+            # END workflow steps
             if route == "intake/defaults":
                 return self.jsend(200, project.intake_defaults())
             if route == "intake/template":

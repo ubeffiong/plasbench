@@ -285,6 +285,9 @@ and a plasmid FASTA gives sequence reassembly only; anything else is a validatio
 from conda, pip, an **https** URL (`method = url`, optionally pinned with a sha256; archives are extracted safely, nothing runs
 at validation) or a file or folder on this computer (`method = local`, copied with a recorded checksum by default). `format = auto`
 recognises the tool's output files by their content and fails loudly, listing what it saw, rather than guessing.
+### Q20d. What does each optional step or tool add, and how do I see the whole chain?
+**Answer.** On **Tools** and on **New benchmark** (step *Tools*), the **Workflow** view lays the run out as ordered steps (download, truth, assemble, tools, score, report, long-read tools, operational). Each tool or optional step has an On/Off switch, a one-line description, badges for what it needs (database, internet, an earlier step) and its added time, memory and disk per isolate; a bar at the top totals the selection and says *estimated*. Switching something that needs a disabled step offers to switch that on too. The figures are labelled: *measured* (real runs in `results_real_cohort1`: assembly, MOB-recon, Platon, plasmidSPAdes), *documented* (README or config.sh) or *not measured*, which is shown as such and left out of the total, never counted as zero. Off is plum with a cross and On is green with a tick; an item at its default shows its default state's colour and a *changed* tag marks what you altered.
+**Status.** Implemented here (`plasbench/workflow_steps.py`, `config/workflow_steps.tsv`; `test/test_workflow_steps.py`, `test/test_workflow_ui.py`). Most optional analyses have no timing yet.
 
 ### Q21. Is the per-plasmid side file safe against stale results?
 **Answer.** It is rewritten on each scoring run, but a tool removed from a later run leaves its old
