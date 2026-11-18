@@ -1538,6 +1538,10 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, {"checks": project.env_checks()})
             if route == "tools":
                 return self.jsend(200, {"tools": project.tools()})
+            # -- BEGIN scan a folder for isolates (plasbench/isolate_scan.py) --
+            if route == "isolates/scan/status":
+                return self.jsend(200, iso_scans().status(q.get("id", "")))
+            # -- END scan a folder for isolates --
             if route == "intake/defaults":
                 return self.jsend(200, project.intake_defaults())
             if route == "intake/template":
@@ -1790,6 +1794,35 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "validate":
                 ok, message = ui_schema.validate_argv(data.get("argv") or [])
                 return self.jsend(200, {"ok": ok, "message": message})
+            # -- BEGIN scan a folder for isolates (plasbench/isolate_scan.py): reads only until "add" --
+            if route == "isolates/scan":
+                folder = str(data.get("path") or "").strip()
+                if not folder:
+                    raise ValueError("choose a folder to scan")
+                if not Path(folder).expanduser().is_dir():
+                    raise ValueError(f"{folder} is not a folder that can be read from here")
+                depth = max(1, min(int(data.get("max_depth") or 6), 12))
+                return self.jsend(200, {"id": iso_scans().start(Path(folder).expanduser(), depth)})
+            if route == "isolates/scan/cancel":
+                return self.jsend(200, iso_scans().cancel(str(data.get("id") or "")))
+            if route == "isolates/add":
+                from . import isolate_scan
+                item = iso_scans().get(str(data.get("scan_id") or ""))
+                if item["state"] != "done":
+                    raise ValueError("that scan is not finished; scan again")
+                data_dir, samples = project.intake_paths(data)
+                chosen = data.get("selections") or {}
+                if not isinstance(chosen, dict):
+                    raise ValueError("selections must be an object")
+                include = {str(x) for x in (data.get("include") or [])}
+                link = str(data.get("link") or "copy")
+                if link not in ("copy", "symlink", "hardlink"):
+                    raise ValueError("link must be copy, symlink or hardlink")
+                done = isolate_scan.stage(item["result"]["samples"], data_dir, samples, link=link, confirm=bool(data.get("confirm")),
+                                          selections=chosen, root=project.root, include=include)
+                session_log().event("isolates_added_from_folder", isolates=len(done["staged"]), samples=str(samples))
+                return self.jsend(200, done)
+            # -- END scan a folder for isolates --
             if route.startswith("intake/"):
                 module = project.intake()
                 what = route[len("intake/"):]
@@ -2211,6 +2244,17 @@ class _LaunchLock:
                 self.path.unlink()
             except OSError:
                 pass
+
+
+_ISO_SCANS = []
+
+
+def iso_scans():
+    """The window's background folder scans (plasbench/isolate_scan.Scans): start, poll, cancel. Bounded; a scan only reads."""
+    if not _ISO_SCANS:
+        from .isolate_scan import Scans
+        _ISO_SCANS.append(Scans())
+    return _ISO_SCANS[0]
 
 
 def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: bool = True, tab: bool = False,

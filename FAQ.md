@@ -621,6 +621,10 @@ the independent-truth subset of public-v4 is still to be done.
 **Answer.** In the study folder: `logs/run_<date>-<time>.log` is everything the run printed, including the heartbeats (`logs/run.latest.log` points at the newest; the newest 20 are kept, `LOG_RETENTION_RUNS`; `RUN_CONSOLE_LOG=0` turns it off); `logs/<sample>.<step>.log` is each tool's own output; `results/run_events.jsonl` has one JSON line per event (stage start and end, isolate steps, command start and end with exit code and seconds, heartbeats with CPU and memory, warnings), safe to read by machine; `results/stage_timing.tsv` has seconds per stage. Events carry names and numbers only, never environment variables or commands.
 **Status.** New after v0.5.0.
 
+### Q59. My reads and reference genomes are in one big folder. Do I have to name every file?
+**Answer.** No. Use **Your own isolates > Scan a folder** in the window, or `plasbench scan-isolates FOLDER` (add `--write-sheet config/local.tsv` to place what it finds). It looks through the sub-folders, pairs the reads by their names (`_R1/_R2`, `_1/_2`, lanes, SRA style), picks the complete reference for each isolate and tells you why, and ignores BAMs, logs, PDFs, spreadsheets and assembler output such as `contigs.fasta`. It changes nothing in your folder; whatever it is unsure of is shown as an issue with the alternatives, never chosen silently. **Limit.** It matches by folder and file names and the start of each file, so a reference sitting in the right folder but from another strain looks right; check every isolate marked "check" and run the quick test. See the guide section "Add isolates from a folder".
+**Status.** New after v0.5.0.
+
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions

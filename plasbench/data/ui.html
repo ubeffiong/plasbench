@@ -837,6 +837,24 @@ body.gd-open #gdrawer{transform:none}
       <div class="row wrap" style="margin:10px 0"><button class="btn" id="in_run"><svg class="ico sm"><use href="#i-check"/></svg>Run the quick test</button><button class="btn sec" id="in_fix" hidden><svg class="ico sm"><use href="#i-refresh"/></svg>Fix what can be fixed</button><span class="mut small" id="in_run_msg"></span></div>
       <div id="in_result"></div>
      </div></div>
+    <!-- BEGIN scan a folder (plasbench/isolate_scan.py) -->
+    <div class="card" id="sc_card">
+     <div class="hd"><h3>Scan a folder</h3><span class="sub">plasbench scan-isolates</span></div>
+     <div class="bd" style="padding:12px 14px">
+      <p class="mut" style="margin-top:0">Point at ONE folder, even a messy one with sub-folders and unrelated files. PlasBench looks for each isolate's paired reads and its complete reference, shows what it would use and why, and flags anything it is not sure of. <b>Scanning never changes your folder</b>, and nothing is added until you press <b>Add selected isolates</b>.</p>
+      <details class="small" style="margin-bottom:10px"><summary>What is recognised</summary>
+       <ul class="flow"><li><b>Reads:</b> FASTQ pairs named _R1/_R2, _1/_2, .1/.2 or _R1_001/_R2_001 (.fastq or .fq, gzipped). Illumina lanes (_L001, _L002) of one isolate are listed and flagged: you confirm before they are joined.</li>
+        <li><b>Reference:</b> a plain FASTA of the complete genome. Assembler output (contigs.fasta, scaffolds.fasta, assembly.fasta in SPAdes, Unicycler or Flye folders, NODE_ headers) is never taken as a reference.</li>
+        <li><b>Also used:</b> sequence_report.jsonl and truth tables (truth.tsv) that sit with an isolate.</li>
+        <li><b>Ignored and counted:</b> alignments (BAM), documents, spreadsheets, logs, hidden folders, .git, results and logs folders, long reads (not used here).</li>
+        <li><b>Limits:</b> matching uses folder and file names; check the reference of every isolate marked "check" before you rely on it.</li></ul></details>
+      <div class="row wrap"><button class="btn sec" id="sc_pick"><svg class="ico sm"><use href="#i-folder"/></svg>Choose a folder…</button>
+       <input type="text" id="sc_path" placeholder="or paste a folder path" aria-label="Folder to scan" style="flex:1;min-width:220px">
+       <button class="btn" id="sc_go"><svg class="ico sm"><use href="#i-play"/></svg>Scan</button><button class="btn sec" id="sc_cancel" hidden>Cancel scan</button></div>
+      <div class="mut small" id="sc_msg" role="status" aria-live="polite" style="margin-top:6px"></div>
+      <div id="sc_out" style="margin-top:10px"></div>
+     </div></div>
+    <!-- END scan a folder -->
     <div class="card" id="isoform"></div>
    </div>
   </section>
@@ -3205,6 +3223,104 @@ $("#lb_save").onclick = async () => {
   } catch (e) { toast(e.message, "bad"); }
 };
 
+/* ---- BEGIN scan a folder (plasbench/isolate_scan.py) ---- */
+/* BEGIN isoscan helpers (pure) */
+const scnBase = p => String(p || "").split(/[\\/]/).pop();
+const scnProgressText = p => p ? `Looked at ${(p.files || 0).toLocaleString()} files in ${(p.folders || 0).toLocaleString()} folders…` : "";
+const scnLevel = l => l === "error" ? ["bad", "blocked"] : l === "warn" ? ["warn", "check"] : ["", "note"];
+const scnStatus = st => ({ready: ["ok", "ready"], review: ["warn", "check"], blocked: ["bad", "blocked"]}[st] || ["", st]);
+function scnPayload(samples, edits, checked) {
+  const include = [], selections = {};
+  for (const s of samples) {
+    if (!checked[s.sample_id]) continue;
+    include.push(s.sample_id);
+    const e = edits[s.sample_id] || {}, sel = {};
+    if (e.reference !== undefined) sel.reference = e.reference;
+    if (e.reads_1) sel.reads_1 = e.reads_1;
+    if (e.new_id) sel.new_id = e.new_id;
+    if (Object.keys(sel).length) selections[s.sample_id] = sel;
+  }
+  return {include, selections};
+}
+const scnNeedsConfirm = (samples, checked) => samples.some(s => checked[s.sample_id] && s.issues.some(i => i.level === "warn"));
+const scnWhy = s => [["Reads", s.why.reads], ["Reference", s.why.reference], ["Sequence report", s.why.sequence_report], ["Truth table", s.why.truth]].filter(x => x[1] && x[1].length)
+  .map(x => [x[0], x[1].join("; ")]);
+/* END isoscan helpers */
+const SCN = {id: null, samples: [], edits: {}, checked: {}};
+function scnSelect(id, options, current, attr, emptyLabel) {
+  const opts = (emptyLabel ? [{value: "", label: emptyLabel}] : []).concat(options);
+  return `<select data-${attr}="${esc(id)}" aria-label="${esc(attr)} for ${esc(id)}" style="max-width:240px">${opts.map(o => `<option value="${esc(o.value)}"${o.value === current ? " selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
+}
+function scnRow(s) {
+  const [c, t] = scnStatus(s.status), id = s.sample_id;
+  const refs = s.reference ? [{value: s.reference, label: scnBase(s.reference)}].concat(s.alternatives.reference.map(a => ({value: a.path, label: scnBase(a.path) + " (alternative)"}))) : s.alternatives.reference.map(a => ({value: a.path, label: scnBase(a.path)}));
+  const reads = s.alternatives.reads.length ? [{value: s.reads_1 || "", label: scnBase(s.reads_1) + " + " + scnBase(s.reads_2)}].concat(s.alternatives.reads.map(a => ({value: a.reads_1 || "", label: scnBase(a.reads_1) + " + " + scnBase(a.reads_2) + " (alternative)"}))) : null;
+  const tip = tipBtn({summary: `Why these files for ${id}`, choices: scnWhy(s)}, "why these files");
+  const lanes = s.lanes.length ? `<div class="mut small">${s.lanes.length} lanes, joined after you confirm: ${s.lanes.map(l => esc(scnBase(l.reads_1))).join(", ")}</div>` : "";
+  return `<tr data-sc="${esc(id)}"><td><input type="checkbox" data-sccheck="${esc(id)}" ${SCN.checked[id] ? "checked" : ""} ${s.status === "blocked" ? "disabled" : ""} aria-label="Include ${esc(id)}"></td>
+    <td><input type="text" data-scid="${esc(id)}" value="${esc(id)}" style="width:140px" aria-label="Sample name"></td>
+    <td class="small">${reads ? scnSelect(id, reads, s.reads_1 || "", "screads") : `${esc(scnBase(s.reads_1) || "none")} + ${esc(scnBase(s.reads_2) || "missing")}`}${lanes}</td>
+    <td class="small">${scnSelect(id, refs, s.reference || "", "scref", "(none: reads only, not scored)")}</td>
+    <td><span class="tag ${c}">${t}</span> <span class="mut small">${esc(s.confidence)}</span> ${tip}</td>
+    <td class="small">${s.issues.filter(i => i.level !== "info").map(i => { const [lc, lt] = scnLevel(i.level); return `<div style="margin:3px 0"><span class="tag ${lc}">${lt}</span> ${esc(i.message)}</div>`; }).join("") || '<span class="mut">no issues</span>'}</td></tr>`;
+}
+function scnRender(res) {
+  SCN.samples = res.samples; SCN.edits = {}; SCN.checked = {};
+  for (const s of res.samples) SCN.checked[s.sample_id] = s.status === "ready";
+  const skipped = Object.entries(res.skipped || {}).map(([k, n]) => `${n} × ${k.replace(/_/g, " ")}`);
+  const notes = (res.warnings || []).map(w => `<div class="note warn" style="margin-bottom:6px"><svg class="ico"><use href="#i-alert"/></svg><div>${esc(w)}</div></div>`).join("");
+  const ignored = (res.unrecognised || []).map(u => `<li><b>${u.count}</b> ${esc(u.kind)}${u.examples.length ? ` <span class="mut">(${u.examples.map(x => esc(scnBase(x))).join(", ")}${u.count > u.examples.length ? ", …" : ""})</span>` : ""}</li>`).join("");
+  $("#sc_out").innerHTML = notes + (res.samples.length ? `<div class="mut small" style="margin-bottom:6px">${res.samples.length} isolate${res.samples.length === 1 ? "" : "s"} found in ${res.files_seen.toLocaleString()} files. Change a choice with the drop-downs; tick what you want.</div>
+    <div style="overflow:auto"><table class="data"><thead><tr><th></th><th>Isolate</th><th>Reads</th><th>Reference</th><th>Confidence</th><th>Issues</th></tr></thead><tbody id="sc_tb">${res.samples.map(scnRow).join("")}</tbody></table></div>
+    <div class="row wrap" style="margin-top:10px"><button class="btn" id="sc_add">${icon("plus")}Add selected isolates</button>
+     <label class="row small">How: <select id="sc_link" aria-label="How to place the files"><option value="copy">copy the files</option><option value="hardlink">hard-link</option><option value="symlink">symbolic link</option></select></label>
+     <span class="mut small">Your folder is never changed. They go to the sample sheet and data folder under "Quick test" below.</span></div>` : `<div class="note info"><svg class="ico"><use href="#i-info"/></svg><div>No isolates were found. Isolates need paired FASTQ files (for example name_R1.fastq.gz and name_R2.fastq.gz).</div></div>`)
+    + (ignored || skipped.length ? `<details class="small" style="margin-top:8px"><summary>Ignored and skipped</summary><ul class="flow">${ignored}${skipped.length ? `<li>Skipped: ${skipped.map(esc).join(", ")}</li>` : ""}</ul></details>` : "")
+    + `<div id="sc_res" style="margin-top:8px"></div>`;
+}
+$("#sc_out").addEventListener("change", ev => {   // edits are recorded, never re-rendered: a long list does not flicker or lose focus
+  const el = ev.target, d = el.dataset;
+  if (d.sccheck !== undefined) { SCN.checked[d.sccheck] = el.checked; return; }
+  const sid = d.scref ?? d.screads ?? d.scid; if (sid === undefined) return;
+  const e = SCN.edits[sid] = SCN.edits[sid] || {};
+  if (d.scref !== undefined) e.reference = el.value;
+  if (d.screads !== undefined) e.reads_1 = el.value;
+  if (d.scid !== undefined) e.new_id = el.value.trim() === sid ? "" : el.value.trim();
+});
+$("#sc_out").addEventListener("click", ev => { if (ev.target.closest("#sc_add")) scnAdd(); });
+$("#sc_pick").onclick = () => pickPath(true, p => { $("#sc_path").value = p; }, "Choose the folder to scan");
+$("#sc_path").onkeydown = e => { if (e.key === "Enter") $("#sc_go").click(); };
+$("#sc_go").onclick = async () => {
+  const path = $("#sc_path").value.trim(); if (!path) return toast("Choose a folder to scan", "bad");
+  $("#sc_go").disabled = true; $("#sc_cancel").hidden = false; $("#sc_out").innerHTML = ""; $("#sc_msg").textContent = "Starting…";
+  try {
+    SCN.id = (await api("isolates/scan", {path})).id;
+    for (;;) {
+      await sleep(600);
+      const st = await api(`isolates/scan/status?id=${encodeURIComponent(SCN.id)}`);
+      if (st.state === "running") { $("#sc_msg").textContent = scnProgressText(st.progress); continue; }
+      if (st.state === "error") throw new Error(st.error);
+      $("#sc_msg").textContent = st.state === "cancelled" ? "Scan cancelled: the list below is incomplete." : "Scan finished.";
+      scnRender(st.result); break;
+    }
+  } catch (e) { $("#sc_msg").textContent = ""; toast(e.message, "bad"); }
+  $("#sc_go").disabled = false; $("#sc_cancel").hidden = true;
+};
+$("#sc_cancel").onclick = async () => { try { await api("isolates/scan/cancel", {id: SCN.id}); $("#sc_msg").textContent = "Cancelling…"; } catch (e) { toast(e.message, "bad"); } };
+async function scnAdd() {
+  const {include, selections} = scnPayload(SCN.samples, SCN.edits, SCN.checked);
+  if (!include.length) return toast("Tick at least one isolate", "bad");
+  const confirm = scnNeedsConfirm(SCN.samples, SCN.checked);
+  if (confirm && !(await askConfirm({title: "Add isolates that need review?", body: "Some ticked isolates have a 'check' note (for example lanes to be joined, or a reference chosen by a narrow margin). Adding them means you have read those notes.", confirmLabel: "Add them", cancelLabel: "Go back"}))) return;
+  $("#sc_add").disabled = true;
+  try {
+    const r = await api("isolates/add", {scan_id: SCN.id, include, selections, confirm, link: $("#sc_link").value, data_dir: $("#in_data").value.trim(), samples: $("#in_sheet").value.trim()});
+    $("#sc_res").innerHTML = r.results.map(x => `<div class="small">${x.ok ? icon("check") : icon("x")} <b>${esc(x.sample_id)}</b> ${x.ok ? "added" : "not added"}${x.messages.length && !x.ok ? `: ${esc(x.messages.join(" "))}` : ""}</div>`).join("");
+    if (r.staged.length) { $("#in_sheet").value = r.samples; toast(`${r.staged.length} isolate${r.staged.length === 1 ? "" : "s"} added`, "ok"); }
+  } catch (e) { toast(e.message, "bad"); }
+  $("#sc_add").disabled = false;
+}
+/* ---- END scan a folder ---- */
 async function loadIsolates() {
   inFolders(); inInit().catch(e => toast(e.message, "bad"));
   await getSchema(); const c = command("init-local");

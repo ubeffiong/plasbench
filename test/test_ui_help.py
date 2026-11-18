@@ -34,7 +34,7 @@ def check(name, ok, detail=""):
 def main():
     sch = ui_schema.schema()
     cmds = {c["name"]: c for c in sch["commands"]}
-    for name in ("run", "demo", "reconstruct", "report", "intake"):
+    for name in ("run", "demo", "reconstruct", "report", "intake", "scan-isolates"):
         args = cmds[name]["args"]
         empty = [a["dest"] for a in args if not (a.get("tooltip") or {}).get("summary")]
         check(f"{name}: every argument has tooltip text", args and not empty, empty)

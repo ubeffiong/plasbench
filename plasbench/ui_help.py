@@ -143,6 +143,17 @@ _RECONSTRUCT = {
     "log_dir": {"summary": "Directory for tool logs.", "when": "Leave empty for the configured logs folder."},
 }
 
+_SCAN = {
+    "folder": {"summary": "The folder to look through; sub-folders are searched. Nothing in it is changed."},
+    "json": {"summary": "Print the full result as JSON (for scripts) instead of a table."},
+    "max_depth": {"summary": "How many folder levels below FOLDER to look into.", "when": "Raise it only if your files are nested deeper than 6 levels."},
+    "max_files": {"summary": "Stop after looking at this many files, so a huge folder cannot hang the scan."},
+    "write_sheet": {"summary": "After the scan, place each complete isolate and write or append this sample sheet, using the same code as init-local.", "when": "Leave empty to only look."},
+    "data_dir": {"summary": "Where each isolate gets its own folder when placing.", "when": "Leave empty for the configured data folder."},
+    "link": {"summary": "How the input files are placed when writing the sheet.", "choices": {"copy": "Copy the files (uses disk space, original untouched).", "symlink": "Make symbolic links to the originals.", "hardlink": "Make hard links (no extra space, same disk only)."}},
+    "yes": {"summary": "Also place isolates that only need review (for example lanes to be joined). Isolates with an error are never placed."},
+}
+
 _INTAKE = {
     "action": {"summary": "What to do with your own isolates.",
                "choices": {"template": "Write a sample sheet (or truth table) to fill in, with the rules as comments.",
@@ -157,7 +168,7 @@ _DEMO = {
     "no_report_prompt": dict(_RUN["no_report_prompt"], summary="Do not offer to open the completed demo report. The window always sets this so the run never stops to ask a question."),
 }
 
-ARGS = {"run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONSTRUCT, "intake": _INTAKE}
+ARGS = {"run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONSTRUCT, "intake": _INTAKE, "scan-isolates": _SCAN}
 
 # Wizard controls that are not command-line options. Keys are the control names used by the page.
 WIZARD = {
