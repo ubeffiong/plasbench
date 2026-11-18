@@ -776,6 +776,8 @@ Stage 1 downloads each isolate's reference assembly and its paired reads.
 | `ENA_SIZE_LOOKUP` | `1` | `0` skips the ENA size lookup for the estimate. |
 | `ENA_PORTAL_URL` | ENA's file-report address | Point the lookup at a mirror. |
 
+**Run status in the window.** Every ongoing run on the Runs page, and the panel that appears under the console when a run has printed nothing for a while, has a Run status panel: a chip (Running / Finished / Stopped: cut off / Not running), what the run is doing now (stage, isolate, step and how long that command has run), CPU and memory of the run's processes, this computer's free memory, swap and disk, the progress counts, the newest log with its age and last line, and a "What this means" list of plain-words hints with the evidence behind each (shown as a warning only when they mention memory or disk). It refreshes every 5 seconds while it is on screen. Buttons: Refresh, Copy diagnosis (a text to paste into a message), Open the console log and Open run_events.jsonl. The "Downloads and reliability" card of New benchmark has a checkbox, on by default, to keep a console log of the run in the study (`logs/run_*.log`; `RUN_CONSOLE_LOG=0` when unchecked) and a field for how many are kept (`LOG_RETENTION_RUNS`, default 20).
+
 ### Where your data and studies live
 
 Two different things are stored on disk, and each can be placed where you want.

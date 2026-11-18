@@ -249,6 +249,7 @@ dialog.pbdlg .ft{flex-wrap:wrap}
 #tipbox{position:fixed;z-index:400;max-width:min(380px,calc(100vw - 24px));box-sizing:border-box;padding:10px 12px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 24px #0003;font-size:12.5px;line-height:1.45;overflow:auto;max-height:70vh}
 #tipbox[hidden]{display:none}#tipbox p{margin:0 0 6px}#tipbox dl{margin:0 0 6px;display:grid;grid-template-columns:auto 1fr;gap:3px 10px}#tipbox dt{font-weight:600}#tipbox dd{margin:0;color:var(--fg-2)}
 #tipbox .tmeta{color:var(--mut);font-size:12px;margin:2px 0 0}#tipbox .twhen{margin:6px 0 0;padding-top:6px;border-top:1px solid var(--line-2);color:var(--fg-2)}
+.rspanel{margin:8px 0 0;padding:8px 10px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface-2)}.rs-row{font-size:13px}.rs-hints{margin:2px 0 0;padding-left:18px}.rsbox{margin-top:6px;padding-top:6px;border-top:1px solid var(--term-line)}
 .stallnote{margin:8px 0 0;padding:8px 10px;border:1px solid var(--warn);border-left-width:3px;border-radius:4px;background:var(--surface-2);color:var(--fg);font-size:12.5px;line-height:1.45}
 .stallnote .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.stallnote ul{margin:6px 0 0;padding-left:18px;font-family:var(--mono,monospace);font-size:11.5px;word-break:break-all}
 #cstall{flex:none;padding:6px 12px;background:var(--term-head);color:var(--term-fg);border-bottom:1px solid var(--term-line);font-size:12px;max-height:40%;overflow:auto}
@@ -1305,7 +1306,7 @@ function stageLine(s) {
 function sessCard(s) {
   const pr = s.progress || {}, open = S.sessOpen.has(s.id);
   const dur = fmtDur((s.ended || Date.now() / 1000) - s.started);
-  const chip = {ongoing: s.state === "cancelling" ? "Cancelling" : s.display_state === "stalled" ? (quietWorking(s.id, "stalled") ? "Working (quiet log)" : "No new output for a while") : s.display_state === "retrying" ? "Retrying a failed tool" : "Running", completed: s.display_state === "completed_with_warnings" ? "Completed with warnings" : "Completed"}[s.group] || ({failed: "Failed", interrupted: "Interrupted", cancelled: "Cancelled"}[s.state] || s.state);
+  const chip = {ongoing: s.state === "cancelling" ? "Cancelling" : s.display_state === "stalled" ? (quietWorking(s.id, "stalled") ? "Working (quiet log)" : (rsFirstHint(s.results).slice(0, 70) || "No new output for a while")) : s.display_state === "retrying" ? "Retrying a failed tool" : "Running", completed: s.display_state === "completed_with_warnings" ? "Completed with warnings" : "Completed"}[s.group] || ({failed: "Failed", interrupted: "Interrupted", cancelled: "Cancelled"}[s.state] || s.state);
   const pct = s.group === "completed" ? 100 : pr.percent;
   const bar = s.group === "ongoing" && pct == null ? `<div class="sbar ind"><i></i></div>` : `<div class="sbar"><i style="width:${pct == null ? (s.group === "attention" ? 8 : 0) : pct}%"></i></div>`;
   const run = s.run_index != null ? (S.runs || [])[s.run_index] : null;
@@ -1330,6 +1331,7 @@ function sessCard(s) {
     ${s.group === "completed" ? "" : bar}${stageLine(s) ? `<div class="small">${esc(stageLine(s))}${pct != null && s.group === "ongoing" ? ` · about ${pct}%` : ""}</div>` : ""}
     ${s.group !== "completed" && pr.last_line ? `<div class="last" title="${esc(pr.last_line)}">${esc(pr.last_line)}</div>` : ""}
     ${s.group === "ongoing" && s.display_state === "stalled" ? `<div class="stallnote" role="status">${esc(STALL_TEXT(s.idle_seconds))}<div class="acts"><button class="btn sec sm" data-sa="activity">Check activity</button><button class="btn danger sm" data-sa="cancel">Cancel</button></div>${activityHTML(S.act[s.id])}<div class="small mut" style="margin-top:4px">Resume is offered under Needs attention after a cancel.</div></div>` : ""}
+    ${s.group === "ongoing" && s.results ? rsPanel(s.results) : ""}
     <div class="acts">${acts.filter(Boolean).join("")}</div>${detail}</div>`;
 }
 /* Runs started outside the window (the Terminal tab, a shell): read-only, never cancellable from here. */
@@ -1436,6 +1438,64 @@ async function refreshJobs() {
   if ($("#pjbadge")) { $("#pjbadge").hidden = !nrun; $("#pjbadge").textContent = nrun; }
 }
 const WARN_EXPLAIN = "The run finished (the process exited normally, exit 0) but at least one tool run failed. Scores and the report cover only the tools that worked; the failed ones and their reasons are listed in tool_status.tsv and the console output.";
+/* ---- Run status panel: what a run is doing now (from the server's run_status summary), with plain-words hints and their evidence ---- */
+S.rs = S.rs || {};   // results folder -> {t, data, sig}
+const rsPick = (o, ...keys) => { for (const k of keys) if (o && o[k] != null && o[k] !== "") return o[k]; return null; };
+const rsState = d => { const v = String(rsPick(d, "state", "status") || "").toLowerCase();
+  return /run/.test(v) && !/not/.test(v) ? ["Running", "run"] : /finish|complete|done/.test(v) ? ["Finished", "ok"] : /stop|cut|interrupt|cancel/.test(v) ? ["Stopped: cut off", "bad"] : ["Not running", ""]; };
+const rsDur = s => s == null || isNaN(s) ? "" : fmtDur(+s);
+const rsBytes = n => n == null || isNaN(n) ? "" : fmtGBytes(+n);
+function rsHints(d) {
+  const hints = rsPick(d, "hints", "what_this_means") || [];
+  return (Array.isArray(hints) ? hints : [hints]).map(h => typeof h === "string" ? {text: h, evidence: ""} : {text: h.text || h.hint || h.message || "", evidence: h.evidence || h.why || ""}).filter(h => h.text);
+}
+const rsAlarm = h => /memory|swap|disk|space|oom|out of/i.test(h.text);
+/* the first hint, to show in place of the generic "no new output" text when a status exists */
+const rsFirstHint = path => { const e = S.rs[path]; const h = e && rsHints(e.data)[0]; return h ? h.text : ""; };
+function rsHTML(path) {
+  const e = S.rs[path]; if (!e) return `<div class="small mut">Loading the run status…</div>`;
+  const d = e.data || {}, [chip, kind] = rsState(d), now = rsPick(d, "now", "current") || {}, mach = rsPick(d, "machine", "system") || {}, prog = rsPick(d, "progress", "counts") || {}, log = rsPick(d, "newest_log", "log") || {};
+  if (d.error && (d.state === "no-run" || !d.state)) return `<div class="small mut">${esc("No run status is available: " + d.error)}</div>`;
+  const nowBits = [rsPick(now, "stage") != null ? `stage ${rsPick(now, "stage")}` : "", rsPick(now, "isolate", "sample") ? `isolate ${rsPick(now, "isolate", "sample")}` : "", rsPick(now, "step", "tool", "command") ? `step ${rsPick(now, "step", "tool", "command")}` : ""].filter(Boolean).join(", ");
+  const ran = rsDur(rsPick(now, "seconds", "running_seconds", "elapsed_seconds")), cpu = rsPick(d, "cpu_percent", "cpu"), mem = rsPick(d, "memory_bytes", "rss_bytes", "memory"), cpuC = rsPick(now, "cpu_percent"), memC = rsPick(now, "memory_bytes");
+  const procs = [cpu != null || cpuC != null ? `CPU ${Math.round(cpu ?? cpuC)}%` : "", mem != null || memC != null ? `memory ${rsBytes(mem ?? memC)}` : ""].filter(Boolean).join(" · ");
+  const machine = [rsPick(mach, "free_memory_bytes", "mem_free_bytes", "free_memory") != null ? `free memory ${rsBytes(rsPick(mach, "free_memory_bytes", "mem_free_bytes", "free_memory"))}` : "", rsPick(mach, "swap_used_bytes", "swap_bytes", "swap") != null ? `swap in use ${rsBytes(rsPick(mach, "swap_used_bytes", "swap_bytes", "swap"))}` : "", rsPick(mach, "disk_free_bytes", "free_disk_bytes", "disk_free") != null ? `free disk ${rsBytes(rsPick(mach, "disk_free_bytes", "free_disk_bytes", "disk_free"))}` : ""].filter(Boolean).join(" · ");
+  const counts = Object.entries(prog).filter(([, v]) => typeof v === "number" || typeof v === "string").map(([k, v]) => `${esc(k.replace(/_/g, " "))} ${esc(v)}`).join(" · ");
+  const logLine = rsPick(log, "last_line", "line"), logAge = rsPick(log, "age_seconds", "idle_seconds"), logName = rsPick(log, "name", "path", "file");
+  const hints = rsHints(d);
+  return `<div class="rs-row"><span class="badge ${kind === "ok" ? "ok" : kind === "bad" ? "bad" : kind === "run" ? "run" : ""}">${esc(chip)}</span>${nowBits ? ` <b>Now:</b> ${esc(nowBits)}${ran ? `; this command has run ${esc(ran)}` : ""}` : ""}</div>
+    ${procs ? `<div class="small">${esc(procs)}</div>` : ""}${machine ? `<div class="small mut">This computer: ${esc(machine)}</div>` : ""}${counts ? `<div class="small mut">${counts}</div>` : ""}
+    ${logName ? `<div class="small mut">Newest log: <span class="mono">${esc(String(logName).split(/[\\/]/).pop())}</span>${logAge != null ? `, last written ${esc(rsDur(logAge))} ago` : ""}${logLine ? `: <span class="mono">${esc(String(logLine).slice(0, 200))}</span>` : ""}</div>` : ""}
+    ${hints.length ? `<div class="small" style="margin-top:4px"><b>What this means</b><ul class="rs-hints">${hints.map(h => `<li class="${rsAlarm(h) ? "bad-t" : ""}">${esc(h.text)}${h.evidence ? ` <span class="mut">(${esc(h.evidence)})</span>` : ""}</li>`).join("")}</ul></div>` : ""}`;
+}
+const rsButtons = path => `<div class="acts"><button class="btn sec sm" data-rsa="refresh" data-rs-path="${esc(path)}" title="Ask for the status again now">Refresh</button><button class="btn sec sm" data-rsa="copy" data-rs-path="${esc(path)}" title="Copy a plain-text diagnosis of this run (to paste into a message)">Copy diagnosis</button><button class="btn ghost sm" data-rsa="log" data-rs-path="${esc(path)}" title="Open the run's console log (logs/run.latest.log) in this window">Open the console log</button><button class="btn ghost sm" data-rsa="events" data-rs-path="${esc(path)}" title="Open run_events.jsonl: one line per event of the run">Open run_events.jsonl</button></div>`;
+const rsPanel = path => `<div class="rspanel" data-rs="${esc(path)}" aria-label="Run status"><div class="rs-body">${rsHTML(path)}</div>${rsButtons(path)}</div>`;
+async function rsFetch(path, force) {
+  const e = S.rs[path]; if (!force && e && Date.now() - e.t < 2500) return false;
+  let data; try { data = await api(`runs/status?path=${encodeURIComponent(path)}`); } catch (err) { data = {state: "no-run", error: err.message}; }
+  const sig = JSON.stringify(data, (k, v) => k === "text" ? undefined : v), changed = !e || e.sig !== sig;
+  S.rs[path] = {t: Date.now(), data, sig}; return changed;
+}
+/* One poll for everything that is showing: the Runs page's ongoing runs and the console's stalled panel. Only while the tab is visible, never while a dialog or a menu is open. */
+async function rsPoll() {
+  if (document.hidden || uiBusy([])) return;
+  const paths = new Set();
+  if ($("#v_runs") && !$("#v_runs").hidden) (S.sessions || []).filter(x => x.group === "ongoing" && x.results).forEach(x => paths.add(x.results));
+  const sj = S._stallJob; if (sj && sj.results && $("#cstall") && !$("#cstall").hidden) paths.add(sj.results);
+  let changed = false; for (const p of paths) if (await rsFetch(p)) changed = true;
+  if (changed) { if (!$("#v_runs").hidden) renderSessions(); paintStall(); }
+}
+setInterval(rsPoll, 5000);
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-rsa]"); if (!b) return;
+  const path = b.dataset.rsPath, sep = S.info?.sep || "/", logs = path.replace(/[\\/]results[^\\/]*$/, "") + sep + "logs";
+  try {
+    if (b.dataset.rsa === "refresh") { await rsFetch(path, true); renderSessions(); paintStall(); }
+    else if (b.dataset.rsa === "copy") { await rsFetch(path, true); const t = (S.rs[path].data || {}).text; if (t) await copyText(t, "Diagnosis copied"); else toast("No diagnosis text is available for this run yet", "bad"); }
+    else if (b.dataset.rsa === "log") openDoc({kind: "file", path: logs + sep + "run.latest.log", name: "run.latest.log"});
+    else if (b.dataset.rsa === "events") { const d = (S.rs[path] || {}).data || {}; openDoc({kind: "file", path: d.events_file || (path + sep + "run_events.jsonl"), name: "run_events.jsonl"}); }
+  } catch (err) { toast(err.message, "bad"); }
+});
 /* ---- a run that has printed nothing for a while: say what that means, and let the user look at what it is writing ---- */
 S.act = S.act || {};   // job id -> {status, files, t}: the last "Check activity" answer
 const stallMinutes = s => Math.max(1, Math.round((s || 0) / 60));
@@ -1458,7 +1518,8 @@ function paintStall() {
   const id = S.consJob, st = S._stallJob;
   if (!st || st.id !== id) { box.hidden = true; return; }
   box.hidden = false;
-  box.innerHTML = `<div>${esc(STALL_TEXT(st.idle))}</div><div style="margin-top:4px"><button data-st-act="activity">Check activity</button><button data-st-act="cancel">Cancel</button><span class="mut small">Cancel keeps finished work; Resume then appears under Runs &rarr; Needs attention.</span></div>${activityHTML(S.act[id])}`;
+  const hint = st.results ? rsFirstHint(st.results) : "";
+  box.innerHTML = `<div>${esc(hint || STALL_TEXT(st.idle))}</div><div style="margin-top:4px"><button data-st-act="activity">Check activity</button><button data-st-act="cancel">Cancel</button><span class="mut small">Cancel keeps finished work; Resume then appears under Runs &rarr; Needs attention.</span></div>${activityHTML(S.act[id])}${st.results ? `<div class="rsbox">${rsHTML(st.results)}${rsButtons(st.results)}</div>` : ""}`;
 }
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-st-act]"); if (!b || !$("#cstall").contains(b)) return;
@@ -1510,7 +1571,7 @@ async function pollConsole(force) {
     const shown0 = quietWorking(j.id, j.display_state) ? "working_quiet" : (j.display_state || j.state);
     st.textContent = stateWord(shown0) + (j.exit != null && j.state !== "done" ? ` (exit ${j.exit})` : "");
     st.title = j.display_state === "stalled" ? STALL_TEXT(j.idle_seconds) : "";
-    if (j.display_state === "stalled") { const fresh = !S._stallJob || S._stallJob.id !== j.id; S._stallJob = {id: j.id, idle: j.idle_seconds}; if (fresh && !S.act[j.id]) checkActivity(j.id); paintStall(); }
+    if (j.display_state === "stalled") { const fresh = !S._stallJob || S._stallJob.id !== j.id; S._stallJob = {id: j.id, idle: j.idle_seconds, results: j.results || ""}; if (j.results && !S.rs[j.results]) rsFetch(j.results).then(() => paintStall()); if (fresh && !S.act[j.id]) checkActivity(j.id); paintStall(); }
     else if (S._stallJob) { S._stallJob = null; paintStall(); }
     $("#ccancel").hidden = j.state !== "running";
     if (S.follow) $("#clog").scrollTop = $("#clog").scrollHeight;
@@ -2868,6 +2929,8 @@ function renderWizard() {
         ${ef("allow_all_failed", "Continue when every tool failed", "allow_all_tools_failed", `<label class="switch"><input type="checkbox" id="we_allow_all_failed" data-wenv="allow_all_failed" ${E.allow_all_failed ? "checked" : ""}><span></span></label>`, "Sets ALLOW_ALL_TOOLS_FAILED=1.")}
         ${ef("retries", "Download retries", "network_retries", num("retries", "3", 1), "Empty = the default, 3.")}
         ${ef("connections", "Parallel downloads per isolate", "ena_download_connections", num("connections", "4", 1), "Empty = the default, 4. Applies to ENA downloads.")}
+        ${ef("console_log", "Keep a console log of the run in the study (logs/run_*.log)", "console_log", `<label class="switch"><input type="checkbox" id="we_console_log" data-wenv="console_log" ${E.console_log !== false ? "checked" : ""}><span></span></label>`, "On by default. Unchecked, the run is started with RUN_CONSOLE_LOG=0.")}
+        ${ef("log_runs", "Console logs kept", "log_retention_runs", num("log_runs", "20", 1), "Empty = the default, 20 runs.")}
       </div></details>` : "";
     const D = S.wizData = S.wizData || {mode: "shared", path: ""};
     const radio = (v, title, lines) => `<label class="choice ${D.mode === v ? "on" : ""}" style="margin-bottom:8px"><input type="radio" name="wdata" value="${v}" ${D.mode === v ? "checked" : ""}><span><b>${title}</b>${lines}</span></label>`;
@@ -2933,6 +2996,8 @@ function wizEnv() {
   if (E.allow_all_failed) d.ALLOW_ALL_TOOLS_FAILED = "1";
   if (n(E.retries)) d.NETWORK_RETRIES = String(E.retries);
   if (n(E.connections) && Number(E.connections) > 0) d.ENA_DOWNLOAD_CONNECTIONS = String(E.connections);
+  if (E.console_log === false) d.RUN_CONSOLE_LOG = "0";
+  if (n(E.log_runs) && Number(E.log_runs) > 0) d.LOG_RETENTION_RUNS = String(E.log_runs);
   return d;
 }
 const envPrefix = env => env && Object.keys(env).length ? Object.entries(env).map(([k, v]) => `${k}=${quote(String(v))}`).join(" ") + " " : "";
