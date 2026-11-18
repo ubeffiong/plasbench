@@ -350,6 +350,12 @@ EOF
  # RUN_DIFFICULTY_FEATURES) has no bioconda package at all -- there is no
  # profile for it here; see INSTALL.md for its manual-binary install steps.
  quast) PKGS=(quast);;
+ multiqc)
+    # Optional companion to the report's own QC panel (MULTIQC_REPORT, python/run_multiqc.py). Own environment, like the other tools with their own
+    # dependency set, so its Python and plotting libraries never touch the main one; pinned so the report it draws does not drift between installs.
+    install_isolated multiqc MultiQC "multiqc" "" "multiqc --version"         -c conda-forge -c bioconda -- "multiqc=1.25.2" "python=3.11"
+    exit $?
+    ;;
  plasme)
     # PLASMe is distributed as a git checkout with its own conda env file,
     # not a bioconda package -- there is no package for this profile to

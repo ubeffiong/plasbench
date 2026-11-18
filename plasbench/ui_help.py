@@ -218,6 +218,30 @@ SETTINGS = {
     "ENA_DOWNLOAD_CONNECTIONS": WIZARD["ena_download_connections"], "NETWORK_RETRIES": WIZARD["network_retries"],
     "RUN_CONSOLE_LOG": WIZARD["console_log"], "LOG_RETENTION_RUNS": WIZARD["log_retention_runs"],
 }
+# MultiQC versus the built-in QC panel: ONE text (python/multiqc_note.py), shown in the report's QC panel and PDF, here as the help of the MULTIQC_REPORT setting and
+# as REPORT_NOTES["qc"] for the window's Report-view / QC area.
+def _multiqc_text():
+    import sys
+    from pathlib import Path
+    folder = str(Path(__file__).resolve().parent.parent / "python")
+    if folder not in sys.path:
+        sys.path.insert(0, folder)
+    try:
+        import multiqc_note
+        return multiqc_note.TITLE, multiqc_note.text()
+    except ImportError:          # a trimmed install without python/: say so rather than show nothing
+        return "MultiQC or the built-in panel?", "The report's QC panel is PlasBench's own; MultiQC is an optional companion (plasbench install-tools multiqc)."
+
+
+_MQ_TITLE, _MQ_TEXT = _multiqc_text()
+SETTINGS["MULTIQC_REPORT"] = {"summary": "Whether to also run the optional MultiQC over the fastp (and QUAST) outputs and link its report from the QC panel. " + _MQ_TEXT,
+                              "choices": {"auto": "Run MultiQC only when it is installed (plasbench install-tools multiqc). The default.",
+                                          "on": "Always try, and warn when MultiQC is missing. A failure never stops the run.",
+                                          "off": "Never run MultiQC."},
+                              "when": "Leave on auto. MultiQC adds plots (per-base quality, adapter content, duplication); it does not change any decision or score.",
+                              "setting": "MULTIQC_REPORT"}
+SETTINGS["MULTIQC_TIMEOUT_SECONDS"] = {"summary": "The limit, in seconds, for the optional MultiQC command (default 600). A timeout is a warning, not a failure."}
+REPORT_NOTES = {"qc": {"title": _MQ_TITLE, "text": _MQ_TEXT, "setting": "MULTIQC_REPORT"}}
 # Settings shown together in the "Reliability and downloads" group (only those config.sh defines).
 RELIABILITY_KEYS = ["READ_SOURCE", "MAX_RUN_DOWNLOAD_GB", "WARN_RUN_DOWNLOAD_GB", "PREFETCH_FAIL_LIMIT", "NETWORK_RETRIES", "NETWORK_RETRY_DELAY_SECONDS",
                     "ENA_DOWNLOAD_CONNECTIONS", "PRESERVE_DOWNLOADS", "TOOL_RETRIES", "TOOL_TIMEOUT_SECONDS", "ALLOW_ALL_TOOLS_FAILED", "RUN_CONSOLE_LOG", "LOG_RETENTION_RUNS"]

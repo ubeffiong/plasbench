@@ -29,6 +29,7 @@ import math
 import os
 import re
 
+import multiqc_note
 from report_svg import esc, num
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -649,6 +650,57 @@ def reviewer_box(model):
     return f"<div class='qp-ask' role='note'><h3>What the reviewer asked</h3><ul class='qp-list'>{''.join(items)}</ul></div>"
 
 
+# ------------------------------------------------------------------------------------------------ MultiQC companion
+def multiqc_status(results_dir):
+    """{'state': ok|failed|no_inputs|absent, ...} from results/multiqc/ (written by python/run_multiqc.py); a report with no status file still counts as ok."""
+    folder = os.path.join(results_dir, "multiqc") if results_dir else ""
+    info = read_json(os.path.join(folder, "multiqc_run.json")) if folder else None
+    info = info if isinstance(info, dict) else {}
+    has_report = bool(folder) and os.path.isfile(os.path.join(folder, "multiqc_report.html"))
+    if has_report and info.get("state") in (None, "", "ok"):
+        info = dict(info, state="ok")
+    elif info.get("state") in ("failed", "no_inputs"):
+        pass
+    else:
+        info = dict(info, state="absent" if not has_report else "ok")
+    return info
+
+
+def multiqc_link(results_dir, report_dir=None):
+    """href to the MultiQC report: relative to the report's folder when it is inside it, else None (the caller then names the file without a link, as the file tree does)."""
+    target = os.path.join(results_dir, "multiqc", "multiqc_report.html")
+    try:
+        rel = os.path.relpath(target, report_dir or results_dir).replace(os.sep, "/")
+    except ValueError:
+        return None
+    return None if rel.startswith("../../") or os.path.isabs(rel) else rel
+
+
+def multiqc_block(results_dir, report_dir=None):
+    info = multiqc_status(results_dir)
+    state = info.get("state")
+    if state == "ok":
+        href = multiqc_link(results_dir, report_dir)
+        name = "multiqc/multiqc_report.html"
+        bits = [b for b in (f"MultiQC {info['version']}" if info.get("version") else "", f"made from {info['inputs']} input file(s)" if info.get("inputs") else "") if b]
+        link = f"<a href='{esc(href)}'>Full MultiQC report</a>" if href else f"Full MultiQC report: <code>{esc(name)}</code> (not linked: it is outside this report's folder)"
+        return (f"<p class='qp-mq'><b>{link}</b>{(' (' + esc(', '.join(bits)) + ')') if bits else ''}. It is a separate file, not embedded here, so this page stays small and works offline.</p>")
+    if state == "failed":
+        return (f"<p class='qp-mq'><b>MultiQC was tried and failed.</b> {esc(info.get('note') or '')} The built-in panel is not affected. "
+                "The failure is recorded as a warning in run_events.jsonl.</p>")
+    if state == "no_inputs":
+        return f"<p class='qp-mq'><b>MultiQC had nothing to read.</b> {esc(info.get('note') or '')}.</p>"
+    return (f"<p class='qp-mq'><b>A full MultiQC report is not available for this run.</b> To get one, install it with <code>{esc(multiqc_note.INSTALL_COMMAND)}</code> "
+            "and run stage 6 again (the MULTIQC_REPORT setting is auto: it runs when multiqc is installed).</p>")
+
+
+def note_box(results_dir, report_dir=None):
+    """The collapsible 'MultiQC or the built-in panel?' box (open in print) with the shared text and the state of the MultiQC companion."""
+    items = "".join(f"<li><b>{esc(head)}.</b> {esc(body)}</li>" for head, body in multiqc_note.POINTS)
+    return (f"<details class='qp-note' id='qp-note'><summary>{esc(multiqc_note.TITLE)}</summary><ul class='qp-list'>{items}</ul></details>"
+            + multiqc_block(results_dir, report_dir))
+
+
 # ------------------------------------------------------------------------------------------------ not measured
 def not_measured(results_dir, subject="short-read QC"):
     """What is missing and the exact commands that produce it; never an empty panel."""
@@ -659,7 +711,7 @@ def not_measured(results_dir, subject="short-read QC"):
     man = read_json(os.path.join(results_dir, "run_manifest.json")) if results_dir else None
     if isinstance(man, dict) and man.get("tool_version"):
         version = f" This run was made with PlasBench {esc(man['tool_version'])}, which did not write them."
-    return (f"<div class='qp-none' role='note'><h3>Not measured in this run</h3><p>No {esc(subject)} table was found, so nothing here is measured and nothing is estimated.{version}</p>"
+    return (note_box(results_dir) + f"<div class='qp-none' role='note'><h3>Not measured in this run</h3><p>No {esc(subject)} table was found, so nothing here is measured and nothing is estimated.{version}</p>"
             f"<div class='qp-scroll'><table class='qp-table'><thead><tr><th>File</th><th>What it holds</th><th>Found</th></tr></thead><tbody>{rows}</tbody></table></div>"
             "<p>To produce it, run stage 3 with the gate on (it is on by default):</p>"
             "<pre class='qp-cmd'>SHORT_READ_QC_MODE=report plasbench run --cohort &lt;your cohort file&gt;</pre>"
@@ -696,7 +748,7 @@ def build(qc, results_dir="", thresholds=None, status_rows=None, candidates=None
     nav = "".join(f"<button type='button' data-g='{gid}' aria-controls='qp-{gid}'{CURRENT if gid == 'stats' else ''}>{esc(label)}</button>" for gid, label in GROUPS)
     flag = f"<div class='insight caution qp-synthetic' role='note'><p><strong>Synthetic.</strong> {esc(SYNTHETIC_NOTE)}</p></div>" if syn else ""
     payload = json.dumps(model.payload(), separators=(",", ":")).replace("<", "\\u003c")
-    return (f"{flag}{reviewer_box(model)}<div class='qp qp-static' id='qp'><nav class='qp-nav' aria-label='Short-read QC sections'>{nav}</nav>"
+    return (f"{flag}{note_box(results_dir)}{reviewer_box(model)}<div class='qp qp-static' id='qp'><nav class='qp-nav' aria-label='Short-read QC sections'>{nav}</nav>"
             f"<div class='qp-main'>{''.join(secs)}</div>"
             "<aside class='qp-panel' id='qp-panel' aria-label='Sample QC record' hidden tabindex='-1'><button type='button' class='qp-close' aria-label='Close the sample record'>Close</button>"
             "<div id='qp-panel-body'></div></aside><div class='qp-tip' id='qp-tip' role='tooltip' hidden></div>"
@@ -873,6 +925,7 @@ CSS = """<style>
 .qp-rec h4{margin:4px 0 6px}.qp-g{margin:6px 0 10px}.qp-gh{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.qp-kv{border-collapse:collapse;font-size:.88em}.qp-kv th,.qp-kv td{border-bottom:1px solid rgba(128,128,128,.25);padding:2px 8px;text-align:left}
 .qp-recs{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}.qp-recs .qp-rec{border:1px solid rgba(128,128,128,.35);border-radius:6px;padding:6px 12px}
 .qp-tip{position:absolute;z-index:5;background:#222;color:#fff;font:12px Arial,sans-serif;padding:3px 8px;border-radius:4px;pointer-events:none;max-width:320px}.qp-tip[hidden]{display:none}
+.qp-note{border:1px solid rgba(128,128,128,.4);border-radius:6px;padding:4px 12px;margin:8px 0}.qp-note summary{cursor:pointer;font-weight:600}.qp-mq{margin:4px 0 8px}
 .qp-cmd{background:rgba(128,128,128,.14);padding:8px 12px;border-radius:5px;overflow-x:auto;font-size:.88em}
 @media (max-width:900px){.qp,.qp.qp-withpanel{grid-template-columns:minmax(0,1fr)}.qp-nav{position:static;flex-direction:row;flex-wrap:wrap;gap:4px;margin-bottom:8px}
 .qp-nav button{border:1px solid rgba(128,128,128,.4);border-radius:14px;padding:4px 10px}.qp-nav button[aria-current]{border-color:#0072B2}.qp-panel{position:static;max-height:none;margin-top:10px}}

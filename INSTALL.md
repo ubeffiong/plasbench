@@ -323,6 +323,12 @@ plasbench install-tools quast
 # then enable RUN_QUAST_DIAGNOSTICS=1 in config/config.sh
 ```
 
+**`MULTIQC_REPORT`** (stage 6, optional, default `auto`) runs MultiQC over the fastp and QUAST outputs when it is installed. It has its own isolated environment and
+pinned version, and it is never needed: the report's QC panel is PlasBench's own.
+```bash
+plasbench install-tools multiqc
+```
+
 **`RUN_DIFFICULTY_FEATURES`** (stage 3) needs three tools: `minimap2` and
 `samtools` are already installed as part of the core environment (step 2
 above); `mash` is a direct `env/environment.yml` dependency, also already

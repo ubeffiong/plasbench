@@ -92,7 +92,7 @@ check("the record of a flagged sample states the reason it warned", "warned: 70.
 check("the record says whether it was excluded or only flagged", "belongs in the sensitivity analysis" in html and "excluded from the primary benchmark when SHORT_READ_QC_MODE=enforce" in html)
 check("the record lists integrity checks and the assembly selection outcome", "Integrity checks" in html and "Selected: unicycler" in html and "not eligible (read support 0.5 &lt; 0.8)" in html)
 check("the thresholds section states status, hash, and that it matches the shipped file", "frozen on" in html and TH["sha"] in html and "does not match" in html, html[html.index("qp-thresholds"):][:200])
-check("the reviewer box answers all five questions with links to the evidence", html.count("<li><b>") == 5 and html.count("data-go='") >= 5 and "What the reviewer asked" in html)
+check("the reviewer box answers all five questions with links to the evidence", html.split("What the reviewer asked")[1].split("</ul>")[0].count("<li><b>") == 5 and html.count("data-go='") >= 5 and "What the reviewer asked" in html)
 check("the sensitivity ranking is computed from scores.tsv and says what changed", "Mean F1, without flagged" in html and ("changed" in html or "same" in html))
 check("marker characters in sample names are escaped everywhere", "<b>x</b>" not in html and "&lt;b&gt;x&lt;/b&gt;&amp;" in html)
 check("no </script> can be injected through the data", html.count("</script>") == 2, html.count("</script>"))

@@ -844,6 +844,15 @@ Stages preserve completed outputs where safe. Stage 4 only reuses a tool result
 when it has both a prediction FASTA and completion marker. Failed, skipped, and
 reused states are written to `results/tool_status.tsv`.
 
+## MultiQC and the built-in QC panel: which to use
+
+PlasBench does **not** use MultiQC to make its QC: read quality is measured by fastp and `python/short_read_qc.py`, and the report's **Short-read QC** panel is PlasBench's own, modelled on MultiQC's layout. Real MultiQC is an optional companion.
+
+- **Built-in panel.** PlasBench's thresholds (PASS, WARN, REJECT with the reason), the assembly selection outcome and the answers to a reviewer's questions, offline in the one report file. It shows only the metrics PlasBench computes.
+- **MultiQC.** The community-standard view of the same fastp (and QUAST) files, with more plots (per-base quality, adapter content, duplication). It needs a separate install (`plasbench install-tools multiqc`), is a separate file (`results/multiqc/multiqc_report.html`, linked from the panel, never embedded) and knows nothing of PlasBench's thresholds.
+- **Setting.** `MULTIQC_REPORT=auto|on|off` (default `auto`: run it only when `multiqc` is installed; `on` warns when it is missing; `off` never). `MULTIQC_TIMEOUT_SECONDS` (600) limits it. A MultiQC problem never fails a run: it is a warning in `run_events.jsonl` and a note in the panel.
+- **If they differ.** Both read the same files, so a figure both show should agree closely; the panel measures the first read pairs of the raw files, fastp reports every read it processed, so small differences are expected. If they differ a lot, check they were made from the same run and sample, then read `results/short_read_qc.tsv` and the sample's `fastp.json`: the files are the record.
+
 ## Outputs
 
 The main outputs are written under `results/` unless `--results-dir` is set.

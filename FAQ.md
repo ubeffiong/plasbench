@@ -442,6 +442,10 @@ in all three modes).
 from pilot data on the intended platform and then frozen (mark every row `frozen`; the file's hash is written to every QC row) before the main
 benchmark. That is why `enforce` is not the default.
 
+### Q33a. Does PlasBench use MultiQC? Which should I look at, MultiQC or the built-in QC panel?
+**Answer.** No, PlasBench does not use MultiQC to make its QC (that is fastp plus `python/short_read_qc.py`). The report's QC panel is PlasBench's own, modelled on MultiQC's layout. Real MultiQC is an optional companion: `plasbench install-tools multiqc`, then `MULTIQC_REPORT=auto` (default) runs it in stage 6 over the fastp and QUAST outputs into `results/multiqc/`, and the panel links to the report (it is never embedded). The built-in panel has PlasBench's thresholds, decisions and selection outcome and works offline in one file; MultiQC has more plots, is a separate file and knows nothing of the thresholds. Both read the same files, so shared figures should agree closely (the panel measures the first read pairs; fastp counts every read); if they differ a lot, compare the files. A MultiQC failure never fails a run.
+**Evidence.** `python/run_multiqc.py`, `python/multiqc_note.py`, `test/test_run_multiqc.py` (a fake `multiqc` on PATH). **Not verified** against a real MultiQC install in this repository's tests.
+
 ### Q34. How is noise picked up when a tool reports more than one sequence for a plasmid?
 **Answer.** Already present: a one-to-one bin match (Hungarian), split and merge outcomes, per-plasmid recovery states, CPRR, and the predicted-sequence
 burden (`redundant_pred_bp`, unmapped and off-truth bases). What was missing was a candidate-level account. `python/candidate_multiplicity.py` (stage 5,

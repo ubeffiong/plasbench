@@ -263,6 +263,10 @@ fi
 if [[ "${RUN_QUAST_DIAGNOSTICS:-0}" -eq 1 ]]; then
     check_tool quast.py quast 0
 fi
+# MultiQC is an optional companion to the report's own QC panel (MULTIQC_REPORT; python/run_multiqc.py): a missing one only warns, never fails setup.
+if [[ "${MULTIQC_REPORT:-auto}" != "off" ]]; then
+    check_tool multiqc multiqc 0
+fi
 if [[ "${RUN_PROTEIN_ANNOTATION:-0}" -eq 1 ]]; then
     if [[ "$PROTEIN_ANNOTATION_ENGINE" == "bakta" ]]; then
         check_tool bakta annotation
