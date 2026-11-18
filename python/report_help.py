@@ -25,6 +25,7 @@ import report_help_text as T
 import report_layout as L
 import report_prune as P
 
+HELP_OF_COMPONENT = "compare-table"
 HEADING = re.compile(r"<(h[2-4])\b[^>]*>(.*?)</\1>", re.S)
 _POPOVER = re.compile(r"<span class='rpt-info'.*?</span></span>", re.S)
 _TAGS = re.compile(r"<[^>]+>")
@@ -41,7 +42,7 @@ def _button(key, title):
 
 
 def _already(fragment):
-    return "class='rpt-help-btn'" in fragment
+    return re.search(r"class='rpt-help-btn' data-help='(?!%s')" % HELP_OF_COMPONENT, fragment) is not None   # a comparison table's own button is not its section's
 
 
 def _heading_edit(block, base, key, entries, used):
@@ -93,7 +94,11 @@ def transform(page, entries=None):
             edit = _panel_edit(section, start, panel, entries, used, None)
             if edit:
                 edits.append(edit)
-    if not edits:
+    # buttons that a component placed itself (data-help='KEY' with an entry): the text goes into the JSON too
+    for key, title in re.findall(r"class='rpt-help-btn' data-help='([^']+)'[^>]*aria-label='Help: about ([^']*)'", page):
+        if key in entries and key not in used:
+            used[key] = html.unescape(title)
+    if not edits and not used:
         return page
     for pos, text in sorted(edits, key=lambda e: e[0], reverse=True):
         page = page[:pos] + text + page[pos:]

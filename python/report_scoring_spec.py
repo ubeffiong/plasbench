@@ -35,6 +35,8 @@ from pathlib import Path
 import report_3d
 import report_aliases
 import report_common
+import report_compare_apply
+from plasbench_common import display_tool_name
 from resampling import MIN_CLUSTERS_CI
 
 SECTIONS = (("prereg", "Pre-registration"), ("scoring-additions", "MCC &amp; F-beta"),
@@ -110,16 +112,17 @@ def prereg_section(manifest):
                    "are seen (docs/PREREGISTRATION.md). This run's settings are checked against it.", body)
 
 
-def scoring_additions_section(leaderboard):
+def scoring_additions_section(leaderboard, scores=()):
     rows = [r for r in leaderboard if r.get("tool")]
     if not rows or not any(r.get("mean_mcc") or r.get("mean_f2") for r in rows):
         body = not_run("MCC / F2 / F0.5", "the leaderboard has no mcc/f2/f0_5 columns (scores from before this version)")
     else:
-        body = table(["Track / task", "Tool", "F1 (macro)", "F1 (micro)", "MCC", "F2 (recall-weighted)",
-                      "F0.5 (precision-weighted)", "Abstention rate"],
-                     [(f"{r.get('analysis_track')} / {r.get('task')}", r["tool"], r.get("mean_f1"), r.get("micro_f1"),
-                       r.get("mean_mcc"), r.get("mean_f2"), r.get("mean_f0_5"), r.get("mean_abstention_rate"))
-                      for r in rows])
+        shown = table(["Track / task", "Tool", "F1 (macro)", "F1 (micro)", "MCC", "F2 (recall-weighted)",
+                       "F0.5 (precision-weighted)", "Abstention rate"],
+                      [(f"{r.get('analysis_track')} / {r.get('task')}", r["tool"], r.get("mean_f1"), r.get("micro_f1"),
+                        r.get("mean_mcc"), r.get("mean_f2"), r.get("mean_f0_5"), r.get("mean_abstention_rate"))
+                       for r in rows])
+        body = report_compare_apply.scoring_additions(rows, scores, shown, display_tool_name)
     return section("scoring-additions", "MCC, F2, F0.5 and abstention",
                    "Base-level, against the reference. MCC uses chromosome bases not predicted as true negatives and "
                    "is blank (undefined) on plasmid-free isolates. F2 favours recall, F0.5 precision. Abstention rate "
@@ -127,7 +130,7 @@ def scoring_additions_section(leaderboard):
                    "bases. None of these changes the ranking metric.", body)
 
 
-def outcomes_section(leaderboard):
+def outcomes_section(leaderboard, scores=()):
     keys = ("total_outcome_perfect", "total_outcome_fragmented", "total_outcome_merged",
             "total_outcome_fragmented_and_merged", "total_outcome_partial", "total_outcome_missed")
     rows = [r for r in leaderboard if r.get("tool") and any(r.get(k) not in (None, "") for k in keys)]
@@ -135,10 +138,11 @@ def outcomes_section(leaderboard):
         body = not_run("per-plasmid outcome states", "no binning tool was scored (score_bins.py runs only for "
                        "binning-capable tools with a bins file)")
     else:
-        body = table(["Track / task", "Tool", "Perfect", "Fragmented", "Merged", "Fragmented and merged", "Partial",
-                      "Missed", "ARI"],
-                     [(f"{r.get('analysis_track')} / {r.get('task')}", r["tool"], *(r.get(k) for k in keys),
-                       r.get("mean_bin_ari")) for r in rows])
+        shown = table(["Track / task", "Tool", "Perfect", "Fragmented", "Merged", "Fragmented and merged", "Partial",
+                       "Missed", "ARI"],
+                      [(f"{r.get('analysis_track')} / {r.get('task')}", r["tool"], *(r.get(k) for k in keys),
+                        r.get("mean_bin_ari")) for r in rows])
+        body = report_compare_apply.plasmid_outcomes(rows, scores, shown, display_tool_name)
     return section("plasmid-outcomes", "Per-plasmid outcomes",
                    "Each truth plasmid, judged on the bin holding most of it: perfect when that bin's precision and "
                    "recall reach PERFECT_THRESHOLD (0.95); fragmented when another bin holds at least FRAGMENT_SHARE "
@@ -203,6 +207,7 @@ def contig_layer_section(leaderboard, scores, crosscheck=()):
     have = [r for r in rows if r.get("mean_contig_f1_bp")]
     status, basis = crosscheck_summary(crosscheck)
     tables = ""
+    comparison = ""       # the comparison table of the contig layer, which keeps its own table in a fold
     drawn = False          # the 3D view carries its own "Independent second scorer" card; the paragraph below is only for when it is not drawn
     if not have:
         body = not_run("contig layer", "no tool was scored at contig level (RUN_CONTIG_CLASSIFICATION=0, no "
@@ -222,6 +227,9 @@ def contig_layer_section(leaderboard, scores, crosscheck=()):
                          r.get("mean_contig_f1_bp"), r.get("mean_contig_mcc_bp"), r.get("mean_contig_bin_f1_bp"),
                          report_common.contig_exclusion_text(scores, r["tool"]))
                         for r in have])
+        comparison = report_compare_apply.contig_layer(have, scores, tables, display_tool_name,
+                                                       exclusion=lambda r: report_common.contig_exclusion_text(scores, r["tool"]))
+        tables = ""
         body += (f"<p class='muted'><strong>Not comparable with base-level F1.</strong> {esc(report_common.CONTIG_NOT_COMPARABLE)} "
                  "The last column is the share of the contigs scored for the tool that were left out for those reasons.</p>")
     if not drawn:
@@ -230,6 +238,8 @@ def contig_layer_section(leaderboard, scores, crosscheck=()):
         tables += table(report_3d.XC_HEADER, [[r.get(f, "") for f in report_3d.XC_FIELDS] for r in crosscheck])
     else:
         body += not_run("independent contig scorer", "no benchmark.contig_crosscheck.tsv (RUN_CONTIG_CROSSCHECK=0 or no contig labels)")
+    if comparison:
+        body += comparison
     if tables:
         body += collapsible(tables)
     return section("contig-layer", "Contig layer beside the reference layer",
@@ -494,8 +504,8 @@ def inject(page, sources):
     taxon = read_tsv(sources.get("leave_taxon_out"))
     html_sections = (
         prereg_section(read_json(sources.get("manifest")))
-        + scoring_additions_section(leaderboard)
-        + outcomes_section(leaderboard)
+        + scoring_additions_section(leaderboard, read_tsv(sources.get("scores")))
+        + outcomes_section(leaderboard, read_tsv(sources.get("scores")))
         + label_schemes_section(read_tsv(sources.get("label_scheme_summary")), read_tsv(sources.get("label_schemes")),
                                 provenance, sources.get("data_dir"))
         + contig_layer_section(leaderboard, read_tsv(sources.get("scores")), crosscheck)

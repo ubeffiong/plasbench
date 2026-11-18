@@ -112,7 +112,7 @@ def main():
 
         # The three views are 3D scenes with the raw table kept in a collapsed details block.
         contig = section(page, "contig-layer")
-        assert "data-v3='bars'" in contig and "Show the data table" in contig and "0.8100" in contig, "contig layer is not a 3D view"
+        assert "data-v3='bars'" in contig and ("Show the data table" in contig or ">Table</summary>" in contig) and "0.8100" in contig, "contig layer is not a 3D view"
         assert page.count("PlasBench 3D engine") == 1, "the 3D engine must be emitted exactly once"
         assert "data-v3='recs'" not in section(page, "recommender-eval"), "no regret table: the 3D scene must not draw empty"
         shutil.copy(tmp / "eval.tsv", tmp / "benchmark.recommender_eval.tsv")
