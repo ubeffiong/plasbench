@@ -275,6 +275,8 @@ def main():
                 "ASSEMBLY_SELECTION_MODE", "ASSEMBLY_SELECTION_POLICY", "ASSEMBLY_ALSO", "ASSEMBLY_MIN_TOTAL_MB", "ASSEMBLY_MAX_TOTAL_MB",
                 "ASSEMBLY_MIN_MAPPED_FRACTION", "ASSEMBLY_READ_SUPPORT",
                 "SHORT_READ_QC_MODE", "SHORT_READ_QC_THRESHOLDS", "SHORT_READ_QC_MAX_PAIRS", "SHORT_READ_QC_GENOME_MB",
+                # what plasbench regenerate-visuals needs to rebuild the report's per-sample files exactly as this run made them
+                "VISUALIZATION_MAX_BLOCKS_PER_TOOL", "VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP", "ANNOTATION_AMR_DB", "KEEP_REPORT_INPUTS", "KEEP_REPORT_INPUTS_MAX_KB",
                 "RUN_CANDIDATE_MULTIPLICITY", "MULTIPLICITY_NEW_FRACTION", "MULTIPLICITY_CHIMERA_MIN_BP", "MULTIPLICITY_CHIMERA_FRACTION",
                 "RUN_PLASEVAL_GATE", "PLASEVAL_SRC", "PLASEVAL_TIMEOUT", "PLASEVAL_GATE_TOLERANCE", "DISSIMILARITY_ALPHA", "DISSIMILARITY_REPEATS",
                 "DISSIMILARITY_MAX_CALLS",
@@ -285,10 +287,16 @@ def main():
     samples = sample_rows(sample_sheet)
     manifest_warnings = []
     truth_tables = {}
+    if samples and not any(row.get("sample_id") for row in samples):
+        # A folder whose sheet is not a benchmark sheet (an accession ledger, a published run kept as results only): a manifest is still written, without truth checksums.
+        manifest_warnings.append(f"{sample_sheet} has no sample_id column; no truth-table checksums were recorded")
     for sample in samples:
-        truth = Path(args.data_dir) / sample["sample_id"] / "truth.tsv"
+        sample_id = sample.get("sample_id")
+        if not sample_id:
+            continue
+        truth = Path(args.data_dir) / sample_id / "truth.tsv"
         if truth.is_file():
-            truth_tables[sample["sample_id"]] = checksum_record(
+            truth_tables[sample_id] = checksum_record(
                 truth, manifest_warnings, "truth table")
     outputs = {}
     for path in Path(args.results_dir).glob("benchmark*"):

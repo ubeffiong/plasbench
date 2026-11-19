@@ -130,8 +130,8 @@ PR.fmt = function (v, d) { return (v === null || v === undefined || !isFinite(v)
 PR.csvEscape = function (v) { var s = v === null || v === undefined ? '' : String(v); var Q = String.fromCharCode(34); return (s.indexOf(',') >= 0 || s.indexOf(String.fromCharCode(10)) >= 0 || s.indexOf(Q) >= 0) ? Q + s.split(Q).join(Q + Q) + Q : s; };
 PR.csvText = function (header, rows) { return [header].concat(rows).map(function (r) { return r.map(PR.csvEscape).join(','); }).join('\n') + '\n'; };
 
-/* Layout shared with the static SVG: viewBox 760 x 640, plot area inside the margins. */
-PR.L = {W: 760, H: 640, ml: 62, mr: 20, mt: 18, mb: 56};
+/* Layout shared with the static SVG: viewBox 640 x 330 (compact: about 320 px tall at its widest), plot area inside the margins. */
+PR.L = {W: 640, H: 330, ml: 54, mr: 14, mt: 10, mb: 44};
 PR.scale = function (view) {
   var L = PR.L, pw = L.W - L.ml - L.mr, ph = L.H - L.mt - L.mb;
   return {

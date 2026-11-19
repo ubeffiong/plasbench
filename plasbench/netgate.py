@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import re
 import time
+from pathlib import Path
 
 from . import netcheck
 
@@ -64,6 +65,8 @@ def set_backend(module) -> None:
     """Tests (and nothing else) replace the connectivity layer."""
     global _backend_override
     _backend_override = module
+    from . import loadcache
+    loadcache.clear()               # the window remembers the last answer for a few seconds: a different backend must not be answered from it
 
 
 def backend():
@@ -126,11 +129,46 @@ def git_services(remote_url: str = "") -> list:
     return ["github"] if (not host or host.endswith("github.com")) else ["internet"]
 
 
+def _install_goes_online(rest) -> bool:
+    """python/tool_installer_registry.needs_network for `install-tools [--env E] [--yes] [PROFILE] [--dry-run]`; an unreadable registry says yes."""
+    if "--dry-run" in rest:
+        return False
+    words = []
+    skip = False
+    for w in rest:
+        if skip:
+            skip = False
+        elif w == "--env":
+            skip = True
+        elif not w.startswith("-"):
+            words.append(w)
+    try:
+        import tool_installer_registry as registry
+        root = Path(__file__).resolve().parent.parent
+        return registry.needs_network(words[0] if words else "core", registry.read_tsv(root / "config" / "tool_installers.tsv"))
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def offline_install_profiles() -> list:
+    """The `install-tools` profiles that fetch nothing (inspection actions, built-in and manual profiles): the window does not grey those buttons out offline."""
+    try:
+        import tool_installer_registry as registry
+        root = Path(__file__).resolve().parent.parent
+        rows = registry.read_tsv(root / "config" / "tool_installers.tsv")
+        names = set(registry.profile_kinds(rows)) | set(registry.ACTIONS)
+        return sorted(n for n in names if not registry.needs_network(n, rows))
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def command_services(argv) -> list:
     """The services a `plasbench ...` command line needs (empty for local commands). `tools add` needs the internet only for a URL; `--online` commands only with that flag."""
     if not argv:
         return []
     command, rest = argv[0], list(argv[1:])
+    if command == "install-tools" and not _install_goes_online(rest):
+        return []                       # inspection, --dry-run, a built-in or manual profile (exit 20), an unknown name: nothing is fetched
     sub = rest[0] if rest and (command, rest[0]) in {(c, s_) for c, d in SUBCOMMAND_NET.items() for s_ in d} | set(FLAG_NET) else ""
     if (command, sub) in FLAG_NET:
         flag, services = FLAG_NET[(command, sub)]

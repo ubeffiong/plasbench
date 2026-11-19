@@ -27,6 +27,8 @@ import shlex
 import time
 from pathlib import Path
 
+from . import loadcache
+
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
 SUBDIRS = ("results", "logs", "tmp")
 WINDOWS_RESERVED = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
@@ -283,6 +285,26 @@ def _data_facts(folder: Path, record: dict) -> dict:
     return out
 
 
+def _study_entry(folder: Path, external: bool, base: Path):
+    """One study's row (everything but the downloaded-data size) and its study.json record. Remembered by list_studies until a file it was built from changes."""
+    try:
+        record = json.loads((folder / "study.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        record = {}
+    results = folder / "results"
+    stamp = max([p.stat().st_mtime for p in (folder / "study.json", results / "benchmark.report.html",
+                                                results / "benchmark.leaderboard.tsv") if p.exists()] or [folder.stat().st_mtime])
+    entry = {"name": folder.name, "path": str(folder), "results": str(results), "modified": stamp,
+             "cohort": record.get("cohort"), "sample_sheet": record.get("sample_sheet"),
+             "runs": len(record.get("runs", [])), "report": (results / "benchmark.report.html").is_file(),
+             "created": record.get("created"), "note": record.get("note", ""), "tags": record.get("tags", []),
+             "cloned_from": record.get("cloned_from"), "imported_from": record.get("imported_from"),
+             "migrated_from": record.get("migrated_from"), "tracked": (folder / ".git").exists() or ((base / ".git").exists() and not external),
+             "tracked_in": "own" if (folder / ".git").exists() else ("workspace" if (base / ".git").exists() and not external else None),
+             "last_command": (record.get("runs") or [{}])[-1].get("command"), "external": external, "available": True}
+    return entry, record
+
+
 def list_studies(root) -> list:
     """Every study in the workspace and every registered external one, newest first, with what the window shows about it. An external study whose folder is missing
     (a disconnected drive) is listed with available False and the reason; it is never an exception."""
@@ -300,20 +322,9 @@ def list_studies(root) -> list:
                         "tracked_in": None, "last_command": None, "external": True, "available": False,
                         "unavailable": f"not available: {folder} (is the drive connected?)", "data_location": None, "data_dir": None, "data_in_study": False, "data_bytes": None})
             continue
-        try:
-            record = json.loads((folder / "study.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            record = {}
         results = folder / "results"
-        stamp = max([p.stat().st_mtime for p in (folder / "study.json", results / "benchmark.report.html",
-                                                    results / "benchmark.leaderboard.tsv") if p.exists()] or [folder.stat().st_mtime])
-        out.append({"name": folder.name, "path": str(folder), "results": str(results), "modified": stamp,
-                    "cohort": record.get("cohort"), "sample_sheet": record.get("sample_sheet"),
-                    "runs": len(record.get("runs", [])), "report": (results / "benchmark.report.html").is_file(),
-                    "created": record.get("created"), "note": record.get("note", ""), "tags": record.get("tags", []),
-                    "cloned_from": record.get("cloned_from"), "imported_from": record.get("imported_from"),
-                    "migrated_from": record.get("migrated_from"), "tracked": (folder / ".git").exists() or ((base / ".git").exists() and not external),
-                    "tracked_in": "own" if (folder / ".git").exists() else ("workspace" if (base / ".git").exists() and not external else None),
-                    "last_command": (record.get("runs") or [{}])[-1].get("command"), "external": external, "available": True, **_data_facts(folder, record)})
+        signature = loadcache.sig(folder, folder / "study.json", results / "benchmark.report.html", results / "benchmark.leaderboard.tsv", folder / ".git", base / ".git") + (external, str(base))
+        entry, record = loadcache.memo(("study", str(folder)), signature, lambda f=folder, e=external: _study_entry(f, e, base))
+        out.append(dict(entry, **_data_facts(folder, record)))
     out.sort(key=lambda s: -s["modified"])
     return out

@@ -227,6 +227,11 @@ def section(views, total=None):
 
 
 def inject(page, results_dir):
+    import report_fig_synteny    # the compact single-comparison redesign; the stacked drawing below is kept as inject_legacy
+    return report_fig_synteny.inject(page, results_dir)
+
+
+def inject_legacy(page, results_dir):
     views = load(results_dir)
     body = CSS + section(views, len(views))
     anchor = "<section id='recommendations'>"

@@ -497,6 +497,12 @@ score_sample() {
         --sample "$SAMPLE" --amr-truth "$AMR" --feature-truth "$FEATURES" --protein-truth "$TRUTH_PROTEINS" --circular-truth "$CIRCULAR" --max-blocks-per-tool "$VISUALIZATION_MAX_BLOCKS_PER_TOOL" --max-nucleotide-bp "$VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP" \
         --out "$RDIR/visualization/alignment_blocks.json" --structural-out "$RDIR/visualization/structural_metrics.tsv" >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 || \
         warn "visualization data generation failed for $SAMPLE; scores are retained"
+    # Keep the report's small per-sample inputs beside the results (KEEP_REPORT_INPUTS, default 1) so this folder can rebuild its report elsewhere.
+    if [[ "${KEEP_REPORT_INPUTS:-1}" == "1" ]]; then
+        python3 "$HERE/../python/keep_report_inputs.py" --data-dir "$DATA_DIR" --results-dir "$RESULTS_DIR" --sample "$SAMPLE" \
+            --max-kb "${KEEP_REPORT_INPUTS_MAX_KB:-2048}" >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 || \
+            warn "could not keep the report inputs of $SAMPLE in the results folder; scores are retained"
+    fi
     rm -f "$REF_MMI"
 }
 

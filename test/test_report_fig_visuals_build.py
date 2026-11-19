@@ -127,7 +127,9 @@ def main():
                 check("the presence matrix is not drawn: no truth tables in this run", "<section id='fig-presence'" not in page)
                 reasons = re.sub(r"<[^>]+>", " ", page[page.find("Not run in this run"):][:200000])
                 check("the reason is listed once, in Run metadata, as 'Not available in this run: ...' naming the missing tables",
-                      "Not available in this run: the per-sample truth tables" in reasons and "--data-dir" in reasons, reasons[:300])
+                      "Not available in this run:" in reasons and (("the per-sample truth tables" in reasons and "--data-dir" in reasons)
+                                                                   # the folder keeps the truth.tsv of two regenerated isolates (plasbench regenerate-visuals), but no annotation table for them
+                                                                   or "no annotation table lists a feature for these plasmids" in reasons), reasons[:300])
                 check("no path of the machine that made the run appears", "/home/" not in seg)
     print()
     if not ok:

@@ -1,0 +1,1 @@
+tool	record_id	event_type	span_bp	query_start	query_end	left_target	left_target_end	right_target	right_target_start	left_strand	right_strand	min_mapq	validated	detail

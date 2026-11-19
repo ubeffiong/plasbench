@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 198 analysis modules, 28 registered tools and baselines (20 real tools), 216 registered
-outputs, 54 run switches, 420 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 205 analysis modules, 28 registered tools and baselines (20 real tools), 219 registered
+outputs, 54 run switches, 429 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -371,7 +371,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-198 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+205 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -553,6 +553,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `report_fig_binerrors.py` | Binning error profile: why a binner scores as it does, not only how much. |
 | `report_fig_complexity.py` | FIGURE 'Does isolate complexity explain performance?' (section fig-complexity). |
 | `report_fig_facets.py` | stratified small-multiples heatmaps: tools across, strata down, one panel per metric, one shared 0-1 colour bar. |
+| `report_fig_fingerprint.py` | FIGURE 'Fingerprint of each tool' (section fig-radar), compact small-multiples version. |
 | `report_fig_heatmap.py` | FIGURE 'Performance of every tool across every metric' (section fig-heatmap). |
 | `report_fig_ladder.py` | the reconstruction ladder: from contigs to a verified plasmid, and which score judges each step. |
 | `report_fig_landscape.py` | the 3D landscape figure: accuracy, completeness and structural fidelity (section id fig-landscape). |
@@ -560,10 +561,12 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `report_fig_presence.py` | a clustered presence/absence matrix of the truth plasmids and their features, with prevalence bars and a tool overlay. |
 | `report_fig_radar.py` | FIGURE 'Fingerprint of each tool' (section fig-radar): a radar chart per analysis track, one polygon per tool. |
 | `report_fig_stats.py` | two statistical figures of the report: CPRR distributions and a forest plot of CPRR differences. |
+| `report_fig_synteny.py` | the redesigned synteny view (section learn-synteny): one comparison at a time, truth plasmid on top, one tool's records below. |
 | `report_figures.py` | the figure modules of the report, injected in one place. |
 | `report_help.py` | a "?" help button on every section and every tab of the report, opening one shared help dialog. |
 | `report_help_text.py` | the words behind the "?" help button on every section and tab of the HTML report. |
 | `report_info.py` | move the report's explanatory notes into hover/focus "info" popovers. |
+| `report_inputs.py` | the table of every file the report reads and how each one can be rebuilt (config/report_inputs.tsv). |
 | `report_isolates.py` | the isolate filter, and "which tool recovered which plasmid". |
 | `report_layout.py` | the report's page shell: top bar, left rail of views, one view at a time, analytics in story order. |
 | `report_learnings.py` | HTML sections for the evaluation additions learned from PlasEval, plsMD and GAEMR. |
@@ -575,6 +578,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `report_question_bank.py` | HTML report sections that answer reviewer |
 | `report_readqc_panel.py` | The short-read QC panel: a MultiQC-style, interactive view of the QC gate, with a side panel for every sample. |
 | `report_recommend_evidence.py` | the evidence panel under the operational recommendation (plan D5). |
+| `report_regenerated.py` | the Run metadata item that says which files of a results folder were rebuilt after the run. |
 | `report_reviewers.py` | Three dashboards for the report: short-read QC, assembly selection and reconstruction multiplicity. |
 | `report_scorecard.py` | a weighted benchmark SCORECARD shown beside the existing composite. |
 | `report_scoring_spec.py` | HTML report sections for the scoring specification and |
@@ -604,22 +608,25 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `data_nature.py` | Is this run made of synthetic (demo) data, real data, or a mix? A mix is refused, and a synthetic run says so inside its report. |
 | `download_progress.py` | How far a read download has got, for the run log. |
 | `intake.py` | Bring your own isolates: get the sheet right, point at your folders, check that PlasBench can see and use what you have. |
+| `keep_report_inputs.py` | keep the small per-sample inputs the report needs inside the results folder. |
 | `make_demo_readqc.py` | SYNTHETIC short-read QC and assembly-candidate tables for the six isolates of the offline demonstration. Never for real data. |
 | `multiqc_note.py` | The one plain-language note on MultiQC versus PlasBench's own QC panel, shared by every place that shows it. |
 | `performance_drivers.py` | What drives per-plasmid reconstruction accuracy? A multivariable, study-clustered regression per tool. |
 | `plsdb_novelty.py` | How novel is each truth plasmid against PLSDB, and does recovery depend on it? |
 | `prereg_admin.py` | read, confirm and change PlasBench's pre-registered scoring decisions, and keep a record of who decided what and when. |
 | `qc_pilot.py` | A short-read QC pilot on real reads: the first part of each run's paired FASTQ files, measured with short_read_qc.py. |
+| `regenerate_visuals.py` | say which report sections a finished results folder can draw, and rebuild the cheap missing inputs in place. |
 | `relabel_cohort_provenance.py` | Recompute a cohort sheet's truth_assembly_strategy and truth_polish_reads from the sheet's own assembly_method and assembly_sequencing_technology columns. |
 | `resolve_contributed_cohort.py` | verify importer candidates against NCBI, run the |
 | `run_consistency.py` | Do the run tables agree before anything is ranked? |
 | `run_multiqc.py` | Optional MultiQC companion: run `multiqc` over the fastp (and QUAST) outputs of a run into results/multiqc/. Never fails the run. |
 | `run_status.py` | What is this run doing right now, and why might it look stuck? |
+| `setting_ranges.py` | The one table of what each numeric Scoring-decision setting accepts (config/setting_ranges.tsv), and the checks built on it. |
 
 
 ## 7. Every output file and where the report shows it
 
-216 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
+219 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
 
 | Output | Written by | Report section | Shown | What it holds |
 |---|---|---|---|---|
@@ -719,6 +726,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `multiqc/multiqc_run.json` | run_multiqc.py | learn-readqc | shown | MultiQC step status: Whether the optional MultiQC step ran, its version and any failure; the QC panel's MultiQC note reads it. |
 | `orthogonal_validation.summary.json` | validate_orthogonal_evidence.py | orthogonal-evidence | shown | Orthogonal-evidence summary: Summarised. |
 | `quast_diagnostics.tsv` | run_quast_diagnostics.py | quast-diagnostics | shown | QUAST diagnostics, merged: Table. |
+| `regenerated_inputs.json` | regenerate_visuals.py | metadata | shown | Files rebuilt after the run: Run metadata says which files were regenerated after the run, when and from what. |
 | `run_manifest.json` | write_manifest.py | method | shown | Run manifest (versions, settings): Method and reproducibility section. |
 | `samples.tsv` | curate_cohort.py | samples | shown | Sample sheet: Sample metadata drives the strata and the drill-down. |
 | `score_failures.tsv` | 05_score.sh | outcome-states | shown | Runs that could not be scored: Listed with the reason. |
@@ -769,6 +777,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `{sample}/plasmid_similarity.tsv` | compute_difficulty_features.py | isolate-difficulty | partly | Similarity between truth plasmids: Summarised as a difficulty signal. |
 | `{sample}/reference.fna` | 01_download.sh | samples | partly | Truth plasmid sequences: Drawn in the sequence view. |
 | `{sample}/reference.full.fna` | 01_download.sh | samples | partly | Complete reference genome: Used by the sequence view and scoring. |
+| `{sample}/report_inputs.json` | keep_report_inputs.py | method | partly | Which report inputs were kept in the results folder: Lists the small per-sample inputs copied beside the results so the report can be rebuilt elsewhere. It is listed in the Artifact explorer only. |
 | `{sample}/selected_candidate/{any}` | select_unknown_sample.py | selected | shown | Selected candidate sequence: Download link on the selection card. |
 | `{sample}/selection_report.json` | select_unknown_sample.py | selected | shown | Operational selection report: Each card translates it into a decision. |
 | `{sample}/sequence_report.jsonl` | 01_download.sh | None | partly | NCBI sequence report: Source of truth molecule types. It is listed in the Artifact explorer only. |
@@ -835,6 +844,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `{sample}/{tool}.pr_summary.tsv` | score_plasmids.py | baselines-calibration | partly | Precision-recall summary: PR-AUC is merged into scores. |
 | `{sample}/{tool}.pred_vs_ref.all.paf` | 05_score.sh | rank-robustness | partly | All prediction alignments, unfiltered: Re-scored for ranking robustness. |
 | `{sample}/{tool}.pred_vs_ref.paf` | 05_score.sh | samples | partly | Prediction mapped to the reference: Drawn as alignment blocks. |
+| `{sample}/{tool}.prediction_summary.tsv` | keep_report_inputs.py | method | partly | Prediction summary kept for report rebuilds (record, length, sequence hash): Lets a rebuild check that predictions supplied later are the ones that were scored. It is listed in the Artifact explorer only. |
 | `{sample}/{tool}.proteins.provenance.json` | annotate_proteins.py | None | partly | Predicted protein provenance: Provenance. It is listed in the Artifact explorer only. |
 | `{sample}/{tool}.proteins.tsv` | annotate_proteins.py | feature-preservation | partly | Predicted proteins: Compared with the truth proteins. |
 | `{sample}/{tool}.quast_diagnostics.tsv` | run_quast_diagnostics.py | quast-diagnostics | partly | QUAST diagnostics: Merged into quast_diagnostics. |

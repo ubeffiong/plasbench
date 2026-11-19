@@ -956,6 +956,7 @@ explain_exit() {
         1) echo "a command reported an error" ;;
         2) echo "a command was given a wrong option or a missing file" ;;
         4) echo "every tool run of stage 4 failed (nothing was produced to score)" ;;
+        20) echo "a manual installation step is needed (nothing failed; the notice above lists the steps)" ;;
         124) echo "a time limit was reached" ;;
         126) echo "a program could not be run (permissions)" ;;
         127) echo "a program was not found (not installed, or not on PATH)" ;;

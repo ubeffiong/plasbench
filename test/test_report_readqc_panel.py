@@ -158,7 +158,10 @@ if os.path.isdir(cohort1):
     out1 = rv.inject(page, cohort1)
     check("results_real_cohort1 shows 'Not measured in this run', what is missing and the command", "Not measured in this run" in out1 and "missing" in out1
           and "SHORT_READ_QC_MODE=report plasbench run --cohort" in out1 and "0.2.3" in out1)
-    check("results_real_cohort1 gets no fake panel and no synthetic label", "id='qp'" not in out1 and "Synthetic." not in out1 and "qp-data" not in out1)
+    # The folder keeps the two isolates whose QC was regenerated from their reads (plasbench regenerate-visuals): the panel is real for those two, and never labelled synthetic.
+    regenerated = os.path.isfile(os.path.join(cohort1, "short_read_qc.tsv"))
+    check("results_real_cohort1: a real panel for the regenerated isolates (upec_ecpf5, upec_ecpf7) and none when no QC table is kept; never a synthetic label",
+          "Synthetic." not in out1 and (("id='qp'" in out1 and "upec_ecpf5" in out1 and "upec_ecpf7" in out1) if regenerated else ("id='qp'" not in out1 and "qp-data" not in out1)))
 else:
     print("  skip  results_real_cohort1 is not in this checkout")
 

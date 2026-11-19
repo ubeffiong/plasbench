@@ -2545,6 +2545,8 @@ def main():
     tool_versions = read_tool_versions(args.manifest, ran=set(tools))   # only the tools that ran: a manifest lists every tool found on the machine
     versions = sorted(set(tool_versions.values()))
     manifest_html = run_manifest_html(args.manifest, tool_versions)
+    import report_regenerated    # files rebuilt after the run by plasbench regenerate-visuals are named in Run metadata (python/report_regenerated.py)
+    manifest_html += report_regenerated.note_html(results_dir)
     track_counts = Counter(row.get("analysis_track") or "short_read" for row in scores)
     tracks = sorted(track_counts)
     if not track_leaderboards:

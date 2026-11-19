@@ -137,6 +137,11 @@ def block_html(block, columns, k):
 
 
 def inject(page, results_dir, data_dir, scores_path):
+    import report_fig_fingerprint    # the compact, interactive small-multiples drawing of this figure (this module keeps the axes, the transform and the old large radar)
+    return report_fig_fingerprint.inject(page, results_dir, data_dir, scores_path)
+
+
+def inject_large(page, results_dir, data_dir, scores_path):
     nav = [(SECTION_ID, "Tool fingerprint")]
     try:
         validate()

@@ -45,7 +45,7 @@ ISO_LEVELS = (0.5, 0.6, 0.7, 0.8, 0.9)
 PAYLOAD_BUDGET_BYTES = 700_000
 VIEW_FULL = (0.0, 1.0, 0.0, 1.0)
 VIEW_ZOOM = (0.5, 1.0, 0.5, 1.0)
-L = {"W": 760, "H": 640, "ml": 62, "mr": 20, "mt": 18, "mb": 56}
+L = {"W": 640, "H": 330, "ml": 54, "mr": 14, "mt": 10, "mb": 44}
 MARKERS = ["circle", "square", "triangle", "diamond", "cross", "plus", "invtriangle", "star"]
 DASHES = ["", "7 3", "2 3", "9 3 2 3", "5 2", "1 3 6 3", "", "7 3"]
 PALETTE = ["#0072B2", "#D55E00", "#009E73", "#E69F00", "#CC79A7", "#56B4E9", "#444444", "#9A8700"]
@@ -414,7 +414,7 @@ def static_svg(track, mode="micro", view=VIEW_FULL):
         parts.append(sv.text(L["ml"] - 8, sy(v) + 4, f"{v:g}", 11, "end"))
     parts.append(f"<rect x='{L['ml']}' y='{L['mt']}' width='{pw}' height='{ph}' fill='none' stroke='#8a948d'/>")
     parts.append(sv.text(L["ml"] + pw / 2, H - 12, "Recall (share of truth plasmid bases recovered)", 12, "middle", "bold"))
-    parts.append(sv.text(16, L["mt"] + ph / 2, "Precision (share of called bases that are plasmid)", 12, "middle", "bold",
+    parts.append(sv.text(16, L["mt"] + ph / 2, "Precision (called bases that are plasmid)", 11, "middle", "bold",
                          extra=f"transform='rotate(-90 16 {L['mt'] + ph / 2:.1f})'"))
     parts.append(f"<g clip-path='url(#prclip-static-{rc.esc(track['id'])})'>")
     for f in ISO_LEVELS:

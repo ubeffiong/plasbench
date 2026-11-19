@@ -331,6 +331,28 @@ def build_parser():
     report_pdf_group.add_argument("--report", type=Path, help="Path to benchmark.report.html.")
     report_pdf_group.add_argument("--results-dir", type=Path, help="Results directory containing benchmark.report.html.")
     report_pdf_parser.add_argument("--out", type=Path, help="PDF to write (default: next to the report, same name with .pdf).")
+    regen_parser = sub.add_parser(
+        "regenerate-visuals", aliases=["rebuild-report"],
+        help="Rebuild the per-sample files the report's figures need (alignments, truth tables, read QC) in an old or published results folder.")
+    regen_parser.add_argument("results_dir", type=Path, help="The finished run's results folder.")
+    regen_parser.add_argument("--data-dir", type=Path, help="The run's data folder (reference FASTAs, truth tables, reads); needed for what the results folder did not keep.")
+    regen_parser.add_argument("--cohort", type=Path, help="The cohort or sample-sheet TSV of the run (same as --samples).")
+    regen_parser.add_argument("--samples", type=Path, help="The sample-sheet TSV of the run.")
+    regen_parser.add_argument("--only", help="Comma-separated parts to rebuild: truth, paf, alignments, truth-features, qc, keep (default: all of these; scores is never rebuilt here).")
+    regen_parser.add_argument("--predictions-dir", type=Path,
+                              help="The original results folder, when this one did not keep the predictions; they are checked against scores.tsv before use.")
+    regen_parser.add_argument("--dry-run", action="store_true", help="Only say which sections are missing, which files cause it and which can be rebuilt; write nothing.")
+    regen_parser.add_argument("--yes", action="store_true", help="Rebuild without asking first.")
+    regen_parser.add_argument("--force", action="store_true", help="Rebuild files that are already present (never scores.tsv or the benchmark.* tables).")
+    regen_parser.add_argument("--report", action="store_true", help="Rebuild the HTML report afterwards (plasbench report on this folder).")
+    regen_parser.add_argument("--json", action="store_true", help="Print the result as JSON.")
+    check_results_parser = sub.add_parser(
+        "check-results", help="Say which report sections a finished results folder can draw, and which missing files stop the rest.")
+    check_results_parser.add_argument("results_dir", type=Path, help="The finished run's results folder.")
+    check_results_parser.add_argument("--data-dir", type=Path, help="The run's data folder, if it is still available.")
+    check_results_parser.add_argument("--cohort", type=Path, help="The cohort or sample-sheet TSV of the run (same as --samples).")
+    check_results_parser.add_argument("--samples", type=Path, help="The sample-sheet TSV of the run.")
+    check_results_parser.add_argument("--json", action="store_true", help="Print the result as JSON.")
     for status_name, status_help in (
             ("status", "Show what a run is doing now: stage, isolate and step, for how long, CPU and memory, progress so far, and plain hints when it looks stuck."),
             ("diagnose", "Like status, plus the busiest processes of the run: use it when a run seems stuck.")):
@@ -549,9 +571,10 @@ def build_parser():
     conda_parser.add_argument("--yes", action="store_true", help="Install without an interactive confirmation prompt.")
     conda_parser.add_argument("--prefix", type=Path, help="Install location (default: $HOME/miniforge3).")
     install_parser = sub.add_parser("install-tools", help="Install, inspect, or verify registered bioinformatics tool profiles.")
-    install_parser.add_argument("profile", nargs="?", default="core", help="list, plan, validate, locked, core, assembly, metagenomics, reconstruction, simulate, quast, multiqc, long-read, annotation, annotation-prokka, ppr-meta, plsmd, mobilome-map, gplas, gplas2, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, rfplasmid, plasmidhunter, plasmer, plascope, all, or a conda package name.")
+    install_parser.add_argument("profile", nargs="?", default="core", help="list, plan, validate, locked, core, assembly, metagenomics, reconstruction, simulate, quast, multiqc, long-read, annotation, annotation-prokka, ppr-meta, plsmd, mobilome-map, gplas, gplas2, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, plasbin_flow, plasmidec, baseline, rfplasmid, plasmidhunter, plasmer, plascope, all, or a conda package name. Exit codes: 0 installed or nothing to do, 20 a manual install is needed (nothing failed), 2 unknown name or wrong option, 1 the install failed.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     install_parser.add_argument("--yes", action="store_true", help="Use non-interactive mode for supported installer profiles; database setup remains explicit in 'plasbench check --yes'.")
+    install_parser.add_argument("--dry-run", action="store_true", help="Say what the profile is (automatic, built in, or a manual install) and stop: no conda, no network, nothing installed.")
     tools_parser = sub.add_parser(
         "tools", help="Add your own plasmid tool (one or several tasks; from conda, pip, an https URL or a folder on this computer): create, validate, list and install user tool manifests (docs/ADDING_TOOLS.md).")
     tools_sub = tools_parser.add_subparsers(dest="tools_command", required=True)
@@ -853,6 +876,17 @@ def network_commands(root):
     return netcheck.command_table(Path(root) / "config" / netcheck.CATALOGUE_NAME)
 
 
+def installer_needs_network(root, profile):
+    """True when `install-tools PROFILE` would really install something (python/tool_installer_registry.needs_network); unreadable registry: assume yes."""
+    try:
+        sys.path.insert(0, str(Path(root) / "python"))
+        import tool_installer_registry as registry
+        rows = registry.read_tsv(Path(root) / "config" / "tool_installers.tsv")
+        return registry.needs_network(profile, rows)
+    except Exception:  # noqa: BLE001 - the pre-flight is a courtesy, never a blocker
+        return True
+
+
 def network_preflight(args, root):
     """Refuse an online-only command before it does anything when the services it needs are unreachable. Returns the message, or None.
 
@@ -868,8 +902,10 @@ def network_preflight(args, root):
             return None                      # a folder or manifest on disk
     elif command == "analysis":
         sub_name = getattr(args, "name", "") or ""
-    elif command == "install-tools" and getattr(args, "profile", "") in ("list", "plan", "validate"):
-        return None                          # registry inspection only
+    elif command == "install-tools":
+        # Nothing is fetched for an inspection action, a dry run, a built-in profile, a manual profile (exit 20) or an unknown name (exit 2): say so, do not demand the internet.
+        if getattr(args, "dry_run", False) or not installer_needs_network(root, getattr(args, "profile", "core")):
+            return None
     entry = table.get((command, sub_name))
     if entry is None:
         return None
@@ -990,6 +1026,23 @@ def main(argv=None):
         command = [sys.executable, str(root / "python" / "export_report_pdf.py"), "--report", str(report)]
         if args.out:
             command += ["--out", str(args.out)]
+        code = run(command, root)
+    elif args.command in ("regenerate-visuals", "rebuild-report", "check-results"):
+        checking = args.command == "check-results"
+        command = [sys.executable, str(root / "python" / "regenerate_visuals.py"), "check" if checking else "regenerate", str(Path(args.results_dir).resolve())]
+        for flag in ("data_dir", "cohort", "samples"):
+            if getattr(args, flag, None):
+                command += ["--" + flag.replace("_", "-"), str(Path(getattr(args, flag)).resolve())]
+        if args.json:
+            command.append("--json")
+        if not checking:
+            if args.only:
+                command += ["--only", args.only]
+            if args.predictions_dir:
+                command += ["--predictions-dir", str(Path(args.predictions_dir).resolve())]
+            for flag in ("dry_run", "yes", "force", "report"):
+                if getattr(args, flag):
+                    command.append("--" + flag.replace("_", "-"))
         code = run(command, root)
     elif args.command in ("status", "diagnose"):
         from . import studies
@@ -1219,7 +1272,7 @@ def main(argv=None):
         if args.yes:
             command.append("--yes")
         command.append(args.profile)
-        code = run(command, root)
+        code = run(command, root, {"PLASBENCH_INSTALL_DRY_RUN": "1"} if args.dry_run else None)
     elif args.command == "tools":
         if args.tools_command == "install":
             code = run([bash_command(), "env/install_tools.sh", "--env", args.env, args.name], root)

@@ -31,7 +31,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import __version__
-from . import cohort_info, fsutil, ghops, ghsignin, jobrunner, netgate, runfolders, runprogress, ui_help, ui_schema
+from . import cohort_info, fsutil, ghops, ghsignin, jobrunner, loadcache, netgate, runfolders, runprogress, ui_help, ui_schema
 from .gitops import GitError   # a refused git action is the user's error (400), not the server's
 from .terminal import Terminal, TerminalError
 from .sessionlog import SessionLog, describe as describe_event
@@ -238,8 +238,20 @@ class Project:
     def settings(self) -> list[dict]:
         """Every `export KEY=...` in config/config.sh with its default, comment and section, plus the override in
         config/local.env and the value in this process's environment."""
-        text = (self.root / "config" / "config.sh").read_text(encoding="utf-8", errors="replace")
+        cfg = self.root / "config" / "config.sh"
+        base = loadcache.memo(("settings", str(cfg)), loadcache.sig(cfg), lambda: self._parse_config_sh(cfg))
         local = self.local_env()
+        rows = []
+        for row in base:
+            row = dict(row)
+            row["override"], row["env"] = local.get(row["key"]), os.environ.get(row["key"])
+            rows.append(row)
+        return rows
+
+    def _parse_config_sh(self, cfg) -> list[dict]:
+        """The part of settings() that depends only on config/config.sh (override and env are added fresh on every call)."""
+        text = cfg.read_text(encoding="utf-8", errors="replace")
+        local = {}
         out, group, comment = [], "General", []
         for raw in text.splitlines():
             line = raw.strip()
@@ -289,12 +301,16 @@ class Project:
     def settings_resolved(self) -> list[dict]:
         """settings(), each location default also resolved to the path it means on this computer."""
         rows = self.settings()
+        ranges = self.setting_ranges().load(self.root)
         carried, prev_group = "", None
         for row in rows:
             row.update(self.resolve_setting_default(row))
             if row.get("group") != prev_group:
                 carried, prev_group = "", row.get("group")
             row["tooltip"] = ui_help.setting_tooltip(row, carried)
+            if row["key"] in ranges:     # the range the code accepts, beside the setting and in its tooltip (config/setting_ranges.tsv)
+                row["range"] = self.setting_ranges().public(ranges[row["key"]], row.get("default"))
+                row["tooltip"]["summary"] = f"{row['tooltip']['summary']} Range: {row['range']['label']} {ranges[row['key']]['note']}"
             if row.get("comment"):
                 carried = row["comment"]
             if row["key"] in ui_help.RELIABILITY_KEYS:
@@ -305,7 +321,12 @@ class Project:
         return Path(os.environ.get("PLASBENCH_LOCAL_SETTINGS", self.root / "config" / "local.env"))
 
     def local_env(self) -> dict:
-        path, values = self.local_env_path(), {}
+        path = self.local_env_path()
+        return dict(loadcache.memo(("local_env", str(path)), loadcache.sig(path), lambda: self._read_local_env(path)))
+
+    @staticmethod
+    def _read_local_env(path) -> dict:
+        values = {}
         if path.is_file():
             for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
                 m = re.match(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$", line)
@@ -324,6 +345,9 @@ class Project:
                 raise ValueError(f"not a setting name: {key}")
             if value is not None and ("\n" in str(value) or "\r" in str(value)):
                 raise ValueError(f"{key}: a value cannot contain a line break")
+        # A numeric Scoring-decision setting outside the range the code accepts is refused with a plain sentence (config/setting_ranges.tsv). Clearing, and a value
+        # equal to the one already saved, always pass, so an existing saved value never blocks a save.
+        self.setting_ranges().validate_changes(changes, self.local_env(), self.root)
         path = self.local_env_path()
         lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else \
             ["# PlasBench settings for this computer (read by config/config.sh). Written by `plasbench ui`; edit freely."]
@@ -367,6 +391,13 @@ class Project:
         d = self.intake_defaults()
         return Path(str(data.get("data_dir") or d["data_dir"])).expanduser(), Path(str(data.get("samples") or d["samples"])).expanduser()
 
+    def setting_ranges(self):
+        import importlib
+        python_dir = str(self.root / "python")
+        if python_dir not in sys.path:
+            sys.path.insert(0, python_dir)
+        return importlib.import_module("setting_ranges")
+
     # -- pre-registered scoring decisions (python/prereg_admin.py) --------------------------------------------------
     def prereg_admin(self):
         import importlib
@@ -380,6 +411,7 @@ class Project:
         admin = self.prereg_admin()
         settings = {s["key"]: s for s in self.settings()}
         local = self.local_env()
+        ranges = self.setting_ranges().load(self.root)
         rows = []
         for r in admin.load(self.root):
             var = (r.get("config_variable") or "").strip()
@@ -392,6 +424,7 @@ class Project:
                     current = (settings.get(var) or {}).get("default")
             rows.append({k: r[k] for k in ("parameter", "topic", "title", "meaning", "if_changed", "type", "choices", "where", "value", "status", "config_variable", "last_action",
                                            "decided_on", "decided_by", "decision_reason", "note")} | {"current": current,
+                         "range": self.setting_ranges().public(ranges[var], r["value"]) if var in ranges else None,
                          "departs": bool(var and current is not None and str(current).strip() != str(r["value"]).strip() and not admin.freeze_prereg_equal(r["value"], current))})
         return {"rows": rows, "status": admin.status(self.root), "topics": list(dict.fromkeys(r["topic"] for r in rows)), "history": admin.history(self.root)[-200:]}
 
@@ -416,7 +449,25 @@ class Project:
         return Path(value).expanduser() if value else self.root / default_rel
 
     # -- tools ------------------------------------------------------------------------------------------------
-    def tools(self) -> list[dict]:
+    def tools(self, block: bool = True) -> list[dict]:
+        """The tool registry. The rows come from the config/*.tsv files and are rebuilt only when one of them changes; `installed` is a PATH probe that is remembered
+        (loadcache.which) and refreshed in the background, so this never waits on the PATH once it has been asked once. With block=False a probe that has no answer yet
+        gives installed=None and the row is marked checking=True (the page shows 'checking...' and asks again)."""
+        cfg = self.root / "config"
+        files = [cfg / "tool_capabilities.tsv", cfg / "tool_installers.tsv", cfg / "tool_database_releases.tsv", cfg / "config.sh", self.local_env_path()]
+        static = loadcache.memo(("tools", str(self.root)), loadcache.sig(*files), self._tools_static)
+        out = []
+        for base in static:
+            row = dict(base)
+            exe = row.get("executable")
+            if exe:
+                found, ready = loadcache.which(exe, block)
+                row["installed"] = bool(found) if ready else None
+                row["checking"] = not ready
+            out.append(row)
+        return out
+
+    def _tools_static(self) -> list[dict]:
         import csv
         try:
             from tool_capabilities import read_capabilities
@@ -460,7 +511,7 @@ class Project:
                 "input": row.get("primary_input"), "description": row.get("description", ""),
                 "profile": inst.get("profile", ""), "automated": inst.get("automated", ""),
                 "database_mode": inst.get("database_mode", ""), "verify": inst.get("verify_command", ""),
-                "notes": inst.get("notes", ""), "installed": bool(exe and shutil.which(exe)) if exe else None,
+                "notes": inst.get("notes", ""), "installed": None,
                 "executable": exe, "run_flag": flag if flag_row else None, "enabled": enabled == "1" if enabled is not None else None,
                 "database": (dbrel.get(name) or {}).get("database", ""),
                 "database_release": (dbrel.get(name) or {}).get("database_release_date", ""),
@@ -486,7 +537,7 @@ class Project:
         add("python", "Python 3.9 or newer", sys.version_info >= (3, 9), sys.version.split()[0])
         try:
             bash = bash_command()
-            add("bash", "Bash (runs the pipeline stages)", bool(bash and shutil.which(bash) or Path(str(bash)).exists()), str(bash),
+            add("bash", "Bash (runs the pipeline stages)", bool(bash and loadcache.which_path(bash) or Path(str(bash)).exists()), str(bash),
                 "" if os.name != "nt" else "install-git")
         except Exception as exc:
             add("bash", "Bash (runs the pipeline stages)", False, str(exc), "install-git" if os.name == "nt" else "")
@@ -498,16 +549,16 @@ class Project:
         add("plasbench_env", "The plasbench conda environment (holds the tools)", prefix, str(prefix) if prefix else "not created yet",
             "" if prefix else "install-tools core")
         from .terminal import git_path_dirs
-        git = shutil.which("git") or shutil.which("git", path=os.pathsep.join(git_path_dirs()))
+        git = loadcache.which_path("git") or shutil.which("git", path=os.pathsep.join(git_path_dirs()))
         add("git", "Git for Windows with Git Bash (version control of your runs, terminal)" if os.name == "nt"
             else "Git (version control of your runs, upgrades)", git, git or "not found", "install-git", optional=True)
         core = [("datasets", "NCBI datasets"), ("prefetch", "SRA toolkit: prefetch"), ("fasterq-dump", "SRA toolkit: fasterq-dump"),
                 ("fastp", "fastp (read trimming)"), ("minimap2", "minimap2 (scoring alignments)")]
         for exe, label in core:
-            path = shutil.which(exe)
+            path = loadcache.which_path(exe)
             add(exe, label, path, path or "not on PATH", "" if path else "install-tools core", group="Core tools")
         for exe, label, profile in (("spades.py", "SPAdes (short-read assembly)", "assembly"), ("mash", "Mash (clonal groups)", "utilities")):
-            path = shutil.which(exe)
+            path = loadcache.which_path(exe)
             add(exe, label, path, path or "not on PATH", "" if path else f"install-tools {profile}", group="Core tools",
                 optional=exe == "mash")
         db = Path(os.environ.get("PLASBENCH_DB_DIR") or self.local_env().get("PLASBENCH_DB_DIR") or Path.home() / ".plasbench" / "databases")
@@ -617,8 +668,12 @@ class Project:
                 "databases": self.databases()}
 
     # -- runs and reports ---------------------------------------------------------------------------------------
+    def studies(self) -> list[dict]:
+        """studies.list_studies, shared for a moment: the page asks for it from several routes at once (runs, run-sessions, workspace). Anything the window changes clears it."""
+        from . import studies
+        return [dict(s) for s in loadcache.ttl(("studies", str(self.root)), 1.5, lambda: studies.list_studies(self.root))]
+
     def runs(self, extra: list[str]) -> list[dict]:
-        import csv
         try:
             from plasbench_common import display_tool_name
         except Exception:
@@ -627,78 +682,94 @@ class Project:
         candidates.update(p for p in self.root.glob("results*") if p.is_dir())
         candidates.update(Path(e) for e in extra)
         from . import studies
-        candidates.update(Path(st["results"]) for st in studies.list_studies(self.root))
-        registered = {str(Path(e).resolve()) for e in extra}   # folders added by hand: these (and only these) can be forgotten
+        candidates.update(Path(st["results"]) for st in self.studies())
+        registered = {loadcache.realpath(e) for e in extra}   # folders added by hand: these (and only these) can be forgotten
         rows = []
         for folder in sorted(candidates):
-            if not folder.is_dir():
+            report, leaderboard = folder / "benchmark.report.html", folder / "benchmark.leaderboard.tsv"
+            # one fingerprint pass answers every "is it there" question (None = missing): the cost on a slow drive is the number of stat calls, not the parsing
+            fp = loadcache.sig(report, leaderboard, folder / "tool_status.tsv", folder.parent / "study.json", folder / "benchmark.report.pdf", folder / "benchmark.report.summary.pdf")
+            if fp[0] is None and fp[1] is None:
                 continue
-            report = folder / "benchmark.report.html"
-            leaderboard = folder / "benchmark.leaderboard.tsv"
-            if not report.is_file() and not leaderboard.is_file():
-                continue
-            leaders, tools = [], set()
-            if leaderboard.is_file():
-                with leaderboard.open(encoding="utf-8", newline="") as handle:
-                    for row in csv.DictReader(handle, delimiter="\t"):
-                        tools.add(row.get("tool"))
-                        if row.get("rank") == "1":
-                            leaders.append({"task": row.get("task", ""), "track": row.get("analysis_track", ""),
-                                            "tool": row.get("tool", ""), "display": display_tool_name(row.get("tool", "")),
-                                            "f1": row.get("mean_f1", ""),
-                                            "lw": row.get("mean_lw_bin_f1", "")})
-            samples = 0
-            status = folder / "tool_status.tsv"
-            failed = 0
-            if status.is_file():
-                with status.open(encoding="utf-8", newline="") as handle:
-                    rows_ = list(csv.DictReader(handle, delimiter="\t"))
-                samples = len({r.get("sample") for r in rows_})
-                failed = sum(1 for r in rows_ if r.get("status") in ("failed", "infrastructure_failure"))
-            stamp = max((p.stat().st_mtime for p in (report, leaderboard) if p.exists()), default=0)
-            # a study's results live in <study>/results: show the study's name
-            is_study = folder.name == "results" and (folder.parent / "study.json").is_file()
-            rows.append({"path": str(folder), "name": folder.parent.name if is_study else folder.name, "study": is_study,
-                         "study_dir": str(folder.parent) if is_study else None, "report": report.is_file(),
-                         "pdf": (folder / "benchmark.report.pdf").is_file(),
-                         "summary_pdf": (folder / "benchmark.report.summary.pdf").is_file(),
-                         "modified": stamp, "tools": len(tools - {None}), "samples": samples, "failed": failed,
-                         "leaders": leaders, "leaderboard": leaderboard.is_file(), "registered": str(folder.resolve()) in registered})
+            parts = loadcache.memo(("run", str(folder)), fp[:4], lambda f=folder: self._run_row(f, display_tool_name))
+            rows.append(dict(parts, registered=loadcache.realpath(folder) in registered, pdf=fp[4] is not None, summary_pdf=fp[5] is not None))
         rows.sort(key=lambda r: -r["modified"])
         return rows
+
+    def _run_row(self, folder: Path, display_tool_name) -> dict:
+        """One results folder's row: its leaderboard leaders, tool and sample counts. Remembered by runs() until the folder's report, leaderboard or tool_status.tsv changes."""
+        import csv
+        report = folder / "benchmark.report.html"
+        leaderboard = folder / "benchmark.leaderboard.tsv"
+        leaders, tools = [], set()
+        if leaderboard.is_file():
+            with leaderboard.open(encoding="utf-8", newline="") as handle:
+                for row in csv.DictReader(handle, delimiter="	"):
+                    tools.add(row.get("tool"))
+                    if row.get("rank") == "1":
+                        leaders.append({"task": row.get("task", ""), "track": row.get("analysis_track", ""),
+                                        "tool": row.get("tool", ""), "display": display_tool_name(row.get("tool", "")),
+                                        "f1": row.get("mean_f1", ""),
+                                        "lw": row.get("mean_lw_bin_f1", "")})
+        samples = 0
+        status = folder / "tool_status.tsv"
+        failed = 0
+        if status.is_file():
+            with status.open(encoding="utf-8", newline="") as handle:
+                rows_ = list(csv.DictReader(handle, delimiter="	"))
+            samples = len({r.get("sample") for r in rows_})
+            failed = sum(1 for r in rows_ if r.get("status") in ("failed", "infrastructure_failure"))
+        stamp = max((p.stat().st_mtime for p in (report, leaderboard) if p.exists()), default=0)
+        # a study's results live in <study>/results: show the study's name
+        is_study = folder.name == "results" and (folder.parent / "study.json").is_file()
+        return {"path": str(folder), "name": folder.parent.name if is_study else folder.name, "study": is_study,
+                "study_dir": str(folder.parent) if is_study else None, "report": report.is_file(),
+                "modified": stamp, "tools": len(tools - {None}), "samples": samples, "failed": failed,
+                "leaders": leaders, "leaderboard": leaderboard.is_file()}
 
     def cohorts(self) -> list[dict]:
         out = []
         for path in sorted((self.root / "cohorts").glob("*.tsv")):
-            try:
-                n = sum(1 for line in path.open(encoding="utf-8") if line.strip() and not line.startswith("#")) - 1
-            except OSError:
-                n = 0
             name = path.stem
-            try:
-                header = _sheet_header(path)
-            except OSError:
-                header = []
-            out.append({"name": name, "path": str(path), "rows": max(n, 0), "ledger": cohort_info.is_ledger(header), "locked": (path.parent / f"{name}.lock.json").is_file(),
-                        "metagenomic": name.startswith("metagenomics"),
-                        "selection": (path.parent / f"{name}.selection.json").is_file(),
-                        "publication": (path.parent / f"{name}.publication.json").is_file()})
+            sibs = [path.parent / f"{name}.lock.json", path.parent / f"{name}.selection.json", path.parent / f"{name}.publication.json"]
+            out.append(dict(loadcache.memo(("cohort", str(path)), loadcache.sig(path, *sibs), lambda p=path: self._cohort_row(p))))
         return out
+
+    @staticmethod
+    def _cohort_row(path: Path) -> dict:
+        """One cohort's row. Counting its rows reads the whole sheet, so it is remembered until the sheet or its lock/selection/publication file changes."""
+        try:
+            n = sum(1 for line in path.open(encoding="utf-8") if line.strip() and not line.startswith("#")) - 1
+        except OSError:
+            n = 0
+        name = path.stem
+        try:
+            header = _sheet_header(path)
+        except OSError:
+            header = []
+        return {"name": name, "path": str(path), "rows": max(n, 0), "ledger": cohort_info.is_ledger(header), "locked": (path.parent / f"{name}.lock.json").is_file(),
+                "metagenomic": name.startswith("metagenomics"),
+                "selection": (path.parent / f"{name}.selection.json").is_file(),
+                "publication": (path.parent / f"{name}.publication.json").is_file()}
 
     def docs(self) -> list[dict]:
         out = []
         for path in [self.root / "README.md"] + sorted((self.root / "docs").glob("*.md")) + sorted((self.root / "adapters").glob("*.md")):
             if path.is_file():
-                first = next((l.lstrip("# ").strip() for l in path.read_text(encoding="utf-8", errors="replace").splitlines()
-                              if l.startswith("#")), path.stem)
-                out.append({"name": str(path.relative_to(self.root)).replace("\\", "/"), "title": first,
-                            "size": path.stat().st_size})
+                title, size = loadcache.memo(("doc", str(path)), loadcache.sig(path), lambda p=path: self._doc_title(p))
+                out.append({"name": str(path.relative_to(self.root)).replace("\\", "/"), "title": title, "size": size})
         return out
+
+    @staticmethod
+    def _doc_title(path: Path) -> tuple:
+        first = next((l.lstrip("# ").strip() for l in path.read_text(encoding="utf-8", errors="replace").splitlines() if l.startswith("#")), path.stem)
+        return first, path.stat().st_size
 
 
 # --------------------------------------------------------------------------------------------- jobs
 SESSION_COMMANDS = ("run", "demo", "report", "report-pdf")   # the commands that make a benchmark run session (everything else stays on the Jobs page)
 RESUMABLE_STATES = ("failed", "interrupted", "cancelled")
+MANUAL_STEP_EXIT = 20   # install-tools: the profile is installed by hand (plasbench/exitcodes.py); shown as "Manual step needed", not Failed
 KEEP_JOBS = 500                       # finished (`done`) jobs kept; a failed, interrupted or cancelled job is kept until deleted or past the retention
 JOB_RETENTION_DAYS_DEFAULT = 180
 LOCK_STALE_SECONDS = 15
@@ -800,6 +871,13 @@ class Jobs:
         text = json.dumps(job, sort_keys=True, indent=1)
         if self._meta_sig.get(job["id"]) == text:
             return
+        if job["id"] not in self._meta_sig:   # first look since this window started: a file that already says the same is left alone (start-up used to rewrite every job's file)
+            try:
+                if self._meta_path(job["id"]).read_text(encoding="utf-8") == text:
+                    self._meta_sig[job["id"]] = text
+                    return
+            except OSError:
+                pass
         tmp = self.dir / f"{job['id']}.meta.json.{os.getpid()}.{threading.get_ident()}.tmp"
         tmp.write_text(text, encoding="utf-8")
         for attempt in range(40):
@@ -1005,8 +1083,13 @@ class Jobs:
         if code not in (0, None):
             # Never end silently: the console's last line says how and why the command stopped.
             from .exitcodes import explain
-            reason = "cancelled from the window" if state == "cancelled" else explain(code)
-            self._append_log(job_id, f"\n[PlasBench] ERROR: the command stopped: {reason} (exit {code}).\n")
+            argv = job.get("argv") or []
+            if code == MANUAL_STEP_EXIT and argv[:1] == ["install-tools"]:
+                # Not an error: a profile PlasBench never installs for you. The notice above already lists the steps.
+                self._append_log(job_id, f"\n[PlasBench] Manual step needed (exit {code}): nothing failed. {explain(code)}.\n")
+            else:
+                reason = "cancelled from the window" if state == "cancelled" else explain(code, argv[0] if argv else None)
+                self._append_log(job_id, f"\n[PlasBench] ERROR: the command stopped: {reason} (exit {code}).\n")
             if job.get("kind") == "git" and state != "cancelled":      # a git / GitHub failure, in plain words (not signed in, no permission, conflicts ...)
                 try:
                     from . import ghops
@@ -1027,6 +1110,8 @@ class Jobs:
             return "retrying"
         if state == "done" and job.get("warnings"):
             return "completed_with_warnings"
+        if state == "failed" and job.get("exit") == MANUAL_STEP_EXIT and (job.get("argv") or [])[:1] == ["install-tools"]:
+            return "manual_step"   # install-tools exit 20: a profile that is installed by hand; not a failure
         return state
 
     RETRY_LINE = re.compile(r"failed \(exit \d+\); retry (\d+) of (\d+)")
@@ -1334,7 +1419,7 @@ class Jobs:
             state = job["state"]
             group = "ongoing" if state in ("running", "cancelling") else "completed" if state == "done" else "attention"
             results = job.get("results") or self._results_dir(job["argv"])
-            idx = (run_index or {}).get(str(Path(results).resolve())) if results else None
+            idx = (run_index or {}).get(loadcache.realpath(results)) if results else None
             progress = self.progress(job["id"])
             if state == "done":
                 progress = dict(progress, percent=100)
@@ -1389,6 +1474,57 @@ def load_state() -> dict:
 def save_state(state: dict):
     _state_path().parent.mkdir(parents=True, exist_ok=True)
     _state_path().write_text(json.dumps(state, indent=1), encoding="utf-8")
+
+
+PROBE_TTL = 30.0
+NET_TTL = 8.0          # seconds the connection check is reused (netcheck keeps its own 10 s memory below this)
+PLATFORM_TTL = 120.0   # seconds a remembered environment probe is fresh; an older one is shown at once and refreshed in the background
+
+
+def schema_bytes() -> bytes:
+    """The window's command schema as ready-made JSON. It only changes with the code, so it is built once per process."""
+    return loadcache.memo("schema_bytes", __version__, lambda: json.dumps(ui_schema.schema(), default=str).encode("utf-8"))
+
+
+_GZ: dict = {}
+_GZ_LOCK = threading.Lock()
+
+
+def gzip_cached(body: bytes) -> bytes:
+    """gzip of `body`, remembered for the last few distinct bodies (the page and the schema are the same bytes on every request)."""
+    import zlib
+    key = (len(body), hash(body))
+    with _GZ_LOCK:
+        hit = _GZ.get(key)
+    if hit is not None:
+        return hit
+    comp = zlib.compressobj(6, zlib.DEFLATED, 31)
+    out = comp.compress(body) + comp.flush()
+    with _GZ_LOCK:
+        if len(_GZ) >= 16:
+            _GZ.pop(next(iter(_GZ)))
+        _GZ[key] = out
+    return out
+
+
+def _platform_probe() -> dict:
+    from . import platform_info
+    info = platform_info.detect()
+    return {"info": info, "plan": platform_info.recommend(info)}
+
+
+def warm(project, jobs=None) -> None:
+    """Fill the caches in the background at start-up, so the first page the user opens is served from memory (the PATH probes, docker and conda included)."""
+    def run():
+        steps = (schema_bytes, lambda: project.tools(block=True), lambda: loadcache.swr(("env", str(project.root)), PROBE_TTL, project.env_checks),
+                 lambda: loadcache.swr("platform", PLATFORM_TTL, _platform_probe), project.cohorts, project.docs, project.settings_resolved, project.info,
+                 lambda: project.runs([]), lambda: jobs.sessions({}) if jobs else None)
+        for step in steps:
+            try:
+                step()
+            except Exception:  # noqa: BLE001 - warming is best effort
+                pass
+    threading.Thread(target=run, daemon=True, name="plasbench-warm").start()
 
 
 TEXT_PREVIEW = {".tsv": "table", ".csv": "table", ".txt": "text", ".log": "text", ".md": "text", ".json": "text",
@@ -1549,15 +1685,21 @@ def make_handler(project: Project, jobs: Jobs):
                 if entry is not None:
                     entry["resp"] = (code, body, ctype)
                     entry["event"].set()
+            encoded = False
+            if len(body) > 1400 and "gzip" in (self.headers.get("Accept-Encoding") or "") and ctype.startswith(("application/json", "text/html")) and not (extra or {}).get("report"):
+                body, encoded = gzip_cached(body), True   # the page (470 KB) and the schema (220 KB) shrink about 5x; kept per body so it is compressed once
             self.send_response(code)
             self.send_header("Content-Type", ctype)
+            if encoded:
+                self.send_header("Content-Encoding", "gzip")
+                self.send_header("Vary", "Accept-Encoding")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("X-PlasBench-Instance", str(int(SERVER_STARTED)))
             if self.close_connection:
                 self.send_header("Connection", "close")   # tell the client, or it reuses a connection that is about to be closed
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Referrer-Policy", "no-referrer")
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Cache-Control", "public, max-age=3600" if (extra or {}).get("static") else "no-store")   # the mark is the same for a whole version
             if ctype.startswith("text/html") and not (extra or {}).get("report"):
                 self.send_header("Content-Security-Policy",
                                  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
@@ -1616,9 +1758,9 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.send(200, b"ok", "text/plain; charset=utf-8", extra={"page_seen": f"{PAGE_SEEN['t']:.3f}"})
             if path in ("/logo.svg", "/favicon.ico", "/icon.png"):   # the PlasBench mark: public, holds nothing private
                 if path == "/logo.svg":
-                    return self.send(200, LOGO_FILE.read_bytes(), "image/svg+xml")
+                    return self.send(200, loadcache.memo("logo", loadcache.sig(LOGO_FILE), LOGO_FILE.read_bytes), "image/svg+xml", extra={"static": True})
                 from . import desktop
-                return self.send(200, desktop.png_bytes(64) if path == "/favicon.ico" else desktop.png_bytes(192), "image/png")
+                return self.send(200, loadcache.memo(("png", path), __version__, lambda: desktop.png_bytes(64) if path == "/favicon.ico" else desktop.png_bytes(192)), "image/png", extra={"static": True})
             if not self.token_ok():
                 return self.send(403, KEY_PAGE.encode("utf-8"), "text/html; charset=utf-8")
             if path == "/":
@@ -1651,27 +1793,43 @@ def make_handler(project: Project, jobs: Jobs):
                 info = project.info()
                 info["token_header"] = "X-PlasBench-Token"
                 return self.jsend(200, info)
-            if route == "schema":
-                return self.jsend(200, ui_schema.schema())
+            if route == "schema":   # built from the argparse parser once (at start-up, in the background), then served as ready-made bytes
+                return self.send(200, schema_bytes())
             if route == "update-check":
                 from . import updatecheck
                 netgate.require("github", "check for updates")
                 return self.jsend(200, updatecheck.check(__version__, updatecheck.fetch_latest))
             if route == "net/status":              # the Online / Offline indicator and the gating of every internet-dependent control
                 names = [n for n in (q.get("services") or "").split(",") if n in netgate.SERVICES] or None
-                out = netgate.status(names)
+                # The connection check goes over the network (up to the 5 s timeout): it must never sit on the page-load path. A recent answer is served as it is, an old one at once
+                # and refreshed in the background; with none yet the page gets a neutral "checking" answer (nothing greyed out) and the probe runs. The Check again button
+                # (?t=...) is the only caller that waits for a real probe. Starting a job or a git action still calls netgate.require, which checks for real.
+                key = ("net", tuple(names or ()))
+                if q.get("t"):
+                    loadcache.forget(key)
+                    from . import netcheck
+                    netcheck.clear_cache()      # netcheck remembers each service for 10 s: the button wants a real probe
+                found, ready = loadcache.swr(key, NET_TTL, lambda: netgate.status(names), block=bool(q.get("t")), wait=0.3)
+                out = dict(found) if ready else {"online": True, "state": "assumed_online", "checking": True, "checked": time.time(), "services": {}, "advice": []}
                 out["commands"] = {k: (v if v is not None else None) for k, v in netgate.NET_COMMANDS.items()}
                 out["subcommands"] = netgate.SUBCOMMAND_NET
                 out["forced_offline"] = netgate.forced_offline()
+                out["offline_install"] = netgate.offline_install_profiles()
                 return self.jsend(200, out)
             if route == "github/account":
                 return self.jsend(200, ghsignin.account(github_cmd()))
             if route == "github/signin/status":
                 return self.jsend(200, signin().status())
             if route == "env":
-                return self.jsend(200, {"checks": project.env_checks()})
-            if route == "tools":
-                return self.jsend(200, {"tools": project.tools()})
+                if q.get("refresh") == "1":
+                    loadcache.clear()   # the Check again button: probe the computer for real
+                checks, _ = loadcache.swr(("env", str(project.root)), PROBE_TTL, project.env_checks)
+                return self.jsend(200, {"checks": checks})
+            if route == "tools":   # rows from the cached registry; `installed` from the remembered PATH probe, never waiting on it (checking=True until it answers)
+                if q.get("refresh") == "1":
+                    loadcache.clear()
+                tools = project.tools(block=False)
+                return self.jsend(200, {"tools": tools, "pending": sum(1 for t in tools if t.get("checking"))})
             # -- BEGIN scan a folder for isolates (plasbench/isolate_scan.py) --
             if route == "isolates/scan/status":
                 return self.jsend(200, iso_scans().status(q.get("id", "")))
@@ -1679,7 +1837,8 @@ def make_handler(project: Project, jobs: Jobs):
             # BEGIN workflow steps
             if route == "workflow":
                 from . import workflow_steps
-                return self.jsend(200, workflow_steps.payload(project.root, workflow_steps.current_values(project.settings())))
+                # Read from files (the chain, the settings), so remembered for a few seconds; any change made through the window clears it (do_POST), and a saved setting shows at once.
+                return self.jsend(200, loadcache.ttl(("workflow", str(project.root)), 5.0, lambda: workflow_steps.payload(project.root, workflow_steps.current_values(project.settings()))))
             # END workflow steps
             if route == "intake/defaults":
                 return self.jsend(200, project.intake_defaults())
@@ -1764,13 +1923,27 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.send(200, body, "text/x-shellscript; charset=utf-8",
                                  extra={"disposition": f"plasbench-session-{sid}.sh"})
             if route == "platform":
-                from . import platform_info
-                info = platform_info.detect()
-                return self.jsend(200, {"info": info, "plan": platform_info.recommend(info)})
+                if q.get("refresh") == "1":
+                    loadcache.clear()
+                found, ready = loadcache.swr("platform", PLATFORM_TTL, _platform_probe, block=False, wait=0.5)
+                return self.jsend(200, found if ready else {"pending": True})
+            if route == "computer":
+                # CPU, memory, limits, the Windows host behind WSL, and every drive (plasbench/computer_info.py). Each call is a fresh look; the drives that
+                # appeared or went away since the previous call come back in "change". Probes fail to "unknown", never to an error.
+                from . import computer_info, studies
+                where = {"data folder": str(project.path_setting("DATA_DIR", "data")), "workspace": str(studies.workspace(project.root))}
+                if q.get("study"):
+                    where["current study"] = q["study"]
+                local = project.local_env()
+                over = {k: os.environ.get(k) or local.get(k) for k in ("THREADS", "MEMORY_GB")}
+                if q.get("refresh") == "1":
+                    loadcache.forget(("computer-host", True))      # Check again: ask the Windows host (PowerShell / wmic) for real
+                    loadcache.forget(("computer-host", False))
+                return self.jsend(200, computer_info.report(where, over))
             if route == "workspace":
                 from . import studies, workspace
                 info = workspace.describe(project.root)
-                info["studies"] = studies.list_studies(project.root) if info["available"] else []
+                info["studies"] = project.studies() if info["available"] else []
                 info["recent"] = [r for r in state.get("workspaces", []) if r != info["path"]][:8]
                 return self.jsend(200, info)
             if route == "workspace/check":
@@ -1812,14 +1985,14 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, {"jobs": jobs.list()})
             if route == "run-sessions":
                 index = {r["path"]: i for i, r in enumerate(project.runs(state.get("runs", [])))}
-                index = {str(Path(k).resolve()): v for k, v in index.items()}
+                index = {loadcache.realpath(k): v for k, v in index.items()}
                 from . import outside_runs, studies
                 try:
-                    outside = outside_runs.outside_runs(studies.list_studies(project.root), list(jobs.jobs.values()))
+                    outside = outside_runs.outside_runs(project.studies(), list(jobs.jobs.values()))
                 except Exception:  # noqa: BLE001 - a study folder that cannot be read must not hide the window's own runs
                     outside = []
                 for entry in outside:
-                    entry["run_index"] = index.get(str(Path(entry["results"]).resolve()))
+                    entry["run_index"] = index.get(loadcache.realpath(entry["results"]))
                 return self.jsend(200, {"sessions": jobs.sessions(index), "outside": outside, "server_started": SERVER_STARTED})
             if route.startswith("jobs/") and route.endswith("/activity"):
                 return self.jsend(200, jobs.activity(route[len("jobs/"):-len("/activity")]))
@@ -1904,7 +2077,10 @@ def make_handler(project: Project, jobs: Jobs):
                     return self.jsend(504, {"error": "the first attempt of this request did not finish"})
             try:
                 data = self.body(UPLOAD_BODY_MAX if route == "usertools/upload" else 5 * 2**20)
-                return self.api_post(route, data)
+                try:
+                    return self.api_post(route, data)
+                finally:
+                    loadcache.clear(probes=False)   # the window changed something: the short-lived lists (studies, real paths) are read again
             except netgate.Offline as exc:
                 return self.jsend(503, exc.payload())
             except ghops.RiskError as exc:
@@ -2513,6 +2689,7 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
     project = Project(root)
     jobs = Jobs(project)
     handler = make_handler(project, jobs)
+    warm(project, jobs)
     server = None
     for candidate in range(port, port + 20):
         try:
