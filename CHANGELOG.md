@@ -13,6 +13,31 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+<<<<<<< HEAD
+### Fixed -- Browse did not open the folder window under WSL, and nothing said why (project lead report, 19 November 2026)
+- **Why it failed.** The dialog script was about 11,000 characters and went through `powershell.exe` as a 29,000-character `-EncodedCommand`, within a few percent of the Windows command-line limit (32,767) and
+  far above the 8,191 that some launchers stop at; `powershell.exe` was found only on PATH (WSL with `appendWindowsPath=false`, a conda environment or `interop` switched off found nothing and gave a bare "not found");
+  a PowerShell that could not run `Add-Type` (company policy, Constrained Language Mode) ended in a blank error; the owner window sat at -32000, and a window started from WSL could open behind the browser;
+  the page waited with "Waiting for the folder window..." and could not tell a window that was starting from one that never would. Each of these is now handled and reported.
+- **Command line.** The script travels as a short ASCII unpacker (about 5,400 characters), else a `.ps1` file in the Windows temp folder, else on standard input; a script file keeps unicode and spaces.
+- **Finding PowerShell.** The override, PATH, `/mnt/c/Windows/System32/WindowsPowerShell/v1.0`, `pwsh.exe`, any `/mnt/<drive>/Windows`, and `%SystemRoot%` asked of `cmd.exe`; `/etc/wsl.conf` and
+  `/proc/sys/fs/binfmt_misc/WSLInterop` are read, and the reason names exactly what was found.
+- **Fallbacks.** Explorer-style dialog, then `FolderBrowserDialog`, then `Shell.Application`, then a clear error that makes the page offer the built-in browser; a locked-down PowerShell is named as such.
+- **In front.** A top-most invisible owner centred on the screen, the Alt-key and thread-input trick, `SetForegroundWindow`, a flashing taskbar button as the last resort; the script says `PB_OPENED` when the window exists.
+- **The page never does nothing.** No "opened" signal within 8 seconds, an error, a lost server or an unknown job opens a dialog with the reason, **Why?**, **Copy diagnostics**, **Keep waiting** and
+  **Use the built-in browser**; the built-in browser shows the reason with Why? as well; an unavailable window is looked at again after 15 seconds so a fix needs no reload.
+- **Loopback rule.** Loopback, and under WSL2 the Windows host a localhost-forwarded browser can be seen as (the VM's default gateway); a Docker bridge address is not accepted.
+
+### Added -- `plasbench picker-check`, Test the folder window, and Docker (same report)
+- **`plasbench picker-check`** (`--interactive`, `--seconds`, `--json`) and Settings > **Test the folder window**: PASS or FAIL per step with the exact error (environment, WSL interop, which `powershell.exe`, a
+  minimal script, `Add-Type`, the route the script takes, the older windows, the real window opened and closed after two seconds, front or flashing, the Windows-to-Linux path), ending with what Browse will do.
+- **Docker.** Detected from `PLASBENCH_IN_DOCKER`, `/.dockerenv`, cgroup v1 and v2: no desktop folder window by nature, so Browse is the built-in browser rooted at the mounts read from
+  `/proc/self/mountinfo` with a banner that other folders are not visible, and **Add another folder** writes the `docker run -v` / compose snippet (Windows, WSL, spaces and unicode handled, a UNC share refused),
+  never run. From a window on the computer, **Run in Docker instead** is offered only when `docker info` answers (background probe) and `scripts/docker_run.sh` exists; it shows and copies the command and
+  starts nothing (the window listens on 127.0.0.1 only and the image's command is the command line). `scripts/docker_run.sh` takes `PLASBENCH_DATA_DIR`.
+- **Tests.** `test/test_picker_diagnostics.py` (about 180 checks; WSL and Docker with fakes; on Windows the real PowerShell route, the temp-file and stdin routes, and a real folder window found with UI Automation,
+  closed with WM_CLOSE and reported as cancelled) and `test/test_picker_ui_browser.py` (opt-in, real browser: unavailable, Docker, and on Windows the real window).
+=======
 ### Fixed -- the "older version than the page" banner no longer cries wolf
 - **Stale means the loaded code really differs.** The window judged itself by the size and mtime of every `plasbench/*.py`; a touched file with the same content, a module it never imported, a cache or a copy made by a sync tool counted. It now records a SHA-256 of each module it has imported and compares content (cached by size and mtime), plus the version in the package it runs from. `ui.html` is no longer part of it; the page carries an api level (`meta plasbench-api-level`), and a server that leaves that placeholder unreplaced is certainly older than the page.
 - **Two installs are told apart from a stale window.** A copy in the plasbench environment (`pip install --no-deps .`) next to a different version in the PlasBench folder is reported as `two_installs` with the install command: Restart window cannot fix it, so it is not offered. `GET /api/server-state` gains `kind`, `running_version/path`, `project_root_version/path`, `changed_modules`, `fix_command`, `server {pid, port, started_at}`, `api_level`.
@@ -25,6 +50,7 @@ history is lost, only the numbering is cleaner. See
 - The PlasBench folder is found from `--project-root`, `PLASBENCH_HOME`, the current folder or a parent, `~/.plasbench/install.json`, the folder the program was imported from, then `~/PlasBench`; the one used is named when it is not the current folder, and a missing folder gives a short error with three fixes instead of the command list.
 - `install.sh` and `plasbench upgrade` write `~/.local/bin/plasbench` (marker comment, never over a foreign file, `PLASBENCH_NO_LAUNCHER=1` to skip) so `plasbench` works outside the conda environment.
 - New `plasbench/roots.py`; tests: `test/test_stale_false_positive.py`.
+>>>>>>> origin/main
 
 ## [0.5.3] - 2026-11-19
 Summary. Nothing in this release changes a score, a ranking or a threshold.

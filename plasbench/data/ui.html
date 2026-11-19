@@ -368,6 +368,10 @@ dialog.fschoose{width:min(860px,96vw)}.fsbody{display:grid;grid-template-columns
 .fsdrive{padding:5px 6px;border-radius:4px;font-size:13px}.fsdrive.off{background:var(--surface-2);margin:2px 0}.fsdrive code{display:block;font-size:11px;word-break:break-all;margin:3px 0}.fsdrive .sub{display:block;color:var(--mut);font-size:11px}
 .fsside .tag{display:inline-block;font-size:11px;padding:0 5px;border-radius:8px;background:var(--surface-3);color:var(--mut)}.fsside .tag.new{background:var(--primary);color:#fff}
 dialog.npdlg{width:min(460px,94vw)}
+/* folder window: Docker helper and failure details (native_picker.py, docker_helper.py) */
+dialog.dkdlg{width:min(660px,96vw)}dialog.dkdlg .bd label{display:block;font-weight:500;margin:8px 0 3px}dialog.dkdlg .bd input[type=text]{width:100%}
+dialog.dkdlg pre.dkcmd{white-space:pre-wrap;word-break:break-all;background:var(--surface-2);padding:8px;border-radius:6px;font-size:12px;margin:8px 0}
+dialog.dkdlg ul.dknotes{margin:6px 0 0 18px;padding:0}.dkerr{color:var(--bad);margin-top:6px}
 .fs-list .sz{margin-left:auto;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
 .fs-list button .ico{color:var(--mut)}
 #toasts{position:fixed;right:16px;bottom:calc(var(--cons) + 16px);display:flex;flex-direction:column;gap:6px;z-index:90}
@@ -867,6 +871,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
    <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Settings</h1>
     <p>Every setting PlasBench reads (from <code>config/config.sh</code>), its default, and your value for this computer. Changes are saved to <code id="set_where">config/local.env</code>, which upgrades keep; clear a value to return to the default.</p></div>
     <div class="row"><button class="btn sec" id="set_reset" disabled>Discard changes</button><button class="btn" id="set_save" disabled><svg class="ico sm"><use href="#i-save"/></svg>Save <span id="set_n"></span></button></div></div>
+   <div class="card" id="np_card"><div class="hd"><h3>Folder window</h3><span class="sub">what Browse opens</span></div><div class="bd"><p class="small mut" style="margin:0">Browse opens this computer's own folder window. If it does not, test it here: PlasBench opens a window, closes it again after two seconds and says which step fails.</p></div><div class="ft"><button class="btn sec" id="np_test" title="Open a test folder window that closes itself, and show a step-by-step report you can copy">Test the folder window</button><button class="btn sec" id="np_dk_switch" hidden title="Get the command that runs PlasBench in Docker">Run in Docker instead</button><button class="btn sec" id="np_dk_add" hidden title="This window runs in Docker: get the command that mounts another folder">Add another folder</button></div></div>
    <div class="card"><div class="toolbar"><input type="search" id="setq" placeholder="Search settings…" aria-label="Search settings"><label class="row small" style="gap:6px"><input type="checkbox" id="set_only"> Only my changes</label><span class="mut small grow" id="set_count" style="text-align:right"></span></div>
     <div id="setlist"></div></div>
   </section>
@@ -1102,13 +1107,21 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
 <dialog id="npdlg" class="npdlg" role="dialog" aria-modal="true" aria-labelledby="np_title" aria-describedby="np_msg"><div class="hd"><svg class="ico"><use href="#i-folder"/></svg><h3 id="np_title">Choose a folder</h3></div>
  <div class="bd"><p id="np_msg" aria-live="polite">Waiting for the folder window... (it may be behind this window)</p><p class="small mut">Choose a folder in the window that opened, then click Select Folder. Nothing here is changed until you do.</p></div>
  <div class="ft"><button class="btn sec" id="np_inline" title="Browse inside this window instead of with the computer's folder window">Use the built-in browser</button><span class="grow"></span><button class="btn sec" id="np_front" title="If the folder window is hidden behind this window, bring it to the front">Bring it to front</button><button class="btn" id="np_cancel">Cancel</button></div></dialog>
+<dialog id="dkdlg" class="dkdlg" role="dialog" aria-modal="true" aria-labelledby="dk_title"><div class="hd"><svg class="ico"><use href="#i-folder"/></svg><h3 id="dk_title">Docker</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
+ <div class="bd"><p id="dk_lead" class="small"></p>
+  <div id="dk_row_add"><label for="dk_host">Folder on this computer (the host)</label><input type="text" id="dk_host" placeholder="D:\data or /home/me/data" autocomplete="off" spellcheck="false"><label for="dk_name">Name inside the container (optional)</label><input type="text" id="dk_name" placeholder="data" autocomplete="off"><label for="dk_cmd_in">Command to run in the container</label><input type="text" id="dk_cmd_in" value="bash" autocomplete="off"></div>
+  <div id="dk_row_sw" hidden><label for="dk_data">Data folder</label><div class="row"><input type="text" id="dk_data" autocomplete="off" spellcheck="false"><button class="btn sec sm" id="dk_bdata">Browse</button></div><label for="dk_ws">Studies folder (where results are written)</label><div class="row"><input type="text" id="dk_ws" placeholder="leave empty for the default studies folder" autocomplete="off" spellcheck="false"><button class="btn sec sm" id="dk_bws">Browse</button></div></div>
+  <div class="dkerr" id="dk_err" role="alert"></div>
+  <div id="dk_out" hidden><pre class="dkcmd" id="dk_cmd"></pre><ul class="dknotes small" id="dk_notes"></ul><details id="dk_compose_box" hidden><summary class="small">docker compose version</summary><pre class="dkcmd" id="dk_compose"></pre></details></div></div>
+ <div class="ft"><button class="btn sec" id="dk_copy" hidden>Copy the command</button><span class="grow"></span><button class="btn sec" data-close>Close</button><button class="btn" id="dk_make">Make the command</button></div></dialog>
 <dialog id="fsdlg" class="fschoose" role="dialog" aria-modal="true" aria-labelledby="fs_title" aria-describedby="fs_sel"><div class="hd"><svg class="ico"><use href="#i-folder"/></svg><h3 id="fs_title">Choose</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
  <div class="bd fsbody"><nav class="fsside" aria-label="Places" id="fs_side"></nav>
   <div class="fsmain"><nav class="crumbbar" id="fs_crumbs" aria-label="Folder path"></nav>
    <div class="row fsbar"><button class="btn sec sm" id="fs_back" title="Back (Alt+Left)" aria-label="Back" disabled>Back</button><button class="btn sec sm" id="fs_fwd" title="Forward (Alt+Right)" aria-label="Forward" disabled>Forward</button><button class="btn sec sm" id="fs_up" title="Up one folder (Backspace)">Up</button><input type="text" id="fs_path" aria-label="Path (a Windows path such as C:\Users\me\data also works)" title="Type or paste a path and press Enter: a Linux path, ~, a Windows path, a path copied in Explorer (Copy as path, the address bar) or a file:/// link."><button class="btn sec sm" id="fs_go" title="Show this folder">Go</button><button class="btn sec sm" id="fs_refresh" title="Look again (finds a drive you just plugged in)">Refresh</button><button class="btn sec sm" id="fs_new" title="Create a new folder inside the folder shown">New folder</button></div>
-   <div class="row fsbar"><input type="search" id="fs_filter" placeholder="Filter this folder (press /)" aria-label="Filter this folder"><select id="fs_sort" aria-label="Sort by"><option value="name">Sort: name</option><option value="size">Sort: size</option><option value="mtime">Sort: modified</option></select><label class="small"><input type="checkbox" id="fs_hidden"> Hidden files</label><button class="btn sec sm" id="fs_open" title="Show this folder in Explorer, the file manager of this computer">Open in Explorer</button><button class="btn sm" id="fs_native" title="Choose with the computer's own folder window" hidden>Use the Explorer window</button></div>
+   <div class="row fsbar"><input type="search" id="fs_filter" placeholder="Filter this folder (press /)" aria-label="Filter this folder"><select id="fs_sort" aria-label="Sort by"><option value="name">Sort: name</option><option value="size">Sort: size</option><option value="mtime">Sort: modified</option></select><label class="small"><input type="checkbox" id="fs_hidden"> Hidden files</label><button class="btn sec sm" id="fs_open" title="Show this folder in Explorer, the file manager of this computer">Open in Explorer</button><button class="btn sm" id="fs_native" title="Choose with the computer's own folder window" hidden>Use the Explorer window</button><button class="btn sec sm" id="fs_docker" title="Get the command that runs PlasBench in Docker with these folders" hidden>Run in Docker instead</button></div>
    <div class="small mut" id="fs_note" aria-live="polite"></div>
    <div class="small mut" id="fs_win" aria-live="polite"></div>
+   <div class="row small" id="fs_why_row" hidden style="gap:6px"><button class="btn ghost sm" id="fs_why" title="Why Browse is not using the computer's own folder window">Why?</button><button class="btn ghost sm" id="fs_diag" title="Copy what PlasBench found out, to paste into a bug report">Copy diagnostics</button><button class="btn sec sm" id="fs_adddk" hidden title="Folders outside the container's mounts are not visible: get the docker command that mounts another folder">Add another folder</button></div>
    <div class="fs-list" id="fs_list" role="list"></div>
    <div id="fs_check" class="small" aria-live="polite" style="margin-top:6px"></div><div id="fs_help" class="small mut" style="margin-top:6px"></div></div></div>
  <div class="ft"><span class="mut small grow" id="fs_sel"></span><button class="btn sec" data-close>Cancel</button><button class="btn" id="fs_ok">Select</button></div></dialog>
@@ -3359,6 +3372,7 @@ function prEdit(r) {
 
 async function loadSettings(force) {
   try { const st = await getSettings(force); $("#set_where").textContent = st.local_env; renderSettings(); } catch (e) { toast(e.message, "bad"); }
+  npLoadOffer(true);
 }
 function renderSettings() {
   const q = SET.q.toLowerCase(), rows = S.settings.settings;
@@ -5806,15 +5820,92 @@ const recentDirs = () => { try { return JSON.parse(localStorage.getItem("pb_rece
 const addRecent = p => { try { localStorage.setItem("pb_recent_dirs", JSON.stringify([p, ...recentDirs().filter(x => x !== p)].slice(0, 8))); } catch {} };
 function setHTML(el, html) { if (el._h !== html) { el._h = html; el.innerHTML = html; } }   // no rewrite (so no flicker, no lost focus) when nothing changed
 async function npCaps() {
-  if (!NP.caps) { try { NP.caps = await api("native-picker/capabilities"); } catch (e) { NP.caps = {available: false, reason: e.message}; } }
+  if (NP.caps && !NP.caps.available && !NP.caps.docker && Date.now() - (NP.capsAt || 0) > 15000) NP.caps = null;     // it may have been fixed since: look again
+  if (!NP.caps) { try { NP.caps = await api("native-picker/capabilities"); } catch (e) { NP.caps = {available: false, reason: "this window could not ask PlasBench what it can open (" + e.message + ")"}; } NP.capsAt = Date.now(); }
   return NP.caps;
 }
 async function pickPath(dir, cb, title, start) {
   const caps = await npCaps();
+  if (caps.docker) return pickInline(dir, cb, title, start, (caps.banner || "") + " " + (caps.reason || ""), {docker: true});
   if (caps.available && npPref() !== "inline") return pickNative(dir ? "folder" : "file", cb, title, start);
   const reason = caps.available ? "You chose the built-in browser. Use the Explorer window button to switch back." : `${(caps.reason || "No folder window is available here").replace(/^./, c => c.toUpperCase())}: using the built-in browser.`;
-  return pickInline(dir, cb, title, start, reason);
+  return pickInline(dir, cb, title, start, reason, {why: !caps.available});
 }
+/* ---- folder window: why it failed, diagnostics, Docker (native_picker.py, docker_helper.py, picker_check.py) ---- */
+const NPX = {offer: null};
+function npDiag(extra) {
+  const c = NP.caps || {}, d = c.diagnostics || {}, v = NP.lastView || {};
+  const lines = ["PlasBench folder window diagnostics", `platform: ${c.platform || "unknown"}`, `available: ${!!c.available}${c.via ? " via " + c.via : ""}${c.docker ? " (inside Docker)" : ""}`, `reason: ${c.reason || "none"}`];
+  if (d.interop) lines.push(`WSL interop: ${d.interop.enabled} (${d.interop.detail})`);
+  if ((d.tried || []).length) lines.push("powershell.exe was looked for in: " + d.tried.join(", "));
+  if (v.id) lines.push("last attempt: " + JSON.stringify({state: v.state, opened: v.opened, after: v.opened_after, window: v.strategy, route: v.route, focus: v.focus, notes: v.notes, error: v.error}));
+  if (extra) lines.push(String(extra));
+  lines.push("browser: " + navigator.userAgent, "For the full step-by-step check run in a terminal: plasbench picker-check");
+  return lines.join("\n");
+}
+async function npFailDialog(reason, canWait) {
+  const diag = npDiag(reason);
+  const r = await modalDialog({title: "The folder window did not open", danger: false,
+    bodyHTML: `<p>${esc(reason)}</p><p>You can choose the folder with PlasBench's built-in browser instead; nothing is lost.</p><details><summary>Why?</summary><pre class="detail">${esc(diag)}</pre></details>`, copy: diag,
+    buttons: [{id: "inline", label: "Use the built-in browser", primary: true}].concat(canWait ? [{id: "wait", label: "Keep waiting"}] : []).concat([{id: "cancel", label: "Cancel"}]), cancelId: "cancel", defaultId: "inline"});
+  return r.id;
+}
+function npFsExtras(extra) {
+  const e = extra || {};
+  $("#fs_why_row").hidden = !(e.why || e.docker); $("#fs_adddk").hidden = !e.docker; $("#fs_docker").hidden = true;
+  for (const [id, k] of [["fs_why", "why"], ["fs_diag", "diagnostics"], ["fs_adddk", "docker_add"], ["fs_docker", "docker_switch"]]) { const t = npHelp(k); if (t) $("#" + id).title = t; }
+  if (!e.docker) npLoadOffer(false);
+}
+async function npLoadOffer(settings) {         // in the background, and only when a chooser or Settings opens: never on the page-load path
+  const caps = await npCaps();
+  if (settings) { $("#np_dk_add").hidden = !caps.docker; }
+  if (caps.docker) return;
+  for (let i = 0; i < 6; i++) {
+    let o; try { o = await api("docker/offer"); } catch { return; }
+    NPX.offer = o;
+    if (!o.pending) break;
+    await sleep(1500);
+  }
+  const on = !!(NPX.offer && NPX.offer.offered);
+  $("#np_dk_switch").hidden = !on;
+  if ($("#fsdlg").open) $("#fs_docker").hidden = !on;
+}
+$("#fs_why").onclick = () => showMessage({title: "Why the built-in browser?", body: (NP.caps && NP.caps.reason) || (NP.lastView && NP.lastView.error) || "No reason was reported.", detail: npDiag(), copy: npDiag()});
+$("#fs_diag").onclick = () => copyText(npDiag(), "Diagnostics copied");
+$("#np_test").onclick = async () => {
+  const b = $("#np_test"); b.disabled = true; toast("Opening a test folder window: it closes itself after two seconds.", "");
+  try { const r = await api("native-picker/selftest", {}); showMessage({title: "Folder window test", body: r.error || r.verdict, detail: r.text || "", copy: r.text || r.error || "", danger: !r.ok, buttonLabel: "Close"}); NP.caps = null; }
+  catch (e) { toast(e.message, "bad"); } finally { b.disabled = false; }
+};
+const dkShell = () => /^Win/i.test(navigator.platform || "") ? "powershell" : "posix";
+function dkOpen(mode, prefill) {
+  const d = $("#dkdlg"); d.dataset.mode = mode;
+  $("#dk_title").textContent = mode === "add" ? "Add another folder to the container" : "Run PlasBench in Docker instead";
+  $("#dk_lead").textContent = mode === "add"
+    ? "This window runs inside Docker, so it only sees folders mounted into the container. Type or paste the folder on your computer: PlasBench makes the docker command that restarts the container with it mounted. It is never run for you."
+    : "The window stays where it is. This makes the command that runs the PlasBench pipeline in Docker with your folders mounted: the tools run inside the image, results are written to the folders you mounted. It is a command to copy and run in a terminal; PlasBench does not start Docker for you.";
+  $("#dk_row_add").hidden = mode !== "add"; $("#dk_row_sw").hidden = mode !== "switch"; $("#dk_out").hidden = true; $("#dk_copy").hidden = true; $("#dk_err").textContent = "";
+  if (prefill) $("#dk_data").value = prefill;
+  d.showModal();
+}
+$("#dk_make").onclick = async () => {
+  const mode = $("#dkdlg").dataset.mode, err = $("#dk_err"); err.textContent = ""; $("#dk_out").hidden = true; $("#dk_copy").hidden = true;
+  const body = mode === "add" ? {folders: [{path: $("#dk_host").value, name: $("#dk_name").value}], shell: dkShell(), command: $("#dk_cmd_in").value || "bash"}
+    : {mode: "switch", data_dir: $("#dk_data").value, workspace: $("#dk_ws").value, shell: dkShell()};
+  try {
+    const r = await api("docker/plan", body);
+    if (!r.ok) { err.textContent = (r.errors || ["That did not work."]).join(" "); return; }
+    $("#dk_cmd").textContent = r.command; $("#dk_notes").innerHTML = (r.steps || []).map(x => `<li>${esc(x)}</li>`).join("") + (r.notes || []).map(x => `<li>${esc(x)}</li>`).join("");
+    $("#dk_compose").textContent = r.compose || ""; $("#dk_compose_box").hidden = !r.compose; $("#dk_out").hidden = false; $("#dk_copy").hidden = false;
+  } catch (e) { err.textContent = e.message; }
+};
+$("#dk_copy").onclick = () => copyText($("#dk_cmd").textContent, "Command copied");
+$("#dk_bdata").onclick = () => pickPath(true, p => { $("#dk_data").value = p; }, "Choose the data folder", $("#dk_data").value);
+$("#dk_bws").onclick = () => pickPath(true, p => { $("#dk_ws").value = p; }, "Choose the studies folder", $("#dk_ws").value);
+$("#fs_adddk").onclick = () => dkOpen("add");
+$("#np_dk_add").onclick = () => dkOpen("add");
+$("#np_dk_switch").onclick = () => dkOpen("switch");
+$("#fs_docker").onclick = () => dkOpen("switch", FS.dir ? (FS.path || "") : "");
 async function npValidate(dir, p) {
   if (!dir || !p) return;
   try {
@@ -5826,7 +5917,7 @@ async function npValidate(dir, p) {
 async function pickNative(kind, cb, title, start, retried) {
   const dir = kind === "folder", dlg = $("#npdlg"), opener = document.activeElement; NP.last = {dir, cb, title, start};
   $("#np_title").textContent = title || (dir ? "Choose a folder" : "Choose a file");
-  $("#np_msg").textContent = "Waiting for the folder window... (it may be behind this window)";
+  $("#np_msg").textContent = "Opening the folder window...";
   $("#np_cancel").disabled = false;
   dlg.showModal(); $("#np_cancel").focus();
   let id;
@@ -5840,14 +5931,27 @@ async function pickNative(kind, cb, title, start, retried) {
       }
       return;
     }
-    return pickInline(dir, cb, title, start, `The computer's folder window could not be opened (${e.message}): using the built-in browser.`);
+    NP.lastView = {state: "error", error: e.message};
+    if (await npFailDialog(`The computer's folder window could not be opened (${e.message}).`, false) === "inline") return pickInline(dir, cb, title, start, `The computer's folder window could not be opened (${e.message}): using the built-in browser.`, {why: true});
+    return;
   }
   const job = NP.job = {id, done: false};
-  let s = {state: "open"};
+  let s = {state: "open"}, bad = 0, warned = false;
   while (!job.done) {
     await sleep(700);
-    try { s = await api(`native-picker/status?id=${id}`); } catch { continue; }
+    try { s = await api(`native-picker/status?id=${id}`); bad = 0; } catch { if (++bad >= 4) { s = {state: "error", error: "this window lost contact with PlasBench while the folder window was opening"}; break; } continue; }
+    NP.lastView = s;
     if (s.state !== "open") break;
+    if (s.opened) $("#np_msg").textContent = s.focus === "flashed" ? "The folder window opened behind this one: its button is flashing in the taskbar. Click it, or press Bring it to front." : "The folder window opened. If you do not see it, click the PowerShell or Explorer icon in the taskbar, or press Bring it to front.";
+    else if (!warned && s.elapsed >= 8) {
+      warned = true; dlg.close();
+      const choice = await npFailDialog(`The folder window has not said it is open after ${Math.round(s.elapsed)} seconds${s.notes && s.notes.length ? " (" + s.notes[s.notes.length - 1] + ")" : ""}. It may still be starting (the first start can take a while) or something may be blocking it.`, true);
+      if (job.done) break;
+      if (choice === "wait") { dlg.showModal(); continue; }
+      job.done = true; NP.job = null; try { await api("native-picker/cancel", {}); } catch {}
+      if (choice === "inline") return pickInline(dir, cb, title, start, "The computer's folder window did not open: using the built-in browser.", {why: true});
+      return;
+    }
   }
   const was = job.done; job.done = true; NP.job = null;
   if (dlg.open) dlg.close();
@@ -5856,7 +5960,7 @@ async function pickNative(kind, cb, title, start, retried) {
   if (s.state === "chosen" && s.path) { addRecent(s.path); cb(s.path); if (s.warning) toast(s.warning, ""); npValidate(dir, s.path); }
   else if (s.state === "cancelled") { /* nothing chosen */ }
   else if (s.mount_hint) showMessage({title: "That drive is not mounted in Ubuntu yet", body: s.error, copy: s.mount_hint, buttonLabel: "Close"});
-  else pickInline(dir, cb, title, start, `The computer's folder window did not return a folder (${s.error || "unknown error"}): using the built-in browser.`);
+  else if (await npFailDialog(`The computer's folder window did not return a folder (${s.error || "unknown error"}).`, false) === "inline") pickInline(dir, cb, title, start, `The computer's folder window did not return a folder (${s.error || "unknown error"}): using the built-in browser.`, {why: true});
 }
 $("#np_cancel").onclick = async () => { const j = NP.job; if (j) j.done = true; NP.job = null; $("#npdlg").close(); try { await api("native-picker/cancel", {}); } catch {} };
 $("#np_front").onclick = async () => { try { const r = await api("native-picker/front", {id: NP.job && NP.job.id}); if (!r.ok) toast(r.error || "Could not bring it to the front", "bad"); } catch (e) { toast(e.message, "bad"); } };
@@ -5866,12 +5970,13 @@ $("#npdlg").addEventListener("cancel", e => { e.preventDefault(); $("#np_cancel"
 
 /* ---- the built-in browser: favourites, recent folders, every drive with its real capacity, history, filter, sort, hidden files, New folder ---- */
 const FS = {cb: null, dir: true, sel: null, path: "", opener: null, side: null, req: 0, tick: 0, entries: [], hist: [], hi: -1, hidden: false, seen: null, newIds: [], title: "", start: ""};
-function pickInline(dir, cb, title, start, note) {
+function pickInline(dir, cb, title, start, note, extra) {
   Object.assign(FS, {cb, dir, sel: null, opener: document.activeElement, hist: [], hi: -1, title, start});
   NP.last = {dir, cb, title, start};
   $("#fs_title").textContent = title || (dir ? "Choose a folder" : "Choose a file"); $("#fs_ok").textContent = dir ? "Select this folder" : "Select";
   $("#fs_new").hidden = !dir; $("#fs_filter").value = ""; $("#fs_note").textContent = note || "";
   $("#fs_native").hidden = !(NP.caps && NP.caps.available);
+  npFsExtras(extra);
   $("#fsdlg").showModal(); fsLoad(start || "", {refresh: true});
 }
 function checkHTML(r) {

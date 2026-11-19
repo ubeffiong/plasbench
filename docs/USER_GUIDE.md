@@ -242,6 +242,9 @@ For a real Docker run, mount `config`, `data`, `logs`, and `results`, then set
 `DATA_DIR`, `LOG_DIR`, `RESULTS_DIR`, and `PLATON_DB` to their mounted paths.
 The exact copy-paste command is in the README.
 
+The window (`plasbench ui`) is for your own computer: it listens on 127.0.0.1 only and opens that computer's folder window. Inside a container it has no desktop, so Browse uses the built-in
+browser at the mounted folders; see "The folder window does not open" above for **Add another folder** and **Run in Docker instead**.
+
 ### Installing the tools
 
 Tools install with your consent, each in its own isolated environment, from a pinned release or an exact commit: `plasbench install-tools NAME --yes` (a first install of a source-built tool
@@ -878,6 +881,35 @@ Windows itself and an unmounted folder shows none.
 **Frequently asked.** *Why does Browse not show my USB drive in the built-in browser?* Plugged in after WSL started: mount it as above. *Why does the folder window open behind the browser?*
 Windows may refuse to raise it: click Bring it to front or find it in the taskbar. *Can the page use the real Explorer without a dialog?* A web page cannot receive a real path from
 the browser, so PlasBench opens the dialog itself; Open in Explorer only shows a folder.
+
+**The folder window does not open (Browse).** Run `plasbench picker-check` (or Settings, **Test the folder window**): it checks the chain step by step, prints `PASS` or `FAIL` for each
+step with the exact error, opens a test window that closes itself after two seconds, and ends with what Browse will do. Add `--interactive` to leave the window open, choose a folder and see the
+path PlasBench receives. Paste the report if it still fails. Whatever fails, Browse never does nothing: when the window does not say it is open within 8 seconds (or fails) a dialog gives the reason, a
+**Why?** fold with the diagnostics, **Copy diagnostics**, **Keep waiting** and **Use the built-in browser**. The checklist per computer:
+
+- *WSL (Ubuntu on Windows).* The folder window is Windows' own, started through `powershell.exe`. `plasbench picker-check` shows **WSL interop** (needs `[interop] enabled` not `false` in `/etc/wsl.conf`
+  and `WSLInterop` enabled: `wsl --shutdown` from Windows restarts it), **powershell.exe is found** (PlasBench looks on PATH, in `/mnt/c/Windows/System32/WindowsPowerShell/v1.0`, in any
+  `/mnt/<drive>/Windows` and asks `cmd.exe` for `%SystemRoot%`, so `appendWindowsPath=false` does not matter), and whether PowerShell is locked down (Constrained Language Mode, a company policy). If the
+  Explorer-style window cannot be compiled, the older Windows folder window and then `Shell.Application` are tried before the built-in browser. The window may open behind the browser: it is made
+  top-most and brought forward, and **Bring it to front** is in the waiting dialog; if Windows refuses, its taskbar button flashes. The first start can take several seconds.
+- *Windows.* The same route without WSL. A locked-down PowerShell or a security product that blocks `Add-Type` makes the older windows or the built-in browser take over, and `picker-check` says which step failed.
+- *macOS.* `osascript` must run and the desktop session must be the one the terminal belongs to; `picker-check` starts the dialog and closes it after the test time.
+- *Linux desktop.* Install `zenity`, `kdialog` or `yad` and start `plasbench ui` from a terminal inside the desktop session (`DISPLAY` or `WAYLAND_DISPLAY` set).
+- *Linux without a desktop, SSH, a server.* No window can open on your screen: the built-in browser is used, by design. Forward the port (`ssh -L 8770:127.0.0.1:8770 you@server`) and open the address locally.
+- *Docker.* See the next section.
+
+Only the WSL route had to be rewritten: Windows (`powershell`), macOS (`osascript`) and Linux desktops (`zenity`/`kdialog`/`yad`) each use their own system dialog, and the other computers fall back to the built-in browser
+by design.
+
+**PlasBench and Docker.** Inside a container there is no desktop, so no folder window can open, and the container sees only the folders that were mounted into it. A window running inside Docker therefore
+sends Browse straight to the built-in browser, which starts at the mounted folders (read from `/proc/self/mountinfo`: bind mounts with the host folder when Docker reveals it, volumes by name) and says that
+folders outside the mounts are not visible. To use another folder, **Add another folder** takes a path on your computer (`D:\data`, `/home/me/data`) and writes the exact `docker run ... -v <folder>:/mnt/<name>` command
+(and a `docker compose` snippet) that restarts the container with it mounted; paths are converted for the shell (`/mnt/d/data` for WSL and Linux, `D:\data` for PowerShell), spaces and unicode are quoted, a network share
+(`\\server\share`) is refused with the reason. The command is shown and copied, never run. The image's default command is the command line, and the window listens on 127.0.0.1 only, so PlasBench does not
+claim to host the window in a container: run the window on your computer and the pipeline in Docker.
+From a window on the computer itself, **Run in Docker instead** (the folder chooser and Settings) appears only when `docker info` answers (checked in the background, never while a page loads) and
+`scripts/docker_run.sh` exists. It writes the command that runs `plasbench run` in the image with your data folder and studies folder mounted (`PLASBENCH_DATA_DIR`, `PLASBENCH_WORKSPACE`), tells you the
+steps, and again does not run it: the window does not stop itself or start containers. The tools run inside the image and results are written to the mounted folders.
 
 **Speed and sync folders.** A Windows drive seen from Ubuntu is slower than Ubuntu's own disk for many small files and for git; a cloud-sync folder (OneDrive, Dropbox) can lock
 or re-upload large files mid-run; an external or network drive stops the run if it disconnects (running again continues from the finished steps). The folder check shows these

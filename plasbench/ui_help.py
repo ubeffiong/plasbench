@@ -411,4 +411,10 @@ NATIVE_PICKER = {
     "drive_capacity": {"summary": "Size and free space come from Windows itself (as Explorer shows them). GB here is 2^30 bytes, the unit Explorer calls GB."},
     "drive_unmounted": {"summary": "This drive is plugged in but Ubuntu has not mounted it yet. Copy the command and run it in the Terminal tab; PlasBench never runs it for you."},
     "paste_path": {"summary": "Paste a path from Explorer: Copy as path (with quotes), the address bar, a wsl.localhost network path or a file:/// link all work."},
+    "why": {"summary": "Why Browse is using the built-in browser instead of the computer's own folder window: the exact reason PlasBench found, and what it tried."},
+    "diagnostics": {"summary": "Copies what PlasBench found out about the folder window (the computer, what it looked for, what happened last) so you can paste it into a bug report. `plasbench picker-check` gives the full step-by-step version."},
+    "test": {"summary": "Opens a test folder window that closes itself after two seconds and reports every step (the computer, WSL interop, PowerShell, compiling the window, opening it, bringing it to the front). Nothing is changed."},
+    "docker_add": {"summary": "This window runs inside Docker and sees only the folders mounted into the container. Type a folder of your computer and PlasBench makes the docker run command that mounts it. The command is only shown and copied, never run."},
+    "docker_switch": {"summary": "Shows the command that runs the PlasBench pipeline in Docker with your folders mounted, when Docker is installed and running. The tools run inside the image and results are written to your folders. The command is only shown and copied, never run."},
+    "in_docker": {"summary": "Inside Docker there is no desktop, so no folder window can open. The built-in browser starts at the folders mounted into the container."},
 }

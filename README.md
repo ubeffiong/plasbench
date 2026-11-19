@@ -974,6 +974,7 @@ plasbench ui                 # start PlasBench and open its window
 plasbench ui --tab           # open it in a normal browser tab instead of an app window
 plasbench ui --no-browser    # only print the address (a server, or another browser)
 plasbench desktop-icon       # (re)make the icon; --remove takes it away, --no-desktop keeps it to the menu
+plasbench picker-check       # Browse does not open the folder window? PASS or FAIL per step (--interactive lets you pick a folder)
 ```
 
 The window is a page served only to this computer (127.0.0.1). Each start gets its own session key, so other programs
@@ -1131,7 +1132,15 @@ persistent volume over its default directory to avoid re-fetching it on every ru
 ```
 
 For a run that records the image digest into `run_manifest.json`, use
-`scripts/docker_run.sh` in place of plain `docker run`, with the same mounts.
+`scripts/docker_run.sh` in place of plain `docker run`, with the same mounts. It also takes
+`PLASBENCH_DATA_DIR` (the host data folder, default `<root>/data`) and `PLASBENCH_WORKSPACE` (the studies folder).
+
+**Docker and the window.** `plasbench ui` is for your own computer (it listens on 127.0.0.1 and opens that
+computer's folder window for Browse). A window inside a container has no desktop: Browse uses the built-in
+browser at the mounted folders, and **Add another folder** writes the `docker run -v` command that mounts one more
+(shown and copied, never run). From a window on your computer, **Run in Docker instead** (folder chooser and
+Settings) appears only when Docker is running and `scripts/docker_run.sh` exists; it writes the command with your
+data and studies folders mounted, and does not start anything itself.
 
 ---
 
@@ -1909,6 +1918,7 @@ None of these actions are required for a successful ordinary benchmark run.
 |---|---|---|
 | `plasbench: command not found` | Environment not active | `conda activate plasbench` |
 | `conda: command not found` | Step 2 not done, or shell not restarted | Run step 2, then `exec bash` |
+| Browse does not open the folder window (WSL, Windows, Linux, Docker) | `powershell.exe` not reachable from WSL, interop off, a locked-down PowerShell, no desktop session, or Docker (no desktop) | `plasbench picker-check` prints PASS or FAIL for each step; Settings, **Test the folder window**, does the same; see the User Guide, "The folder window does not open" |
 | `curl: (6) Could not resolve host: raw.githubusercontent.com` (or `api.github.com`) | This computer's DNS is not working, common in WSL2 or behind a VPN; not a PlasBench problem | In PowerShell run `wsl --shutdown`, reopen Ubuntu and retry; turn a VPN off or on. With no internet here, download `plasbench-<version>.tar.gz` and its `.sha256` from the Releases page on another computer, then `tar -xzf` it and run `bash plasbench-<version>/scripts/install_latest.sh --archive <path to the .tar.gz> --tools` |
 | `sha256sum: no properly formatted checksum lines found` | Download returned an error page | `rm` both files, redo step 3 |
 | `curl: (22) ... 404` | Wrong version in the URL | Check the Releases page for the current version |

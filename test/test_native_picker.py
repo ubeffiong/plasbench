@@ -64,7 +64,18 @@ def log(**kw):
     with open(os.environ["FAKE_LOG"], "a", encoding="utf-8") as f:
         f.write(json.dumps(dict(name=name, args=args, pid=os.getpid(), **kw)) + "\n")
 if name == "powershell":
-    script = base64.b64decode(args[args.index("-EncodedCommand") + 1]).decode("utf-16-le")
+    if "-EncodedCommand" in args:
+        script = base64.b64decode(args[args.index("-EncodedCommand") + 1]).decode("utf-16-le")
+    elif "-File" in args:
+        script = open(args[args.index("-File") + 1], encoding="utf-8-sig").read()
+    else:
+        cmd = args[args.index("-Command") + 1]
+        if cmd == "-":
+            cmd = sys.stdin.read()
+        if "GZipStream" in cmd:      # the short unpacker: base64 of a gzip of the real script
+            import gzip
+            cmd = gzip.decompress(base64.b64decode(re.search(r"FromBase64String\('([^']+)'\)", cmd).group(1))).decode("utf-8")
+        script = cmd
     payload = json.loads(base64.b64decode(re.search(r"FromBase64String\('([^']+)'\)", script).group(1)))
     log(payload=payload)
     print("PB_PID:%d" % os.getpid(), flush=True)
@@ -419,7 +430,7 @@ def main():
     sites = re.findall(r'data-browse="', html)
     check("every Browse button (data-browse) is drawn on the pages and handled by the one click handler", len(sites) >= 10 and 'e.target.closest("[data-browse]")' in html and html.count("pickPath(b.dataset.dir") == 1, len(sites))
     check("pickPath asks for the native window first and falls back to the built-in browser with a reason", all(k in html for k in ("async function pickPath", "caps.available && npPref() !== \"inline\"", "pickNative(", "pickInline(", "using the built-in browser")))
-    check("the capabilities are asked only when Browse is used (never on the load path)", html.count('"native-picker/capabilities"') == 1 and html.count("await npCaps()") == 1 and "async function npCaps" in html)
+    check("the capabilities are asked only when Browse is used (never on the load path)", html.count('"native-picker/capabilities"') == 1 and html.count("await npCaps()") == 2 and "async function npCaps" in html and "npLoadOffer(true);" in html)   # pickPath, and the Docker offer when Settings or a chooser opens: never the load path
     check("the waiting dialog: message, Cancel, Bring it to front, built-in browser", all(k in html for k in ("Waiting for the folder window... (it may be behind this window)", 'id="np_cancel"', 'id="np_front"', 'id="np_inline"')))
     check("the choice is remembered in localStorage inside try/catch", "pb_picker" in html and re.search(r'const npPref = \(\) => \{ try \{ return localStorage\.getItem\("pb_picker"\)', html) and "const npSetPref = v => { try {" in html)
     check("the chosen path is validated with the existing folder check", "async function npValidate" in html and "workspace/check?path=" in html)

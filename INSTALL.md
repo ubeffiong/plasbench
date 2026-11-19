@@ -61,6 +61,10 @@ bash env/download_mobsuite_db.sh      # its database, into the new environment
 
 `plasbench check` reports a MOB-suite that is installed but cannot start as `[BROKEN]`.
 
+**Docker and the folder window.** The window (`plasbench ui`) opens this computer's own folder window for Browse, so run it on your computer; Docker runs the pipeline
+(`scripts/docker_run.sh plasbench run ...`, see the README's Container section). Inside a container there is no desktop: Browse uses the built-in browser at the folders you mounted, and
+the window shows the `docker run -v` command for mounting another one. If Browse does not open the folder window on your computer, run `plasbench picker-check`.
+
 **Databases are kept once per machine.** Every tool database lives in
 `PLASBENCH_DB_DIR` (default `~/.plasbench/databases`), not inside a project folder or a
 conda environment, so a new checkout, a new `DATA_DIR` or a rebuilt environment reuses

@@ -1582,6 +1582,47 @@ def read_study_file(root, raw: str) -> dict:
             "text": data.decode("utf-8", "replace")}
 
 
+# ---- the folder window's extras (plasbench/native_picker.py, docker_helper.py, picker_check.py): small, additive ----
+_selftest_lock = threading.Lock()
+
+
+def native_picker_extras(caps: dict) -> dict:
+    """What the page needs beside the capabilities: in Docker the mounts and the banner; every platform its diagnostics."""
+    from . import docker_helper
+    out = {"diagnostics": {"platform": caps.get("platform"), "via": caps.get("via"), "tried": caps.get("tried") or [], "interop": caps.get("interop")}}
+    if caps.get("docker"):
+        mounts = docker_helper.user_mounts()
+        out.update(mounts=mounts, mount_roots=docker_helper.mount_roots(mounts),
+                   banner="Folders outside these mounts are not visible to the window." if mounts else "No folder is mounted into this container, so no folder of yours is visible to the window.")
+    return out
+
+
+def native_picker_selftest() -> dict:
+    """The same checks as `plasbench picker-check`, for the Settings button: one at a time, bounded (the window it opens closes itself after 2 s)."""
+    from . import picker_check
+    if not _selftest_lock.acquire(blocking=False):
+        return {"error": "a folder window test is already running", "steps": [], "verdict": "", "ok": False}
+    try:
+        report = picker_check.run_checks(interactive=False, seconds=2)
+        report["text"] = picker_check.format_report(report)
+        return report
+    finally:
+        _selftest_lock.release()
+
+
+def docker_offer_state(root) -> dict:
+    """Whether "run PlasBench in Docker instead" is offered: Docker answers `docker info` and scripts/docker_run.sh exists; never inside Docker. The probe runs in the background."""
+    from . import docker_helper, platform_info
+    if docker_helper.in_docker():
+        return {"pending": False, "offered": False, "reason": "this window already runs inside Docker", "in_docker": True}
+    state, ready = loadcache.swr(("docker-state",), 60.0, platform_info.docker, block=False)
+    if not ready:
+        return {"pending": True, "offered": False, "reason": "checking whether Docker is available"}
+    offer = docker_helper.switch_offer(state, (Path(root) / "scripts" / "docker_run.sh").is_file())
+    return dict(offer, pending=False, in_docker=False, docker=state)
+# ---- end folder window extras ----
+
+
 def browse(path: str, files: bool, project=None, hidden: bool = False, refresh: bool = False) -> dict:
     """The folder chooser's listing. An empty path is the root view: Quick places (Home, the workspace, the PlasBench folder, the shared data folder) and This PC (drive letters;
     in WSL the Windows drives; on Linux /mnt, /media/$USER; on macOS /Volumes). A typed Windows or \\\\wsl.localhost path is converted to the Linux path in WSL."""
@@ -1601,9 +1642,18 @@ def browse(path: str, files: bool, project=None, hidden: bool = False, refresh: 
             places = chooser.quick_places(project.root, studies.workspace(project.root), configured_data_dir(project.root), wsl=wsl)
         else:
             places = chooser.quick_places(Path.cwd(), Path.home(), wsl=wsl)
+        # ---- Docker: the root is the folders mounted into this container (plasbench/docker_helper.py) ----
+        from . import docker_helper
+        in_dock = loadcache.ttl(("in-docker",), 60.0, docker_helper.in_docker)
+        if in_dock:
+            pc = [{"name": r["label"], "path": r["path"], "dir": True, "free": None, "kind": "drive"} for r in docker_helper.mount_roots(docker_helper.user_mounts())]
+            places = [p for p in places if p["name"] in ("Workspace (studies)", "PlasBench folder", "Shared data folder")]
+        # ---- end Docker ----
         help_text = ("A drive that is not listed is not mounted in Ubuntu. To mount a drive (E: as the example), run this in the Terminal tab; PlasBench never runs it for you: "
                      + chooser.mount_command("E")) if wsl else ""
-        return {"path": "", "parent": None, "windows": "", "wsl": wsl, "places": places, "pc": pc, "help": help_text, "entries": places + pc}
+        if in_dock:
+            help_text = "This window runs inside Docker: you can only choose folders mounted into the container. Folders outside these mounts are not visible to the window."
+        return {"path": "", "parent": None, "windows": "", "wsl": wsl, "docker": bool(in_dock), "places": places, "pc": pc, "help": help_text, "entries": places + pc}
     path = chooser.to_linux(path)
     p = Path(path).expanduser()
     if not p.exists():
@@ -1769,7 +1819,8 @@ def make_handler(project: Project, jobs: Jobs):
 
         def loopback(self):
             """True when the request comes from this computer itself (the window is localhost-only; the folder window opens on this machine's desktop)."""
-            return str(self.client_address[0]).split("%")[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+            from . import native_picker     # loopback, and under WSL2 the Windows host a localhost-forwarded browser is seen as (see native_picker.is_local_client)
+            return native_picker.is_local_client(str(self.client_address[0]), loadcache.ttl(("platform-kind",), 3600.0, native_picker._platform))
 
         def host_ok(self):
             host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
@@ -1857,7 +1908,9 @@ def make_handler(project: Project, jobs: Jobs):
                 if route == "native-picker/status":
                     return self.jsend(200, native_picker.status(q.get("id", "")))
                 caps = loadcache.ttl(("native-picker-caps",), 60.0, native_picker.capabilities)     # only looks for programs; starts nothing
-                return self.jsend(200, dict(caps, exe=None))
+                return self.jsend(200, dict(caps, exe=None, **native_picker_extras(caps)))
+            if route == "docker/offer":      # "run in Docker instead": the docker probe runs in the background (loadcache.swr), never on the page-load path
+                return self.jsend(200, docker_offer_state(project.root))
             # ---- end native folder window ----
             if route == "info":
                 info = project.info()
@@ -2371,10 +2424,19 @@ def make_handler(project: Project, jobs: Jobs):
                 session_log().event("study_added", path=str(folder))
                 return self.jsend(200, {"path": str(folder), "name": folder.name})
             # ---- native folder window (plasbench/native_picker.py): additive block, POST side ----
-            if route in ("native-picker/open", "native-picker/cancel", "native-picker/front"):
+            if route == "docker/plan":       # the docker run command for chosen folders: built here, shown and copied, never run
+                from . import docker_helper
+                shell = data.get("shell") if data.get("shell") in ("posix", "powershell") else ("powershell" if os.name == "nt" else "posix")
+                if data.get("mode") == "switch":
+                    return self.jsend(200, docker_helper.switch_plan(str(project.root), str(data.get("data_dir") or ""), str(data.get("workspace") or ""), shell))
+                return self.jsend(200, docker_helper.run_command([e for e in (data.get("folders") or []) if isinstance(e, dict)][:12], shell, str(data.get("image") or "plasbench:local"),
+                                                                 str(data.get("command") or "bash")[:200], docker_helper.user_mounts() if docker_helper.in_docker() else None))
+            if route in ("native-picker/open", "native-picker/cancel", "native-picker/front", "native-picker/selftest"):
                 if not self.loopback():
                     raise PermissionError("the computer's folder window can only be opened from the computer this window runs on")
                 from . import native_picker
+                if route == "native-picker/selftest":
+                    return self.jsend(200, native_picker_selftest())
                 if route == "native-picker/cancel":
                     return self.jsend(200, native_picker.cancel(data.get("id")))
                 if route == "native-picker/front":
