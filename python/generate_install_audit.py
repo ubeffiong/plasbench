@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import io
 import sys
 from pathlib import Path
 
@@ -114,12 +115,13 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     text = build()
     if args.check:
-        current = OUT.read_text(encoding="utf-8", newline="") if OUT.is_file() else ""
+        current = io.open(OUT, encoding="utf-8", newline="").read() if OUT.is_file() else ""
         if current.replace("\r\n", "\n") != text:
             print("docs/TOOL_INSTALL_AUDIT.md is out of date: run python python/generate_install_audit.py", file=sys.stderr)
             return 1
         return 0
-    OUT.write_text(text, encoding="utf-8", newline="\n")
+    with io.open(OUT, "w", encoding="utf-8", newline="\n") as handle:   # Path.write_text(newline=) needs Python 3.10
+        handle.write(text)
     print(f"wrote {OUT}")
     return 0
 

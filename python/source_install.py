@@ -19,6 +19,7 @@ Exit codes: 0 installed (or already installed at the pinned revision), 1 failed 
 from __future__ import annotations
 
 import argparse
+import io
 import hashlib
 import json
 import os
@@ -40,6 +41,12 @@ PROVENANCE = "plasbench-install.json"
 SOURCE_DIR = "plasbench-src"
 # Services an install needs, by upstream host (config/network_services.tsv).
 HOST_SERVICE = {"github.com": "github", "gitlab.com": "gitlab"}
+
+
+def write_lf(path, text):
+    """Write text with LF line endings on every platform (Path.write_text(newline=) needs Python 3.10)."""
+    with io.open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
 
 
 def load(path: Path | None = None) -> dict:
@@ -339,7 +346,7 @@ def install(name: str, entry: dict, main_prefix: Path | None, solver: str, env_n
         staging_wrappers.mkdir(parents=True, exist_ok=True)
         try:
             for cmd, spec in entry["commands"].items():
-                (staging_wrappers / cmd).write_text(wrapper_text(cmd, spec, entry, layout, name), encoding="utf-8", newline="\n")
+                write_lf(staging_wrappers / cmd, wrapper_text(cmd, spec, entry, layout, name))
                 os.chmod(staging_wrappers / cmd, 0o755)
             ok, said = verify(entry, staging_wrappers, layout)
         finally:
@@ -380,7 +387,7 @@ def _expose(entry: dict, layout: Layout, name: str):
     for cmd, spec in entry["commands"].items():
         target = layout.bin / cmd
         tmp = layout.bin / f".{cmd}.plasbench-new"
-        tmp.write_text(wrapper_text(cmd, spec, entry, layout, name), encoding="utf-8", newline="\n")
+        write_lf(tmp, wrapper_text(cmd, spec, entry, layout, name))
         os.chmod(tmp, 0o755)
         os.replace(tmp, target)
 
@@ -465,7 +472,7 @@ def _do_install(name: str, entry: dict, layout: Layout, solver: str, env_name: s
                 return fail(f"`{label}` failed (exit {done.returncode}).", "The messages above say which package failed; run the same command again once that is fixed.")
         staging_wrappers.mkdir(parents=True)
         for cmd, spec in entry["commands"].items():
-            (staging_wrappers / cmd).write_text(wrapper_text(cmd, spec, entry, layout, name), encoding="utf-8", newline="\n")
+            write_lf(staging_wrappers / cmd, wrapper_text(cmd, spec, entry, layout, name))
             os.chmod(staging_wrappers / cmd, 0o755)
         ok, said = verify(entry, staging_wrappers, layout)
         if not ok:
