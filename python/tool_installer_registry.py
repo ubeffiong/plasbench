@@ -86,7 +86,7 @@ def profile_kinds(rows: list[dict[str, str]]) -> dict[str, str]:
     for profile, group in by_profile.items():
         if all(r["install_mode"] == "builtin" for r in group):
             kinds[profile] = "builtin"
-        elif any(r["automated"] == "yes" for r in group):
+        elif any(r["automated"] == "yes" or r["install_mode"] == "user_none" for r in group):   # a user tool already on PATH: install-tools runs its verify_command, it is not a manual install
             kinds[profile] = "automatic"
         else:
             kinds[profile] = "manual"

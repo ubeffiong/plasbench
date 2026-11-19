@@ -91,5 +91,8 @@ for _name, _entry in si.load()["profiles"].items():
     except Exception as exc:  # noqa: BLE001 - the failure is the finding
         plans[_name] = repr(exc)
 check("every profile's install plan can be printed (a step type the plan does not know crashed the PLASMe install on CI)", all(not v.startswith(("KeyError", "TypeError")) for v in plans.values()), plans)
+import tool_installer_registry as reg  # noqa: E402
+_row = {"tool": "mine", "profile": "mine", "install_mode": "user_none", "automated": "planned", "runtime": "plasbench", "database_mode": "none", "verify_command": "mytool --version", "notes": ""}
+check("a user tool already on PATH (method = none) is not a manual install: install-tools runs its verify_command (it exited 20 before)", reg.resolve("mine", [_row])[0] == 0, reg.resolve("mine", [_row]))
 print("FAILED: " + ", ".join(FAILED) if FAILED else "ALL PASS")
 sys.exit(1 if FAILED else 0)

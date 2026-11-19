@@ -413,7 +413,7 @@ def sources():
 
     if (TMP / "git_first").exists():
         first = (TMP / "git_first").read_text().strip()
-        env_run = lambda command, **kw: subprocess.run(command, **dict(kw, env=dict(kw.get("env") or os.environ, GIT_SSL_CAINFO=str(cert), GIT_CONFIG_COUNT="1", GIT_CONFIG_KEY_0="http.sslBackend", GIT_CONFIG_VALUE_0="openssl")))  # noqa: E731
+        env_run = lambda command, **kw: subprocess.run(command, **dict(kw, env=dict(kw.get("env") or os.environ, GIT_SSL_CAINFO=str(cert), **({"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "http.sslBackend", "GIT_CONFIG_VALUE_0": "openssl"} if IS_WINDOWS else {}))))   # Git for Windows defaults to schannel, which ignores the test certificate  # noqa: E731
         tool = url_tool("g_pin", f"{base_url}/tool.git", f"kind = git\nref = {first}\n")
         try:
             entry = tool.install_source(run=env_run, log=lambda m: None)
@@ -449,7 +449,7 @@ def installers():
     calls = TMP / "calls.log"
     for name in ("conda", "mamba", "micromamba"):
         (bin_dir / name).write_text('#!/usr/bin/env bash\necho "' + name + ' $*" >> "$FAKE_CALLS"\n'
-                                    'case "$1" in env) exit 0;; run) shift; shift; shift; exec "$@";; --version) echo "conda 24.1.0";; esac\nexit 0\n', encoding="utf-8")
+                                    'case "$1" in env) exit 0;; run) shift; shift; shift; if [ "$1" = python ] && [ "$2" = -m ] && [ "$3" = pip ]; then echo "fake-pip $*" >> "$FAKE_CALLS"; exit 0; fi; exec "$@";; --version) echo "conda 24.1.0";; esac\nexit 0\n', encoding="utf-8")
         (bin_dir / name).chmod(0o755)
     (bin_dir / "mytool").write_text("#!/usr/bin/env bash\necho mytool 1.0\n", encoding="utf-8")
     (bin_dir / "mytool").chmod(0o755)
@@ -468,6 +468,9 @@ def installers():
         log = calls.read_text() if calls.exists() else ""
         ok = (done.returncode == 0) == expect_ok
         check(f"install {name}: exit {'0' if expect_ok else 'non-zero'} (got {done.returncode})", ok, (done.stdout + done.stderr)[-400:])
+        if name == "i_badverify":
+            check("install i_badverify: exit 1 and the message says the verification failed after the install (not exit 20, which means a manual install)",
+                  done.returncode == 1 and "failed after installing" in done.stderr + done.stdout, (done.returncode, (done.stdout + done.stderr)[-300:]))
         if needle:
             check(f"install {name}: the fake conda was asked to '{needle}' for the tool's own environment", needle in log and f"plasbench-{name}" in log, log)
     check("install i_script: the shipped script ran", (HOME / "script_ran").exists())
