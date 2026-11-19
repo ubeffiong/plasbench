@@ -37,8 +37,7 @@ def main():
     tmp = Path(tempfile.mkdtemp())
     os.environ["PLASBENCH_UI_HOME"] = str(tmp / "ui")
     page = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
-    script = page[page.index("<script>") + 8:page.rindex("</script>")]
-
+    script = chr(10).join(re.findall(r"<script[^>]*>(.*?)</script>", page, re.S))   # the page has more than one script block (the workflow view has its own)
     print("page script")
     node = shutil.which("node")
     if node:
