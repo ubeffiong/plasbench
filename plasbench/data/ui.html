@@ -2271,7 +2271,7 @@ function renderInstallBar() {
   if (!j) { if (!bar.hidden) { bar.hidden = true; bar.textContent = ""; } return; }
   const secs = Math.max(0, Math.round(Date.now() / 1000 - j.started)), m = String(Math.floor(secs / 60)), sec = String(secs % 60).padStart(2, "0");
   const est = S.instStart && S.instStart.minutes ? ` Estimated ${esc(S.instStart.minutes.join(" + "))}.` : "";
-  const html = `<b>Installing ${esc(String(j.argv[1] || "").split(",").join(", "))}</b> · running for ${m}:${sec}.${est} <a href="#" onclick="showConsole('${esc(j.id)}', true); return false">Open the log</a>`;
+  const html = `<b>Installing ${esc(String(j.argv[1] || "").split(",").join(", "))}</b> · running for ${m}:${sec}.${est} <a href="#" onclick="showConsole(${jsq(j.id)}, true); return false">Open the log</a>`;
   bar.hidden = false; if (bar.innerHTML !== html) bar.innerHTML = html;
 }
 setInterval(renderInstallBar, 1000);
