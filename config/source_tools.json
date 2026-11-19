@@ -34,7 +34,8 @@
       "disk_gb": 6,
       "minutes": "10-30 (not measured; PyTorch 1.11 and CUDA 10.2 toolkit packages)",
       "env": {"python": null, "steps": [
-        {"type": "conda_file", "path": "plasme.yaml"}
+        {"type": "conda_file", "path": "plasme.yaml"},
+        {"type": "clear_execstack", "glob": "lib/python3*/site-packages/torch/lib/*.so*"}
       ]},
       "commands": {"PLASMe.py": {"kind": "script", "path": "PLASMe.py", "interpreter": "python", "set_env": {"GLIBC_TUNABLES": "glibc.rtld.execstack=1"}}},
       "verify": {"argv": ["PLASMe.py", "--help"], "expect": "", "why": "the script starts and imports its PyTorch/Biopython dependencies"},

@@ -73,5 +73,16 @@ text = si.wrapper_text("nextflow", {"kind": "env_bin", "path": "nextflow", "unse
 check("a wrapper unsets and sets the environment its tool needs (a runner's JAVA_HOME, glibc's execstack tunable, a namespace package's PYTHONPATH)",
       "unset JAVA_CMD" in text and 'JAVA_HOME="/m/envs/plasbench-x"' in text and "export JAVA_HOME" in text and '/plasbench-src"' in text and text.index("unset JAVA_CMD") < text.index("exec "), text)
 check("the registry still validates with those fields", si.validate(si.load()) == [], si.validate(si.load()))
+import tempfile as _t
+hdr = bytearray(64); hdr[:4] = bytes([127]) + b"ELF"; hdr[4] = 2; hdr[5] = 1
+hdr[32:40] = (64).to_bytes(8, "little"); hdr[54:56] = (56).to_bytes(2, "little"); hdr[56:58] = (1).to_bytes(2, "little")
+ph = bytearray(56); ph[:4] = si.PT_GNU_STACK.to_bytes(4, "little"); ph[4:8] = (7).to_bytes(4, "little")
+with _t.TemporaryDirectory() as _d:
+    so = Path(_d) / "libx.so"
+    so.write_bytes(bytes(hdr + ph))
+    changed, again = si.clear_execstack(so), si.clear_execstack(so)
+    check("clear_execstack clears only the X flag of PT_GNU_STACK (rw- stays), once", changed and not again and int.from_bytes(so.read_bytes()[68:72], "little") == 6)
+    txt = Path(_d) / "notelf.so"; txt.write_text("hello")
+    check("a file that is not an ELF64 is left alone", si.clear_execstack(txt) is False and txt.read_text() == "hello")
 print("FAILED: " + ", ".join(FAILED) if FAILED else "ALL PASS")
 sys.exit(1 if FAILED else 0)

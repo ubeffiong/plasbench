@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parent.parent
 REGISTRY = ROOT / "config" / "source_tools.json"
 EXIT_FAILED, EXIT_USAGE, EXIT_MANUAL, EXIT_CONSENT = 1, 2, 20, 21
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
-STEP_TYPES = {"conda_create", "conda_file", "pip_requirements", "pip_install"}
+STEP_TYPES = {"conda_create", "conda_file", "pip_requirements", "pip_install", "clear_execstack"}
 WRAPPER_MARK = "# PlasBench source install:"
 PROVENANCE = "plasbench-install.json"
 SOURCE_DIR = "plasbench-src"
@@ -274,6 +274,32 @@ def _confirm(prompt: str) -> bool:
 
 # ---- the installer --------------------------------------------------------------------------------------------------------------------------------------
 
+PT_GNU_STACK, PF_X = 0x6474E551, 1
+
+
+def clear_execstack(path: Path) -> bool:
+    """Clear the executable-stack request (PT_GNU_STACK's X flag) of one ELF64 little-endian shared object, in place; True when it changed.
+    Recent glibc refuses to load a library that asks for an executable stack (`cannot enable executable stack as shared object requires`), which is what
+    PyTorch 1.11's libtorch_cpu.so does; clearing the flag is what `execstack -c` / `patchelf --clear-execstack` do."""
+    with open(path, "r+b") as handle:
+        head = handle.read(64)
+        if head[:4] != b"\x7fELF" or head[4] != 2 or head[5] != 1:
+            return False
+        phoff, phentsize, phnum = int.from_bytes(head[32:40], "little"), int.from_bytes(head[54:56], "little"), int.from_bytes(head[56:58], "little")
+        for index in range(phnum):
+            at = phoff + index * phentsize
+            handle.seek(at)
+            entry = handle.read(8)
+            if int.from_bytes(entry[:4], "little") == PT_GNU_STACK:
+                flags = int.from_bytes(entry[4:8], "little")
+                if flags & PF_X:
+                    handle.seek(at + 4)
+                    handle.write((flags & ~PF_X).to_bytes(4, "little"))
+                    return True
+                return False
+    return False
+
+
 def wrapper_env_lines(spec: dict, layout: Layout) -> list[str]:
     """Shell lines a wrapper starts with for a command's `set_env` (name -> value; {install} and {src} are the tool's own folders) and `unset_env` (names)."""
     lines = []
@@ -478,6 +504,10 @@ def _do_install(name: str, entry: dict, layout: Layout, solver: str, env_name: s
                 label, command = "pip install -r " + step["path"].lstrip("@"), [str(layout.install / "bin" / "pip"), "install", "-r", str(path)]
             elif step["type"] == "pip_install":
                 label, command = "pip install " + step["target"], [str(layout.install / "bin" / "pip"), "install"] + step.get("args", []) + [step["target"]]
+            elif step["type"] == "clear_execstack":
+                changed = [str(f) for f in sorted(layout.install.glob(step["glob"])) if f.is_file() and clear_execstack(f)]
+                print(f"[PlasBench] cleared the executable-stack request of {len(changed)} library file(s) ({step['glob']}): recent glibc refuses to load them otherwise")
+                continue
             else:
                 continue
             print(f"[PlasBench] {label}")
