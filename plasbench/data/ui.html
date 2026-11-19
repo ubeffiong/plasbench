@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="plasbench-version" content="__VERSION__">
+<meta name="plasbench-page-version" content="__PAGE_VERSION__">
 <title>PlasBench</title>
 <link rel="icon" type="image/png" href="/favicon.ico">
 <style>
@@ -391,6 +392,12 @@ dialog.fschoose{width:min(860px,96vw)}.fsbody{display:grid;grid-template-columns
 .sess .stg{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0}.sess .stg span{padding:1px 8px;border:1px solid var(--line);border-radius:10px;font-size:11.5px;color:var(--muted)}
 .sess .stg span.d{border-color:var(--ok);color:var(--ok)}.sess .stg span.c{border-color:var(--primary);color:var(--primary);font-weight:600}
 #connbar{position:fixed;top:0;left:0;right:0;z-index:150;background:var(--warn-soft,#fff4d6);color:var(--fg);border-bottom:2px solid var(--warn,#b7791f);padding:8px 16px;font-size:13px;display:flex;gap:10px;align-items:center;justify-content:center}
+/* BEGIN server state (stale window server) */
+#stalebar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:140;width:min(760px,calc(100vw - 32px));background:var(--warn-soft,#fff4d6);color:var(--fg);border:1px solid var(--warn,#b7791f);border-left-width:5px;border-radius:8px;padding:10px 14px;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.22)}
+#stalebar[hidden]{display:none}
+#stalebar .ss-row{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}#stalebar .ss-msg{flex:1 1 320px;min-width:0}#stalebar .ss-msg b{display:block;margin-bottom:2px}
+#stalebar .ss-btns{display:flex;gap:8px;align-items:center}#stalebar details{margin-top:6px}#stalebar pre{margin:4px 0 0;white-space:pre-wrap;font-size:12px}
+/* END server state */
 #connbar[hidden]{display:none}#connbar .rt-spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--warn,#b7791f);border-radius:50%;animation:rtspin .9s linear infinite}
 .runtoast.attn{border-left-color:var(--bad)}.runtoast.attn .rt-bar{display:none}.runtoast .rt-x{position:absolute;top:4px;right:6px;border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
 .runtoast .rt-act{margin-top:6px;display:flex;gap:6px}
@@ -703,6 +710,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
  <button class="tbtn" id="gdbtn" aria-pressed="false" title="Side panel: Studies, Jobs and Git (Ctrl+Shift+G opens Git)"><svg class="ico sm"><use href="#i-sidebar"/></svg><span>Panel</span><span class="badge" id="gdbadge" hidden></span></button>
  <button class="tbtn netind" id="netind" title="Checking the internet connection…" aria-label="Internet status: checking"><span class="nd" aria-hidden="true"></span><span class="nl">Checking…</span></button>
  <button class="tbtn" id="helpbtn" title="Help for this page (F1)" aria-label="Help for this page"><svg class="ico sm"><use href="#i-help"/></svg></button>
+ <button class="tbtn" id="reloadbtn" title="Reload page (clear cache)" aria-label="Reload page (clear cache)"><svg class="ico sm"><use href="#i-refresh"/></svg></button>
  <button class="tbtn" id="theme" title="Switch between light and dark"><svg class="ico sm"><use href="#i-moon"/></svg></button>
  <button class="tbtn" id="consbtn" title="Show or hide the console (job output and terminal)"><svg class="ico sm"><use href="#i-term"/></svg><span>Console</span></button>
  <button class="tbtn quit" id="quitbtn" title="Quit PlasBench: stop it and close this window"><svg class="ico sm"><use href="#i-power"/></svg><span>Quit</span></button>
@@ -1292,6 +1300,7 @@ plasmid_values = plasmid
  <div class="ft"><button class="btn sec" data-close>Cancel</button><button class="btn" id="cf_ok"><svg class="ico sm"><use href="#i-play"/></svg>Run</button></div></dialog>
 
 <div id="connbar" hidden role="status"><span class="rt-spin" aria-hidden="true"></span><span id="connmsg">Connection to PlasBench lost. Retrying… Your runs keep going in the background.</span></div>
+<div id="stalebar" hidden role="alert" aria-labelledby="ss_t"></div>
 <div id="toasts" aria-live="polite"></div>
 <div id="tipbox" role="tooltip" hidden></div>
 
@@ -1341,6 +1350,7 @@ async function api(path, body) {
   let data; try { data = await r.json(); } catch { data = {error: `HTTP ${r.status}`}; }
   if (!r.ok) {
     const err = new Error(data.message || data.error || `HTTP ${r.status}`); err.data = data; err.status = r.status;
+    const stale = friendlyApiError(err.message); if (stale) { err.details = err.message; err.message = stale.friendly; err.staleApi = true; raiseStale({detail: stale.details}); }   // server state: see the block after sessionEnded()
     if (r.status === 503 && data.error === "offline") { S.offlineMsg = {msg: err.message, t: Date.now()}; netRefresh(true); showOfflineDialog({service: data.service, state: data.state, advice: data.advice, message: data.message}); }
     else if (r.status === 401 && data.action === "signin") { S.offlineMsg = {msg: err.message, t: Date.now()}; askSignInDialog(err.message); }
     throw err;
@@ -1417,6 +1427,89 @@ function sessionEnded(msg) {   // the server answered, but refused this window's
   S.conn = S.conn || {since: Date.now(), tries: 0, delay: 2000, timer: null, probing: false};
   clearTimeout(S.conn.timer); showLost("expired");
 }
+/* BEGIN server state (stale window server): the page is re-read from disk on every update but the server's code is fixed when it starts, so after an update the NEW page can be served by
+   the OLD server. The banner below says so and offers Restart window (POST /api/server/restart starts a replacement server; runs are detached and are not touched). */
+/* ==SS-PURE-BEGIN== (no DOM access: node runs this block in test/test_stale_server.py) */
+const STALE_API_TEXT = "This window is running an older version of PlasBench than the page. Restart the window.";
+function friendlyApiError(msg) { const m = /^no such API: ?(.*)$/.exec(String(msg || "")); return m ? {friendly: STALE_API_TEXT, details: String(msg)} : null; }
+const knownVersion = v => (v && !/^__/.test(String(v))) ? String(v) : "";
+function pageServerMismatch(pageV, serverV) { const a = knownVersion(pageV), b = knownVersion(serverV); return !!(a && b && a !== b); }
+function staleMessage(started, disk) {
+  started = knownVersion(started); disk = knownVersion(disk);
+  if (started && disk && started !== disk) return `PlasBench was updated (${started} -> ${disk}) while this window was open. Restart the window to use the new version.`;
+  if (started && disk) return "PlasBench's program files changed while this window was open. Restart the window to use the new files.";
+  return STALE_API_TEXT;
+}
+/* Hard reload: the same address plus a cache-busting _r (the key ?t= is kept, so the window stays signed in); the _r is removed again once the page has loaded. */
+function hardReloadUrl(href, stamp) { const u = new URL(href); u.searchParams.set("_r", String(stamp)); return u.toString(); }
+function withoutReloadParam(href) { const u = new URL(href); if (!u.searchParams.has("_r")) return href; u.searchParams.delete("_r"); return u.toString(); }
+const RELOAD_HINT = "Keyboard: Ctrl+Shift+R (Cmd+Shift+R on a Mac) does the same.";
+/* ==SS-PURE-END== */
+const SS = {stale: null, details: [], timer: null, restarting: false};
+const metaContent = n => { const e = document.querySelector(`meta[name="${n}"]`); return e ? e.content : ""; };
+function renderStale() {
+  const bar = document.getElementById("stalebar"); if (!bar) return;
+  if (!SS.stale) { bar.hidden = true; return; }
+  const det = [SS.stale.reason, ...SS.details].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).slice(0, 6);
+  setIfChanged(bar, `<div class="ss-row">${icon("alert", "ico")}<div class="ss-msg"><b id="ss_t">${esc(staleMessage(SS.stale.started, SS.stale.disk))}</b>
+      <span>Your runs keep going in the background: they are detached, and closing or restarting this window does not stop them.</span>
+      ${det.length ? `<details><summary>Details</summary><pre>${esc(det.join("\n"))}</pre></details>` : ""}</div>
+    <div class="ss-btns"><button class="btn" id="ss_restart">${icon("refresh")}Restart window</button><button class="btn sec" id="ss_reload">Reload page (clear cache)</button><button class="btn sec" id="ss_why">Why?</button></div></div>`);
+  bar.hidden = false;
+  document.getElementById("ss_restart").onclick = restartWindow;
+  document.getElementById("ss_reload").onclick = hardReload;
+  document.getElementById("ss_why").onclick = () => modalDialog({title: "Why does the window need a restart?", cancelId: "ok", buttons: [{id: "ok", label: "Close", primary: true}],
+    bodyHTML: `<p>PlasBench's page is read from disk again whenever it changes, but the program behind it (the server) is loaded once, when it starts. After an update (plasbench upgrade, update.sh, a git pull or a new release), the new page can therefore be shown by the old server, and the page asks for things the old server does not have, such as <code>no such API: workflow</code>.</p>
+      <p>Restarting starts the new version. Your studies, results and settings are kept. Runs are detached from the window and keep going; they are listed under Runs &amp; reports.</p>`});
+}
+function raiseStale(p) {
+  p = p || {};
+  SS.stale = Object.assign({started: metaContent("plasbench-version"), disk: metaContent("plasbench-page-version"), reason: ""}, SS.stale || {}, p.state || {});
+  if (p.detail && !SS.details.includes(p.detail) && SS.details.length < 6) SS.details.push(p.detail);
+  renderStale();
+}
+async function restartWindow() {
+  if (SS.restarting) return;
+  const supported = !SS.stale || SS.stale.restart_supported !== false;
+  const manual = why => modalDialog({title: "Restart PlasBench yourself", cancelId: "ok", buttons: [{id: "ok", label: "Close", primary: true}],
+    bodyHTML: `<p>${why ? esc(why) + " " : ""}PlasBench cannot restart this window by itself here. Do this instead:</p><ol><li>Use <b>Quit</b> at the top of this window and choose <b>Quit and keep running</b> if a run is going.</li><li>Start PlasBench again from its desktop icon, or run <code>plasbench ui</code>.</li></ol><p>Your runs keep going and are listed under Runs &amp; reports.</p>`});
+  if (!supported) return manual("");
+  const r = await modalDialog({title: "Restart the PlasBench window?", cancelId: "cancel", buttons: [{id: "cancel", label: "Cancel"}, {id: "reload", label: "Reload page (clear cache)"}, {id: "go", label: "Restart window", primary: true}],
+    bodyHTML: `<p>PlasBench starts again with the new version and this window opens at its new address. It takes a few seconds.</p><p><b>Your runs keep going</b>: they are detached from the window. Anything you have typed but not saved in a form here is lost.</p><p>If the page only looks stuck or out of date, <b>Reload page (clear cache)</b> is enough and does not restart anything. ${esc(RELOAD_HINT)}</p>`});
+  if (r.id === "reload") return hardReload();
+  if (r.id !== "go") return;
+  SS.restarting = true;
+  const btn = document.getElementById("ss_restart"); if (btn) { btn.disabled = true; btn.textContent = "Restarting…"; }
+  try {
+    const res = await api("server/restart", {});
+    if (res.ok && res.url) { S.quit = true; location.href = res.url; return; }
+    SS.restarting = false; if (btn) { btn.disabled = false; btn.innerHTML = icon("refresh") + "Restart window"; }
+    manual(res.message || "");
+  } catch (e) {
+    SS.restarting = false; if (btn) { btn.disabled = false; btn.innerHTML = icon("refresh") + "Restart window"; }
+    manual(e.staleApi ? "This server is too old to restart itself." : e.message);
+  }
+}
+/* Hard reload. PlasBench registers no service worker and uses no Cache Storage, and no localStorage key holds server data (the keys are preferences and layout: pb_theme, pb_consh, pb_consopen,
+   pb_gd_*, pb_pt, pb_wfview, plasbench.decider, the seen-attention list), so there is nothing of those to clear and they are kept; if a service worker or cache ever exists it is removed here. */
+async function hardReload() {
+  try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); } catch (e) { /* none */ }
+  try { if (window.caches && caches.keys) for (const k of await caches.keys()) await caches.delete(k); } catch (e) { /* none */ }
+  S.quit = true;
+  location.replace(hardReloadUrl(location.href, Date.now()));
+}
+try { if (new URLSearchParams(location.search).has("_r")) history.replaceState(null, "", withoutReloadParam(location.href)); } catch (e) { /* cosmetic */ }
+{ const rb = document.getElementById("reloadbtn"); if (rb) rb.onclick = hardReload; }
+async function ssPoll() {
+  if (pageServerMismatch(metaContent("plasbench-page-version"), metaContent("plasbench-version"))) raiseStale({state: {reason: "the page and the server report different versions"}});   // at once, no wait for the poll
+  if (S.quit || S.conn || SS.restarting) return;
+  try { const st = await api("server-state"); if (st.stale) raiseStale({state: {started: st.started_version, disk: st.disk_version, reason: st.reason, restart_supported: st.restart_supported}}); }
+  catch (e) { /* a server without this route is reported by api() itself (staleApi); anything else is the connection banner's business */ }
+}
+setTimeout(ssPoll, 0);
+setInterval(() => { if (!document.hidden) ssPoll(); }, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && !SS.stale) ssPoll(); });
+/* END server state */
 window.addEventListener("online", () => { if (S.conn) { S.conn.delay = 2000; connProbe(false); } });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && S.conn) { S.conn.delay = 2000; connProbe(false); } });
 window.addEventListener("pageshow", () => { if (S.conn) connProbe(false); });
