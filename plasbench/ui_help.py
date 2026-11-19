@@ -391,3 +391,15 @@ USERTOOL = {
     "out_contig_id_from": {"summary": "How to turn the tool's contig ids into PlasBench's.", "choices": {"": "Use them as written.", "first_token": "Keep the first word of each id."}, "setting": "contig_id_from"},
     "out_contig_id_strip": {"summary": "A regular expression removed from each contig id, for example _length_.*$.", "setting": "contig_id_strip_regex"},
 }
+
+
+# The folder window (plasbench/native_picker.py) and the built-in browser; the page shows these next to every Browse button.
+NATIVE_PICKER = {
+    "browse": {"summary": "Opens this computer's own folder window (Explorer on Windows) with every drive, USB stick and network location, and puts the folder you choose in the box. "
+                          "If the window is hidden behind this one, use Bring it to front."},
+    "inline": {"summary": "Browse inside this window with PlasBench's built-in browser. It is used automatically when this computer has no folder window to open."},
+    "open_explorer": {"summary": "Shows the folder in the box in Explorer (the file manager of this computer). It only opens a view: use Browse to choose a folder."},
+    "drive_capacity": {"summary": "Size and free space come from Windows itself (as Explorer shows them). GB here is 2^30 bytes, the unit Explorer calls GB."},
+    "drive_unmounted": {"summary": "This drive is plugged in but Ubuntu has not mounted it yet. Copy the command and run it in the Terminal tab; PlasBench never runs it for you."},
+    "paste_path": {"summary": "Paste a path from Explorer: Copy as path (with quotes), the address bar, a wsl.localhost network path or a file:/// link all work."},
+}

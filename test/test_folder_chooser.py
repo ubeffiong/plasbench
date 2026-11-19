@@ -137,7 +137,7 @@ def main():
     check("breadcrumb, path box that accepts Windows paths, New folder, Select", all(k in html for k in ('id="fs_crumbs"', 'id="fs_path"', "Windows path such as C:", 'id="fs_new"', 'id="fs_ok"')))
     check("the folder check warnings show under the path", "workspace/check?path=" in html and 'id="fs_check"' in html)
     check("the unmounted-drive help is shown", 'id="fs_help"' in html and "r.help" in html)
-    check("keyboard: arrows move in the list, Tab stays in the dialog, Enter in the path box goes", all(k in html for k in ('e.key !== "ArrowDown" && e.key !== "ArrowUp"', 'e.key !== "Tab"', 'e.key === "Enter"')))
+    check("keyboard: arrows move in the list, Tab stays in the dialog, Enter in the path box goes", all(k in html for k in ('ArrowDown: i + 1, ArrowUp: i - 1', 'e.key === "Tab"', 'e.key === "Enter"')))
     check("New folder uses the dialog component and the validated server route", 'askText({title: "New folder"' in html and 'api("fs/mkdir"' in html)
     check("every Browse button and Choose call goes through pickPath", 'data-browse' in html and html.count("pickPath(") >= 5)
     check("narrow screens stack the sidebar", "@media (max-width:640px){.fsbody{grid-template-columns:1fr}" in html)

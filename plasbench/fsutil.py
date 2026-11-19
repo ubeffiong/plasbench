@@ -81,3 +81,31 @@ def reveal(path, popen=subprocess.Popen, **kwargs) -> dict:
     except OSError as exc:
         return dict(base, ok=False, opened=False, reason=f"{argv[0]} could not be started: {exc.strerror or exc}")
     return dict(base, ok=True, opened=True, opener=argv[0])
+
+
+def reveal_typed(text, popen=subprocess.Popen, which=None, wsl: bool | None = None, **kwargs) -> dict:
+    r"""The window's "Open in Explorer" next to a path box: `text` is whatever is in the box (a Linux path, C:\x, \\wsl.localhost\..., a pasted Explorer path).
+    A path that exists opens as `reveal` does (WSL: wslview, else explorer.exe with `wslpath -w`, so /mnt/<drive> and \wsl.localhost paths work). A Windows drive that is plugged in
+    but not mounted in Ubuntu has no Linux path: its Windows letter (E:\...) is opened with explorer.exe. Raises FileNotFoundError / ValueError for the caller's 404 / 400."""
+    from . import chooser
+    which = which or shutil.which
+    wsl = in_wsl() if wsl is None else wsl
+    raw = chooser.normalize_typed(text)
+    m = chooser.DRIVE_RE.match(raw)
+    if wsl and m:
+        linux = chooser.to_linux(raw, wsl=True)
+        if Path(linux).exists() and chooser.drive_mounted(m.group(1)):
+            return reveal(linux, popen=popen, which=which, wsl=True, **kwargs)
+        exe = which("explorer.exe")
+        if not exe:
+            raise FileNotFoundError(chooser.mount_help(m.group(1)))
+        win = m.group(1).upper() + ":" + (m.group(2) or "\\").replace("/", "\\")
+        try:
+            popen([exe, win], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError as exc:
+            return {"path": win, "ok": False, "opened": False, "reason": f"explorer.exe could not be started: {exc.strerror or exc}"}
+        return {"path": win, "ok": True, "opened": True, "opener": "explorer.exe", "windows": True}
+    path = chooser.to_linux(raw, wsl=wsl)
+    if not Path(path).expanduser().exists():
+        raise FileNotFoundError(f"{path} does not exist")
+    return reveal(Path(path).expanduser(), popen=popen, which=which, wsl=wsl, **kwargs)
