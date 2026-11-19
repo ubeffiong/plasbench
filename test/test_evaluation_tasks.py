@@ -15,6 +15,7 @@ Before this split the task was decided by `binning_capable` alone: every tool th
 import csv
 import os
 import subprocess
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -171,7 +172,9 @@ def main():
     check("the task endpoints are confirmed decisions (fixed), with a dated record of who confirmed them", pre["primary_endpoint"]["status"] == "fixed" and pre["primary_endpoint_reassembly"]["status"] == "fixed"
           and "primary_endpoint_reassembly\tconfirmed" in (ROOT / "config" / "prereg_decisions.tsv").read_text(encoding="utf-8").replace("2026-11-16\t", ""))
     ui = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
-    check("the setup window offers the three tasks", all(t in ui for t in tc.EVALUATION_TASKS) and 'select:binning_reconstruction|sequence_reassembly|classification' in ui)
+    m = re.search(r'const UT_TASKS = \[(.*?)\];', ui)
+    check("the setup window offers the three tasks (its multi-select lists exactly the evaluation tasks)", all(t in ui for t in tc.EVALUATION_TASKS) and m is not None
+          and sorted(x.strip().strip('"') for x in m.group(1).split(",")) == sorted(tc.EVALUATION_TASKS))
     demo = ROOT / "results_demo" / "benchmark.leaderboard.tsv"
     if demo.is_file() and "task" in open(demo, encoding="utf-8").readline():
         tasks = {r["tool"]: r["task"] for r in read(demo)}
