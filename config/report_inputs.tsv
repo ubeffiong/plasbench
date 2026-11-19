@@ -1,7 +1,7 @@
 # One row per file the report reads (the registry in python/report_surfaces.py, plus what each needs to be rebuilt).
 # role: required = the section cannot draw without it; enriches = the section draws less without it.
 # regen_key: the --only key of `plasbench regenerate-visuals` that can rebuild it from cheaper inputs (blank = cannot).
-# sections: report section ids; fig-presence, fig-facets and fig-fingerprint are figure sections from branches not yet merged.
+# sections: report section ids; fig-presence, fig-facets, fig-fingerprint and fig-synteny are the figure sections of the redesign and visuals branches.
 pattern	level	written_by	stage	needs	regenerable_from	regen_key	role	sections
 {sample}/truth.tsv	per_sample	make_truth.py / build_hybrid_truth.py	2	reference FASTA + sequence_report.jsonl (or a hand-written table)	sequence_report.jsonl + reference.fna via make_truth.py (plasbench regenerate-visuals --only truth)	truth	required	samples
 {sample}/truth.scored.tsv	per_sample	label_truth_evidence.py	2	reference FASTA and its sequence report; reads for depth rows; annotation tools and databases for feature rows	re-run stage 2 (scripts/02_truth.sh) against the data dir		enriches	label-schemes
@@ -158,6 +158,10 @@ benchmark.tool_agreement.tsv	aggregate	bin_agreement.py	6	scores.tsv, tool_statu
 assembly_candidates.tsv	aggregate	assembly_selection.py	3	reads (and the assembler or QC tool)	re-run stage 3 (scripts/03_assemble.sh) from the reads		enriches	learn-assembly
 short_read_qc.tsv	aggregate	short_read_qc.py	3	the raw read pair of every sample	reads via short_read_qc.py (--only qc)	qc	required	learn-readqc
 short_read_qc_status.tsv	aggregate	short_read_qc.py	3	the raw read pair of every sample	reads via short_read_qc.py merge (--only qc)	qc	enriches	learn-readqc
+multiqc/multiqc_report.html	aggregate	run_multiqc.py	6	the fastp (and QUAST) output files of the run	re-run MultiQC (`multiqc`, optional) over the kept fastp reports; never rebuilt by regenerate-visuals		enriches	learn-readqc
+multiqc/multiqc_run.json	aggregate	run_multiqc.py	6	the MultiQC step itself (its status record)	re-run python/run_multiqc.py (it writes this record even when MultiQC is absent)		enriches	learn-readqc
+multiqc/multiqc_data/{any}	aggregate	run_multiqc.py	6	the fastp (and QUAST) output files of the run	re-run MultiQC (the data folder is written beside its report)		enriches	learn-readqc
+short_read_qc.provenance.json	aggregate	make_demo_readqc.py	3	marks the QC tables as synthetic (demo only)	written by make_demo_readqc.py with the demo; a real run has none		enriches	learn-readqc
 benchmark.candidate_multiplicity.tsv	aggregate	candidate_multiplicity.py	6	scores.tsv, tool_status.tsv and the per-sample tables	re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder		enriches	learn-multiplicity
 benchmark.candidate_intervals.tsv	aggregate	candidate_multiplicity.py	6	scores.tsv, tool_status.tsv and the per-sample tables	re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder		enriches	learn-multiplicity
 benchmark.candidates.tsv	aggregate	candidate_multiplicity.py	6	scores.tsv, tool_status.tsv and the per-sample tables	re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder		enriches	learn-multiplicity

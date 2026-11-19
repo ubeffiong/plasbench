@@ -287,10 +287,16 @@ def main():
     samples = sample_rows(sample_sheet)
     manifest_warnings = []
     truth_tables = {}
+    if samples and not any(row.get("sample_id") for row in samples):
+        # A folder whose sheet is not a benchmark sheet (an accession ledger, a published run kept as results only): a manifest is still written, without truth checksums.
+        manifest_warnings.append(f"{sample_sheet} has no sample_id column; no truth-table checksums were recorded")
     for sample in samples:
-        truth = Path(args.data_dir) / sample["sample_id"] / "truth.tsv"
+        sample_id = sample.get("sample_id")
+        if not sample_id:
+            continue
+        truth = Path(args.data_dir) / sample_id / "truth.tsv"
         if truth.is_file():
-            truth_tables[sample["sample_id"]] = checksum_record(
+            truth_tables[sample_id] = checksum_record(
                 truth, manifest_warnings, "truth table")
     outputs = {}
     for path in Path(args.results_dir).glob("benchmark*"):

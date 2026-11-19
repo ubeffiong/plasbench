@@ -109,7 +109,7 @@ The table has one row for every file the report reads (the registry in `python/r
 | `{sample}/{tool}.replicon_hits.tsv` | 04_run_tools.sh | 4 tools | reads or assemblies, the tool and its database | re-run the tool (stage 4, scripts/04_run_tools.sh); it cannot be rebuilt from other files | none | enriches | none |
 | `{sample}/{tool}.prediction_summary.tsv` | keep_report_inputs.py | 5 scoring | the predictions (pred_<tool>.plasmid.fasta) | pred_<tool>.plasmid.fasta via keep_report_inputs.py (written at the end of stage 5) | none | enriches | `method` |
 
-## Per run (results folder top level) (104 files)
+## Per run (results folder top level) (108 files)
 
 | File | Written by | Stage | Needs | Rebuild from | --only | Role | Sections |
 |---|---|---|---|---|---|---|---|
@@ -177,6 +177,10 @@ The table has one row for every file the report reads (the registry in `python/r
 | `assembly_candidates.tsv` | assembly_selection.py | 3 assembly | reads (and the assembler or QC tool) | re-run stage 3 (scripts/03_assemble.sh) from the reads | none | enriches | `learn-assembly` |
 | `short_read_qc.tsv` | short_read_qc.py | 3 assembly | the raw read pair of every sample | reads via short_read_qc.py (--only qc) | `qc` | required | `learn-readqc` |
 | `short_read_qc_status.tsv` | short_read_qc.py | 3 assembly | the raw read pair of every sample | reads via short_read_qc.py merge (--only qc) | `qc` | enriches | `learn-readqc` |
+| `multiqc/multiqc_report.html` | run_multiqc.py | 6 aggregation | the fastp (and QUAST) output files of the run | re-run MultiQC (`multiqc`, optional) over the kept fastp reports; never rebuilt by regenerate-visuals | none | enriches | `learn-readqc` |
+| `multiqc/multiqc_run.json` | run_multiqc.py | 6 aggregation | the MultiQC step itself (its status record) | re-run python/run_multiqc.py (it writes this record even when MultiQC is absent) | none | enriches | `learn-readqc` |
+| `multiqc/multiqc_data/{any}` | run_multiqc.py | 6 aggregation | the fastp (and QUAST) output files of the run | re-run MultiQC (the data folder is written beside its report) | none | enriches | `learn-readqc` |
+| `short_read_qc.provenance.json` | make_demo_readqc.py | 3 assembly | marks the QC tables as synthetic (demo only) | written by make_demo_readqc.py with the demo; a real run has none | none | enriches | `learn-readqc` |
 | `benchmark.candidate_multiplicity.tsv` | candidate_multiplicity.py | 6 aggregation | scores.tsv, tool_status.tsv and the per-sample tables | re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder | none | enriches | `learn-multiplicity` |
 | `benchmark.candidate_intervals.tsv` | candidate_multiplicity.py | 6 aggregation | scores.tsv, tool_status.tsv and the per-sample tables | re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder | none | enriches | `learn-multiplicity` |
 | `benchmark.candidates.tsv` | candidate_multiplicity.py | 6 aggregation | scores.tsv, tool_status.tsv and the per-sample tables | re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder | none | enriches | `learn-multiplicity` |

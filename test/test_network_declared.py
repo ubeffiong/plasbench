@@ -49,6 +49,7 @@ ALLOWED = {
     "python/write_manifest.py": "a list of tool names recorded in the manifest, and a comment about pip install; no request",
     "plasbench/ghops.py": "builds and runs `gh` commands only for the window's routes, which call netgate.require('github') (netcheck) first; the injectable runner keeps its tests offline",
     "plasbench/ghsignin.py": "starts `gh auth login` only from the window's sign-in route, which calls netgate.require('github') (netcheck) first; `git push` here is a docstring",
+    "python/regenerate_visuals.py": "a message that tells the user to conda install minimap2 when it is missing; it makes no request (the rebuild works from files in the results folder)",
     "python/build_published_outcomes.py": "a message that tells the user to pip install openpyxl; no request",
 }
 
