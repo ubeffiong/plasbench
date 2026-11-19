@@ -34,13 +34,14 @@ open(work + "/data/s1/reference.fna", "w").write(">pBR322\n" + seq + "\n")
 open(work + "/data/s1/truth.tsv", "w").write(f"sequence_id\tmolecule_type\tlength\npBR322\tPLASMID\t{len(seq)}\n")
 circ = seq + seq[:200]
 with gzip.open(work + "/data/s1/SRR1_1.fastq.gz", "wt") as r1, gzip.open(work + "/data/s1/SRR1_2.fastq.gz", "wt") as r2:
-    for i in range(int(150 * len(seq) / 100 / 2)):
+    for i in range(12000):
         start = random.randrange(len(seq))
         frag = circ[start:start + 300]
         a, b = frag[:100], rc(frag)[:100]
-        q = "I" * 100
+        q = "".join(random.choice("5?ABCDEFGHI") for _ in range(100))   # varied qualities: SPAdes cannot tell the Phred offset from a flat string
+        qb = "".join(random.choice("5?ABCDEFGHI") for _ in range(100))
         r1.write(f"@r{i}/1\n{a}\n+\n{q}\n")
-        r2.write(f"@r{i}/2\n{b}\n+\n{q}\n")
+        r2.write(f"@r{i}/2\n{b}\n+\n{qb}\n")
 print("plasmid", len(seq), "bp")
 EOF
 printf 'sample_id\tassembly_accession\tsra_run\ns1\tNA\tSRR1\n' > "$WORK/config/accessions.tsv"

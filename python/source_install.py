@@ -107,6 +107,8 @@ def validate(registry: dict, root: Path = ROOT) -> list[str]:
             for cmd, spec in entry.get("commands", {}).items():
                 if spec.get("kind") not in ("env_bin", "script") or not spec.get("path"):
                     bad(f"command {cmd} needs kind env_bin|script and a path")
+                if not isinstance(spec.get("set_env", {}), dict) or not isinstance(spec.get("unset_env", []), list):
+                    bad(f"command {cmd}: set_env must be an object and unset_env a list")
         else:
             manual = entry.get("manual") or {}
             if not manual.get("reason") or not manual.get("recipe"):
@@ -272,9 +274,21 @@ def _confirm(prompt: str) -> bool:
 
 # ---- the installer --------------------------------------------------------------------------------------------------------------------------------------
 
+def wrapper_env_lines(spec: dict, layout: Layout) -> list[str]:
+    """Shell lines a wrapper starts with for a command's `set_env` (name -> value; {install} and {src} are the tool's own folders) and `unset_env` (names)."""
+    lines = []
+    for name in spec.get("unset_env", []):
+        lines.append(f"unset {name}")
+    for name, value in spec.get("set_env", {}).items():
+        shown = value.replace("{install}", str(layout.install)).replace("{src}", str(layout.src))
+        lines += [f'{name}="{shown}"', f"export {name}"]
+    return lines
+
+
 def wrapper_text(name: str, spec: dict, entry: dict, layout: Layout, profile: str) -> str:
     head = ["#!/bin/sh", f"{WRAPPER_MARK} {profile} {entry['commit']} {layout.provenance}",
             f"# Runs {name} from its own pinned, isolated installation (config/source_tools.json, python/source_install.py)."]
+    head += wrapper_env_lines(spec, layout)
     if spec["kind"] == "env_bin":
         head += [f'PATH="{layout.install}/bin:$PATH"', "export PATH", f'exec "{layout.install}/bin/{spec["path"]}" "$@"']
     else:

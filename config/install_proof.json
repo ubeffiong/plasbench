@@ -76,7 +76,7 @@
     },
     "rfplasmid": {
       "verify": [
-        "RFPlasmid --help"
+        "rfplasmid --help"
       ]
     },
     "plascope": {
@@ -132,7 +132,7 @@
     },
     "gplas": {
       "verify": [
-        "gplas --help"
+        "gplas.sh -h"
       ]
     },
     "gplas2": {

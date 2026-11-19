@@ -67,5 +67,11 @@ with tempfile.TemporaryDirectory() as tmp:
     check("a profile whose job uploaded no result is a failure, never silently absent", code == 1 and "no result was uploaded" in summary.read_text(encoding="utf-8"))
     result("utilities", "pass"); result("plsmd", "fail", 0, problem="expected exit 20")
     check("an expected-manual profile that installed (or exited otherwise) is a failure to be explained", proof.aggregate(str(folder), str(summary)) == 1)
+import source_install as si  # noqa: E402
+layout = si.Layout(Path("/m/envs/plasbench"), "plasbench", "x")
+text = si.wrapper_text("nextflow", {"kind": "env_bin", "path": "nextflow", "unset_env": ["JAVA_CMD"], "set_env": {"JAVA_HOME": "{install}", "P": "{src}"}}, {"commit": "c" * 40}, layout, "x").replace(chr(92), "/")
+check("a wrapper unsets and sets the environment its tool needs (a runner's JAVA_HOME, glibc's execstack tunable, a namespace package's PYTHONPATH)",
+      "unset JAVA_CMD" in text and 'JAVA_HOME="/m/envs/plasbench-x"' in text and "export JAVA_HOME" in text and '/plasbench-src"' in text and text.index("unset JAVA_CMD") < text.index("exec "), text)
+check("the registry still validates with those fields", si.validate(si.load()) == [], si.validate(si.load()))
 print("FAILED: " + ", ".join(FAILED) if FAILED else "ALL PASS")
 sys.exit(1 if FAILED else 0)
