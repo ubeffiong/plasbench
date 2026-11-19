@@ -24,7 +24,7 @@ Command-line use (scripts/04_run_tools.sh, env/install_tools.sh and `plasbench t
     user_tools.py run-spec NAME --sample S --contigs F --graph F --reads-1 F --reads-2 F --long-reads F --outdir D --threads N
     user_tools.py install-plan NAME   |   task-ids NAME   |   fetch NAME   (download or locate the tool's source; `plasbench install-tools` runs it)
     user_tools.py new NAME [--dir D] [--task a,b] [--source S] [--url U] [--sha256 H] [--local-path P] [--output-format F]
-    user_tools.py add PATH [--dest D]
+    user_tools.py add PATH [--dest D]   |   remove NAME
 
 For a program (the window's form): parse_text(text), validate_text(text) -> {ok, problems, warnings, tasks, source, outputs},
 and the constants TASKS, FORMATS, INSTALL_METHODS, TASK_HELP, FORMAT_HELP, SOURCE_HELP.
@@ -380,6 +380,13 @@ class Manifest:
             base = self.folder / source_lib.SRC_DIR
             return base / target.name if target.is_file() or not target.exists() and target.suffix else base
         return None
+
+    def source_missing(self):
+        """True when the tool comes from a URL or a folder and that source has not been fetched yet (`plasbench install-tools <name>` fetches it)."""
+        if self.method not in ("url", "local") or self.folder is None:
+            return False
+        src = self.src_path()
+        return src is None or not Path(src).exists()
 
     def src_dir(self):
         """The folder a build_command runs in: {src} itself when it is a folder, else the folder holding the file."""
@@ -1141,21 +1148,56 @@ def scaffold(name, dest, tasks=None, source="conda", url="", sha256="", local_pa
 
 
 def add(source, dest):
-    """Copy a tool folder (or a lone manifest) onto the user search path after validating it."""
+    """Copy a tool folder (or a lone manifest) onto the user search path after validating it. Adding the folder that already is the
+    installed copy changes nothing (it used to delete the folder and then fail to copy it); the copy is made beside the old one and
+    swapped in, so a failed copy keeps the tool that was there."""
     source = Path(source).expanduser().resolve()
     manifest = source if source.is_file() else source / MANIFEST
     tool = UserTool(manifest)
     if tool.name in builtin_tools():
         raise ManifestError(f"'{tool.name}' is a built-in PlasBench tool; rename it in [tool] name")
     target = Path(dest).expanduser() / tool.name
-    if target.exists():
-        shutil.rmtree(target)
-    if source.is_file():
-        target.mkdir(parents=True)
-        shutil.copy2(manifest, target / MANIFEST)
-    else:
-        shutil.copytree(source, target)
+    same = target.exists() and os.path.normcase(str(target.resolve())) == os.path.normcase(str(source if source.is_dir() else source.parent))
+    if same:
+        return target
+    staging = target.with_name("." + target.name + ".adding")
+    shutil.rmtree(staging, ignore_errors=True)
+    try:
+        if source.is_file():
+            staging.mkdir(parents=True)
+            shutil.copy2(manifest, staging / MANIFEST)
+        else:
+            if staging.resolve() == source or source in staging.resolve().parents:
+                raise ManifestError(f"{source} contains the folder PlasBench installs tools into; add a tool folder from elsewhere")
+            shutil.copytree(source, staging)
+        if target.exists():
+            shutil.rmtree(target)
+        staging.rename(target)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
     return target
+
+
+def remove(name, paths=None):
+    """Delete a user tool's folder (manifest, scripts, its downloaded src/ and provenance) and return the folder. Only a tool PlasBench
+    found in one of the user's own folders can be removed: never a built-in, never the examples that ship in tools.d/, and never a
+    folder that is not directly inside a search-path folder. Raises ManifestError with the reason."""
+    if not isinstance(name, str) or not NAME_RE.match(name):
+        raise ManifestError(f"'{name}' is not a tool name (lower-case letters, digits and _)")
+    if name in builtin_tools():
+        raise ManifestError(f"'{name}' is a built-in PlasBench tool and cannot be removed")
+    tool = discover(paths).get(name)
+    if tool is None:
+        raise ManifestError(f"no user tool named '{name}' on the search path: " + ", ".join(str(p) for p in (paths or search_path())))
+    folder = tool.path.parent
+    if os.path.normcase(str(folder.parent.resolve())) == os.path.normcase(str((ROOT / "tools.d").resolve())):
+        raise ManifestError(f"'{name}' is an example that ships with PlasBench ({folder}); copy it with `plasbench tools add` to change a copy")
+    if folder.is_symlink():
+        folder.unlink()
+    else:
+        shutil.rmtree(folder)
+    _CACHE.clear()
+    return folder
 
 
 def print_validation(tool):
@@ -1195,6 +1237,8 @@ def main(argv=None):
     i.add_argument("name")
     t = sub.add_parser("task-ids", help="the registry ids of a tool, one per task (<name>, <name>__<task>)")
     t.add_argument("name")
+    ss = sub.add_parser("source-status", help="exit 3 when the tool's url/local source has not been fetched yet (scripts/00_setup.sh), else 0")
+    ss.add_argument("name")
     f = sub.add_parser("fetch", help="download (url) or locate (local) a tool's source now; plasbench install-tools runs this")
     f.add_argument("name")
     c = sub.add_parser("new", help="write a commented manifest to fill in")
@@ -1206,6 +1250,8 @@ def main(argv=None):
     c.add_argument("--sha256", default="", help="with --source url: the file's sha256")
     c.add_argument("--local-path", default="", help="with --source local: a file or folder on this computer")
     c.add_argument("--output-format", default="", help="one format, a comma list, or auto: " + ", ".join(FORMATS))
+    d = sub.add_parser("remove", help="delete a tool you added (its folder, downloaded source and provenance)")
+    d.add_argument("name")
     a = sub.add_parser("add", help="validate a tool folder and copy it onto the search path")
     a.add_argument("path")
     a.add_argument("--dest", default=str(Path.home() / ".plasbench" / "tools"))
@@ -1215,6 +1261,10 @@ def main(argv=None):
         if args.command == "new":
             made = scaffold(args.name, args.dir, args.task, args.source, args.url, args.sha256, args.local_path, args.output_format)
             print(f"Wrote {made}\nEdit it, then: plasbench tools validate {args.name}")
+            return 0
+        if args.command == "remove":
+            folder = remove(args.name)
+            print(f"Removed {args.name} ({folder})")
             return 0
         if args.command == "add":
             target = add(args.path, args.dest)
@@ -1267,6 +1317,12 @@ def main(argv=None):
             return 0
         if args.command == "task-ids":
             print("\n".join(i for i, _ in tool.task_ids()))
+            return 0
+        if args.command == "source-status":
+            if tool.source_missing():
+                print(f"{tool.name}: the source is not installed ({tool.src_path()}); run: plasbench install-tools {tool.name}")
+                return 3
+            print(f"{tool.name}: ok")
             return 0
         if args.command == "fetch":
             entry = tool.install_source(log=lambda m: print(m, file=sys.stderr))

@@ -1,0 +1,171 @@
+{
+  "_comment": "What python/tool_install_proof.py proves on a Linux runner (.github/workflows/tool-install-proof.yml). expect: install (default) = `plasbench install-tools PROFILE --yes` must exit 0 and every verify command (plus the registry's verify_command) must exit 0; manual = must exit 20 with the reason; skip = not run on a runner, with the reason. A test (test_tool_install_proof.py) fails when env/install_tools.sh can install a profile that is not listed here.",
+  "env_name": "plasbench",
+  "profiles": {
+    "mobsuite": {
+      "verify": [
+        "mob_recon --version",
+        "mob_typer --version",
+        "mob_cluster --version"
+      ]
+    },
+    "core": {
+      "verify": [
+        "datasets --version",
+        "prefetch --version",
+        "fasterq-dump --version",
+        "fastp --version",
+        "minimap2 --version",
+        "seqtk 2>&1 | grep -q Version",
+        "unzip -v"
+      ]
+    },
+    "assembly": {
+      "verify": [
+        "spades.py --version",
+        "plasmidspades.py --version",
+        "unicycler --version"
+      ]
+    },
+    "metagenomics": {
+      "verify": [
+        "spades.py --version",
+        "metaspades.py --version",
+        "genomad --version"
+      ]
+    },
+    "reconstruction": {
+      "verify": [
+        "mob_recon --version",
+        "platon --version"
+      ]
+    },
+    "simulate": {
+      "verify": [
+        "iss --version",
+        "badread --version"
+      ]
+    },
+    "long-read": {
+      "verify": [
+        "flye --version",
+        "mob_recon --version",
+        "filtlong --version"
+      ]
+    },
+    "plassembler": {
+      "verify": [
+        "plassembler --help"
+      ]
+    },
+    "hybracter": {
+      "verify": [
+        "hybracter --help"
+      ]
+    },
+    "trycycler": {
+      "verify": [
+        "trycycler --version",
+        "medaka --version"
+      ]
+    },
+    "genomad": {
+      "verify": [
+        "genomad --version"
+      ]
+    },
+    "rfplasmid": {
+      "verify": [
+        "RFPlasmid --help"
+      ]
+    },
+    "plascope": {
+      "verify": [
+        "plaScope.sh --help",
+        "centrifuge --version"
+      ]
+    },
+    "plasmidhunter": {
+      "verify": [
+        "plasmidhunter --help"
+      ]
+    },
+    "plasmer": {
+      "verify": [
+        "Plasmer --help"
+      ]
+    },
+    "quast": {
+      "verify": [
+        "quast.py --version"
+      ]
+    },
+    "multiqc": {
+      "verify": [
+        "multiqc --version"
+      ]
+    },
+    "utilities": {
+      "verify": [
+        "mash --version",
+        "samtools --version",
+        "barrnap --version"
+      ]
+    },
+    "reference-annotation": {
+      "verify": [
+        "abricate --version",
+        "amrfinder --version",
+        "isescan.py --version",
+        "mob_typer --version"
+      ]
+    },
+    "annotation": {
+      "verify": [
+        "bakta --version"
+      ]
+    },
+    "annotation-prokka": {
+      "verify": [
+        "prokka --version"
+      ]
+    },
+    "gplas": {
+      "verify": [
+        "gplas --help"
+      ]
+    },
+    "gplas2": {
+      "verify": [],
+      "note": "source-pinned; verified by the registry verify_command and by the installer's own verification"
+    },
+    "plasme": {
+      "verify": [],
+      "note": "source-pinned; verified by the registry verify_command and by the installer's own verification"
+    },
+    "plasgraph2": {
+      "verify": [],
+      "note": "source-pinned; verified by the registry verify_command and by the installer's own verification"
+    },
+    "plasmidec": {
+      "verify": [],
+      "note": "source-pinned; verified by the registry verify_command and by the installer's own verification"
+    },
+    "plasbin_flow": {
+      "verify": [],
+      "note": "source-pinned; verified by the registry verify_command and by the installer's own verification"
+    },
+    "mobilome-map": {
+      "verify": [],
+      "note": "source-pinned; verified by the registry verify_command and by the installer's own verification"
+    },
+    "plsmd": {
+      "expect": "manual",
+      "reason": "upstream ships only a Dockerfile with unpinned builds, no release and no licence file, and running it needs a Docker daemon: must exit 20 with the verified recipe"
+    },
+    "ppr-meta": {
+      "expect": "manual",
+      "reason": "needs the MATLAB Runtime R2018a (click-through licence on mathworks.com) and an end-of-life Python 2.7 / TensorFlow 1.4 stack: must exit 20 with the verified recipe"
+    }
+  }
+}

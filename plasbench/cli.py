@@ -581,6 +581,8 @@ def build_parser():
     tools_sub.add_parser("list", help="Every user tool PlasBench can see, with its task, track, run mode and output format.")
     tools_validate = tools_sub.add_parser("validate", help="Check every manifest (or one); exit 1 with each problem listed. Prints, per task, whether it is native, derived or not possible from the declared output, and the tool's source.")
     tools_validate.add_argument("name", nargs="?")
+    tools_remove = tools_sub.add_parser("remove", help="Delete a tool you added (its folder, downloaded source and provenance). Built-in tools and the shipped examples are refused.")
+    tools_remove.add_argument("name")
     tools_show = tools_sub.add_parser("show", help="Print one tool's manifest as PlasBench reads it.")
     tools_show.add_argument("name")
     tools_new = tools_sub.add_parser("new", help="Write a commented manifest template to fill in.")
@@ -1282,7 +1284,7 @@ def main(argv=None):
             code = run([bash_command(), "env/install_tools.sh", "--env", args.env, args.name], root)
         else:
             command = [sys.executable, "python/user_tools.py", args.tools_command]
-            if args.tools_command in ("validate", "show", "new") and getattr(args, "name", None):
+            if args.tools_command in ("validate", "show", "new", "remove") and getattr(args, "name", None):
                 command.append(args.name)
             if args.tools_command == "new" and args.dir:
                 command.extend(["--dir", str(args.dir)])

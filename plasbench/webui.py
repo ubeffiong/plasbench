@@ -2458,6 +2458,13 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, self.validate_manifest(data.get("text", "")))
             if route == "usertools/save":
                 return self.jsend(200, self.save_manifest(data.get("text", ""), bool(data.get("overwrite"))))
+            if route == "usertools/remove":
+                ut = project.user_tools()
+                try:
+                    folder = ut.remove(data.get("name", ""))
+                except ut.ManifestError as exc:
+                    return self.jsend(400, {"error": str(exc)})
+                return self.jsend(200, {"ok": True, "removed": str(folder)})
             if route == "usertools/upload":
                 return self.jsend(200, store_tool_upload(data.get("name"), data.get("filename"), data.get("text")))
             if route == "reveal":
