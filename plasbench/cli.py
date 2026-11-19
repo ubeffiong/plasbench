@@ -1,6 +1,7 @@
 """Command-line entry point for the source checkout and container image."""
 
 import argparse
+import glob
 import json
 import os
 import re
@@ -11,7 +12,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from . import __version__
+from . import __version__, roots
 
 
 STAGE_HELP = """stage numbers: 0=setup, 1=download, 2=truth, 3=assemble,
@@ -54,6 +55,97 @@ def project_root(value):
 def is_project_root(root):
     """Whether *root* contains the runnable pipeline, not merely the CLI wheel."""
     return (root / "scripts" / "run_all.sh").is_file()
+
+
+def verify_after_upgrade(root, python=None, run_pip=None, verify=None) -> int:
+    """After update.sh: is the program Python imports (outside the folder) the version the folder holds? If an old installed copy is left behind (the usual cause of 'the window says it is
+    older than the page'), install the folder into this Python (pip install --no-deps) and check again. 0 when they match, 4 with the command to run otherwise."""
+    verify = verify or roots.verify
+    run_pip = run_pip or (lambda cmd: subprocess.run(cmd).returncode)
+    res = verify(root, python)
+    if res["ok"]:
+        roots.record_install(root, res.get("folder_version", ""), python)
+        print(f"[plasbench] Verified: {res['message']}.")
+    else:
+        print(f"[plasbench] The installed program does not match the folder: {res['message']}")
+        print(f"[plasbench] Installing the folder into this Python: {' '.join(roots.pip_command(root, python))}")
+        if run_pip(roots.pip_command(root, python)) == 0:
+            res = verify(root, python)
+        if not res["ok"]:
+            print("[plasbench] ERROR: still not matching. In the plasbench environment run:  "
+                  f"conda activate plasbench && cd \"{root}\" && python -m pip install --no-deps .   then start PlasBench again.", file=sys.stderr)
+            return 4
+        roots.record_install(root, res.get("folder_version", ""), python)
+        print(f"[plasbench] Repaired: {res['message']}.")
+    path, message = roots.write_launcher(python)
+    print(f"[plasbench] {message}")
+    print(f"[plasbench] Folder: {root}. If a PlasBench window is open, restart it (Restart window in the window, or run `plasbench ui` again).")
+    return 0
+
+
+def ui_state_command(args, root, how) -> int:
+    """`plasbench ui-state`: the evidence behind the window's 'older than the page' banner, in one paste-able block."""
+    import importlib.metadata as md
+    info = {"running": {"version": __version__, "path": str(Path(__file__).resolve().parent), "python": sys.executable, "frozen": bool(getattr(sys, "frozen", False))},
+            "project_root": {"path": str(root) if root else None, "how": how, "version": roots.read_version(root) if root else ""},
+            "install_record": roots.read_install(), "copies": [], "pip": {}, "server": None}
+    seen = set()
+    env_dirs = glob.glob(os.path.join(os.path.dirname(os.path.dirname(sys.executable)), "..", "*", "lib", "python*", "site-packages"))
+    for entry in list(sys.path) + env_dirs:
+        try:
+            pkg = (Path(entry or ".") / "plasbench").resolve()
+        except OSError:
+            continue
+        if pkg in seen or not (pkg / "__init__.py").is_file():
+            continue
+        seen.add(pkg)
+        info["copies"].append({"path": str(pkg), "version": roots.read_version(pkg.parent), "this_process": pkg == Path(__file__).resolve().parent})
+    try:
+        dist = md.distribution("plasbench")
+        info["pip"] = {"version": dist.version, "location": str(dist.locate_file(""))}
+    except Exception:  # noqa: BLE001 - not installed with pip: the report says so
+        info["pip"] = {"version": None, "location": None}
+    try:
+        from . import webui
+        rec = json.loads(webui._instance_file().read_text(encoding="utf-8"))
+        info["server"] = {"record": {k: rec.get(k) for k in ("port", "pid", "root", "started")}, "state": webui._call_old_server(rec["url"], "server-state")}
+    except (OSError, ValueError, KeyError):
+        info["server"] = None
+    problems = []
+    for c in info["copies"]:
+        if root and c["version"] and info["project_root"]["version"] and c["version"] != info["project_root"]["version"]:
+            problems.append(f"the plasbench at {c['path']} is {c['version']} but the PlasBench folder holds {info['project_root']['version']}")
+    st = (info["server"] or {}).get("state") or {}
+    if st.get("stale"):
+        problems.append("the running window reports: " + (st.get("reason") or st.get("kind", "stale")))
+    info["problems"] = problems
+    if args.json:
+        print(json.dumps(info, indent=2, default=str))
+        return 0
+    r, p = info["running"], info["project_root"]
+    print(f"This command: PlasBench {r['version']} from {r['path']}\n  Python: {r['python']}")
+    print(f"PlasBench folder: {p['path'] or 'NOT FOUND'}" + (f" ({p['how']}), version {p['version'] or '?'}" if p["path"] else ""))
+    rec = info["install_record"]
+    print("Recorded at install: " + (f"{rec.get('root')} (version {rec.get('version')}, {rec.get('recorded_at')})" if rec else "nothing (run ./install.sh or plasbench upgrade)"))
+    print(f"pip says: {info['pip'].get('version') or 'not installed with pip'}" + (f" at {info['pip']['location']}" if info["pip"].get("location") else ""))
+    print("Copies of plasbench visible to this Python and the conda environments next to it:")
+    for c in info["copies"] or [{"path": "(none found)", "version": "", "this_process": False}]:
+        print(f"  {c['path']}  version {c['version'] or '?'}" + ("  <- this command" if c["this_process"] else ""))
+    if info["server"]:
+        sv = info["server"]["record"]
+        print(f"Running window: pid {sv.get('pid')}, port {sv.get('port')}, folder {sv.get('root')}")
+        if st:
+            print(f"  version {st.get('running_version')} from {st.get('running_path')}; stale: {st.get('stale')} ({st.get('kind')}); changed modules: {len(st.get('changed_modules') or [])}")
+        else:
+            print("  it did not answer /api/server-state (a window from before 0.5.2, or it has stopped)")
+    else:
+        print("Running window: none recorded")
+    print("Problems: " + ("none found" if not problems else ""))
+    for line in problems:
+        print("  - " + line)
+    if problems and root:
+        print(f"Fix: conda activate plasbench && cd \"{root}\" && python -m pip install --no-deps .   (or: plasbench upgrade), then restart the window")
+    return 0
 
 
 def configured_data_dir(root):
@@ -295,8 +387,9 @@ def build_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"plasbench {__version__}")
-    parser.add_argument("--project-root", type=project_root, default=Path.cwd(),
-                        help="PlasBench source checkout (default: current directory).")
+    parser.add_argument("--project-root", type=project_root, default=None,
+                        help="The PlasBench folder. Default: the current folder (or a parent), else PLASBENCH_HOME, the folder recorded at install time, the folder this program was "
+                             "installed from, or ~/PlasBench; the one used is named when it is not the current folder.")
     sub = parser.add_subparsers(dest="command", required=True)
     ui_parser = sub.add_parser(
         "ui", help="Open the PlasBench window: set up, add tools, run benchmarks and read results without the command line.")
@@ -311,6 +404,10 @@ def build_parser():
         help="Install Git (optional): Git for Windows with Git Bash on Windows, conda-forge git elsewhere.")
     git_parser.add_argument("--force", action="store_true", help="Install even if git is already found.")
     git_parser.add_argument("--dry-run", action="store_true", help="Only say what would be done.")
+    state_parser = sub.add_parser(
+        "ui-state",
+        help="Say which PlasBench the window runs: version and folder of the running program, every installed copy, the PlasBench folder, and the running window's state (paste it when asking for help).")
+    state_parser.add_argument("--json", action="store_true", help="Print the evidence as JSON.")
     icon_parser = sub.add_parser(
         "desktop-icon",
         help="Put a PlasBench icon on the desktop and in the applications/Start menu; clicking it starts PlasBench.")
@@ -998,19 +1095,22 @@ def main(argv=None):
         parser.error("argument stages: invalid choice: {} (choose from {})".format(
             ", ".join(repr(s) for s in invalid_stages),
             ", ".join(repr(s) for s in sorted(VALID_STAGES))))
-    root = args.project_root
-    # argparse does not apply ``type=project_root`` to a Path-valued default.
-    # Without this explicit check, invoking the CLI from a random directory
-    # failed later with a shell "file not found" message. The report opener is
-    # deliberately standalone; every other command needs the release tree.
+    # The PlasBench folder: --project-root, PLASBENCH_HOME, the current folder (or a parent), the folder recorded at install time, the checkout this program was imported from,
+    # ~/PlasBench (plasbench/roots.py). The report opener is deliberately standalone; every other command needs the release tree.
     if args.command == "net":
         raise SystemExit(net_command(args))
-    if args.command != "open-report" and not is_project_root(root):
-        parser.error(
-            f"{root} is not a PlasBench release/source directory (scripts/run_all.sh missing). "
-            "Run 'cd \"$PB\"' using the installation directory from the README, "
-            "or pass --project-root /path/to/plasbench before the command."
-        )
+    root, how, tried = roots.resolve(args.project_root)
+    if args.command == "ui-state":
+        raise SystemExit(ui_state_command(args, root, how))
+    if args.command != "open-report":
+        if root is None:
+            print("[plasbench] ERROR: " + roots.not_found_message(tried), file=sys.stderr)
+            raise SystemExit(2)
+        if not is_project_root(root):
+            parser.error(f"{root} is not a PlasBench release/source directory (scripts/run_all.sh missing). Pass --project-root /path/to/PlasBench, or cd into it.")
+        mutating = args.command in ("run", "upgrade", "install-tools", "init-local", "reconstruct", "intake")
+        if how not in ("the current folder", "given with --project-root") or (mutating and not getattr(args, "json", False)):
+            print(f"[plasbench] Using the PlasBench folder {root} ({how})", file=sys.stderr)
     problem = network_preflight(args, root)
     if problem:
         print(f"[plasbench] ERROR: {problem}", file=sys.stderr)
@@ -1100,6 +1200,8 @@ def main(argv=None):
         if args.refresh_tools:
             command.append("--refresh-tools")
         code = run(command, root)
+        if code == 0:
+            code = verify_after_upgrade(root)
     elif args.command == "check":
         command = [bash_command(), "scripts/00_setup.sh"]
         if args.yes:

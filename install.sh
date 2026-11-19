@@ -153,6 +153,13 @@ else
     micromamba run -n plasbench python -m pip install --no-deps .
 fi
 
+# Record this folder (~/.plasbench/install.json: plasbench finds it from any directory), check that the installed program is the version in this folder, and write the optional
+# ~/.local/bin/plasbench launcher (PLASBENCH_NO_LAUNCHER=1 skips it). Never fatal.
+if command -v conda >/dev/null 2>&1; then PB_ENV_RUN=(conda run --no-capture-output -n plasbench); else PB_ENV_RUN=(micromamba run -n plasbench); fi
+"${PB_ENV_RUN[@]}" python -m plasbench.roots record "$HERE" || say "could not record the install folder (plasbench still works from inside $HERE)"
+"${PB_ENV_RUN[@]}" python -m plasbench.roots verify "$HERE" || say "WARNING: the installed plasbench does not match $HERE; run: conda activate plasbench && cd \"$HERE\" && python -m pip install --no-deps ."
+"${PB_ENV_RUN[@]}" python -m plasbench.roots launcher "$HERE" || true
+
 step_done
 
 # 4. Optional: the bioinformatics tools themselves.

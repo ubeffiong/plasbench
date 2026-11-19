@@ -169,7 +169,9 @@ _DEMO = {
     "no_report_prompt": dict(_RUN["no_report_prompt"], summary="Do not offer to open the completed demo report. The window always sets this so the run never stops to ask a question."),
 }
 
-ARGS = {"run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONSTRUCT, "intake": _INTAKE, "scan-isolates": _SCAN}
+_UI_STATE = {"json": {"summary": "Print the evidence as JSON instead of a short report.", "when": "Only when you want to process it with a script; to ask for help, paste the plain report."}}
+
+ARGS = {"ui-state": _UI_STATE, "run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONSTRUCT, "intake": _INTAKE, "scan-isolates": _SCAN}
 
 # Wizard controls that are not command-line options. Keys are the control names used by the page.
 WIZARD = {

@@ -105,24 +105,22 @@ def main():
     check("the source page has both placeholders", 'content="__PAGE_VERSION__"' in HTML and 'name="plasbench-version" content="__VERSION__"' in HTML)
 
     print("detection")
-    now = server_state.code_fingerprint()
     cmp = server_state.compare
-    check("a newer on-disk version is stale, and says both versions", cmp({"version": "0.5.1", "files": now, "at": 1.0}, "0.5.2", now)[0]
-          and "0.5.2" in cmp({"version": "0.5.1", "files": now, "at": 1.0}, "0.5.2", now)[1])
-    same = {"version": "0.5.2", "files": now, "at": 1.0}
-    check("nothing changed: not stale", cmp(same, "0.5.2", now) == (False, ""))
-    touched = dict(now, **{"webui.py": [now["webui.py"][0] + 5, now["webui.py"][1]]})
-    check("a touched module is stale and names it", cmp(same, "0.5.2", touched)[0] and "webui.py" in cmp(same, "0.5.2", touched)[1])
-    check("a module added or removed is stale", cmp(same, "0.5.2", dict(now, **{"new_mod.py": [1, 1]}))[0] and cmp({"version": "0.5.2", "files": dict(now, gone=[1, 1]), "at": 1.0}, "0.5.2", now)[0])
+    base = {"version": "0.5.2", "modules": {}, "at": 1.0}
+    one = [{"module": "webui.py", "old": "aaaa", "new": "bbbb"}]
+    check("a newer on-disk version is stale, and says both versions", cmp({"version": "0.5.1", "modules": {}, "at": 1.0}, "0.5.2", [])[0]
+          and "0.5.2" in cmp({"version": "0.5.1", "modules": {}, "at": 1.0}, "0.5.2", [])[1])
+    check("nothing changed: not stale", cmp(base, "0.5.2", []) == (False, ""))
+    check("a loaded module whose content changed is stale and names it", cmp(base, "0.5.2", one)[0] and "webui.py" in cmp(base, "0.5.2", one)[1])
     check("disk_version reads __init__.py without importing and equals the package version", server_state.disk_version() == webui.__version__, server_state.disk_version())
-    server_state.reset()
+    server_state.reset(root=root)
     check("a fresh start is not stale", server_state.state()["stale"] is False, server_state.state())
 
     print("/api/server-state")
     code, st = call("server-state", token=False)
     check("the route needs the key", code == 403, code)
     code, st = call("server-state")
-    check("it answers with the documented shape", code == 200 and set(st) >= {"started_version", "disk_version", "stale", "reason", "started_at"} and st["stale"] is False, st)
+    check("it answers with the documented shape", code == 200 and set(st) >= {"started_version", "disk_version", "stale", "reason", "started_at", "kind", "running_version", "running_path", "project_root_version", "changed_modules", "server", "api_level"} and st["stale"] is False, st)
     loadcache.reset_all()
     saved = server_state.START["version"]
     server_state.START["version"] = "0.0.1"   # a server started from an older version
@@ -169,7 +167,7 @@ def main():
           'id="ss_reload"' in block and 'id: "reload", label: "Reload page (clear cache)"' in block and 'id="reloadbtn"' in HTML)
     check("the dialog gives the keyboard shortcut", "Ctrl+Shift+R (Cmd+Shift+R on a Mac)" in block)
     check("the hard reload clears service workers and Cache Storage, and keeps the session key and preferences",
-          "getRegistrations" in block and "caches.delete" in block and "localStorage" not in block.replace("no localStorage key", "").replace("localStorage key", "") and "sessionStorage" not in block)
+          "getRegistrations" in block and "caches.delete" in block and "localStorage" not in block.replace("no localStorage key", "").replace("localStorage key", "") and "sessionStorage" not in block.split("async function hardReload")[1].split("try { if (new URLSearchParams")[0])
     check("the page registers no service worker and uses no Cache Storage", "serviceWorker.register" not in HTML and "caches.open" not in HTML)
     check("the restart-lost path still exists (key refused / connection lost)", "LOST_EXPIRED" in HTML and "PlasBench was restarted" in HTML and "sessionEnded();" in HTML)
     node = shutil.which("node")
@@ -236,7 +234,7 @@ console.log(JSON.stringify(out));
     check("a detached run is going", jobrunner.is_alive(str(jobs.dir), slow["id"]))
     code, res = call("server/restart", {})
     check("restart: starts the same Python on the same package with a new instance and no browser", res.get("ok") is True and res["url"].endswith("?t=NEWKEY") and calls
-          and calls[0][0][0] == sys.executable and "--new-instance" in calls[0][0] and "--no-browser" in calls[0][0] and calls[0][0][1:3] == ["-m", "plasbench"], (res, calls))
+          and calls[0][0][0] == sys.executable and "--new-instance" in calls[0][0] and "--no-browser" in calls[0][0] and calls[0][0][1] == "-c" and calls[0][0][3] == str(server_state.PKG.parent), (res, calls))
     t0 = time.time()
     while time.time() - t0 < 8:   # the old server shuts down after answering
         try:

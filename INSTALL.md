@@ -429,8 +429,21 @@ Commit that file so collaborators reproduce the exact toolchain.
 
 ---
 
+## Finding the PlasBench folder, and the `plasbench` launcher
+
+`plasbench` needs your PlasBench folder (the one with `scripts/run_all.sh`). It looks, in this order, at `--project-root`, the `PLASBENCH_HOME` environment variable, the current
+folder and its parents, the folder recorded at install time (`~/.plasbench/install.json`, written by `./install.sh` and `plasbench upgrade`), the folder the installed program came
+from, and `~/PlasBench`. When the folder is not the current one, the command says which it used and why (and any command that changes things always names its folder).
+
+`./install.sh` and `plasbench upgrade` also write a small launcher, `~/.local/bin/plasbench`, which starts the plasbench environment's `plasbench` so the command works from any terminal
+without `conda activate`. It is marked as written by PlasBench, is never written over a file PlasBench did not make, and tells you if `~/.local/bin` is not on your `PATH`.
+Set `PLASBENCH_NO_LAUNCHER=1` to skip it. After an upgrade, `plasbench` checks that the installed program is the version in your folder and repairs it
+(`python -m pip install --no-deps .`) if not; `plasbench ui-state` shows the evidence.
+
 ## Troubleshooting
 
+- **The window says it is older than the page** -> run `plasbench ui-state`. If it reports two installs, run
+  `conda activate plasbench && cd ~/PlasBench && python -m pip install --no-deps .`, then restart the window.
 - **`datasets: command not found`** → you didn't `conda activate plasbench`.
 - **SRA download stalls** → run `vdb-config --interactive` once (sets the SRA cache dir),
   or try `prefetch --max-size 100g <SRR>`.

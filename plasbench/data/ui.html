@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="plasbench-version" content="__VERSION__">
 <meta name="plasbench-page-version" content="__PAGE_VERSION__">
+<meta name="plasbench-api-level" content="__API_LEVEL__">
 <title>PlasBench</title>
 <link rel="icon" type="image/png" href="/favicon.ico">
 <style>
@@ -1469,27 +1470,52 @@ function staleMessage(started, disk) {
 function hardReloadUrl(href, stamp) { const u = new URL(href); u.searchParams.set("_r", String(stamp)); return u.toString(); }
 function withoutReloadParam(href) { const u = new URL(href); if (!u.searchParams.has("_r")) return href; u.searchParams.delete("_r"); return u.toString(); }
 const RELOAD_HINT = "Keyboard: Ctrl+Shift+R (Cmd+Shift+R on a Mac) does the same.";
+/* A server older than this page leaves the page's api-level placeholder unreplaced: that server cannot have the routes this page calls. */
+function serverTooOld(levelMeta) { return /^__API_LEVEL__$/.test(String(levelMeta || "")); }
+/* The banner is shown only for a state the server itself calls stale (kind loaded_code or two_installs); a server without `kind` is an older server: its `stale` is trusted as loaded code. */
+function staleKind(st) { return st && st.stale ? (st.kind === "two_installs" ? "two_installs" : "loaded_code") : ""; }
+function dismissKey(st) { st = st || {}; const sv = st.server || {}; return [st.started_at || "", sv.pid || "", staleKind(st) || st.kind || ""].join(":"); }
+function staleHeadline(st) {
+  if (staleKind(st) === "two_installs") return `PlasBench is installed in two places with different versions (running ${st.running_version || "?"}, project folder ${st.project_root_version || "?"}). Restarting the window will not fix this.`;
+  return staleMessage(st && (st.started_version || st.started), st && (st.disk_version || st.disk));
+}
+function evidenceLines(st) {
+  st = st || {}; const sv = st.server || {}; const L = [];
+  if (st.running_version) L.push(`Running: PlasBench ${st.running_version} from ${st.running_path || "?"}`);
+  if (st.disk_version && st.disk_path) L.push(`On disk there: PlasBench ${st.disk_version} (${st.disk_path})`);
+  if (st.project_root_path) L.push(`Project folder: PlasBench ${st.project_root_version || "?"} at ${st.project_root_path}`);
+  if (sv.pid || sv.port) L.push(`This window's server: pid ${sv.pid || "?"}, port ${sv.port || "?"}` + (st.started_at ? `, started ${new Date(st.started_at * 1000).toLocaleString()}` : ""));
+  for (const m of (st.changed_modules || []).slice(0, 8)) L.push(`Changed since start: ${m.module}  ${m.old} -> ${m.new}`);
+  if (st.reason) L.push(st.reason);
+  return L;
+}
 /* ==SS-PURE-END== */
-const SS = {stale: null, details: [], timer: null, restarting: false};
+const SS = {stale: null, details: [], timer: null, restarting: false, sticky: false};
+const ssDismissed = st => { try { return sessionStorage.getItem("pb_ss_dismiss") === dismissKey(st); } catch (e) { return false; } };
 const metaContent = n => { const e = document.querySelector(`meta[name="${n}"]`); return e ? e.content : ""; };
 function renderStale() {
   const bar = document.getElementById("stalebar"); if (!bar) return;
-  if (!SS.stale) { bar.hidden = true; return; }
-  const det = [SS.stale.reason, ...SS.details].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).slice(0, 6);
-  setIfChanged(bar, `<div class="ss-row">${icon("alert", "ico")}<div class="ss-msg"><b id="ss_t">${esc(staleMessage(SS.stale.started, SS.stale.disk))}</b>
+  if (!SS.stale || ssDismissed(SS.stale)) { bar.hidden = true; return; }
+  const two = staleKind(SS.stale) === "two_installs", fix = SS.stale.fix_command || "";
+  const det = [...evidenceLines(SS.stale), ...SS.details].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).slice(0, 14);
+  setIfChanged(bar, `<div class="ss-row">${icon("alert", "ico")}<div class="ss-msg"><b id="ss_t">${esc(staleHeadline(SS.stale))}</b>
+      ${two ? `<span>Run this in a terminal, then start PlasBench again:</span><pre id="ss_fix">${esc(fix)}</pre>` : ""}
       <span>Your runs keep going in the background: they are detached, and closing or restarting this window does not stop them.</span>
       ${det.length ? `<details><summary>Details</summary><pre>${esc(det.join("\n"))}</pre></details>` : ""}</div>
-    <div class="ss-btns"><button class="btn" id="ss_restart">${icon("refresh")}Restart window</button><button class="btn sec" id="ss_reload">Reload page (clear cache)</button><button class="btn sec" id="ss_why">Why?</button></div></div>`);
+    <div class="ss-btns">${two ? `<button class="btn" id="ss_copy">Copy command</button>` : `<button class="btn" id="ss_restart">${icon("refresh")}Restart window</button><button class="btn sec" id="ss_reload">Reload page (clear cache)</button>`}<button class="btn sec" id="ss_why">Why?</button><button class="btn sec" id="ss_dismiss">Dismiss for this server run</button></div></div>`);
   bar.hidden = false;
-  document.getElementById("ss_restart").onclick = restartWindow;
-  document.getElementById("ss_reload").onclick = hardReload;
+  const rb = document.getElementById("ss_restart"); if (rb) rb.onclick = restartWindow;
+  const rl = document.getElementById("ss_reload"); if (rl) rl.onclick = hardReload;
+  const cp = document.getElementById("ss_copy"); if (cp) cp.onclick = () => copyText(fix, "Command copied");
+  document.getElementById("ss_dismiss").onclick = () => { try { sessionStorage.setItem("pb_ss_dismiss", dismissKey(SS.stale)); } catch (e) { /* kept for this view only */ } bar.hidden = true; };
   document.getElementById("ss_why").onclick = () => modalDialog({title: "Why does the window need a restart?", cancelId: "ok", buttons: [{id: "ok", label: "Close", primary: true}],
     bodyHTML: `<p>PlasBench's page is read from disk again whenever it changes, but the program behind it (the server) is loaded once, when it starts. After an update (plasbench upgrade, update.sh, a git pull or a new release), the new page can therefore be shown by the old server, and the page asks for things the old server does not have, such as <code>no such API: workflow</code>.</p>
       <p>Restarting starts the new version. Your studies, results and settings are kept. Runs are detached from the window and keep going; they are listed under Runs &amp; reports.</p>`});
 }
 function raiseStale(p) {
   p = p || {};
-  SS.stale = Object.assign({started: metaContent("plasbench-version"), disk: metaContent("plasbench-page-version"), reason: ""}, SS.stale || {}, p.state || {});
+  SS.stale = Object.assign({started: metaContent("plasbench-version"), disk: metaContent("plasbench-page-version"), reason: "", stale: true}, SS.stale || {}, p.state || {});
+  if (p.sticky) SS.sticky = true;
   if (p.detail && !SS.details.includes(p.detail) && SS.details.length < 6) SS.details.push(p.detail);
   renderStale();
 }
@@ -1526,9 +1552,13 @@ async function hardReload() {
 try { if (new URLSearchParams(location.search).has("_r")) history.replaceState(null, "", withoutReloadParam(location.href)); } catch (e) { /* cosmetic */ }
 { const rb = document.getElementById("reloadbtn"); if (rb) rb.onclick = hardReload; }
 async function ssPoll() {
-  if (pageServerMismatch(metaContent("plasbench-page-version"), metaContent("plasbench-version"))) raiseStale({state: {reason: "the page and the server report different versions"}});   // at once, no wait for the poll
+  if (serverTooOld(metaContent("plasbench-api-level"))) raiseStale({sticky: true, state: {reason: "this server is older than the page (it does not know the page's api level)"}});   // certain: no poll needed
   if (S.quit || S.conn || SS.restarting) return;
-  try { const st = await api("server-state"); if (st.stale) raiseStale({state: {started: st.started_version, disk: st.disk_version, reason: st.reason, restart_supported: st.restart_supported}}); }
+  try {
+    const st = await api("server-state");
+    if (staleKind(st)) raiseStale({state: st});
+    else if (st.kind && !SS.sticky) { SS.stale = null; SS.details = []; renderStale(); }   // the server says nothing differs: no banner (a version difference between the meta tags alone is not evidence)
+  }
   catch (e) { /* a server without this route is reported by api() itself (staleApi); anything else is the connection banner's business */ }
 }
 setTimeout(ssPoll, 0);

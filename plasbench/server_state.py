@@ -1,16 +1,24 @@
-"""Is this running window server older than the files on disk? And restarting it safely.
+"""Is this running window server running different code from what a restart would load? And restarting it safely.
 
 The server's Python code is fixed in memory when it starts, but the page (plasbench/data/ui.html) is re-read from disk. After an update (plasbench upgrade, update.sh, a source update, a
 release install) while a window is open, the NEW page is therefore served by the OLD server, and the page calls routes the old server does not have ("no such API: workflow").
-At start the server records a fingerprint of its code (the package version and the size and modification time of every plasbench/*.py file); `state()` compares it with the disk
-without importing anything and without starting a process. `restart()` starts a replacement server and leaves the old one to exit; runs are detached (plasbench/jobrunner.py) and
-are never touched.
+
+What counts as stale (and nothing else does):
+  - loaded_code: the package this server imported (PKG, the folder of plasbench/__init__.py it runs from, wherever that is: site-packages, an editable checkout) now holds a different
+    `__version__`, or the CONTENT (sha256) of a plasbench module this server has already imported differs from what it had at start. A file that was only touched (same content: OneDrive,
+    an antivirus, git, a copy) is not stale; neither is a file the server never imported, a *.pyc, a cache, or ui.html (the page is meant to change; see API_LEVEL).
+  - two_installs: the project folder (--project-root) holds a plasbench package of a different version than the one this server imported (a copy in site-packages from `pip install .`
+    next to a newer checkout). Restarting the window cannot fix that: the same Python would import the same old copy. It needs the install command.
+`state()` compares without importing anything and without starting a process. `restart()` starts a replacement server that loads the SAME package folder as this one and leaves the old one
+to exit; runs are detached (plasbench/jobrunner.py) and are never touched.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import threading
@@ -20,26 +28,58 @@ from pathlib import Path
 from . import __version__
 
 PKG = Path(__file__).resolve().parent
+API_LEVEL = 2   # raised when the page needs a route or a field an older server lacks; the page carries the level it needs (meta plasbench-api-level) and the server substitutes its own
 _VERSION_RE = re.compile(r"""^__version__\s*=\s*["']([^"']+)["']""", re.M)
 _RESTART_LOCK = threading.Lock()
+_HASHES: dict = {}   # path -> ((size, mtime_ns), sha256): a hash is recomputed only when the size or mtime changed
+_BOOT = ("import sys, runpy; sys.path.insert(0, sys.argv[1]); sys.argv = ['plasbench'] + sys.argv[2:]; "
+         "runpy.run_module('plasbench', run_name='__main__', alter_sys=True)")
 
 
-def code_fingerprint() -> dict:
-    """{file name: [mtime_ns, size]} of every plasbench/*.py (the server imports them lazily, so all of them count)."""
+def file_hash(path) -> str:
+    """sha256 of a file's bytes, cached by (size, mtime): a touched file is re-read once, an untouched one never. '' when unreadable."""
+    path = str(path)
+    try:
+        st = os.stat(path)
+    except OSError:
+        return ""
+    key = (st.st_size, st.st_mtime_ns)
+    hit = _HASHES.get(path)
+    if hit and hit[0] == key:
+        return hit[1]
+    try:
+        with open(path, "rb") as fh:
+            digest = hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return ""
+    _HASHES[path] = (key, digest)
+    return digest
+
+
+def loaded_modules(pkg=None) -> dict:
+    """{path relative to the package folder: absolute path} of the plasbench modules this process has imported from `pkg` (source files only)."""
+    pkg = Path(pkg).resolve() if pkg else PKG
     out = {}
-    for path in PKG.glob("*.py"):
-        try:
-            st = path.stat()
-        except OSError:
+    for mod in list(sys.modules.values()):
+        f = getattr(mod, "__file__", None)
+        if not f or not str(f).endswith(".py"):
             continue
-        out[path.name] = [st.st_mtime_ns, st.st_size]
+        try:
+            rel = Path(f).resolve().relative_to(pkg)
+        except (ValueError, OSError):
+            continue
+        out[rel.as_posix()] = str(Path(f).resolve())
     return out
 
 
-def disk_version() -> str:
-    """The version written in the package files on disk (read as text, never imported)."""
+def module_hashes(pkg=None) -> dict:
+    return {rel: file_hash(path) for rel, path in loaded_modules(pkg).items()}
+
+
+def read_version(pkg) -> str:
+    """The version written in `pkg`/__init__.py (read as text, never imported); '' when there is none."""
     try:
-        m = _VERSION_RE.search((PKG / "__init__.py").read_text(encoding="utf-8"))
+        m = _VERSION_RE.search((Path(pkg) / "__init__.py").read_text(encoding="utf-8"))
         if m:
             return m.group(1)
     except OSError:
@@ -47,25 +87,46 @@ def disk_version() -> str:
     return ""
 
 
-START = {"version": __version__, "files": code_fingerprint(), "at": time.time()}
+def disk_version() -> str:
+    """The version written in the package files this server imported (read as text, never imported)."""
+    return read_version(PKG)
 
 
-def reset(version: str | None = None, files: dict | None = None) -> None:
-    """Record 'now' as the start (used by tests that simulate a start)."""
-    START.update(version=version or __version__, files=files if files is not None else code_fingerprint(), at=time.time())
+START = {"version": __version__, "modules": module_hashes(), "at": time.time(), "pid": os.getpid(), "port": None, "root": None}
 
 
-def compare(started: dict, version_now: str, files_now: dict) -> tuple[bool, str]:
+def reset(version=None, modules=None, root=None, port=None) -> None:
+    """Record 'now' as the start (the server calls it once it is listening; tests use it to simulate a start)."""
+    START.update(version=version or __version__, modules=modules if modules is not None else module_hashes(), at=time.time(), pid=os.getpid(),
+                 port=port if port is not None else START.get("port"), root=str(root) if root else START.get("root"))
+
+
+def changed_modules(started: dict, pkg=None) -> list:
+    """The modules this server had imported (hash recorded at start, or the first time it was seen) whose content on disk now differs. A module first seen later is recorded, not
+    flagged: it was imported from the files as they are."""
+    base = started["modules"]
+    found = []
+    for rel, path in loaded_modules(pkg).items():
+        now = file_hash(path)
+        if rel not in base:
+            base[rel] = now
+        elif now != base[rel]:
+            found.append({"module": rel, "old": (base[rel] or "missing")[:12], "new": (now or "missing")[:12]})
+    return sorted(found, key=lambda x: x["module"])
+
+
+def compare(started: dict, version_now: str, changed: list) -> tuple[bool, str]:
     if version_now and version_now != started["version"]:
         return True, f"the files on disk are version {version_now}, this window was started from {started['version']}"
-    old, new = started["files"], files_now
-    changed = sorted(n for n in new if n in old and new[n] != old[n])
-    added = sorted(set(new) - set(old))
-    removed = sorted(set(old) - set(new))
-    if changed or added or removed:
-        names = changed + added + removed
+    if changed:
+        names = [c["module"] for c in changed]
         return True, "program files changed on disk since this window started (" + ", ".join(names[:3]) + (", ..." if len(names) > 3 else "") + ")"
     return False, ""
+
+
+def install_command(root) -> str:
+    """The command that refreshes the installed copy from the project folder (run it in the plasbench environment)."""
+    return f"conda activate plasbench && cd {shlex.quote(str(root))} && python -m pip install --no-deps ."
 
 
 def restart_support() -> tuple[bool, str]:
@@ -80,16 +141,37 @@ def restart_support() -> tuple[bool, str]:
     return True, ""
 
 
-def state() -> dict:
+def state(root=None) -> dict:
     """The answer of GET /api/server-state."""
+    root = root if root is not None else START.get("root")
     disk = disk_version()
-    stale, reason = compare(START, disk, code_fingerprint())
+    changed = changed_modules(START)
+    stale, reason = compare(START, disk, changed)
+    kind = "loaded_code" if stale else "none"
+    root_version, root_path = "", ""
+    try:
+        root_pkg = Path(root) / "plasbench" if root else None
+        if root_pkg and (root_pkg / "__init__.py").is_file() and root_pkg.resolve() != PKG:
+            root_version, root_path = read_version(root_pkg), str(root_pkg.resolve())
+    except OSError:
+        pass
+    fix = ""
+    if kind == "none" and root_version and root_version != START["version"]:
+        kind, stale = "two_installs", True
+        fix = install_command(root)
+        reason = (f"PlasBench is installed in two places with different versions (running: {START['version']} from {PKG}; project folder: {root_version} at {root_path}). "
+                  f"Restarting the window cannot fix this; run: {fix}")
     return {"started_version": START["version"], "disk_version": disk or START["version"], "stale": stale, "reason": reason, "started_at": START["at"],
-            "restart_supported": restart_support()[0]}
+            "restart_supported": restart_support()[0], "kind": kind, "api_level": API_LEVEL,
+            "running_version": START["version"], "running_path": str(PKG), "disk_path": str(PKG),
+            "project_root_version": root_version, "project_root_path": root_path, "project_root": str(root) if root else "",
+            "changed_modules": changed[:20], "fix_command": fix, "restart_helps": kind == "loaded_code",
+            "server": {"pid": START.get("pid"), "port": START.get("port"), "started_at": START["at"]}}
 
 
 def replacement_command(root: Path, port: int) -> list[str]:
-    return [sys.executable, "-m", "plasbench", "--project-root", str(root), "ui", "--new-instance", "--no-browser", "--port", str(port)]
+    """The same Python, started on the package folder THIS server runs from (not whatever `-m plasbench` finds first in the current directory)."""
+    return [sys.executable, "-c", _BOOT, str(PKG.parent), "--project-root", str(root), "ui", "--new-instance", "--no-browser", "--port", str(port)]
 
 
 def spawn_detached(cmd: list[str], cwd) -> subprocess.Popen:

@@ -1300,6 +1300,25 @@ and `results/tool_status.tsv` to monitor progress.
 ## Troubleshooting
 
 ```text
+The banner says "This window is running an older version of PlasBench than the page"
+    Open Details in the banner: it lists what the window runs (version and folder), the PlasBench folder, the window's
+    pid and port, and any program file that really changed. Run `plasbench ui-state` for the same in the terminal.
+    Case 1, "PlasBench was updated (X -> Y) while this window was open": press Restart window (runs keep going).
+    A second `plasbench ui` or the desktop icon now replaces a window older than the command.
+    Case 2, "PlasBench is installed in two places with different versions": Restart cannot help. In a terminal:
+        conda activate plasbench && cd ~/PlasBench && python -m pip install --no-deps .
+    (or `plasbench upgrade`, which verifies the installed program against the folder and repairs it), then start
+    PlasBench again. Touched files, caches and files the window never loaded no longer raise the banner.
+    "Dismiss for this server run" hides it until the situation changes (a new server, or a different kind).
+
+`plasbench` from another folder says it cannot find the PlasBench folder
+    The folder is looked for in this order: --project-root, PLASBENCH_HOME, the current folder (or a parent), the
+    folder recorded at install time (~/.plasbench/install.json), the checkout plasbench was imported from, ~/PlasBench.
+    When it was not the current folder it says which one it used. Otherwise: cd into the folder, pass --project-root
+    /path/to/PlasBench, or run ./install.sh there (it records the folder). The installer also writes ~/.local/bin/plasbench
+    so the command works outside the conda environment (PLASBENCH_NO_LAUNCHER=1 skips it; a file there that PlasBench
+    did not write is never replaced).
+
 Empty sample sheet
     Add valid data rows to config/accessions.tsv or pass --samples PATH.
 
