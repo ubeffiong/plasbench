@@ -13,15 +13,11 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
-## [0.5.1] - 2026-11-18
+## [0.5.2] - 2026-11-19
 Summary. Nothing in this release changes a score, a ranking or a threshold.
-- **GitHub sign-in and actions.** Sign in from the window (device flow through the GitHub CLI) and run GitHub actions from the Version control page.
-- **Connectivity checks.** One internet check for everything online (`plasbench net`, `config/network_services.tsv`), used by the command line, the scripts and the window, so being offline is said plainly instead of timing out.
-- **Add-your-tool (multi-task, sources, outputs).** One tool can do several tasks; tools can come from a URL, a local folder or a small uploaded script; a tool can describe several outputs, and the Check panel says which output serves which task.
-- **Folder scan for isolates.** `plasbench scan-isolates FOLDER` and the window's Scan a folder find each isolate's reads and reference in one mixed folder (`plasbench intake scan/stage` stay).
-- **Report visuals.** The short-read QC panel, QUAST-style comparison tables with a heatmap, facet heatmaps, and the presence matrix.
-- **Optional MultiQC.** A companion report (`MULTIQC_REPORT`, `plasbench install-tools multiqc`) that never fails a run.
-- **Also:** workflow steps (what each optional step adds), and a fix for the Guides page freezing on a `#####` heading.
+- **Install and computer.** `plasbench install-tools` exits 20 ("manual step needed", nothing failed) for profiles PlasBench never installs for you; settings carry ranges that the window checks; the This-computer card shows CPUs, memory, limits, the Windows host behind WSL and every drive; the Version control page's description is a tooltip. Built-in, manual, dry-run and inspection install profiles need no internet: the command-line pre-flight, the window's gating and `/api/net/status` (`offline_install`) agree.
+- **Window load and storage.** The window is drawn from a cache (`plasbench/loadcache.py`): tools answer at once with `pending` while the PATH probe finishes, the schema and long lists are cached and gzipped (`docs/WINDOW_PERFORMANCE.md`). The connection check, the workflow chain and the Windows-host probe are off the load path too, and the tests count that.
+- **Report figures.** Redesigned fingerprint (radar), synteny view and a smaller precision-recall plot.
 
 ### Fixed -- install-tools, the "This computer" card, scoring-setting ranges, version-control note (project lead report, 18 November 2026)
 - **`plasbench install-tools gplas2 --yes` is not an error.** gplas2, PLASMe, plASgraph2, plsMD, PPR-Meta, the Mobilome Annotation Pipeline, PlasBin-flow and PlasmidEC are installed by hand; their profiles exited 2 (or 1), and the window then printed "a command was given a wrong option or a missing file". They now print the reason and the exact steps and exit **20** (`manual step needed; nothing failed`). `plasbin_flow`, `plasmidec` and `baseline` used to fall through to a conda package of that name; `baseline` (built in) now exits 0 with "nothing to install". A misspelt profile (`plasmidhuter`) exits 2 and names the nearest profiles. Manual profiles are recognised before conda is looked for, so they no longer report "install conda first". `exitcodes.explain` gives exit 2 of `install-tools` its own text (an unknown name or a wrong option), and `scripts/00_setup.sh` does not count 20 as a failure. New `--dry-run` reports what a profile is with no conda and no network. In the window a job ending in 20 reads **Manual step needed** (amber), with its steps in the console, not Failed. Tests: `test/test_install_outcomes.py`.
@@ -37,6 +33,17 @@ Summary. Nothing in this release changes a score, a ranking or a threshold.
 - **Tool fingerprint** (`python/report_fig_fingerprint.py`, `assets/report/fig_fingerprint_*.html`). One 150 px radar per tool in a grid on one shared 0-1 scale (was one 560 x 470 radar with every tool overlaid), with a code key for the seven axes. Hover or focus shows each dimension, the rank and n; click, Enter or Space opens the side panel with every dimension, its meaning and limits from the registry, the spread across isolates, the per-isolate table and a link to the leaderboard row; arrow keys move between tiles, Escape closes; Compare overlays up to three tools. The numbers table stays in a fold; print shows the tiles. Axes and the not-available rule are unchanged.
 - **Precision-recall** (`fig_pr_*`). The figure was already interactive; it is now about half the height (viewBox 640 x 330, at most about 320 px tall, was 760 x 640) with a narrower panel (340 px, was 430). Scores and curves are unchanged.
 - **Synteny ribbons** (`python/report_fig_synteny.py`, `assets/report/fig_synteny_*.html`). One comparison (sample, plasmid, tool) at a time, chosen with selectors, at most 200 px tall (was every tool stacked, about 700 px): truth plasmid on top with a kb ruler, scale bar and annotated features, the tool's records below on the same scale, smooth bands that twist only for a reverse block (blue and hatched). Tooltips, a side panel with the alignment table and the plasmid-map link, drag and Ctrl+wheel zoom with `+`, `-`, `0` and arrows, a static fold per comparison for print. The old stacked drawing is kept as `report_synteny.inject_legacy`. Nothing that is scored changed.
+
+## [0.5.1] - 2026-11-18
+Summary. Nothing in this release changes a score, a ranking or a threshold.
+- **GitHub sign-in and actions.** Sign in from the window (device flow through the GitHub CLI) and run GitHub actions from the Version control page.
+- **Connectivity checks.** One internet check for everything online (`plasbench net`, `config/network_services.tsv`), used by the command line, the scripts and the window, so being offline is said plainly instead of timing out.
+- **Add-your-tool (multi-task, sources, outputs).** One tool can do several tasks; tools can come from a URL, a local folder or a small uploaded script; a tool can describe several outputs, and the Check panel says which output serves which task.
+- **Folder scan for isolates.** `plasbench scan-isolates FOLDER` and the window's Scan a folder find each isolate's reads and reference in one mixed folder (`plasbench intake scan/stage` stay).
+- **Report visuals.** The short-read QC panel, QUAST-style comparison tables with a heatmap, facet heatmaps, and the presence matrix.
+- **Optional MultiQC.** A companion report (`MULTIQC_REPORT`, `plasbench install-tools multiqc`) that never fails a run.
+- **Also:** workflow steps (what each optional step adds), and a fix for the Guides page freezing on a `#####` heading.
+
 ### Fixed -- opening a guide froze the window
 - **The Guides page hung on the README.** The window's Markdown converter knew headings only up to level 4. A `##### ...` line (README line 2168) matched no rule and the paragraph rule refused to take a line starting with `#`, so the loop never advanced and the page stopped responding. The converter now knows levels 1 to 6, every pass must consume a line, and a stuck pass takes the line as plain text, so no input can loop. `test/test_ui_markdown.py` runs the real converter in Node on the exact line that hung, on odd inputs, on 3000 random Markdown-looking documents and on all 36 guides in the repository (each converts in well under a second; the README now takes about 30 ms).
 ### Added -- one internet check for everything online, and `plasbench net` (no more silent timeouts when offline)
