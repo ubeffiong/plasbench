@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 205 analysis modules, 28 registered tools and baselines (20 real tools), 219 registered
-outputs, 54 run switches, 430 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 207 analysis modules, 28 registered tools and baselines (20 real tools), 219 registered
+outputs, 54 run switches, 433 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -371,7 +371,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-205 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+207 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -607,6 +607,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `check_prediction_fasta.py` | Stage-4 well-formedness check of a tool's prediction FASTA (audit AU-035). |
 | `data_nature.py` | Is this run made of synthetic (demo) data, real data, or a mix? A mix is refused, and a synthetic run says so inside its report. |
 | `download_progress.py` | How far a read download has got, for the run log. |
+| `generate_install_audit.py` | Write docs/TOOL_INSTALL_AUDIT.md from the registries (config/tool_installers.tsv, config/metagenomic_tool_installers.tsv, config/source_tools.json). |
 | `intake.py` | Bring your own isolates: get the sheet right, point at your folders, check that PlasBench can see and use what you have. |
 | `keep_report_inputs.py` | keep the small per-sample inputs the report needs inside the results folder. |
 | `make_demo_readqc.py` | SYNTHETIC short-read QC and assembly-candidate tables for the six isolates of the offline demonstration. Never for real data. |
@@ -622,6 +623,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `run_multiqc.py` | Optional MultiQC companion: run `multiqc` over the fastp (and QUAST) outputs of a run into results/multiqc/. Never fails the run. |
 | `run_status.py` | What is this run doing right now, and why might it look stuck? |
 | `setting_ranges.py` | The one table of what each numeric Scoring-decision setting accepts (config/setting_ranges.tsv), and the checks built on it. |
+| `source_install.py` | Install the source-distributed tools PlasBench can run, pinned, isolated and verified. |
 
 
 ## 7. Every output file and where the report shows it

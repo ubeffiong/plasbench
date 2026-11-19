@@ -539,6 +539,10 @@ export DECISION_PROFILE="${DECISION_PROFILE:-accuracy_first}"
 # results/<sample>/.<tool>.complete, and any change re-runs that tool. Set
 # FORCE_RERUN_TOOLS=1 to re-run every tool regardless.
 export FORCE_RERUN_TOOLS="${FORCE_RERUN_TOOLS:-0}"
+# Results from releases before fingerprints have an empty marker, so their inputs
+# cannot be checked and they re-run once. REUSE_UNFINGERPRINTED=1 reuses them
+# unchecked instead (with a warning), e.g. to avoid re-running a long finished cohort.
+export REUSE_UNFINGERPRINTED="${REUSE_UNFINGERPRINTED:-0}"
 # INSTALL_MISSING_TOOLS=1: stage 0 installs any enabled tool that is not installed instead of stopping (plasbench run --install-missing-tools). Unset, a run with
 # no terminal stops at the first check and names every missing tool with the command that installs it; at a terminal it asks. The window asks, then sets it.
 export INSTALL_MISSING_TOOLS="${INSTALL_MISSING_TOOLS:-0}"
@@ -548,10 +552,6 @@ if [[ -z "${PLASGRAPH2_MODEL_DIR:-}" && "${RUN_PLASGRAPH2:-0}" == "1" ]] && comm
     [[ -n "$_pg_env" && -d "$_pg_env/plasbench-src/model/ESKAPEE_model" ]] && export PLASGRAPH2_MODEL_DIR="$_pg_env/plasbench-src/model/ESKAPEE_model"
     unset _pg_env
 fi
-# Results from releases before fingerprints have an empty marker, so their inputs
-# cannot be checked and they re-run once. REUSE_UNFINGERPRINTED=1 reuses them
-# unchecked instead (with a warning), e.g. to avoid re-running a long finished cohort.
-export REUSE_UNFINGERPRINTED="${REUSE_UNFINGERPRINTED:-0}"
 
 # --- Tool databases (set after INSTALL step) ---------------------------------
 # Platon needs its DB downloaded once; point to it here.
