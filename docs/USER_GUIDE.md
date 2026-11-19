@@ -1228,6 +1228,17 @@ Empty sample sheet
 Missing executable
     Activate the plasbench Conda environment, then run plasbench check.
 
+The window shows an old "installed" answer, or a tool you just installed as "not found"
+    The window remembers what it found on this computer for 30 seconds and refreshes it
+    in the background. Press Check again on Set up (or restart the window) to clear that
+    memory; nothing is stored on disk, so there is no cache folder to delete. See
+    docs/WINDOW_PERFORMANCE.md.
+
+The window is slow to open its pages
+    Keep the workspace on the computer's own disk (under /home in WSL, not /mnt/c or a
+    OneDrive folder) and keep PATH short; see docs/WINDOW_PERFORMANCE.md for what is
+    cached and why.
+
 Platon database missing
     Install/mount the database and use --platon-db PATH, or run --platon off.
 

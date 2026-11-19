@@ -65,6 +65,8 @@ def set_backend(module) -> None:
     """Tests (and nothing else) replace the connectivity layer."""
     global _backend_override
     _backend_override = module
+    from . import loadcache
+    loadcache.clear()               # the window remembers the last answer for a few seconds: a different backend must not be answered from it
 
 
 def backend():

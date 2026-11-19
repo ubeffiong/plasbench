@@ -569,6 +569,7 @@ def diff_drives(previous: list | None, current: list) -> dict:
 
 
 # ---------------------------------------------------------------- everything the card shows
+HOST_TTL = 300.0   # seconds the answer about the Windows host is reused (plasbench/loadcache.py)
 _LAST: dict = {"ids": None, "drives": None}
 
 
@@ -581,7 +582,10 @@ def report(where: dict | None = None, overrides: dict | None = None, remember: b
     host = None
     try:
         if o == "windows" or wsl:
-            host = host_info(in_wsl=wsl)
+            # The Windows host is asked through PowerShell / wmic, which can take seconds and does not change while the window is open: remembered with the window's other
+            # probes (plasbench/loadcache.py; the Check again button clears them). The drives below are read fresh every time, because that is how a plugged-in drive is noticed.
+            from . import loadcache
+            host, _ = loadcache.swr(("computer-host", wsl), HOST_TTL, lambda: host_info(in_wsl=wsl))
     except Exception:  # noqa: BLE001
         host = None
     wslconfig = None

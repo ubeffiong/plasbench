@@ -97,6 +97,8 @@ bash "$HERE/test_resumable_download.sh"
 bash "$HERE/test_preserve_databases.sh"
 # Audit P0 fixes (see audit/): inline-handler injection, zero-plasmid bin scoring, sleep/Resume, silent stage failures and orphans.
 python3 "$HERE/test_webui_inline_handlers.py"
+# The window loads from caches (loadcache.py): counted spawns/file reads on the load path, invalidation, gzip, and the Tools filter render (node).
+python3 "$HERE/test_window_load.py"
 python3 "$HERE/test_zero_plasmid_bin_scoring.py"
 python3 "$HERE/test_job_sleep_resume.py"
 bash "$HERE/test_stage_failure_visibility.sh"
