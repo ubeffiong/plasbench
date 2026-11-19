@@ -681,6 +681,11 @@ cloud-sync warnings. **Refresh** looks again and marks drives plugged in since t
 **Evidence.** `plasbench/computer_info.py`; `test/test_computer_info.py` (sample /proc/meminfo, /proc/mounts, df, lsblk, PowerShell, wmic, sysctl, vm_stat and mount output for Linux, WSL, macOS and Windows).
 **Status.** Fixed after v0.5.0 (next release). Not yet checked on a real Mac.
 
+### Q66. I updated PlasBench and the window shows errors like "no such API: workflow". What is wrong?
+**Answer.** The window you have open is an old program showing a new page. PlasBench re-reads its page from disk when it changes, but the server behind it is loaded once, when it starts; after an update (`plasbench upgrade`, `update.sh`, a git pull, a new release) the new page asks the old server for things it does not have. The window now notices: it compares the version it started from with the files on disk and shows a banner, "PlasBench was updated (0.5.1 -> 0.5.2) while this window was open", and any "no such API" error is replaced by "This window is running an older version of PlasBench than the page. Restart the window." (the original text is under Details). **Restart window** starts the new version and opens it at its new address; your runs are detached and keep going. Where PlasBench cannot restart itself, the dialog says exactly what to do: **Quit** (choose Quit and keep running if a run is going), then start PlasBench again from its desktop icon or with `plasbench ui`. If a page only looks stuck, **Reload page (clear cache)** (top bar, banner, or Ctrl+Shift+R, Cmd+Shift+R on a Mac) reloads it without restarting anything.
+**Evidence.** `plasbench/server_state.py`, `GET /api/server-state`, `POST /api/server/restart`; `test/test_stale_server.py`.
+**Status.** Fixed after v0.5.2 (next release). Not yet checked in a real browser or on a real desktop shortcut.
+
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions

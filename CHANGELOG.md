@@ -12,6 +12,7 @@ history is lost, only the numbering is cleaner. See
 [docs/releases/](docs/releases/) for the full per-version notes.
 
 ## [Unreleased]
+- **Window updated while open.** The server records its version and program files when it starts; `GET /api/server-state` (key required, cached, starts nothing) says whether the files on disk are newer. The page shows a banner with **Restart window**, **Reload page (clear cache)** and Why?, turns any `no such API: X` into "This window is running an older version of PlasBench than the page" (the original under Details), and compares its own version (`plasbench-page-version`) with the server's at once. `POST /api/server/restart` starts a replacement server and then lets the old one exit like Quit and keep running; runs are detached and are not touched. Where a restart is refused the dialog gives the manual steps. The page is served `no-cache` with an ETag; `/api` stays `no-store`.
 
 ### Fixed -- tools are installed when you run, exit 20 is not an error (project lead report, 19 November 2026)
 - **Exit 20 and 21 are information everywhere.** `plasbench install-tools gplas2 --yes` ended with "ERROR: the command stopped: failed with exit code 20". Every wrapper (the window's job console and state, the terminal page, `scripts/lib.sh`'s error trap and `explain_exit`) now treats 20 (a manual step, nothing failed) and new 21 (consent needed, nothing changed) as information, whatever command returned them. `test/test_exit20_wrappers.py` runs a fake command returning each code through every wrapper.
