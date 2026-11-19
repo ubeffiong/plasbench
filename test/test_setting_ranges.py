@@ -136,6 +136,8 @@ with tempfile.TemporaryDirectory() as tmp:
     check("a setting with no range (and a non-numeric one) is untouched by the check", refused({"NCBI_EMAIL": "a@b.org", "THREADS": "999"}) is None)
     # an existing saved value outside the range must never break saving other things
     local.write_text("export MIN_ALIGNMENT_IDENTITY=5\nexport TOOL_RETRIES=2\n", encoding="utf-8")
+    from plasbench import loadcache
+    loadcache.clear()   # a file's fingerprint is remembered for loadcache.STAT_TTL (0.5 s); the window clears it after every save
     check("an old saved out-of-range value does not block saving another setting", refused({"TOOL_RETRIES": "4"}) is None)
     check("saving the same old value again (the page re-sends what it shows) is allowed", refused({"MIN_ALIGNMENT_IDENTITY": "5"}) is None)
     check("clearing a setting back to its default is always allowed", refused({"MIN_ALIGNMENT_IDENTITY": None, "TOOL_TIMEOUT_SECONDS": ""}) is None)
