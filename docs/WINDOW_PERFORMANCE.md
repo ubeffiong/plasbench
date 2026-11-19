@@ -46,7 +46,55 @@ marks the tools as stale and the page asks for a fresh probe.
 
 ## Measured before and after
 
-TIMING_TABLE
+Machine: Windows 11 laptop, 6 cores, Python 3.14 (native) and WSL2 Ubuntu (Python 3.12) with the project and workspace on a `/mnt/c` 9p drive, which is the slow
+case this window usually runs in. Workspace: this repository, 200 studies with results, 200 jobs, 40 hand-added run folders, a 5,000-row sheet. Times are
+milliseconds for one HTTP call to a local server. "Cold" is the first call in a fresh process (no start-up warm-up); "warm" is the median of later calls. The harness
+is not in the repo (it was a throwaway script); `test/test_window_load.py` is the regression guard.
+
+**WSL2, workspace on `/mnt/c` (the project's usual setup).** Before = origin/main, one cold and two warm calls each; after = this change, with the start-up warm-up
+already done (it runs in a background thread, about 4 s, not on any request).
+
+| Route (page) | Before cold | Before warm | After cold, no warm-up | After warm (with start-up warm-up) |
+|---|---:|---:|---:|---:|
+| `tools` (Tools filters) | 3,626 to 5,495 | 3,584 to 4,913 | 337 | 16 |
+| `env` (Set up) | 1,810 to 2,478 | 1,800 to 1,918 | 1,904 | 6 |
+| `settings` | 222 to 342 | 218 to 291 | 55 | 40 |
+| `cohorts` | 841 to 1,466 | 699 to 806 | 1,295 | 31 |
+| `docs` | 1,469 | 471 | n/a | 203 |
+| `workspace` | 12,113 | 11,942 | 6,086 | 11 |
+| `runs` | 31,550 to 75,063 | 35,193 to 54,865 | 16,425 | 14,874 |
+| `run-sessions` | 67,209 to 80,318 | 55,947 to 122,871 | 31,618 | 32,370 |
+| `platform` | not measured (docker/wsl probe, seconds) | | 12 (answers pending, then ready) | 7 |
+| page `/` (bytes sent) | 309 ms, 470 KB | | 25 ms, about 90 KB gzipped | |
+| `schema` bytes | 222,635 | | 29,909 | |
+| `Jobs()` start-up | 5,111 to 9,812 | | 1,998 | |
+
+Honest reading: on `/mnt/c` the Tools filters, Set up, Settings, Cohorts and Workspace now answer in tens of milliseconds once warm, and the first call is no longer a
+blocking PATH search. **`runs` and `run-sessions` remain slow on `/mnt/c` with 240 results folders (about 15 s and 32 s)**: each folder still costs several stat calls
+at about 5 ms each on that drive; the fingerprint pass was reduced afterwards (one stat pass per folder, see below) but WSL went down before this could be re-measured
+there. With 240 folders that is the cost of walking a 9p drive; the remedy is to keep the workspace on WSL's own disk, or (if it matters) the rebuildable index
+described under "When it would be reconsidered". The load-path target of "no handler over 200 ms warm" is therefore met for every route except those two on `/mnt`.
+
+**Windows native (Python 3.14, drive C:), after the last change, with start-up warm-up; warm median of two calls.**
+
+| Route | Before warm | After warm |
+|---|---:|---:|
+| `tools` | 89 to 526 | 3 |
+| `env` | 57 to 467 | 1 |
+| `settings` | 83 to 269 | 8 |
+| `cohorts` | 59 to 78 | 3 |
+| `runs` | 592 to 1,891 | 17 |
+| `run-sessions` | 749 to 1,921 | 24 |
+| `workspace` | 56 to 502 | 9 |
+| `info` | 16 to 92 | 3 |
+| `platform` | 681 to 3,919 | 8 |
+| `Jobs()` start-up | 389 to 1,126 (1,856 under profile) | 361 |
+| page `/` | 6 to 44 ms | 9 ms |
+
+Not changed: `git/status` (about 1.7 to 2.7 s on Windows: several `git` and `gh` processes; it belongs to the Git page, not to the load path of the pages above).
+No bootstrap endpoint was added: a localhost round trip costs 2 to 3 ms, so batching saves nothing once the handlers are cached.
+Client-side timings could not be measured (no browser here); only the filter's DOM-operation count is tested, under node.
+
 
 ## Where things are stored
 

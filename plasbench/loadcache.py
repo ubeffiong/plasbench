@@ -26,16 +26,28 @@ _INFLIGHT: set = set()
 WHICH_TTL = float(os.environ.get("PLASBENCH_PROBE_TTL", "30"))
 
 
+STAT_TTL = 0.5   # seconds a file's fingerprint is reused: the page asks several routes at once, and on a slow drive (WSL /mnt, OneDrive) each stat costs milliseconds
+_STATS_CACHE: dict = {}
+
+
+def _one(path):
+    now = time.monotonic()
+    key = str(path)
+    hit = _STATS_CACHE.get(key)
+    if hit is not None and now - hit[0] < STAT_TTL:
+        return hit[1]
+    try:
+        st = os.stat(path)
+        value = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        value = None
+    _STATS_CACHE[key] = (now, value)
+    return value
+
+
 def sig(*paths) -> tuple:
-    """A cheap fingerprint of files: (mtime_ns, size) each, None for a file that is not there."""
-    out = []
-    for p in paths:
-        try:
-            st = os.stat(p)
-            out.append((st.st_mtime_ns, st.st_size))
-        except OSError:
-            out.append(None)
-    return tuple(out)
+    """A cheap fingerprint of files: (mtime_ns, size) each, None for a file that is not there. Reused for STAT_TTL seconds, and forgotten by clear()."""
+    return tuple(_one(p) for p in paths)
 
 
 def memo(key, signature, compute):
@@ -137,6 +149,7 @@ def pending_probes() -> int:
 
 def clear(probes: bool = True):
     """Forget everything that depends on the outside world. File-fingerprinted memos stay valid by themselves and are kept."""
+    _STATS_CACHE.clear()
     with _LOCK:
         _TTL.clear()
         if probes:
@@ -144,6 +157,7 @@ def clear(probes: bool = True):
 
 
 def reset_all():
+    _STATS_CACHE.clear()
     with _LOCK:
         _MEMO.clear()
         _TTL.clear()

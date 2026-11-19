@@ -139,10 +139,11 @@ def main():
     sample = lines[header + 1].split("\t")
     new = dict(zip(cols, sample))
     new["tool"] = "zz_new_tool"
-    time.sleep(0.02)
+    time.sleep(0.6)   # a file's fingerprint is reused for loadcache.STAT_TTL (0.5 s)
     caps.write_text(text.rstrip("\n") + "\n" + "\t".join(new.get(c, "") for c in cols) + "\n", encoding="utf-8")
     names = [t["tool"] for t in call("tools")["tools"]]
     check("a tool added to config/tool_capabilities.tsv appears on the next call", "zz_new_tool" in names)
+    time.sleep(0.6)
     caps.write_text(text, encoding="utf-8")
     check("and disappears when the file is restored", "zz_new_tool" not in [t["tool"] for t in call("tools")["tools"]])
 
@@ -156,6 +157,7 @@ def main():
     with Counters(watch) as c:
         call("settings")
     check("a warm settings call does not re-parse config.sh", not c.opens.get("config.sh"), c.opens)
+    time.sleep(0.6)
     (tmp / "local.env").write_text("export THREADS=3\n", encoding="utf-8")
     s2 = call("settings")
     row = next(x for x in s2["settings"] if x["key"] == "THREADS")
@@ -221,6 +223,7 @@ def main():
     big.write_text("sample_id\torganism\n" + "".join(f"x{i}\te\n" for i in range(50)), encoding="utf-8")
     rows = {x["name"]: x for x in call("cohorts")["cohorts"]}
     check("a new cohort sheet shows with its row count", rows.get("zz_new", {}).get("rows") == 50, rows.get("zz_new"))
+    time.sleep(0.6)
     big.write_text("sample_id\torganism\n" + "".join(f"x{i}\te\n" for i in range(70)), encoding="utf-8")
     rows = {x["name"]: x for x in call("cohorts")["cohorts"]}
     check("a grown cohort sheet shows its new row count", rows["zz_new"]["rows"] == 70, rows["zz_new"])

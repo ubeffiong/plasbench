@@ -563,16 +563,13 @@ class Project:
         registered = {loadcache.realpath(e) for e in extra}   # folders added by hand: these (and only these) can be forgotten
         rows = []
         for folder in sorted(candidates):
-            if not folder.is_dir():
+            report, leaderboard = folder / "benchmark.report.html", folder / "benchmark.leaderboard.tsv"
+            # one fingerprint pass answers every "is it there" question (None = missing): the cost on a slow drive is the number of stat calls, not the parsing
+            fp = loadcache.sig(report, leaderboard, folder / "tool_status.tsv", folder.parent / "study.json", folder / "benchmark.report.pdf", folder / "benchmark.report.summary.pdf")
+            if fp[0] is None and fp[1] is None:
                 continue
-            report = folder / "benchmark.report.html"
-            leaderboard = folder / "benchmark.leaderboard.tsv"
-            if not report.is_file() and not leaderboard.is_file():
-                continue
-            parts = loadcache.memo(("run", str(folder)), loadcache.sig(report, leaderboard, folder / "tool_status.tsv", folder.parent / "study.json"),
-                                   lambda f=folder: self._run_row(f, display_tool_name))
-            rows.append(dict(parts, registered=loadcache.realpath(folder) in registered,
-                             pdf=(folder / "benchmark.report.pdf").is_file(), summary_pdf=(folder / "benchmark.report.summary.pdf").is_file()))
+            parts = loadcache.memo(("run", str(folder)), fp[:4], lambda f=folder: self._run_row(f, display_tool_name))
+            rows.append(dict(parts, registered=loadcache.realpath(folder) in registered, pdf=fp[4] is not None, summary_pdf=fp[5] is not None))
         rows.sort(key=lambda r: -r["modified"])
         return rows
 
@@ -1375,12 +1372,12 @@ def _platform_probe() -> dict:
     return {"info": info, "plan": platform_info.recommend(info)}
 
 
-def warm(project) -> None:
+def warm(project, jobs=None) -> None:
     """Fill the caches in the background at start-up, so the first page the user opens is served from memory (the PATH probes, docker and conda included)."""
     def run():
         steps = (schema_bytes, lambda: project.tools(block=True), lambda: loadcache.swr(("env", str(project.root)), PROBE_TTL, project.env_checks),
                  lambda: loadcache.swr("platform", PLATFORM_TTL, _platform_probe), project.cohorts, project.docs, project.settings_resolved, project.info,
-                 lambda: project.runs([]))
+                 lambda: project.runs([]), lambda: jobs.sessions({}) if jobs else None)
         for step in steps:
             try:
                 step()
@@ -2372,7 +2369,7 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
     project = Project(root)
     jobs = Jobs(project)
     handler = make_handler(project, jobs)
-    warm(project)
+    warm(project, jobs)
     server = None
     for candidate in range(port, port + 20):
         try:
