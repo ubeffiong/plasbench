@@ -1493,7 +1493,7 @@ function renderStale() {
   bar.hidden = false;
   const rb = document.getElementById("ss_restart"); if (rb) rb.onclick = restartWindow;
   const rl = document.getElementById("ss_reload"); if (rl) rl.onclick = hardReload;
-  const cp = document.getElementById("ss_copy"); if (cp) cp.onclick = () => { try { navigator.clipboard.writeText(fix); toast("Command copied", "ok"); } catch (e) { toast("Select the command and copy it", ""); } };
+  const cp = document.getElementById("ss_copy"); if (cp) cp.onclick = () => copyText(fix, "Command copied");
   document.getElementById("ss_dismiss").onclick = () => { try { sessionStorage.setItem("pb_ss_dismiss", dismissKey(SS.stale)); } catch (e) { /* kept for this view only */ } bar.hidden = true; };
   document.getElementById("ss_why").onclick = () => modalDialog({title: "Why does the window need a restart?", cancelId: "ok", buttons: [{id: "ok", label: "Close", primary: true}],
     bodyHTML: `<p>PlasBench's page is read from disk again whenever it changes, but the program behind it (the server) is loaded once, when it starts. After an update (plasbench upgrade, update.sh, a git pull or a new release), the new page can therefore be shown by the old server, and the page asks for things the old server does not have, such as <code>no such API: workflow</code>.</p>
