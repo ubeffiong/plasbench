@@ -376,7 +376,10 @@ if [[ -n "${USER_TOOLS:-}" ]]; then
                 [[ "$key" == "ENV" ]] && user_env="$value"
                 [[ "$key" == "VERIFY" ]] && user_verify="$value"
             done < <(python3 "$HERE/../python/user_tools.py" install-plan "$user_tool")
-            if [[ -z "$user_verify" ]]; then
+            if user_source_note="$(python3 "$HERE/../python/user_tools.py" source-status "$user_tool" 2>&1)"; [[ $? -eq 3 ]]; then
+                warn "  [MISS] $user_tool (user tool): ${user_source_note}"
+                NEEDED_PROFILES["$user_tool"]=1
+            elif [[ -z "$user_verify" ]]; then
                 log "  [ok]   $user_tool (user tool; no verify_command declared)"
             elif conda run -n "$user_env" bash -c "$user_verify" >/dev/null 2>&1 || bash -c "$user_verify" >/dev/null 2>&1; then
                 log "  [ok]   $user_tool (user tool)"

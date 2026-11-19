@@ -967,6 +967,7 @@ run_user_tool() {
         return 0
     fi
     if [[ -n "${SPEC[missing]:-}" ]]; then
+        warn "$TOOL skipped for $SAMPLE: ${SPEC[missing]}"
         user_tool_status_all "skipped" "${SPEC[missing]}"; return 0
     fi
     # Read by tool_fingerprint: the manifest folder's checksum (with the tool's source: URL, pinned checksum, recorded

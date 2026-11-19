@@ -132,6 +132,13 @@ else
     fail "the stage log must name ut_noinst and 'plasbench install-tools ut_noinst'"
 fi
 
+# stage 0 (scripts/00_setup.sh) asks the same question before any sample work: a url/local tool whose source was never fetched is MISSING, not "ok"
+rc=0; note="$(PLASBENCH_TOOLS_PATH="$TMP/tools" python3 "$ROOT/python/user_tools.py" source-status ut_noinst 2>&1)" || rc=$?
+[[ "$rc" == "3" && "$note" == *"install-tools ut_noinst"* ]] || fail "source-status must exit 3 and name the install command for an unfetched source (exit $rc: $note)"
+PLASBENCH_TOOLS_PATH="$TMP/tools" python3 "$ROOT/python/user_tools.py" source-status ut_multi >/dev/null || fail "a tool with nothing to fetch is not missing"
+grep -q 'user_tools.py" source-status' "$ROOT/scripts/00_setup.sh" || fail "scripts/00_setup.sh must use source-status for user tools"
+echo "stage 0 treats an unfetched url/local source as missing (exit 3 with the install command) -> PASS"
+
 # ---- stage 5 and 6: each task row is scored and ranked on its own ---------------------------------------------------------------
 stage 05_score.sh USER_TOOLS=ut_multi,ut_fail,ut_noinst || fail "stage 5 must finish"
 SCORES="$TMP/results/scores.tsv"
