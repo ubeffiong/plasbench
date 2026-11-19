@@ -856,6 +856,10 @@ def build_parser():
                                 "or give 'all'. Sets USER_TOOLS.")
         tools.add_argument("--force-rerun-tools", action="store_true",
                            help="Discard completed tool results and execute them again.")
+        tools.add_argument("--install-missing-tools", action="store_true",
+                           help="Install any enabled tool that is not installed before the run starts (each from its pinned release or commit, in its own environment; "
+                                "needs the internet). Without it a run with a missing enabled tool stops at the first check, before any sample work, naming every "
+                                "missing tool and the command that installs it. Sets INSTALL_MISSING_TOOLS=1.")
 
     add_run_options(run_parser)
     add_run_options(report_parser)
@@ -1587,6 +1591,8 @@ def main(argv=None):
             env["USER_TOOLS"] = ",".join(name.strip() for value in args.user_tools for name in value.split(",") if name.strip())
         if args.force_rerun_tools:
             env["FORCE_RERUN_TOOLS"] = "1"
+        if getattr(args, "install_missing_tools", False):
+            env["INSTALL_MISSING_TOOLS"] = "1"
         stages = ["6"] if args.command == "report" else args.stages
         if args.write_script:
             # A generic "bash", not bash_command()'s Windows-bash.exe-path

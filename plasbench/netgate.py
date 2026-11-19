@@ -129,6 +129,33 @@ def git_services(remote_url: str = "") -> list:
     return ["github"] if (not host or host.endswith("github.com")) else ["internet"]
 
 
+def _source_install_services(rest) -> list:
+    """The services a source-built profile (config/source_tools.json) needs, joined over a comma list; empty when no named profile is one (then the catalogue's services apply)."""
+    words = [w for i, w in enumerate(rest) if not w.startswith("-") and (i == 0 or rest[i - 1] != "--env")]
+    if not words:
+        return []
+    try:
+        import source_install
+        root = Path(__file__).resolve().parent.parent
+        profiles = source_install.load(root / "config" / "source_tools.json")["profiles"]
+    except Exception:  # noqa: BLE001
+        return []
+    found, others = [], False
+    for name in words[0].split(","):
+        entry = profiles.get(name)
+        if entry is not None and entry["mode"] == "source":
+            for svc in source_install.services(entry):
+                if svc not in found:
+                    found.append(svc)
+        elif name:
+            others = True
+    if others:                          # a mix: the catalogue's services plus the git hosts
+        for svc in ("conda", "github", "pypi"):
+            if svc not in found:
+                found.append(svc)
+    return found
+
+
 def _install_goes_online(rest) -> bool:
     """python/tool_installer_registry.needs_network for `install-tools [--env E] [--yes] [PROFILE] [--dry-run]`; an unreadable registry says yes."""
     if "--dry-run" in rest:
@@ -145,7 +172,7 @@ def _install_goes_online(rest) -> bool:
     try:
         import tool_installer_registry as registry
         root = Path(__file__).resolve().parent.parent
-        return registry.needs_network(words[0] if words else "core", registry.read_tsv(root / "config" / "tool_installers.tsv"))
+        return registry.needs_network(words[0] if words else "core", registry.read_tsv(root / "config" / "tool_installers.tsv") + registry.read_tsv(root / "config" / "metagenomic_tool_installers.tsv"))
     except Exception:  # noqa: BLE001
         return True
 
@@ -155,7 +182,7 @@ def offline_install_profiles() -> list:
     try:
         import tool_installer_registry as registry
         root = Path(__file__).resolve().parent.parent
-        rows = registry.read_tsv(root / "config" / "tool_installers.tsv")
+        rows = registry.read_tsv(root / "config" / "tool_installers.tsv") + registry.read_tsv(root / "config" / "metagenomic_tool_installers.tsv")
         names = set(registry.profile_kinds(rows)) | set(registry.ACTIONS)
         return sorted(n for n in names if not registry.needs_network(n, rows))
     except Exception:  # noqa: BLE001
@@ -173,6 +200,10 @@ def command_services(argv) -> list:
     if (command, sub) in FLAG_NET:
         flag, services = FLAG_NET[(command, sub)]
         return list(services) if flag in rest else []
+    if command == "install-tools":
+        wanted = _source_install_services(rest)
+        if wanted:
+            return wanted               # a source-built tool also needs its git host (GitLab for gplas2 and PlasmidEC)
     table = NET_COMMANDS.get(command, [])
     if table is None:
         if command == "tools" and sub == "add" and not re.match(r"^(https?|git|ssh):/|^git@", (rest[1] if len(rest) > 1 else "").replace("\\", "/")):

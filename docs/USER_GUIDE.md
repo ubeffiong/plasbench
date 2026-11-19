@@ -242,6 +242,15 @@ For a real Docker run, mount `config`, `data`, `logs`, and `results`, then set
 `DATA_DIR`, `LOG_DIR`, `RESULTS_DIR`, and `PLATON_DB` to their mounted paths.
 The exact copy-paste command is in the README.
 
+### Installing the tools
+
+Tools install with your consent, each in its own isolated environment, from a pinned release or an exact commit: `plasbench install-tools NAME --yes` (a first install of a source-built tool
+shows its plan and stops without `--yes`), `plasbench install-tools a,b --yes`, `plasbench install-tools all --yes`, or `plasbench check --yes` for exactly what your enabled tools need.
+`plasbench run --install-missing-tools` (or `INSTALL_MISSING_TOOLS=1`) installs missing enabled tools before the run; without it a run with a missing enabled tool stops at its first check,
+naming each one and the command. In the window, the Tools page has Install and Update buttons per tool, **Install all enabled tools** (one confirmation dialog) and a progress strip; the Workflow
+cards show the same state, and starting a run offers to install missing enabled tools first. Exit codes 20 (a manual step; plsMD and PPR-Meta) and 21 (consent needed) are information, not
+errors. The per-tool table is `docs/TOOL_INSTALL_AUDIT.md`.
+
 ## Inputs
 
 The default sample sheet is `config/accessions.tsv`. It is a tab-separated file

@@ -116,21 +116,57 @@ plasbench install-tools validate   # confirms registry coverage; no downloads
 
 `plasbench install-tools all` runs every **verified automatic** profile through
 its existing installer path. It deliberately does not fake an installation for
-source-only runtimes (currently gplas2, PLASMe and plASgraph2) or databases
-without a stable upstream checksum. Those rows remain explicit as `planned` or
-`manual` in the registry, and their own profile prints the safe next step.
+the two runtimes that cannot be installed automatically (plsMD and PPR-Meta: see
+"Tools that cannot be installed automatically" below) or databases without a stable
+upstream checksum. Source-built profiles (gplas2, PLASMe, plASgraph2, PlasmidEC,
+PlasBin-flow, the Mobilome Annotation Pipeline) are installed from a pinned commit, with
+`--yes`; see "Installing every tool".
 
-### Manual-install profiles (exit code 20)
+### Installing every tool
 
-Some profiles are installed by hand because the upstream is a source checkout, a container or a workflow that PlasBench will not clone or pull unpinned: **gplas2**, **plasme**,
-**plasgraph2**, **plsmd**, **ppr-meta**, **mobilome-map**, **plasbin_flow** and **plasmidec**. `plasbench install-tools NAME` for one of them installs nothing, prints the reason, the
-commands to run yourself and the next steps, and exits **20**. That is not a failure: in the window the job reads *Manual step needed*, and `plasbench install-tools all` and
-`scripts/00_setup.sh` do not count it as one. The steps are: read the notice, run `plasbench install-tools plan` for the verification command of each tool, install the pinned
-revision yourself (sections 4 and 6 below give the gplas2, PLASMe and plASgraph2 commands), then run `plasbench check`.
+Every tool the benchmark can run installs automatically, with your consent, in its own isolated environment, from a pinned release or an exact commit. Nothing is installed
+until you agree: `--yes` on the command line, `y` at a prompt, the confirmation dialog in the window, or `INSTALL_MISSING_TOOLS=1` for an unattended run.
 
-`plasbench install-tools` exit codes: **0** installed, or nothing to install (`baseline` is built in); **20** a manual installation step is needed (nothing failed); **2** an unknown
-profile name or a wrong option (a name close to a real one lists the nearest names); **1** the installation failed (the messages above it say which step); **137** killed for memory
-(the output says how to give WSL more). `plasbench install-tools NAME --dry-run` reports what a name is without starting conda or using the network.
+```bash
+plasbench install-tools gplas2            # shows the plan (repository, pinned commit, size, licence, time) and stops: exit 21, nothing changed
+plasbench install-tools gplas2 --yes      # clones the pinned commit, builds the environment, verifies the tool, records where it came from
+plasbench install-tools gplas2,plasme --yes   # several profiles at once
+plasbench install-tools all --yes         # every automatic profile, including the source-built ones
+plasbench check --yes                     # installs whatever the tools enabled in config/config.sh need (tools and databases), then re-checks
+plasbench run --install-missing-tools ... # a run installs its missing enabled tools first (INSTALL_MISSING_TOOLS=1)
+```
+
+How a source-built tool is installed (gplas2, PLASMe, plASgraph2, PlasmidEC, PlasBin-flow, the Mobilome Annotation Pipeline; the pins are in `config/source_tools.json`):
+
+1. The repository is cloned into a staging folder and the **pinned commit** (a 40-character SHA, never a branch or tag) is checked out; `git rev-parse HEAD` must print it.
+2. A dedicated environment `<env>-<profile>` is created next to the main one from that commit's own dependency file (or a pinned file kept in `env/pins/`).
+3. The tool's verification command runs (for gplas2 it proves that `gplas --help` lists `-P/--prediction`).
+4. Only then is a small wrapper placed in the main environment's `bin/` and a provenance record written (revision, source, time, environment, SHA-256 of the checkout and of the dependency files, dependency versions) at `<env>-<profile>/plasbench-install.json`. `plasbench check` and the run manifest read it.
+5. A failure at any step removes everything that step created and puts a previous working install back. Running the command again says *already installed at the pinned revision*; if the pin changed in a newer PlasBench it upgrades.
+
+A run that needs a missing enabled tool never silently skips it: `plasbench run` stops at its first check, before any sample work, naming every missing tool and the exact command
+(`plasbench install-tools <profile> --yes`), unless you asked it to install (`--install-missing-tools`, `INSTALL_MISSING_TOOLS=1`, `--yes` on `plasbench check`, or the window's dialog).
+After installing it checks again in the same process, so the run carries on without a new shell.
+
+What the runtime does not include is said per tool and reported by `plasbench check` as "runtime installed, input X missing": the PLASMe database (`plasbench check --yes` installs it),
+a Gurobi licence for PlasBin-flow (free for academics; PlasBench cannot obtain it), a container engine for the Mobilome Annotation Pipeline (installing one needs administrator rights),
+and the databases PlasmidEC downloads itself the first time it runs (about 20 minutes). `docs/TOOL_INSTALL_AUDIT.md` lists, per tool, how it is installed, the pinned revision, the source,
+the size, the time estimate and the verification command.
+
+### Tools that cannot be installed automatically (exit code 20)
+
+Two profiles stay manual, each with a verified reason (checked against the upstream on 2026-11-19) and a step-by-step recipe that `plasbench install-tools NAME` prints:
+
+- **plsmd**: upstream ships only a Dockerfile that downloads `Miniconda3-latest` and unpinned packages (two builds of one commit differ), its only tag predates the Dockerfile, it has no licence file, and Docker needs administrator rights.
+- **ppr-meta**: its executable needs the MATLAB Runtime R2018a, which MathWorks gives out only after a click-through licence, plus Python 2.7, TensorFlow 1.4.1 and Keras 2.0.8 (all end of life).
+
+`plasbench install-tools NAME` for these prints the reason, the evidence URLs and the steps, and exits **20**. That is information, not a failure: no `ERROR`, not red, in the window's console,
+the terminal page, the job state (*Manual step needed*) and the scripts.
+
+`plasbench install-tools` exit codes: **0** installed, already installed, or nothing to install (`baseline` is built in); **20** a manual installation step is needed (nothing failed);
+**21** consent is needed (nothing was changed: read the plan, then add `--yes`); **2** an unknown profile name or a wrong option (a name close to a real one lists the nearest names); **1** the
+installation failed (the messages say which step, and nothing is left half installed); **137** killed for memory (the output says how to give WSL more). `plasbench install-tools NAME --dry-run`
+reports what a name is without starting conda or using the network.
 
 ### Platon database (required if `RUN_PLATON=1`)
 ```bash
@@ -160,9 +196,9 @@ plasbench install-tools plan | grep gplas2
 graph. `gplas2_external` requires one validated `<sample>.tsv` classifier table
 per graph. Both need an **assembly graph**; set `ASSEMBLER=unicycler` for the
 cleanest graphs. `bash scripts/00_setup.sh` (or `plasbench check`) detects a
-missing `gplas` binary whenever either mode is enabled and records a clear
-source-runtime instruction rather than silently installing the incompatible
-legacy executable.
+missing `gplas` (or one without the `-P` option, which is the old gplas 0.6.1) whenever
+either mode is enabled and offers `plasbench install-tools gplas2 --yes`, which installs the
+pinned gplas2 1.1.0 commit in its own environment instead of the incompatible legacy package.
 
 ---
 
@@ -212,42 +248,26 @@ own hard call -- see `adapters/SCORES.md` for the mechanism and
 `docs/USER_GUIDE.md`'s Commands section for the leaderboard's `mean_pr_auc`
 column.
 
-PLASMe (alignment+transformer classifier) is the same idea, but it is
-distributed as a git checkout with its own conda environment rather than a
-conda/bioconda package, so `plasbench install-tools plasme` cannot install it
-automatically -- it prints these manual steps instead:
+PLASMe (alignment+transformer classifier) is distributed as a git checkout with its own conda
+environment file rather than a bioconda package. PlasBench installs it from the pinned v1.1
+commit (`ef0409bad9c8c9ee5d66d90812bf56b345d8dd1d`) into its own environment, with your consent:
 
 ```bash
-git clone https://github.com/HubertTang/PLASMe.git
-cd PLASMe && conda env create -f plasme.yaml
-# make PLASMe.py executable and put it on PATH (e.g. symlink it into the
-# plasme conda env's bin/ directory) -- the same manual step this project
-# already documents for gplas2 below
-bash env/download_plasme_db.sh   # ~12.4 GB, via PLASMe's own PLASMe_db.py
+plasbench install-tools plasme --yes
+bash env/download_plasme_db.sh   # ~12.4 GB, via PLASMe's own PLASMe_db.py (plasbench check --yes does this too)
 # then enable RUN_PLASME=1 in config/config.sh, or --plasme on
-# optionally also set PLASME_VERSION=<git tag/commit> and
-# PLASME_CHECKOUT_DIR=/path/to/your/PLASMe/clone -- both purely
-# informational, recorded in run_manifest.json for readability/provenance
 ```
 
-plASgraph2 (a GNN classifier over the assembly graph) is the same idea again,
-but needs the same `assembly_graph.gfa` gplas2 uses (set `ASSEMBLER=unicycler`
-for the cleanest graphs), rather than an assembly FASTA:
+plASgraph2 (a GNN classifier over the assembly graph) is installed the same way, from the pinned
+v1.0.0 commit (`7bc4e92df8570ac2848599e57d5e59730ed5713f`) into a Python 3.8 environment with the
+exact versions in its `requirements.txt`. It needs the same `assembly_graph.gfa` gplas2 uses (set
+`ASSEMBLER=unicycler` for the cleanest graphs), rather than an assembly FASTA:
 
 ```bash
-git clone https://github.com/cchauve/plASgraph2.git
-cd plASgraph2
-conda create -n plasgraph2 python=3.8
-conda activate plasgraph2 && pip install -r requirements.txt
-# make src/plASgraph2_classify.py executable and put it on PATH as
-# `plASgraph2_classify.py` (e.g. symlink it into the plasgraph2 conda env's
-# bin/ directory) -- the same manual step this project already documents
-# for gplas2/PLASMe above. The pretrained model ships inside the checkout
-# at model/ESKAPEE_model/ -- no separate database download is needed.
-# then enable RUN_PLASGRAPH2=1 and PLASGRAPH2_MODEL_DIR=/path/to/plASgraph2/model/ESKAPEE_model
-# in config/config.sh, or: plasbench run --plasgraph2 on --plasgraph2-model-dir ...
-# optionally also set PLASGRAPH2_VERSION=<git tag/commit> -- purely
-# informational, recorded in run_manifest.json for readability
+plasbench install-tools plasgraph2 --yes
+# The pretrained model ships inside the checkout; when PLASGRAPH2_MODEL_DIR is not set, PlasBench
+# uses <env>-plasgraph2/plasbench-src/model/ESKAPEE_model.
+# then enable RUN_PLASGRAPH2=1 in config/config.sh, or: plasbench run --plasgraph2 on
 ```
 
 RFPlasmid (random forest over marker genes, plasmid genes, and kmers) IS a

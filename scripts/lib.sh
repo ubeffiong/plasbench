@@ -957,6 +957,7 @@ explain_exit() {
         2) echo "a command was given a wrong option or a missing file" ;;
         4) echo "every tool run of stage 4 failed (nothing was produced to score)" ;;
         20) echo "a manual installation step is needed (nothing failed; the notice above lists the steps)" ;;
+        21) echo "your consent is needed to install (nothing was changed; run the same command with --yes)" ;;
         124) echo "a time limit was reached" ;;
         126) echo "a program could not be run (permissions)" ;;
         127) echo "a program was not found (not installed, or not on PATH)" ;;
@@ -982,6 +983,7 @@ _plasbench_record_error() {
 _plasbench_on_err() {
     local code=$? cmd="$BASH_COMMAND" src="${BASH_SOURCE[1]:-$0}" lineno="${BASH_LINENO[0]:-?}"
     [[ $- == *e* ]] || return 0                 # only when set -e is about to stop the script
+    [[ "$code" -eq 20 || "$code" -eq 21 ]] && return 0   # 20 = a manual step, 21 = consent needed: information, not an error (plasbench/exitcodes.py)
     [[ "${_PLASBENCH_ERR_REPORTED:-0}" == "1" ]] && return 0
     _PLASBENCH_ERR_REPORTED=1
     _plasbench_record_error "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $(basename "$0") stopped: \`${cmd}\` failed, $(explain_exit "$code") (exit $code, ${src##*/} line $lineno)"

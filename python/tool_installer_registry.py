@@ -66,14 +66,15 @@ def validate(rows: list[dict[str, str]], capabilities: set[str]) -> list[str]:
 
 # Exit codes of `plasbench install-tools` (documented in INSTALL.md and FAQ.md). Anything not listed keeps its usual meaning (1 = the install
 # failed, 2 = a wrong option or an unknown name, 137 = killed for memory).
-EXIT_MANUAL = 20      # nothing failed: this profile is installed by hand; the notice says how
+EXIT_MANUAL = 20      # nothing failed: this profile cannot be installed automatically (researched, with evidence); the notice says how
+EXIT_CONSENT = 21     # nothing was changed: a first install of a source-built tool needs --yes (or an answer of y) after the plan is shown
 EXIT_NOTHING_TO_DO = 10   # internal to `resolve`: a built-in profile; env/install_tools.sh turns it into exit 0
 
 # Profiles env/install_tools.sh installs through its own case branch although no registry row names them.
 SCRIPT_PROFILES = ("core", "assembly", "mobsuite", "locked", "metagenomics", "simulate", "quast", "long-read", "utilities",
                    "reference-annotation", "annotation", "annotation-prokka", "gplas", "all")
 ACTIONS = ("list", "plan", "validate")
-INSTALL_POINTER = "INSTALL.md, section 3, 'Manual-install profiles (exit code 20)'"
+INSTALL_POINTER = "INSTALL.md, section 3, 'Tools that cannot be installed automatically (exit code 20)'"
 
 
 def profile_kinds(rows: list[dict[str, str]]) -> dict[str, str]:
@@ -109,6 +110,13 @@ def resolve(name: str, rows: list[dict[str, str]]) -> tuple[int, str]:
         return EXIT_NOTHING_TO_DO, (f"[PlasBench] {name}: nothing to install. These tools are built into PlasBench "
                                     "(they need no program or database of their own; see `plasbench install-tools plan` for what each one needs).")
     if kind == "manual":
+        try:     # a profile whose manual status was researched: the verified reason, the evidence and a working recipe (config/source_tools.json)
+            import source_install
+            entry = source_install.load()["profiles"].get(name)
+            if entry and entry["mode"] == "manual":
+                return EXIT_MANUAL, source_install.manual_text(name, entry)
+        except (ImportError, OSError, ValueError, KeyError):
+            pass
         notes = sorted({r["notes"] for r in rows if r["profile"] == name and r["notes"]})
         tool_names = ", ".join(sorted(r["tool"] for r in rows if r["profile"] == name))
         lines = [f"[PlasBench] {name} needs a manual install. Nothing failed; PlasBench does not install this one for you (exit code {EXIT_MANUAL}).",

@@ -40,6 +40,21 @@ else
     CORE_OK=0
 fi
 
+# " (profile revision, release)" for a tool that PlasBench installed from a pinned source checkout (python/source_install.py), else nothing.
+source_tool_note() {
+    local info
+    info="$(python3 "$HERE/../python/source_install.py" command-info "$1" 2>/dev/null)" || return 0
+    python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(" (%s, revision %s, release %s)" % (d["profile"], d["commit"][:12], d.get("ref","")))' "$info" 2>/dev/null || true
+}
+
+# A tool installed from source: also report what it still needs that PlasBench cannot install ("runtime installed, input X missing").
+source_tool_inputs() {
+    local profile="$1" line
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && warn "         runtime installed; input missing: $line"
+    done < <(python3 "$HERE/../python/source_install.py" missing-inputs "$profile" 2>/dev/null || true)
+}
+
 # check_tool BINARY PROFILE_OR_EMPTY [REQUIRED=1]
 # Always returns 0: every call site below is a bare top-level statement (not
 # guarded by if/&&/||), and this function's job is purely to log and record
@@ -48,7 +63,7 @@ fi
 check_tool() {
     local binary="$1" profile="$2" required="${3:-1}"
     if have "$binary"; then
-        log "  [ok]   $binary"
+        log "  [ok]   $binary$(source_tool_note "$binary")"
         return 0
     fi
     if [[ "$required" -eq 1 ]]; then
@@ -135,12 +150,19 @@ if [[ "${RUN_PLATON:-0}" -eq 1 ]]; then
     if have platon; then smoke_test platon && log "  [ok]   platon"
     else warn "  [MISS] platon (RUN_PLATON=1)"; NEEDED_PROFILES["reconstruction"]=1; fi
 fi
-if [[ "${RUN_GPLAS2_MOB:-0}" -eq 1 ]]; then
-    have gplas && log "  [ok]   gplas (gplas2_mob)" || { warn "  [MISS] gplas (RUN_GPLAS2_MOB=1)"; NEEDED_PROFILES["gplas"]=1; }
-fi
-if [[ "${RUN_GPLAS2_EXTERNAL:-0}" -eq 1 ]]; then
-    have gplas && log "  [ok]   gplas (gplas2_external)" || { warn "  [MISS] gplas (RUN_GPLAS2_EXTERNAL=1)"; NEEDED_PROFILES["gplas"]=1; }
-fi
+# gplas2 (not bioconda's gplas 0.6.1): the run passes -P/--prediction, which only gplas2 has, so an older gplas on PATH counts as missing.
+check_gplas2() {
+    local why="$1"
+    if have gplas && gplas --help 2>&1 | grep -q -- '--prediction'; then
+        log "  [ok]   gplas ($why)$(source_tool_note gplas)"
+    elif have gplas; then
+        warn "  [MISS] gplas2 ($why): the gplas on PATH has no -P/--prediction option (it is the older gplas 0.6.1)"; NEEDED_PROFILES["gplas2"]=1
+    else
+        warn "  [MISS] gplas ($why)"; NEEDED_PROFILES["gplas2"]=1
+    fi
+}
+if [[ "${RUN_GPLAS2_MOB:-0}" -eq 1 ]]; then check_gplas2 "gplas2_mob, RUN_GPLAS2_MOB=1"; fi
+if [[ "${RUN_GPLAS2_EXTERNAL:-0}" -eq 1 ]]; then check_gplas2 "gplas2_external, RUN_GPLAS2_EXTERNAL=1"; fi
 if [[ "${RUN_FLYE_MOB_RECON:-0}" -eq 1 ]]; then
     check_tool flye long-read
 fi
@@ -183,7 +205,20 @@ fi
 if [[ "${RUN_PLASMIDEC:-0}" -eq 1 ]]; then
     # PlasmidEC installs its own conda environments and databases on first use, so only the launcher is checked here.
     plasmidec_bin="${PLASMIDEC_CMD%% *}"
-    check_tool "$plasmidec_bin" ""
+    check_tool "$plasmidec_bin" plasmidec
+fi
+if [[ "${RUN_PLSMD:-0}" -eq 1 ]]; then
+    # plsMD cannot be installed automatically (verified reason and recipe: plasbench install-tools plsmd).
+    plsmd_bin="${PLSMD_CMD%% *}"
+    if have "$plsmd_bin"; then log "  [ok]   $plsmd_bin (plsmd)"; else
+        warn "  [MISS] $plsmd_bin (RUN_PLSMD=1)"
+        UNFIXABLE+=("plsMD: a manual step (Docker image, not installable by PlasBench): run 'plasbench install-tools plsmd' for the verified reason and the steps")
+        CORE_OK=0
+    fi
+fi
+if [[ "${RUN_PLASBIN_FLOW:-0}" -eq 1 ]]; then
+    check_tool plasbin_flow.py plasbin_flow 0
+    source_tool_inputs plasbin_flow
 fi
 if [[ "${RUN_PLASMER:-0}" -eq 1 ]]; then
     check_tool Plasmer plasmer
@@ -225,7 +260,7 @@ if [[ "${RUN_PLASGRAPH2:-0}" -eq 1 ]]; then
     # not a NEED_*_DB/downloader pair like the other tools above.
     if [[ -z "${PLASGRAPH2_MODEL_DIR:-}" ]]; then
         warn "  [MISS] PLASGRAPH2_MODEL_DIR is not set"
-        UNFIXABLE+=("PLASGRAPH2_MODEL_DIR: point it at plASgraph2's model/ESKAPEE_model/ (or your own trained model) after cloning; see INSTALL.md")
+        UNFIXABLE+=("PLASGRAPH2_MODEL_DIR: point it at plASgraph2's model/ESKAPEE_model/ (or your own trained model); 'plasbench install-tools plasgraph2 --yes' installs the checkout that contains it")
         CORE_OK=0
     elif [[ ! -d "$PLASGRAPH2_MODEL_DIR" ]]; then
         warn "  [MISS] PLASGRAPH2_MODEL_DIR does not exist: $PLASGRAPH2_MODEL_DIR"
@@ -378,7 +413,15 @@ fi
 
 echo "The following can be installed automatically:"
 [[ "$NEED_CONDA" -eq 1 ]] && echo "  - a conda-family package manager (Miniforge)"
-for profile in "${!NEEDED_PROFILES[@]}"; do echo "  - install-tools profile: $profile"; done
+SOURCE_PROFILES=()
+for profile in "${!NEEDED_PROFILES[@]}"; do
+    echo "  - install-tools profile: $profile"
+    if [[ "$(python3 "$HERE/../python/source_install.py" kind "$profile" 2>/dev/null || true)" == "source" ]]; then
+        SOURCE_PROFILES+=("$profile")
+        # A source-built tool shows what will be cloned (repository, pinned revision, size, licence) before you agree.
+        python3 "$HERE/../python/source_install.py" plan "$profile" | sed 's/^/      /'
+    fi
+done
 [[ "$NEED_PLATON_DB" -eq 1 ]] && echo "  - the Platon database (~1.7 GB from Zenodo; resumes if interrupted)"
 [[ "$NEED_MOBSUITE_DB" -eq 1 ]] && echo "  - the MOB-suite database"
 [[ "$NEED_BAKTA_DB" -eq 1 ]] && echo "  - the Bakta database"
@@ -389,30 +432,53 @@ for profile in "${!NEEDED_PROFILES[@]}"; do echo "  - install-tools profile: $pr
 for note in "${UNFIXABLE[@]:-}"; do [[ -n "$note" ]] && echo "  (not automatic) $note"; done
 echo
 
+# The exact commands, for a run that cannot ask (no terminal) and for the notices below.
+INSTALL_COMMANDS=()
+for profile in "${!NEEDED_PROFILES[@]}"; do INSTALL_COMMANDS+=("plasbench install-tools $profile --yes"); done
+[[ "$NEED_PLATON_DB$NEED_MOBSUITE_DB$NEED_BAKTA_DB$NEED_PLASSEMBLER_DB$NEED_GENOMAD_DB$NEED_PLASME_DB$NEED_PLASCOPE_DB" == *1* ]] && INSTALL_COMMANDS+=("plasbench check --yes")
+MISSING_NAMES="${!NEEDED_PROFILES[*]}"
+
 # Installing needs the internet; checking does not. Say so (naming what is unreachable) before asking, only when something must be fetched.
 NET_NEEDS=()
 [[ "$NEED_CONDA" -eq 1 ]] && NET_NEEDS+=(github)
-[[ ${#NEEDED_PROFILES[@]} -gt 0 ]] && NET_NEEDS+=(conda pypi github)
+if [[ ${#NEEDED_PROFILES[@]} -gt 0 ]]; then
+    NET_NEEDS+=(conda pypi github)
+    for profile in "${SOURCE_PROFILES[@]:-}"; do
+        [[ -n "$profile" ]] || continue
+        # shellcheck disable=SC2207
+        NET_NEEDS+=($(python3 "$HERE/../python/source_install.py" services "$profile" 2>/dev/null || true))
+    done
+fi
 [[ "$NEED_PLATON_DB" -eq 1 || "$NEED_MOBSUITE_DB" -eq 1 || "$NEED_BAKTA_DB" -eq 1 || "$NEED_PLASSEMBLER_DB" -eq 1 || "$NEED_GENOMAD_DB" -eq 1 || "$NEED_PLASME_DB" -eq 1 ]] && NET_NEEDS+=(zenodo)
+
+# Consent. --yes, or INSTALL_MISSING_TOOLS=1 (plasbench run --install-missing-tools; the window sets it after its own confirmation dialog), installs without asking.
+# At a terminal the user is asked. A run with no terminal and no consent stops HERE, before any isolate work, naming every missing tool and the exact command.
+PROCEED=0
+if [[ "$ASSUME_YES" -eq 1 || "${INSTALL_MISSING_TOOLS:-0}" == "1" ]]; then
+    PROCEED=1
+elif [[ -t 0 ]]; then
+    REPLY=""
+    printf '%s' "Install the missing item(s) above now? [y/N] " >&2; read -r REPLY || true
+    case "$REPLY" in y|Y|yes|YES|Yes) PROCEED=1 ;; esac
+else
+    warn "Skipped: this run is not interactive and installing missing tools was not requested, so nothing was installed."
+    warn "Missing: ${MISSING_NAMES:-databases only}. Enabled tools need them, so the run stops here, before any sample work."
+    for command_line in "${INSTALL_COMMANDS[@]}"; do warn "  install them with:  $command_line"; done
+    warn "  or run again with INSTALL_MISSING_TOOLS=1 (plasbench run --install-missing-tools) to install them first, or switch the tool off in Settings."
+    exit 1
+fi
+
+if [[ "$PROCEED" -ne 1 ]]; then
+    log "Skipped. Install the missing item(s) with: ${INSTALL_COMMANDS[*]:-plasbench check --yes}"
+    exit 1
+fi
 if [[ ${#NET_NEEDS[@]} -gt 0 ]]; then
     require_internet --action "Installing the missing tools and databases" --hint "The check above worked offline. Connect and run 'plasbench check --yes' again, or install them on a computer with internet (see INSTALL.md)." "${NET_NEEDS[@]}"
 fi
 
-PROCEED=0
-if [[ "$ASSUME_YES" -eq 1 ]]; then
-    PROCEED=1
-else
-    REPLY=""
-    printf '%s' "Install the missing item(s) above now? [y/N] " >&2; read -r REPLY || true
-    case "$REPLY" in y|Y|yes|YES|Yes) PROCEED=1 ;; esac
-fi
-
-if [[ "$PROCEED" -ne 1 ]]; then
-    log "Skipped. Re-run with --yes to skip this prompt, or install manually (see INSTALL.md)."
-    exit 1
-fi
-
 YES_FLAG=(); [[ "$ASSUME_YES" -eq 1 ]] && YES_FLAG=(--yes)
+DB_YES_FLAG=("${YES_FLAG[@]}")
+[[ "${INSTALL_MISSING_TOOLS:-0}" == "1" ]] && DB_YES_FLAG=(--yes)
 
 if [[ "$NEED_CONDA" -eq 1 ]]; then
     bash "$HERE/../env/bootstrap_conda.sh" "${YES_FLAG[@]}" || die "conda bootstrap failed; cannot continue without it"
@@ -420,44 +486,59 @@ fi
 for profile in "${!NEEDED_PROFILES[@]}"; do
     log "Installing 'install-tools $profile' ..."
     profile_status=0
-    bash "$HERE/../env/install_tools.sh" "$profile" || profile_status=$?
-    if [[ "$profile_status" -eq 20 ]]; then warn "install-tools $profile needs a manual install (nothing failed); the steps are above"
+    # The consent was given above (the plan of a source-built tool was shown), so the installer is told --yes.
+    bash "$HERE/../env/install_tools.sh" --yes "$profile" || profile_status=$?
+    if [[ "$profile_status" -eq 20 ]]; then log "install-tools $profile needs a manual step (nothing failed, this is a verified limit); the steps are above"
     elif [[ "$profile_status" -ne 0 ]]; then warn "install-tools $profile failed; see output above"; fi
 done
 if [[ "$NEED_PLATON_DB" -eq 1 ]]; then
     bash "$HERE/../env/download_platon_db.sh" || warn "Platon database step did not complete; see output above"
 fi
 if [[ "$NEED_MOBSUITE_DB" -eq 1 ]]; then
-    bash "$HERE/../env/download_mobsuite_db.sh" "${YES_FLAG[@]}" || warn "MOB-suite database step did not complete; see output above"
+    bash "$HERE/../env/download_mobsuite_db.sh" "${DB_YES_FLAG[@]}" || warn "MOB-suite database step did not complete; see output above"
 fi
 if [[ "$NEED_BAKTA_DB" -eq 1 ]]; then
-    bash "$HERE/../env/download_bakta_db.sh" "${YES_FLAG[@]}" || warn "Bakta database step did not complete; see output above"
+    bash "$HERE/../env/download_bakta_db.sh" "${DB_YES_FLAG[@]}" || warn "Bakta database step did not complete; see output above"
 fi
 if [[ "$NEED_PLASSEMBLER_DB" -eq 1 ]]; then
-    bash "$HERE/../env/download_plassembler_db.sh" "${YES_FLAG[@]}" || warn "Plassembler database step did not complete; see output above"
+    bash "$HERE/../env/download_plassembler_db.sh" "${DB_YES_FLAG[@]}" || warn "Plassembler database step did not complete; see output above"
 fi
 if [[ "$NEED_GENOMAD_DB" -eq 1 ]]; then
-    bash "$HERE/../env/download_genomad_db.sh" "${YES_FLAG[@]}" || warn "geNomad database step did not complete; see output above"
+    bash "$HERE/../env/download_genomad_db.sh" "${DB_YES_FLAG[@]}" || warn "geNomad database step did not complete; see output above"
 fi
 if [[ "$NEED_PLASME_DB" -eq 1 ]]; then
-    bash "$HERE/../env/download_plasme_db.sh" "${YES_FLAG[@]}" || warn "PLASMe database step did not complete; see output above"
+    bash "$HERE/../env/download_plasme_db.sh" "${DB_YES_FLAG[@]}" || warn "PLASMe database step did not complete; see output above"
 fi
 if [[ "$NEED_PLASCOPE_DB" -eq 1 ]]; then
     bash "$HERE/../env/download_plascope_db.sh" || warn "PlaScope database step did not complete; see output above"
 fi
 
-echo
-if [[ "$NEED_CONDA" -eq 1 || ${#NEEDED_PROFILES[@]} -gt 0 ]]; then
-    log "A tool was just installed into a conda environment that this shell has not"
-    log "(re-)activated -- it will not be on PATH yet in THIS session even though the"
-    log "install succeeded. Run 'conda activate plasbench' (open a new shell after a"
-    log "conda bootstrap), then re-run 'plasbench check' to confirm."
-else
-    log "Re-run 'plasbench check' (bash scripts/00_setup.sh) to confirm everything now passes."
+# A tool installed just now lives in a conda environment this process did not start in. Put that environment first on PATH and check again, so a run that
+# installed what it needed carries on instead of stopping and asking you to open a new shell. A second pass that finds the same gaps stops (no progress).
+refresh_tool_path() {
+    local env_name="${PLASBENCH_ENV:-plasbench}" base cand
+    local cands=()
+    [[ -n "${CONDA_PREFIX:-}" ]] && cands+=("$CONDA_PREFIX")
+    base="$(conda info --base 2>/dev/null || true)"
+    [[ -n "$base" ]] && cands+=("$base/envs/$env_name")
+    cands+=("${MAMBA_ROOT_PREFIX:-$HOME/micromamba}/envs/$env_name" "$HOME/miniforge3/envs/$env_name" "$HOME/mambaforge/envs/$env_name" "$HOME/miniconda3/envs/$env_name" "$HOME/anaconda3/envs/$env_name")
+    for cand in "${cands[@]}"; do
+        if [[ -d "$cand/bin" ]]; then
+            case ":$PATH:" in *":$cand/bin:"*) ;; *) PATH="$cand/bin:$PATH" ;; esac
+        fi
+    done
+    export PATH
+    hash -r
+}
+SETUP_ROUND="${PLASBENCH_SETUP_ROUND:-1}"
+SETUP_SIGNATURE="${MISSING_NAMES}|${NEED_PLATON_DB}${NEED_MOBSUITE_DB}${NEED_BAKTA_DB}${NEED_PLASSEMBLER_DB}${NEED_GENOMAD_DB}${NEED_PLASME_DB}${NEED_PLASCOPE_DB}"
+if [[ "$SETUP_ROUND" -lt 3 && "${PLASBENCH_SETUP_PREVIOUS:-}" != "$SETUP_SIGNATURE" ]]; then
+    refresh_tool_path
+    log "Checking again now that the installation has run ..."
+    PLASBENCH_SETUP_ROUND=$(( SETUP_ROUND + 1 )) PLASBENCH_SETUP_PREVIOUS="$SETUP_SIGNATURE" exec bash "$HERE/00_setup.sh" "${YES_FLAG[@]}"
 fi
-# Not a success exit: the fixes above are best-effort (each failure was only
-# warned about, not fatal, so one bad step does not abort the others), and
-# even a fully successful tool install is not yet visible on THIS process's
-# PATH. Callers (run_all.sh's stage-0 gate included) must not treat this run
-# as a passing dependency check.
+
+echo
+warn "Still missing after the installation: ${MISSING_NAMES:-a database}. The messages above say why (an install that failed, or a step only you can do)."
+log "Re-run 'plasbench check' once that is fixed."
 exit 1

@@ -422,7 +422,7 @@ dialog.npdlg{width:min(460px,94vw)}
 @media (max-width:640px){#chead{overflow-x:auto;scrollbar-width:thin}#chead .grow{flex:0 0 4px}}
 #cstate{font-size:11.5px;padding:0 6px;line-height:18px;border-radius:2px;border:1px solid var(--term-line);color:#aab3bd}
 #cstate:empty{display:none}
-#cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled,#cstate.stalled,#cstate.retrying,#cstate.completed_with_warnings,#cstate.manual_step{color:#e3c27a;border-color:#6b5520}
+#cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled,#cstate.stalled,#cstate.retrying,#cstate.completed_with_warnings,#cstate.manual_step,#cstate.consent_needed{color:#e3c27a;border-color:#6b5520}
 #clog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
 /* console colour code, all three tabs: errors red, warnings yellow */
 .c-err,#clog .c-err,#tlog .t-err,#slog .s-bad{color:#ff6b6b;font-weight:600}
@@ -512,7 +512,7 @@ body.gd-open #gdrawer{transform:none}
 .tree li.study>.tn{font-weight:600;padding-top:5px;padding-bottom:5px;border-top:1px solid var(--line-2)}
 .tree li:not(.open)>ul{display:none}
 .sdot{width:8px;height:8px;border-radius:50%;flex:none;margin-top:5px;background:var(--faint)}
-.sdot.running,.sdot.cancelling{background:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}.sdot.done{background:var(--ok)}.sdot.failed,.sdot.interrupted{background:var(--bad)}.sdot.cancelled,.sdot.stalled,.sdot.retrying,.sdot.completed_with_warnings,.sdot.manual_step{background:var(--warn)}
+.sdot.running,.sdot.cancelling{background:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}.sdot.done{background:var(--ok)}.sdot.failed,.sdot.interrupted{background:var(--bad)}.sdot.cancelled,.sdot.stalled,.sdot.retrying,.sdot.completed_with_warnings,.sdot.manual_step,.sdot.consent_needed{background:var(--warn)}
 /* git history colour code: you are here / pushed / not yet pushed / merge */
 .hdot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block;background:var(--faint)}
 .hdot.head{background:var(--primary);box-shadow:0 0 0 2px var(--primary-soft)}.hdot.pushed{background:var(--ok)}.hdot.local{background:var(--warn)}
@@ -819,7 +819,8 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
   <section class="view" id="v_tools" hidden>
    <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Tools</h1>
     <p>Every tool PlasBench can benchmark, built-in and your own. The switch, and the <b>on</b> / <b>off</b> beside it, set whether a tool runs by default: <b>on</b> means it runs unless you turn it off for a run, <b>off</b> means it is skipped unless you turn it on (saved for this computer). The New benchmark page can still change it for one run.</p></div>
-    <div class="row"><button class="btn sec" id="toolsref"><svg class="ico sm"><use href="#i-refresh"/></svg>Refresh</button><button class="btn" data-go="addtool"><svg class="ico sm"><use href="#i-plus"/></svg>Add your own tool</button></div></div>
+    <div class="row"><button class="btn" id="installall" title="Installs exactly the tools that are switched on in Settings and not installed yet, after one confirmation">Install all enabled tools</button><button class="btn sec" id="toolsref"><svg class="ico sm"><use href="#i-refresh"/></svg>Refresh</button><button class="btn" data-go="addtool"><svg class="ico sm"><use href="#i-plus"/></svg>Add your own tool</button></div></div>
+   <div class="note info small" id="instbar" role="status" aria-live="polite" hidden style="margin-bottom:12px"></div>
    <div class="stats" id="toolkpis" style="margin-bottom:12px"></div>
    <div class="note info small" id="taskhelp" style="margin-bottom:12px"><svg class="ico"><use href="#i-info"/></svg><div><b>Three kinds of task, each ranked on its own.</b>
     <b>Classification</b>: the tool labels every contig plasmid or chromosome (ranked by base-level F1).
@@ -1589,6 +1590,11 @@ function confirmRun(argv, label, env) {
 $("#cf_ok").onclick = async () => { $("#confirm").close(); if (pendingRun) await startJob(pendingRun.argv, pendingRun.label, pendingRun.env); };
 async function startJob(argv, label, env) {
   const bench = isBenchArgv(argv);
+  if (bench && argv[0] === "run" && typeof instPreRun === "function" && !(env && env.INSTALL_MISSING_TOOLS)) {     // enabled tools that are missing: offer to install them first
+    const answer = await instPreRun();
+    if (answer === "cancel") return null;
+    if (answer === "install") env = Object.assign({}, env, {INSTALL_MISSING_TOOLS: "1"});
+  }
   if (bench) { S.pendingBench = {label: label || cmdText(argv), t0: Date.now()}; renderRunToast(); }   // the toast appears the moment the button is clicked
   try {
     const job = await api("jobs", {argv, label, env});
@@ -1742,6 +1748,7 @@ setInterval(renderRunToast, 1000);
 async function refreshJobs() {
   if (S.conn) return;
   try { S.jobs = (await api("jobs")).jobs; } catch { return; }
+  renderInstallBar();
   renderRunToast();
   if (!$("#v_runs").hidden || S.jobs.some(j => j.state === "running" || j.state === "cancelling") || !S.sessionsLoaded) { S.sessionsLoaded = true; refreshSessions(); }
   const running = S.jobs.filter(j => j.state === "running" || j.state === "cancelling");
@@ -1847,7 +1854,7 @@ document.addEventListener("click", e => {
   if (b.dataset.stAct === "activity") checkActivity(S.consJob);
   else $("#ccancel").click();
 });
-const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted", stalled:"No new output (may still be working)", working_quiet:"Working (quiet log)", retrying:"Retrying a failed tool", completed_with_warnings:"Completed with warnings", manual_step:"Manual step needed"})[s] || s;
+const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted", stalled:"No new output (may still be working)", working_quiet:"Working (quiet log)", retrying:"Retrying a failed tool", completed_with_warnings:"Completed with warnings", manual_step:"Manual step needed", consent_needed:"Consent needed"})[s] || s;
 function showConsole(id, expand) {
   if (id && id !== S.consJob) { S.consJob = id; S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; }
   $("#cjob").value = S.consJob || "";
@@ -1901,6 +1908,7 @@ async function pollConsole(force) {
     if (shown === "completed_with_warnings") st.title = WARN_EXPLAIN;
     if (wasRunning && j.state !== "running") {
       if (shown === "completed_with_warnings") toast(`${j.label}: finished, but some tool runs failed. ${WARN_EXPLAIN}`, "bad");
+      else if (shown === "consent_needed") toast(`${j.label}: consent needed. Nothing was changed; confirm the install to go ahead.`, "");
       else if (shown === "manual_step") toast(`${j.label}: manual step needed. Nothing failed; the console lists the steps.`, "");
       else toast(`${j.label}: ${stateWord(shown).toLowerCase()}`, j.state === "done" ? "ok" : "bad");
       refreshJobs(); afterJob(j);
@@ -1966,7 +1974,7 @@ $("#tab_term").onclick = () => setCTab("term");
 /* ---- session log ---- */
 const SL = {shown: "", count: -1};
 const sessClass = e => e.kind === "job_end" ? ({done: "s-ok", failed: "s-bad"}[e.state] || "s-warn")
-  : e.kind === "terminal" ? (e.exit ? "s-bad" : "s-term")
+  : e.kind === "terminal" ? (e.exit && e.exit !== 20 && e.exit !== 21 ? "s-bad" : "s-term")
   : ({job_start: "s-job", job_input: "s-you", job_cancel: "s-warn"})[e.kind] || "s-sys";
 const sessName = s => s.id.replace(/^(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)\d\d$/, "$1-$2-$3 $4:$5");
 async function pollSession(force) {
@@ -2023,7 +2031,8 @@ async function termRun() {
     const r = await api("terminal/run", {command: cmd});
     const out = (r.output || "").replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").replace(/\s+$/, "");
     if (out) tPrint(colorize(out) + "\n");
-    if (r.exit !== 0) tPrint(`<span class="t-err">[exit ${r.exit}]</span>\n`);
+    if (r.exit === 20 || r.exit === 21) tPrint(`<span class="mut">[exit ${r.exit}: ${r.exit === 20 ? "a manual step is needed; nothing failed" : "consent is needed; nothing was changed"}]</span>\n`);   // information, not an error
+    else if (r.exit !== 0) tPrint(`<span class="t-err">[exit ${r.exit}]</span>\n`);
     $("#tpr").textContent = r.prompt || $("#tpr").textContent;
     if (/^(cd|chdir|set-location)\b/i.test(cmd)) termState();
   } catch (e) { tPrint(`<span class="t-err">${esc(e.message)}</span>\n`); }
@@ -2287,12 +2296,12 @@ function toolRowHtml(t) {
     <td><b>${esc(t.display)}</b> ${t.source === "user" ? `<span class="tag user">your tool</span>` : t.source === "demo" ? `<span class="tag">demo</span>` : ""}<div class="mut small">${esc(t.tool)} · ${esc(t.method_class || "")}</div>
       ${t.description ? `<div class="mut small" style="max-width:420px">${esc(t.description.slice(0, 160))}</div>` : ""}</td>
     <td>${utToolTasks(t).map((x, i, all) => `<span class="tag ${x !== "classification" ? "rec" : "cls"}" ${all.length > 1 && i === 0 ? 'title="the primary task"' : ""}>${esc(taskLabel(x))}${all.length > 1 && i === 0 ? " · primary" : ""}</span>`).join(" ")}<div class="mut small" style="margin-top:3px">${esc((t.track || "").replace("_", " "))} · ${esc((t.input || "").replace(/_/g, " "))}</div>${t.source === "user" && t.install_source ? `<div class="mut small">${esc(utSourceLine(t))}</div>` : ""}</td>
-    <td>${t.checking ? `<span class="mut small">checking…</span>` : t.installed === true ? `<span class="tag ok">${icon("check")}installed</span>` : t.installed === false ? `<span class="tag bad">not found</span>` : `<span class="mut small">–</span>`}</td>
+    <td>${t.checking ? `<span class="mut small">checking…</span>` : t.installed === true ? `<span class="tag ok">${icon("check")}installed</span>${instRevision(t)}` : t.installed === false ? `<span class="tag bad">not found</span>` : `<span class="mut small">–</span>`}</td>
     <td class="small" style="max-width:260px">${esc(t.database || "–")}${t.database_release ? `<div class="mut">released ${esc(t.database_release)}</div>` : ""}</td>
     <td>${t.run_flag ? `<label class="switch" title="${esc(t.run_flag)}: ${t.enabled ? "on, so it runs unless you turn it off for a run" : "off, so it is skipped unless you turn it on for a run"}"><input type="checkbox" data-flag="${esc(t.run_flag)}" ${t.enabled ? "checked" : ""}><span></span></label> <b class="small ${t.enabled ? "ok-t" : "mut"}" data-flagtxt="${esc(t.run_flag)}">${t.enabled ? "on" : "off"}</b>` :
          t.source === "user" ? `<span class="mut small">--tool ${esc(t.tool)}</span>` : `<span class="mut small">–</span>`}</td>
     <td style="text-align:right;white-space:nowrap">${t.source === "user" ? `<button class="btn ghost sm" onclick="editUserTool(${jsq(t.tool)})">${icon("edit")}Edit</button>` : ""}
-      ${t.profile && t.installed === false ? `<button class="btn sec sm" data-run="${dattr(["install-tools", t.profile, "--yes"])}" data-label="Install ${esc(t.display)}">Install</button>` : ""}</td></tr>`);
+      ${instButtons(t)}</td></tr>`);
 }
 function renderToolTable() {
   const q = TF.q.toLowerCase().trim(), c = TF.chip;
@@ -2308,6 +2317,80 @@ $("#tooltb").onchange = async e => { const f = e.target.dataset.flag; if (!f) re
     toast(`${f}=${e.target.checked ? 1 : 0} saved for this computer: ${e.target.checked ? "runs by default" : "skipped by default"}`, "ok"); S.settings = null; }
   catch (err) { toast(err.message, "bad"); e.target.checked = !e.target.checked; } };
 $("#toolsref").onclick = () => loadTools(true);
+
+/* ==INSTALL-UI-BEGIN== Installing tools from the window: Install / Update buttons (Tools page and Workflow cards), "Install all enabled tools", one consent dialog, a progress strip.
+   Every install runs `plasbench install-tools PROFILE[,PROFILE...] --yes` as a job (live log, gated on the internet by plasbench/netgate.py); the dialog IS the consent that --yes
+   stands for. A tool whose automatic install is impossible (verified, with evidence in config/source_tools.json) shows "manual step", never Failed. After a job ends the tools are
+   marked stale (see the job-end handler), so the next probe re-checks. */
+const instKind = t => (t.install && t.install.kind) || (t.profile ? "conda" : "builtin");
+const instShort = v => String(v || "").slice(0, 12);
+const instDone = t => t.installed === true && !(t.install && t.install.current === false);
+const instCanInstall = t => t.profile && t.source !== "user" && t.source !== "demo" && instKind(t) !== "manual" && instKind(t) !== "builtin" && t.installed !== true;
+function instRevision(t) {
+  const i = t.install;
+  return i && i.kind === "source" && i.revision ? `<div class="mut small" title="${esc(i.pinned === i.revision ? "the pinned revision" : "pinned is " + i.pinned)}">${esc(i.installed_ref || "")} @ ${esc(instShort(i.revision))}${i.current === false ? ` <span class="tag warn">older than the pin</span>` : ""}</div>` : "";
+}
+function instButtons(t) {
+  const k = instKind(t);
+  if (k === "manual") return `<span class="tag warn" title="${esc((t.install && t.install.reason) || "")}">manual step</span> <button class="btn ghost sm" data-run="${dattr(["install-tools", t.profile])}" data-label="Steps to install ${esc(t.display)}">Show steps</button>`;
+  if (t.profile && t.installed === false && t.source !== "user") return `<button class="btn sec sm" data-instl="${esc(t.tool)}">Install</button>`;
+  if (t.profile && t.installed === true && t.install && t.install.current === false) return `<button class="btn sec sm" data-instl="${esc(t.tool)}">Update</button>`;
+  return "";
+}
+function instWorkflow(it) {
+  const t = (S.tools || []).find(x => x.tool === it.item_id);
+  if (!t || !t.profile) return "";
+  const k = instKind(t);
+  const state = k === "manual" ? `<span class="tag warn" title="${esc((t.install && t.install.reason) || "")}">manual step</span>`
+    : t.installed === true ? `<span class="tag ok">installed</span>${instRevision(t)}` : t.installed === false ? `<span class="tag bad">not installed</span>` : "";
+  return `<div class="inst small" style="margin-top:4px">${state} ${instButtons(t).replace(/<span class="tag warn"[^>]*>manual step<\/span> /, "")}</div>`;
+}
+const instMinutes = t => (t.install && t.install.minutes) || "about 5-15 minutes (not measured)";
+async function installTools(tools, label) {
+  const list = [], seen = new Set();
+  for (const t of tools) if (t.profile && !seen.has(t.profile)) { seen.add(t.profile); list.push(t); }
+  if (!list.length) return toast("Nothing to install: every enabled tool is installed, or needs a manual step.", "");
+  const row = t => { const i = t.install; return `<tr><td><b>${esc(t.display)}</b><div class="mut small">profile ${esc(t.profile)}</div></td><td class="small">${i && i.kind === "source" ? `${esc(i.repo.replace(/^https:\/\//, "").replace(/\.git$/, ""))}<div class="mono">${esc(instShort(i.pinned))} (${esc(i.ref)})</div>${esc(i.licence)}` : "conda package, from the pinned channel"}</td><td class="small">${i && i.kind === "source" ? `${esc(i.download_mb)} MB download, ${esc(i.disk_gb)} GB disk` : "size depends on the solve"}</td><td class="small">${esc(instMinutes(t))}</td></tr>`; };
+  const x = await modalDialog({title: label || `Install ${list.length} tool${list.length > 1 ? "s" : ""}?`, wide: true, buttons: [{id: "cancel", label: "Cancel"}, {id: "ok", label: "Install", primary: true}],
+    bodyHTML: `<p>This installs the tools below, each in its own isolated environment, from a pinned release or an exact commit (never a moving branch). It needs the internet, no administrator rights, and a failed install is removed completely.</p>
+      <table class="ghlist"><thead><tr><th>Tool</th><th>Source, revision, licence</th><th>Size</th><th>Time</th></tr></thead><tbody>${list.map(row).join("")}</tbody></table>
+      <p class="small mut" style="margin-top:10px">Times are estimates from the upstream files, not measurements. ${list.some(t => (t.install && t.install.inputs || []).length) ? "Some tools also need something only you can supply (a licence, a database, a container engine); the Tools page says which after the install." : ""}</p>`});
+  if (x.id !== "ok") return null;
+  S.instStart = {t0: Date.now(), profiles: list.map(t => t.profile), minutes: list.map(instMinutes)};
+  return startJob(["install-tools", list.map(t => t.profile).join(","), "--yes"], label || `Install ${list.map(t => t.display).join(", ")}`);
+}
+function installEnabled() {
+  const need = (S.tools || []).filter(t => t.enabled && instCanInstall(t));
+  const manual = (S.tools || []).filter(t => t.enabled && instKind(t) === "manual");
+  if (!need.length) return toast(manual.length ? `Every enabled tool that can be installed is installed. ${manual.map(t => t.display).join(", ")} need a manual step (Show steps).` : "Every enabled tool is installed.", "ok");
+  return installTools(need, `Install the ${need.length} enabled tool${need.length > 1 ? "s" : ""} that ${need.length > 1 ? "are" : "is"} missing`);
+}
+$("#installall").onclick = () => { if (!S.tools) return toast("The tool list is still loading", ""); installEnabled(); };
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-instl]"); if (!b) return; const t = (S.tools || []).find(x => x.tool === b.dataset.instl); if (t) installTools([t], `${t.installed ? "Update" : "Install"} ${t.display}?`); });
+/* Progress strip: what is installing, how long it has been running, and the estimate (from the registry, not measured). */
+function renderInstallBar() {
+  const bar = $("#instbar"); if (!bar) return;
+  const j = (S.jobs || []).find(x => x.state === "running" && x.argv && x.argv[0] === "install-tools" && !["plan", "list", "validate"].includes(x.argv[1]));
+  if (!j) { if (!bar.hidden) { bar.hidden = true; bar.textContent = ""; } return; }
+  const secs = Math.max(0, Math.round(Date.now() / 1000 - j.started)), m = String(Math.floor(secs / 60)), sec = String(secs % 60).padStart(2, "0");
+  const est = S.instStart && S.instStart.minutes ? ` Estimated ${esc(S.instStart.minutes.join(" + "))}.` : "";
+  const html = `<b>Installing ${esc(String(j.argv[1] || "").split(",").join(", "))}</b> · running for ${m}:${sec}.${est} <a href="#" onclick="showConsole(${jsq(j.id)}, true); return false">Open the log</a>`;
+  bar.hidden = false; if (bar.innerHTML !== html) bar.innerHTML = html;
+}
+setInterval(renderInstallBar, 1000);
+/* Before a benchmark starts: the enabled tools that are not installed are listed, and one confirmation installs them first (the run then carries on). Without it a run with no
+   terminal stops at its first check, before any sample work, naming every missing tool. Returns "run", "install" or "cancel". */
+async function instPreRun() {
+  const need = (S.tools || []).filter(t => t.enabled && instCanInstall(t));
+  if (!need.length) return "run";
+  const x = await modalDialog({title: `${need.length} enabled tool${need.length > 1 ? "s are" : " is"} not installed`, wide: true,
+    buttons: [{id: "cancel", label: "Cancel"}, {id: "ok", label: "Install, then run", primary: true}],
+    bodyHTML: `<p>${need.map(t => `<b>${esc(t.display)}</b>`).join(", ")} ${need.length > 1 ? "are" : "is"} switched on but not installed here. PlasBench can install ${need.length > 1 ? "them" : "it"} now, each in an isolated environment from a pinned release or exact commit, and then start the run.</p>
+      <ul class="small">${need.map(t => `<li>${esc(t.display)}: ${esc(instMinutes(t))}${t.install && t.install.kind === "source" ? `, ${esc(t.install.download_mb)} MB download, licence ${esc(t.install.licence)}` : ""}</li>`).join("")}</ul>
+      <p class="small mut">Needs the internet and no administrator rights. Turn a tool off in Settings or on the Tools page if you do not want it in this run.</p>`});
+  return x.id === "ok" ? "install" : "cancel";
+}
+/* ==INSTALL-UI-END== */
 
 /* ===================================================================================================
    ADD YOUR OWN TOOL (manifest builder)
@@ -6083,7 +6166,7 @@ function wfItemHTML(it, states, ctx, idx, per) {
   else sw = `<button type="button" class="sw" role="switch" aria-checked="${wfCounts(s)}" id="${id}" data-wftoggle="${esc(it.item_id)}" aria-label="${esc(it.label)}: ${s === "auto" ? "auto, runs when its inputs exist" : wfCounts(s) ? "on" : "off"}. Press to turn ${wfCounts(s) ? "off" : "on"}">${wfPill(s)}</button>`;
   const rst = (changed || wfOverridden(it, ctx)) && it.kind !== "core" ? `<button type="button" class="rst" data-wfreset="${esc(it.item_id)}" title="${ctx === "wizard" ? "Use the saved setting for this run" : "Back to the default"}">${ctx === "wizard" ? "use saved" : "default"}</button>` : "";
   return `<li class="wfi ${s}" id="wfi_${esc(id)}">${sw}<div class="tx"><b>${esc(it.label)}</b> ${it.user ? `<span class="tag user">your tool</span> ` : ""}${changed ? `<span class="chgtag" title="Different from its default (${wfDefaultState(it)})">changed</span> ` : ""}${rst}${tipBtn(wfTip(it, per), it.label)}
-    <div class="d">${esc(it.description)}</div><div class="cost">${wfCost(it, per)}</div>${wfBadges(it, states, idx)}</div></li>`;
+    <div class="d">${esc(it.description)}</div><div class="cost">${wfCost(it, per)}</div>${wfBadges(it, states, idx)}${typeof instWorkflow === "function" ? instWorkflow(it) : ""}</div></li>`;
 }
 function wfStepHTML(step, rows, states, ctx, per) {
   const idx = wfById(rows), items = rows.filter(r => r.step_id === step.id), shown = items.filter(r => r.kind !== "demo"), demo = items.filter(r => r.kind === "demo");

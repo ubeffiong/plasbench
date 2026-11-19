@@ -2,23 +2,23 @@ tool	profile	install_mode	automated	runtime	database_mode	verify_command	notes
 mob_recon	reconstruction	conda	yes	plasbench	automated	mob_recon --version	MOB-suite database is installed by the managed database step.
 platon	reconstruction	conda	yes	plasbench	automated	platon --version	Platon database is installed by the managed database step.
 plasmidspades	assembly	conda	yes	plasbench	none	plasmidspades.py --help	Provided by SPAdes.
-gplas2_mob	gplas2	isolated_source	planned	gplas2	none	gplas --help	Requires a pinned gplas2 source runtime and MOB-compatible graph identifiers.
-gplas2_external	gplas2	isolated_source	planned	gplas2	none	gplas --help	Requires a pinned gplas2 source runtime and validated external classifier input.
+gplas2_mob	gplas2	isolated_source	yes	gplas2	none	gplas --help	Installed from a pinned gplas2 commit into its own environment (config/source_tools.json); verified by checking that gplas --help lists -P. Needs MOB-compatible graph identifiers.
+gplas2_external	gplas2	isolated_source	yes	gplas2	none	gplas --help	Installed from a pinned gplas2 commit into its own environment (config/source_tools.json). Needs classifier tables you provide.
 flye_mob_recon	long-read	conda	yes	plasbench	automated	flye --version	Uses the MOB-suite managed database.
 plassembler	plassembler	conda	yes	plasbench	automated	plassembler --help	Uses the Plassembler managed database.
 hybracter_long	hybracter	conda	yes	plasbench	automated	hybracter --help	Uses the Plassembler managed database.
 hybracter_hybrid	hybracter	conda	yes	plasbench	automated	hybracter --help	Uses the Plassembler managed database.
 trycycler_mob_recon	trycycler	conda_isolated	yes	plasbench-trycycler	automated	trycycler --help	Own environment (Trycycler, Flye, Medaka; Medaka's PyTorch stack would not solve in the main environment); wrappers for trycycler, medaka, medaka_consensus. Uses the MOB-suite managed database.
 genomad	genomad	conda	yes	plasbench	automated	genomad --version	geNomad database is installed by the managed database step.
-plasme	plasme	isolated_source	planned	plasme	automated	PLASMe.py --help	Pinned source runtime required; PLASMe database is managed separately.
+plasme	plasme	isolated_source	yes	plasme	automated	PLASMe.py --help	Installed from a pinned PLASMe commit into its own environment (config/source_tools.json); the PLASMe database is installed by the managed database step.
 rfplasmid	rfplasmid	conda	yes	plasbench	manual	RFPlasmid --help	CheckM reference data must be configured from its licensed upstream distribution.
 plasmidhunter	plasmidhunter	conda_isolated	yes	plasbench-plasmidhunter	none	plasmidhunter --help	Own python 3.10 environment (its PyPI releases require python ==3.10.*): conda diamond/prodigal plus pip plasmidhunter==1.4; wrapper in the main environment.
 plasmer	plasmer	conda_isolated	yes	plasbench-plasmer	manual	Plasmer --help	Own python 3.10 environment (channel iskoldt builds only for 3.10); wrapper in the main environment. The upstream database has no stable checksummed direct URL; installation cannot safely fabricate one.
 plascope	plascope	conda_isolated	yes	plasbench-plascope	automated	plaScope.sh --help	Own python 3.6 environment (centrifuge 1.0.3 is built only for python <= 3.6); wrapper in the main environment. Species-specific databases are managed separately.
-plasgraph2	plasgraph2	isolated_source	planned	plasgraph2	none	plASgraph2_classify.py --help	Pinned source runtime and shipped pretrained model required.
+plasgraph2	plasgraph2	isolated_source	yes	plasgraph2	none	plASgraph2_classify.py --help	Installed from a pinned plASgraph2 commit into its own Python 3.8 environment (config/source_tools.json); the pretrained model ships in the checkout.
 baseline_coverage	baseline	builtin	yes	plasbench	none	python3 python/baseline_predictors.py coverage --help	Built-in trivial baseline; no install or database.
 baseline_reference	baseline	builtin	yes	plasbench	manual	python3 python/baseline_predictors.py reference --help	Built-in trivial baseline; needs minimap2 and the local plasmid reference set (build_plasmid_reference_set.py).
 plsmd	plsmd	container_pinned	planned	docker	manual	plsMD --help	Docker-packaged upstream. Needs a PLSDB BLAST index (PLSMD_DB) and a Unicycler assembly.
 baseline_replicon	baseline	builtin	yes	plasbench	manual	python3 python/baseline_predictors.py replicon --help	Built in; needs Abricate and its plasmidfinder database.
-plasbin_flow	plasbin_flow	isolated_source	planned	plasbin_flow	manual	python plasbin_flow.py --help	MIT-licensed; needs a Gurobi licence (free for academics), a gzipped GFA with dp or KC tags, a plasmid-score file and a GC-probability file. Run it yourself; PlasBench adapts its output.
-plasmidec	plasmidec	isolated_source	planned	plasmidec	automated	plasmidEC.sh -h	Clone the repository (gitlab.com/mmb-umcu/plasmidec); plasmidEC.sh builds its own conda environments and downloads the classifiers' databases on first use (about 20 minutes). Put plasmidEC.sh on PATH or set PLASMIDEC_CMD.
+plasbin_flow	plasbin_flow	isolated_source	yes	plasbin_flow	manual	python plasbin_flow.py --help	MIT-licensed. Runtime installed from a pinned commit with pinned dependencies (config/source_tools.json). Needs a Gurobi licence (free for academics, which PlasBench cannot obtain for you), a gzipped GFA with dp or KC tags, a plasmid-score file and a GC-probability file; PlasBench adapts its output.
+plasmidec	plasmidec	isolated_source	yes	plasmidec	automated	plasmidEC.sh -h	Installed from the pinned plasmidEC 1.3.1 commit (config/source_tools.json); plasmidEC.sh builds its own conda environments and downloads the classifier databases the first time it runs (about 20 minutes).
