@@ -121,6 +121,7 @@ _RUN = {
     "trycycler_assembly_count": {"summary": "Independent Flye assemblies Trycycler reconciles per sample. Higher is more robust but multiplies stage-7 runtime for trycycler_mob_recon proportionally.", "when": "Only matters when trycycler_mob_recon is on.", "setting": "TRYCYCLER_ASSEMBLY_COUNT"},
     "user_tools": {"summary": "Also benchmark a tool you added (see `plasbench tools list`); repeat for several, or give 'all'.", "when": "Leave empty unless you added your own tools.", "setting": "USER_TOOLS"},
     "force_rerun_tools": {"summary": "Discard completed tool results and execute them again.", "when": "Leave off to keep finished tool results.", "setting": "FORCE_RERUN_TOOLS"},
+    "install_missing_tools": {"summary": "Install any enabled tool that is missing before the run starts, each from its pinned release or commit in its own environment (needs the internet).", "when": "Leave off to have the run stop at its first check and name what is missing; the window asks before installing.", "setting": "INSTALL_MISSING_TOOLS"},
 }
 _RUN.update(_TOOL_ENTRIES)
 

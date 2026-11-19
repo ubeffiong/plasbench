@@ -34,6 +34,16 @@ stage_timing_begin 4
 # GNU time for peak memory; PLASBENCH_TIME_BIN overrides the path (the tests point it at nothing to prove the blank-memory note, AU-033)
 TIME_BIN="${PLASBENCH_TIME_BIN:-/usr/bin/time}"; export TIME_BIN
 [[ -x "$TIME_BIN" ]] || warn "$TIME_BIN is not installed: peak memory and CPU time cannot be measured; peak_rss_kb stays blank and tool_run_resources.tsv says so for each run"
+# One notice naming every enabled tool that is not installed (they are recorded below as "skipped" with the reason, never silently dropped). `plasbench run` stops
+# before this stage when tools are missing (stage 0, scripts/00_setup.sh); this covers stage 4 started on its own.
+missing_enabled=()
+for pair in RUN_MOB_RECON:mob_recon RUN_PLATON:platon RUN_PLASMIDSPADES:plasmidspades.py RUN_GPLAS2_MOB:gplas RUN_GPLAS2_EXTERNAL:gplas RUN_GENOMAD:genomad RUN_PLASME:PLASMe.py             RUN_RFPLASMID:rfplasmid RUN_PLASMIDHUNTER:plasmidhunter RUN_PLASMER:Plasmer RUN_PLASCOPE:plaScope.sh RUN_PLASGRAPH2:plASgraph2_classify.py; do
+    flag_name="${pair%%:*}"
+    if [[ "${!flag_name:-0}" == "1" ]] && ! have "${pair#*:}"; then missing_enabled+=("${pair#*:}"); fi
+done
+if [[ -z "${ONLY_TOOL:-}" && ${#missing_enabled[@]} -gt 0 ]]; then
+    warn "enabled tools that are not installed: ${missing_enabled[*]}. Each is recorded as skipped (not run) with the reason. Install them with: plasbench install-tools <profile> --yes (plasbench check lists the profile)."
+fi
 reset_shard_dir "run_tools"
 STATUS_SHARDS="$(shard_dir "run_tools")"
 reset_shard_dir "run_tools_outcomes"
@@ -361,7 +371,7 @@ run_mob_recon() {
         fi
     elif tool_enabled RUN_MOB_RECON mob_recon; then
         warn "mob_recon is enabled but not installed; skipped for $SAMPLE"
-        record_status "$SAMPLE" "mob_recon" "skipped" "" "command unavailable"
+        record_status "$SAMPLE" "mob_recon" "skipped" "" "command unavailable (not installed; run: plasbench install-tools reconstruction --yes)"
     fi
 }
 
@@ -392,7 +402,7 @@ run_gplas2_mob() {
         fi
     elif tool_enabled RUN_GPLAS2_MOB gplas2_mob; then
         warn "gplas2_mob is enabled but gplas is not installed; skipped for $SAMPLE"
-        record_status "$SAMPLE" "gplas2_mob" "skipped" "" "command unavailable"
+        record_status "$SAMPLE" "gplas2_mob" "skipped" "" "command unavailable (not installed; run: plasbench install-tools gplas2 --yes)"
     fi
 }
 
@@ -468,7 +478,7 @@ run_plsmd() {
         local TOOL="plsmd" OUT="$RDIR/plsmd" PRED="$RDIR/pred_plsmd.plasmid.fasta" DONE="$RDIR/.plsmd.complete"
         if ! have "$PLSMD_CMD"; then
             warn "plsmd is enabled but '$PLSMD_CMD' is not installed; skipped for $SAMPLE"
-            record_status "$SAMPLE" "$TOOL" "skipped" "" "command unavailable"
+            record_status "$SAMPLE" "$TOOL" "skipped" "" "command unavailable (a manual install: plasbench install-tools plsmd lists the steps)"
         elif [[ -z "${PLSMD_DB:-}" ]]; then
             warn "plsmd needs PLSMD_DB (the PLSDB BLAST index prefix); skipped for $SAMPLE"
             record_status "$SAMPLE" "$TOOL" "skipped" "" "PLSMD_DB not set"
@@ -545,7 +555,7 @@ run_platon() {
         fi
     elif tool_enabled RUN_PLATON platon; then
         warn "platon is enabled but not installed; skipped for $SAMPLE"
-        record_status "$SAMPLE" "platon" "skipped" "" "command unavailable"
+        record_status "$SAMPLE" "platon" "skipped" "" "command unavailable (not installed; run: plasbench install-tools reconstruction --yes)"
     fi
 }
 
@@ -568,7 +578,7 @@ run_plasmidspades() {
         fi
     elif tool_enabled RUN_PLASMIDSPADES plasmidspades; then
         warn "plasmidSPAdes is enabled but not installed; skipped for $SAMPLE"
-        record_status "$SAMPLE" "plasmidspades" "skipped" "" "command unavailable"
+        record_status "$SAMPLE" "plasmidspades" "skipped" "" "command unavailable (not installed; run: plasbench install-tools assembly --yes)"
     fi
 }
 
@@ -597,7 +607,7 @@ run_gplas2_external() {
         fi
     elif tool_enabled RUN_GPLAS2_EXTERNAL gplas2_external; then
         warn "gplas2_external is enabled but gplas is not installed; skipped for $SAMPLE"
-        record_status "$SAMPLE" "gplas2_external" "skipped" "" "command unavailable"
+        record_status "$SAMPLE" "gplas2_external" "skipped" "" "command unavailable (not installed; run: plasbench install-tools gplas2 --yes)"
     fi
 }
 
@@ -622,7 +632,7 @@ run_genomad() {
         fi
     elif tool_enabled RUN_GENOMAD genomad; then
         warn "genomad is enabled but not installed; skipped for $SAMPLE"
-        record_status "$SAMPLE" "genomad" "skipped" "" "command unavailable"
+        record_status "$SAMPLE" "genomad" "skipped" "" "command unavailable (not installed; run: plasbench install-tools genomad --yes)"
     fi
 }
 
@@ -648,7 +658,7 @@ run_plasme() {
         fi
     elif tool_enabled RUN_PLASME plasme; then
         warn "plasme is enabled but PLASMe.py is not installed (or not on PATH); skipped for $SAMPLE"
-        record_status "$SAMPLE" "plasme" "skipped" "" "command unavailable"
+        record_status "$SAMPLE" "plasme" "skipped" "" "command unavailable (not installed; run: plasbench install-tools plasme --yes)"
     fi
 }
 
@@ -682,7 +692,7 @@ run_rfplasmid() {
         fi
     elif tool_enabled RUN_RFPLASMID rfplasmid; then
         warn "rfplasmid is enabled but not installed; skipped for $SAMPLE"
-        record_status "$SAMPLE" "rfplasmid" "skipped" "" "command unavailable"
+        record_status "$SAMPLE" "rfplasmid" "skipped" "" "command unavailable (not installed; run: plasbench install-tools rfplasmid --yes)"
     fi
 }
 
@@ -706,7 +716,7 @@ run_plasmidhunter() {
         fi
     elif tool_enabled RUN_PLASMIDHUNTER plasmidhunter; then
         warn "plasmidhunter is enabled but not installed; skipped for $SAMPLE"
-        record_status "$SAMPLE" "plasmidhunter" "skipped" "" "command unavailable"
+        record_status "$SAMPLE" "plasmidhunter" "skipped" "" "command unavailable (not installed; run: plasbench install-tools plasmidhunter --yes)"
     fi
 }
 
@@ -739,7 +749,7 @@ run_plasmer() {
         fi
     elif tool_enabled RUN_PLASMER plasmer; then
         warn "plasmer is enabled but not installed; skipped for $SAMPLE"
-        record_status "$SAMPLE" "plasmer" "skipped" "" "command unavailable"
+        record_status "$SAMPLE" "plasmer" "skipped" "" "command unavailable (not installed; run: plasbench install-tools plasmer --yes)"
     fi
 }
 
@@ -781,7 +791,7 @@ run_plascope() {
         fi
     elif tool_enabled RUN_PLASCOPE plascope; then
         warn "plascope is enabled but not installed; skipped for $SAMPLE"
-        record_status "$SAMPLE" "plascope" "skipped" "" "command unavailable"
+        record_status "$SAMPLE" "plascope" "skipped" "" "command unavailable (not installed; run: plasbench install-tools plascope --yes)"
     fi
 }
 
@@ -826,7 +836,7 @@ run_plasmidec() {
         fi
     elif tool_enabled RUN_PLASMIDEC plasmidec; then
         warn "plasmidec is enabled but $CMD0 is not installed; skipped for $SAMPLE"
-        record_status "$SAMPLE" "plasmidec" "skipped" "" "command unavailable"
+        record_status "$SAMPLE" "plasmidec" "skipped" "" "command unavailable (not installed; run: plasbench install-tools plasmidec --yes)"
     fi
 }
 

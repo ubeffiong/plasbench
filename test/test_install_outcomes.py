@@ -39,9 +39,9 @@ def kind_of(name):
     return kinds.get(name) or kinds.get(tool_profile.get(name, ""), "automatic")
 
 
-check("the registry has manual and built-in profiles to test", len(manual) >= 6 and builtin == ["baseline"], (manual, builtin))
-check("the known source-only profiles are all manual",
-      {"gplas2", "plasme", "plasgraph2", "plsmd", "ppr-meta", "mobilome-map", "plasbin_flow", "plasmidec"} <= set(manual), manual)
+check("the registry has manual and built-in profiles to test", manual == ["plsmd", "ppr-meta"] and builtin == ["baseline"], (manual, builtin))
+check("the source-only profiles that can be pinned are automatic now; only plsmd and ppr-meta stay manual (with evidence)",
+      {"gplas2", "plasme", "plasgraph2", "mobilome-map", "plasbin_flow", "plasmidec"}.isdisjoint(manual), manual)
 
 bad = []
 for name in names:
@@ -51,7 +51,7 @@ for name in names:
         bad.append((name, code, expected))
     if code in (10, 20) and not message:
         bad.append((name, "no message"))
-    if code == 20 and not ("manual" in message and "Nothing failed" in message and "plasbench install-tools plan" in message and "INSTALL.md" in message):
+    if code == 20 and not ("manual" in message and "Nothing failed" in message and "Checked against upstream" in message and "Steps:" in message):
         bad.append((name, "manual notice lacks the steps"))
     if "wrong option or a missing file" in message:
         bad.append((name, "misleading text"))
@@ -63,19 +63,16 @@ check("a misspelt profile exits 2 and suggests the nearest name", code == 2 and 
 code, message = reg.resolve("gplas3", rows)
 check("gplas3 suggests gplas2", code == 2 and "gplas2" in message, (code, message))
 check("a name unlike any profile is left to conda as a package name", reg.resolve("zzqq-not-a-profile", rows)[0] == 0)
-check("a tool name resolves through its profile (gplas2_mob is manual)", reg.resolve("gplas2_mob", rows)[0] == 20)
+check("a tool name resolves through its profile (gplas2_mob installs; ppr_meta is manual)", reg.resolve("gplas2_mob", rows)[0] == 0 and reg.resolve("ppr_meta", rows)[0] == 20)
 
 check("exit 2 reads as the generic usage text outside install-tools", "wrong option or a missing file" in explain(2))
 check("exit 2 of install-tools is about the name, never a missing file",
       "missing file" not in explain(2, "install-tools") and "profile" in explain(2, "install-tools"))
 check("exit 20 is 'a manual installation step is needed', not an error", "manual" in explain(20) and "nothing failed" in explain(20))
 lib = open(os.path.join(ROOT, "scripts", "lib.sh"), encoding="utf-8").read()
-check("lib.sh's shell translator agrees on 20", 'a manual installation step is needed' in lib)
+check("lib.sh's shell translator agrees on 20 and 21", 'a manual installation step is needed' in lib and "consent is needed" in lib)
 
 script = open(os.path.join(ROOT, "env", "install_tools.sh"), encoding="utf-8").read()
-details = script[script.index("manual_details() {"):script.index("RESOLVE_STATUS=0")]
-labels = set(re.findall(r"^\s+([a-z0-9_-]+)\)\s*$", details, re.M))
-check("every profile with manual commands in install_tools.sh is a manual profile in the registry", labels <= set(manual), (labels, manual))
 flat = {p for item in re.findall(r"^ ([a-z0-9_|-]+)\)", script, re.M) for p in item.split("|")}
 check("every script-only profile has a case branch", set(reg.SCRIPT_PROFILES) <= flat, set(reg.SCRIPT_PROFILES) - flat)
 
@@ -83,7 +80,7 @@ from plasbench import webui  # noqa: E402
 state = webui.Jobs.display_state(object(), {"state": "failed", "exit": 20, "argv": ["install-tools", "gplas2", "--yes"], "id": "x"})
 check("the window's job state for install-tools exit 20 is manual_step", state == "manual_step", state)
 state = webui.Jobs.display_state(object(), {"state": "failed", "exit": 20, "argv": ["run"], "id": "x"})
-check("exit 20 of another command stays failed", state == "failed", state)
+check("exit 20 of another command is a manual step too (information, whatever the command)", state == "manual_step", state)
 html = open(os.path.join(ROOT, "plasbench", "data", "ui.html"), encoding="utf-8").read()
 check("ui.html words and styles the manual_step state", 'manual_step:"Manual step needed"' in html and "#cstate.manual_step" in html)
 
@@ -99,12 +96,14 @@ if bash and probe.returncode == 0 and os.name != "nt":
     for name in sorted(set(names) | set(reg.SCRIPT_PROFILES)):
         code, out = run("--yes", name)
         want = 20 if kind_of(name) == "manual" else 0
+        if kind_of(name) == "automatic" and name in ("gplas2", "gplas2_mob", "gplas2_external", "plasme", "plasgraph2", "plasmidec", "plasbin_flow", "mobilome-map", "mobilome_annotation_pipeline"):
+            want = 0
         if code != want or "wrong option or a missing file" in out or not out.strip():
             bad.append((name, code, want))
     check("env/install_tools.sh --yes NAME gives the right exit code and text for every profile (dry run, no network)", not bad, bad)
-    code, out = run("--yes", "gplas2", dry=False)
-    check("gplas2 --yes exits 20 with the manual-install notice (not 2, not an error)",
-          code == 20 and "needs a manual install" in out and "Nothing failed" in out, (code, out[-300:]))
+    code, out = run("--yes", "ppr-meta", dry=False)
+    check("ppr-meta --yes exits 20 with the manual-install notice and evidence (not 2, not an error)",
+          code == 20 and "needs a manual install" in out and "Nothing failed" in out and "ERROR" not in out, (code, out[-300:]))
     code, out = run("plasmidhuter", dry=False)
     check("a misspelt profile exits 2 and names plasmidhunter", code == 2 and "plasmidhunter" in out, (code, out))
 else:

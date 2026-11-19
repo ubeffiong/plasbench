@@ -1,0 +1,11 @@
+# Pinned runtime for PlasBin-flow v1.1 (49d34787c8d63715027c88e6db40ad513828204b). Upstream ships no requirements file; these are the minimum versions its README states
+# (https://github.com/cchauve/PlasBin-flow/blob/49d34787c8d63715027c88e6db40ad513828204b/README.md, 'Prerequisites'), each verified on PyPI on 2026-11-19 to have a CPython 3.9 wheel.
+# gurobipy 11.0.3 is a version that README's 'gurobi 9.1.2+' allows; a Gurobi licence is still needed for models above the free size limit.
+numpy==1.24.2
+pandas==2.0.0
+matplotlib==3.7.0
+seaborn==0.12.2
+biopython==1.81
+scipy==1.10.1
+networkx==2.8.8
+gurobipy==11.0.3
