@@ -129,6 +129,13 @@ def resolve(name: str, rows: list[dict[str, str]]) -> tuple[int, str]:
     return 0, ""
 
 
+def needs_network(name: str, rows: list[dict[str, str]]) -> bool:
+    """Will `install-tools NAME` go online? Only when an installer would run (resolve says 0) and NAME is not an inspection action: a built-in profile (nothing to
+    install), a manual one (exit 20: the notice is printed and nothing is fetched) and a near-miss name (exit 2) must not be refused for lack of internet.
+    The command-line pre-flight (plasbench/cli.py) and the window's gating (plasbench/netgate.py) both ask this."""
+    return name not in ACTIONS and resolve(name, rows)[0] == 0
+
+
 def main(argv: list[str] | None = None) -> int:
     root = Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser(description=__doc__)

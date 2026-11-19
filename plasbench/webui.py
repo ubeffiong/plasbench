@@ -1687,6 +1687,7 @@ def make_handler(project: Project, jobs: Jobs):
                 out["commands"] = {k: (v if v is not None else None) for k, v in netgate.NET_COMMANDS.items()}
                 out["subcommands"] = netgate.SUBCOMMAND_NET
                 out["forced_offline"] = netgate.forced_offline()
+                out["offline_install"] = netgate.offline_install_profiles()
                 return self.jsend(200, out)
             if route == "github/account":
                 return self.jsend(200, ghsignin.account(github_cmd()))

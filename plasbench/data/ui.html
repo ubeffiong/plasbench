@@ -4485,13 +4485,14 @@ function applyNetGating() {
   });
 }
 async function netRefresh(force) {
-  try { S.net = await api("net/status" + (force ? "?t=" + Date.now() : "")); S.netCommands = {commands: S.net.commands || {}, sub: S.net.subcommands || {}}; } catch { return; }
+  try { S.net = await api("net/status" + (force ? "?t=" + Date.now() : "")); S.netCommands = {commands: S.net.commands || {}, sub: S.net.subcommands || {}, offlineInstall: S.net.offline_install || []}; } catch { return; }
   renderNetInd(); applyNetGating();
 }
 function netNeedsFor(el) {
   if (el.dataset.needs) return [el.dataset.needs];
   if (!el.dataset.run || !S.netCommands) return [];
   let argv; try { argv = JSON.parse(el.dataset.run); } catch { return []; }
+  if (argv[0] === "install-tools" && (argv.includes("--dry-run") || (S.netCommands.offlineInstall || []).includes(argv.filter((a, i) => !a.startsWith("-") && argv[i - 1] !== "--env")[1] || "core"))) return [];   // built-in, manual (exit 20) and inspection profiles fetch nothing
   const t = S.netCommands.commands[argv[0]];
   if (t === undefined) return [];
   return t === null ? ((S.netCommands.sub[argv[0]] || {})[argv[1]] || []) : t;

@@ -854,6 +854,17 @@ def network_commands(root):
     return netcheck.command_table(Path(root) / "config" / netcheck.CATALOGUE_NAME)
 
 
+def installer_needs_network(root, profile):
+    """True when `install-tools PROFILE` would really install something (python/tool_installer_registry.needs_network); unreadable registry: assume yes."""
+    try:
+        sys.path.insert(0, str(Path(root) / "python"))
+        import tool_installer_registry as registry
+        rows = registry.read_tsv(Path(root) / "config" / "tool_installers.tsv")
+        return registry.needs_network(profile, rows)
+    except Exception:  # noqa: BLE001 - the pre-flight is a courtesy, never a blocker
+        return True
+
+
 def network_preflight(args, root):
     """Refuse an online-only command before it does anything when the services it needs are unreachable. Returns the message, or None.
 
@@ -869,8 +880,10 @@ def network_preflight(args, root):
             return None                      # a folder or manifest on disk
     elif command == "analysis":
         sub_name = getattr(args, "name", "") or ""
-    elif command == "install-tools" and getattr(args, "profile", "") in ("list", "plan", "validate"):
-        return None                          # registry inspection only
+    elif command == "install-tools":
+        # Nothing is fetched for an inspection action, a dry run, a built-in profile, a manual profile (exit 20) or an unknown name (exit 2): say so, do not demand the internet.
+        if getattr(args, "dry_run", False) or not installer_needs_network(root, getattr(args, "profile", "core")):
+            return None
     entry = table.get((command, sub_name))
     if entry is None:
         return None
