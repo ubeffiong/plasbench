@@ -115,10 +115,9 @@ def fake_fetch(payload, final="https://cdn.example.org/real/tool-1.0.tar.gz"):
 
 def manifest(folder, install, extra_run="", name="src_tool"):
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / "plasbench-tool.ini").write_text(
-        f"[tool]\nname = {name}\ntask = binning_reconstruction\nanalysis_track = short_read\n[install]\n{install}\n"
+    (folder / "plasbench-tool.ini").write_bytes((f"[tool]\nname = {name}\ntask = binning_reconstruction\nanalysis_track = short_read\n[install]\n{install}\n"
         f"[run]\nmode = command\ncommand = {{src}}/run.sh {{contigs}} {{outdir}}{extra_run}\nrequires = contigs\n"
-        f"[output]\nformat = contig_bins\npath = bins.tsv\n", encoding="utf-8", newline="\n")
+        f"[output]\nformat = contig_bins\npath = bins.tsv\n").encode("utf-8"))
     return folder / "plasbench-tool.ini"
 
 

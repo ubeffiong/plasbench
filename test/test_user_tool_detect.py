@@ -40,7 +40,7 @@ def main():
             if mode == "gz":
                 path.write_bytes(gzip.compress(text.encode()))
             else:
-                path.write_text(text, encoding="utf-8", newline="\n")
+                path.write_bytes((text).encode("utf-8"))
             return path
 
         print("single files")

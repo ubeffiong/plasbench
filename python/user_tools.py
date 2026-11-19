@@ -1129,14 +1129,14 @@ def scaffold(name, dest, tasks=None, source="conda", url="", sha256="", local_pa
     folder.mkdir(parents=True, exist_ok=True)
     display = name.replace("_", " ").title()
     text = _template(name, display, tasks, source, url, sha256, local_path, ",".join(formats))
-    (folder / MANIFEST).write_text(text, encoding="utf-8", newline="\n")
+    (folder / MANIFEST).write_bytes((text).encode("utf-8"))
     if source == "script" and not (folder / "install.sh").exists():
-        (folder / "install.sh").write_text("#!/usr/bin/env bash\n# Called as: install.sh <environment name>\nset -euo pipefail\n"
-                                           "echo \"install $1 here\"\n", encoding="utf-8", newline="\n")
+        (folder / "install.sh").write_bytes(("#!/usr/bin/env bash\n# Called as: install.sh <environment name>\nset -euo pipefail\n"
+                                           "echo \"install $1 here\"\n").encode("utf-8"))
     if "adapter" in formats and not (folder / "adapt.py").exists():
-        (folder / "adapt.py").write_text("#!/usr/bin/env python3\n\"\"\"Called as: adapt.py <tool output> <assembly contigs> <out fasta>.\n"
+        (folder / "adapt.py").write_bytes(("#!/usr/bin/env python3\n\"\"\"Called as: adapt.py <tool output> <assembly contigs> <out fasta>.\n"
                                          "Write the predicted plasmid FASTA to <out fasta> (and bins.tsv / scores.tsv beside it, see adapters/).\n"
-                                         "PLASBENCH_TASK names the task being converted.\"\"\"\nimport sys\n", encoding="utf-8", newline="\n")
+                                         "PLASBENCH_TASK names the task being converted.\"\"\"\nimport sys\n").encode("utf-8"))
     return folder / MANIFEST
 
 

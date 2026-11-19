@@ -70,7 +70,7 @@ def main():
     check("a registry tool without a step is reported", any("brand_new_tool" in e and "exactly one" in e for e in found), found)
     shutil.copy(ROOT / "config" / "tool_capabilities.tsv", copy / "config" / "tool_capabilities.tsv")
     text = (copy / "config" / "workflow_steps.tsv").read_text(encoding="utf-8").replace("RUN_PLATON", "RUN_NO_SUCH_SETTING", 1)
-    (copy / "config" / "workflow_steps.tsv").write_text(text, encoding="utf-8", newline="")
+    (copy / "config" / "workflow_steps.tsv").write_bytes((text).encode("utf-8"))
     found = ws.problems(copy)
     check("a setting key that is not in config.sh is reported", any("RUN_NO_SUCH_SETTING" in e for e in found), found)
     (copy / "scripts" / "09_new_stage.sh").write_text("#!/bin/bash\n", encoding="utf-8")

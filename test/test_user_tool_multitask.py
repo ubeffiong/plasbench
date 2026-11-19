@@ -62,7 +62,7 @@ def status_of(text):
 
 def write(folder, text, name="plasbench-tool.ini"):
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / name).write_text(text, encoding="utf-8", newline="\n")
+    (folder / name).write_bytes((text).encode("utf-8"))
     return folder / name
 
 
