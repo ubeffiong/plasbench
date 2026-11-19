@@ -90,7 +90,7 @@ def load_assembly_stats(data_dir):
     stats = {}
     if not data_dir:
         return stats
-    for sample_dir in sorted(p for p in Path(data_dir).iterdir() if p.is_dir()) if Path(data_dir).is_dir() else []:
+    for sample_dir in sorted(p for p in Path(data_dir).iterdir() if p.is_dir() and not p.name.startswith(".")) if Path(data_dir).is_dir() else []:
         for name in ("contigs.fasta", "contigs.fasta.gz"):
             path = sample_dir / name
             if path.is_file():

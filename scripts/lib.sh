@@ -481,6 +481,54 @@ check_free_disk() {
     return 0
 }
 
+# preflight_resources STAGE [quiet]: python/preflight_resources.py looks at free disk (study, data, temporary folder, and under WSL the Windows drive holding
+# Ubuntu's virtual disk), memory, usable CPUs and writable folders BEFORE the heavy work. A shortage stops the stage (exit 6) with the numbers; warnings are
+# printed; THREADS above the usable CPUs is lowered to them (CAP_THREADS_TO_CPUS=0 keeps it). PLASBENCH_SKIP_RESOURCE_CHECK=1 skips it all and
+# PLASBENCH_SKIP_DISK_CHECK=1 skips only the disk figures. Silent when the information is unavailable. "quiet" prints nothing when all is well.
+preflight_resources() {
+    local stage="$1" quiet="${2:-}" out rc=0 line capped="" extra=()
+    [[ "${PLASBENCH_SKIP_RESOURCE_CHECK:-0}" == "1" ]] && return 0
+    have python3 || return 0
+    [[ "${CAP_THREADS_TO_CPUS:-1}" == "0" ]] && extra+=(--no-cap)
+    [[ -n "$quiet" ]] && extra+=(--quiet-ok)
+    out="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" check --stage "$stage" --results-dir "${RESULTS_DIR:-.}" \
+        --data-dir "${DATA_DIR:-.}" --tmp-dir "${TMPDIR:-/tmp}" --sheet "${SAMPLE_SHEET:-/nonexistent}" --threads "${THREADS:-1}" \
+        --memory-gb "${ASSEMBLY_MEMORY_GB:-${MEMORY_GB:-0}}" ${extra[@]+"${extra[@]}"} 2>/dev/null)" || rc=$?
+    while IFS= read -r line; do
+        case "$line" in
+            "@threads="*) capped="${line#@threads=}" ;;
+            "Resources check: ok"*) log "$line" ;;
+            "") ;;
+            *) warn "$line" ;;
+        esac
+    done <<< "$out"
+    if [[ "$capped" =~ ^[0-9]+$ && "$capped" -ge 1 ]]; then
+        run_event resource_check "action=threads_capped" "from=$THREADS" "to=$capped"
+        THREADS="$capped"; export THREADS
+    fi
+    if [[ "$rc" -eq 3 ]]; then
+        run_event resource_check "action=stopped" "stage=$stage"
+        exit 6
+    fi
+    return 0
+}
+
+# diagnose_failed_step LOGFILE EXIT_CODE SAMPLE: ask python/assembler_diagnosis.py why a step failed. Sets DIAG_CAUSE, DIAG_CONFIDENCE, DIAG_RETRY (memory,
+# stale, reads or "-"), DIAG_ENV (1 when the cause is the machine's, so it would repeat for every sample), DIAG_TITLE, DIAG_EVIDENCE and DIAG_ADVICE.
+diagnose_failed_step() {
+    local logfile="$1" code="$2" sample="$3" line free_gb=""
+    DIAG_CAUSE="unknown"; DIAG_CONFIDENCE="low"; DIAG_RETRY="-"; DIAG_ENV="0"; DIAG_TITLE="the cause is not recognised"
+    DIAG_EVIDENCE="see $logfile"; DIAG_ADVICE="Read the end of the log: tail -30 $logfile"
+    have python3 || return 0
+    free_gb="$(df -Pk "${DATA_DIR:-.}" 2>/dev/null | awk 'NR == 2 && $4 ~ /^[0-9]+$/ { printf "%.2f", $4 / 1048576 }')"
+    line="$(python3 -I "${PROJECT_ROOT:-.}/python/assembler_diagnosis.py" "$logfile" --format tsv --exit-code "$code" --sample "$sample" \
+        --threads "${THREADS:-}" --memory-gb "${ASSEMBLY_MEMORY_GB:-}" --tmpdir "${TMPDIR:-/tmp}" ${free_gb:+--free-gb "$free_gb"} 2>/dev/null)" || return 0
+    [[ -n "$line" ]] || return 0
+    # shellcheck disable=SC2034  # the DIAG_* variables are read by the stage scripts that source this file
+    IFS=$'\t' read -r DIAG_CAUSE DIAG_CONFIDENCE DIAG_RETRY DIAG_ENV DIAG_TITLE DIAG_EVIDENCE DIAG_ADVICE <<< "$line"
+    return 0
+}
+
 # merge_shards STAGE_NAME OUT_FILE HEADER SHARD_FILE...
 # Writes HEADER once, then the content of every existing shard file, in the
 # order given. A shard that a job never created (skipped/never reached) is
@@ -956,6 +1004,8 @@ explain_exit() {
         1) echo "a command reported an error" ;;
         2) echo "a command was given a wrong option or a missing file" ;;
         4) echo "every tool run of stage 4 failed (nothing was produced to score)" ;;
+        5) echo "stage 3 stopped early: the assembler failed for a cause that belongs to the computer, not the isolate (the message above names it)" ;;
+        6) echo "the resource check found too little disk space or a folder that cannot be written (the message above has the figures)" ;;
         20) echo "a manual installation step is needed (nothing failed; the notice above lists the steps)" ;;
         124) echo "a time limit was reached" ;;
         126) echo "a program could not be run (permissions)" ;;

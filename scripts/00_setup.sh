@@ -74,6 +74,7 @@ if [[ -n "${PLASBENCH_AVAILABLE_GB:-}" && "$MEMORY_GB" -gt "$PLASBENCH_AVAILABLE
     warn "  The assembler will be told it has memory the machine cannot give it, and may swap"
     warn "  rather than fail -- which is far slower. Lower it with --memory-gb, or free memory."
 fi
+preflight_resources 0
 log "Checking core dependencies..."
 check_tool datasets core
 check_tool prefetch core

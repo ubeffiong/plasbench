@@ -1,0 +1,3 @@
+sequence_id	start	end	feature_type	label	source	version
+p1	0	5	amr	amrfinder	amrfinder	1
+p1	0	5	replicon	mob_typer	mob_typer	1

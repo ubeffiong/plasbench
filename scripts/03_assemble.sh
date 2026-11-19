@@ -29,6 +29,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 need fastp
+preflight_resources 3 quiet
 warn_resource_oversubscription "stage 3 (assembly)" "$MAX_PARALLEL_SAMPLES" "$THREADS" "$ASSEMBLY_MEMORY_GB"
 
 STATUS="$RESULTS_DIR/assembly_status.tsv"
@@ -52,9 +53,94 @@ ASSEMBLY_SELECTION_MODE="${ASSEMBLY_SELECTION_MODE:-report}"
 # parallel jobs actually interleaved.
 record_assembly_status() {
     local sample="$1"
-    printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "${5:-}" \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "${5:-}" "${6:-}" "${7:-}" \
         > "$STATUS_SHARDS/${sample}.tsv"
-    run_event assembly_end "sample=$1" "status=$2" "reason=${4:-}"
+    run_event assembly_end "sample=$1" "status=$2" "reason=${4:-}" "cause=${6:-}"
+}
+
+# --- why a step failed, what was tried, and when to stop ------------------------------------------------------------------------------
+# Columns 6 and 7 of assembly_status.tsv (cause, advice) come from python/assembler_diagnosis.py, which reads the tool's log. A cause that belongs to the
+# computer (a full disk, a broken Python, a CPU feature) would repeat for every sample, so the stage stops at the first one instead of spending minutes
+# on each (exit 5). Out of memory gets ONE retry with fewer threads and a budget that fits the memory free now (ASSEMBLER_AUTO_RETRY=0 turns it off).
+# Print one block, record the failure, and ask the stage to stop when the cause is the computer's (or STOP_EARLY=1 from the caller).
+handle_step_failure() {   # handle_step_failure TOOL SAMPLE LOG START [NOTE]
+    local tool="$1" sample="$2" log="$3" start="$4" note="${5:-}"
+    warn "$tool failed for $sample: $DIAG_TITLE ($DIAG_EVIDENCE). What to do: $DIAG_ADVICE${note:+ $note} Log: $log. $sample is excluded from tool runs and scoring."
+    record_assembly_status "$sample" "failed" "" "$tool: $DIAG_CAUSE ($DIAG_EVIDENCE)" "$(( $(date +%s) - start ))" "$DIAG_CAUSE" "$DIAG_ADVICE${note:+ $note}"
+    run_event assembly_failed "sample=$sample" "tool=$tool" "cause=$DIAG_CAUSE" "confidence=$DIAG_CONFIDENCE"
+    if [[ "$DIAG_ENV" == "1" || "${STOP_EARLY:-0}" == "1" ]]; then
+        printf '%s\t%s\t%s\n' "$DIAG_CAUSE" "$sample" "$DIAG_TITLE" > "$STATUS_SHARDS/.stop"
+    fi
+}
+
+# After a read-related failure: test the raw reads (gzip, and downloads.sha256 when there is one) and the trimmed copy. Sets READS_NOTE. Never retries.
+verify_reads() {   # verify_reads SDIR R1 R2 T1 T2
+    local sdir="$1" r1="$2" r2="$3" t1="$4" t2="$5" f bad=() tbad=0
+    READS_NOTE=""
+    for f in "$r1" "$r2"; do gzip -t "$f" 2>/dev/null || bad+=("$f"); done
+    if [[ ${#bad[@]} -eq 0 && -s "$sdir/downloads.sha256" ]] && ! (cd "$sdir" && sha256sum --quiet -c downloads.sha256 > /dev/null 2>&1); then
+        bad+=("a file listed in $sdir/downloads.sha256")
+    fi
+    for f in "$t1" "$t2"; do if [[ -e "$f" ]] && ! gzip -t "$f" 2>/dev/null; then tbad=1; fi; done
+    if [[ ${#bad[@]} -gt 0 ]]; then
+        READS_NOTE="Checked: the downloaded reads are damaged (${bad[*]}). Re-download: rm -f \"$r1\" \"$r2\" \"$sdir/downloads.sha256\" then run the same plasbench run command again; stage 1 fetches them afresh and finished work is reused."
+        rm -f "$t1" "$t2" "$sdir/.fastp.complete"
+    elif [[ "$tbad" -eq 1 ]]; then
+        READS_NOTE="Checked: the downloaded reads are intact but the trimmed copy was damaged; it was removed, so run the same plasbench run command again to trim afresh."
+        rm -f "$t1" "$t2" "$sdir/.fastp.complete"
+    else
+        READS_NOTE="Checked: the downloaded reads pass the gzip and checksum tests, so the download is not the problem."
+    fi
+}
+
+# SPAdes with diagnosis and at most ONE retry. Returns 0 when it assembled (ASM_RETRY_NOTE says what was changed), 1 when it failed (recorded).
+run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SDIR
+    local sample="$1" t1="$2" t2="$3" asmdir="$4" start="$5" r1="$6" r2="$7" sdir="$8"
+    local log="$LOG_DIR/${sample}.spades.log" threads="$THREADS" mem="$ASSEMBLY_MEMORY_GB" rc attempt=1 plan="" note="" first="" own="" nt nm av
+    local STOP_EARLY=0
+    ASM_RETRY_NOTE=""
+    while :; do
+        rc=0
+        WATCH_LOG="$log" run_with_heartbeat "$sample / SPAdes assembly" spades.py -1 "$t1" -2 "$t2" -o "$asmdir" \
+            --threads "$threads" --memory "$mem" > "$log" 2>&1 || rc=$?
+        if [[ "$rc" -eq 0 ]]; then
+            [[ -n "$note" ]] && ASM_RETRY_NOTE="retried once after $first: $note"
+            return 0
+        fi
+        THREADS="$threads" ASSEMBLY_MEMORY_GB="$mem" diagnose_failed_step "$log" "$rc" "$sample"
+        if [[ "$attempt" -ge 2 || "${ASSEMBLER_AUTO_RETRY:-1}" != "1" ]]; then break; fi
+        case "$DIAG_RETRY" in
+            memory)
+                own=""; [[ "$DIAG_CAUSE" == "memory_limit_exceeded" ]] && own="--own-limit"
+                plan="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" retry-plan --threads "$threads" --memory-gb "$mem" ${own:+$own} 2>/dev/null || true)"
+                if [[ -z "$plan" || "$plan" == "none" ]]; then STOP_EARLY=1; break; fi
+                read -r nt nm av <<< "$plan"
+                note="threads $threads -> $nt, memory budget $mem -> $nm GB (memory available now: $av GB)"
+                threads="$nt"; mem="$nm" ;;
+            stale)
+                note="removed this isolate's own unfinished assembly folder and started it again" ;;
+            *) break ;;
+        esac
+        first="$DIAG_CAUSE"
+        warn "SPAdes failed for $sample ($DIAG_TITLE); trying once more: $note"
+        run_event assembly_retry "sample=$sample" "cause=$first" "change=$note"
+        cp "$log" "$LOG_DIR/${sample}.spades.attempt${attempt}.log" 2>/dev/null || true
+        rm -rf "$asmdir"
+        attempt=$((attempt + 1))
+    done
+    local extra=""
+    if [[ "$attempt" -ge 2 ]]; then
+        extra="PlasBench already retried once ($note) and it failed again."
+        [[ "$DIAG_RETRY" == "memory" ]] && STOP_EARLY=1
+    elif [[ "$DIAG_RETRY" == "memory" && "$STOP_EARLY" == "1" ]]; then
+        extra="Memory and threads are already at the smallest setting PlasBench will try."
+    fi
+    if [[ "$DIAG_RETRY" == "reads" ]]; then
+        verify_reads "$sdir" "$r1" "$r2" "$t1" "$t2"
+        extra="$READS_NOTE"
+    fi
+    handle_step_failure "SPAdes" "$sample" "$log" "$start" "$extra"
+    return 1
 }
 
 # Difficulty features (RUN_DIFFICULTY_FEATURES, off by default; see
@@ -228,17 +314,18 @@ assemble_sample() {
         rm -f "$T1" "$T2" "$TRIM_DONE"
         log "  fastp trimming ($SAMPLE) ..."
         run_event sample_start "sample=$SAMPLE" "step=fastp"
-        if ! WATCH_LOG="$LOG_DIR/${SAMPLE}.fastp.log" run_with_heartbeat "$SAMPLE / fastp trimming" fastp -i "$R1" -I "$R2" -o "$P1" -O "$P2" \
+        local FASTP_RC=0
+        WATCH_LOG="$LOG_DIR/${SAMPLE}.fastp.log" run_with_heartbeat "$SAMPLE / fastp trimming" fastp -i "$R1" -I "$R2" -o "$P1" -O "$P2" \
             --length_required "$MIN_READ_LEN" --thread "$THREADS" \
             --json "$SDIR/fastp.json" --html "$SDIR/fastp.html" $FASTP_EXTRA \
-            > "$LOG_DIR/${SAMPLE}.fastp.log" 2>&1 \
-            || [[ ! -s "$P1" || ! -s "$P2" ]] || ! mv -f "$P1" "$T1" || ! mv -f "$P2" "$T2"; then
+            > "$LOG_DIR/${SAMPLE}.fastp.log" 2>&1 || FASTP_RC=$?
+        if [[ "$FASTP_RC" -ne 0 || ! -s "$P1" || ! -s "$P2" ]] || ! mv -f "$P1" "$T1" || ! mv -f "$P2" "$T2"; then
             # Remove the partial pair so a re-run retries the trim instead of
             # assembling truncated reads.
             rm -f "$P1" "$P2" "$T1" "$T2"
-            warn "fastp failed for $SAMPLE; excluded from assembly and scoring"
-            record_assembly_status "$SAMPLE" "failed" "" \
-                "fastp: see $LOG_DIR/${SAMPLE}.fastp.log" "$(( $(date +%s) - START ))"
+            diagnose_failed_step "$LOG_DIR/${SAMPLE}.fastp.log" "$FASTP_RC" "$SAMPLE"
+            DIAG_RETRY="-"
+            handle_step_failure "fastp" "$SAMPLE" "$LOG_DIR/${SAMPLE}.fastp.log" "$START"
             return 0
         fi
         : > "$TRIM_DONE"
@@ -269,14 +356,7 @@ assemble_sample() {
         need spades.py
         log "  SPAdes assembling ($SAMPLE) ..."
         run_event sample_start "sample=$SAMPLE" "step=spades"
-        if ! WATCH_LOG="$LOG_DIR/${SAMPLE}.spades.log" run_with_heartbeat "$SAMPLE / SPAdes assembly" spades.py -1 "$T1" -2 "$T2" -o "$ASMDIR" \
-            --threads "$THREADS" --memory "$ASSEMBLY_MEMORY_GB" \
-            > "$LOG_DIR/${SAMPLE}.spades.log" 2>&1; then
-            warn "SPAdes failed for $SAMPLE; excluded from tool runs and scoring"
-            record_assembly_status "$SAMPLE" "failed" "" \
-                "spades: see $LOG_DIR/${SAMPLE}.spades.log" "$(( $(date +%s) - START ))"
-            return 0
-        fi
+        run_spades_checked "$SAMPLE" "$T1" "$T2" "$ASMDIR" "$START" "$R1" "$R2" "$SDIR" || return 0
         if [[ -f "$ASMDIR/assembly_graph_with_scaffolds.gfa" ]]; then
             cp "$ASMDIR/assembly_graph_with_scaffolds.gfa" "$GRAPH.partial" && mv -f "$GRAPH.partial" "$GRAPH" || true
         fi
@@ -286,11 +366,13 @@ assemble_sample() {
         need unicycler
         log "  Unicycler assembling ($SAMPLE) ..."
         run_event sample_start "sample=$SAMPLE" "step=unicycler"
-        if ! WATCH_LOG="$LOG_DIR/${SAMPLE}.unicycler.log" run_with_heartbeat "$SAMPLE / Unicycler assembly" unicycler -1 "$T1" -2 "$T2" -o "$ASMDIR" -t "$THREADS" \
-            > "$LOG_DIR/${SAMPLE}.unicycler.log" 2>&1; then
-            warn "Unicycler failed for $SAMPLE; excluded from tool runs and scoring"
-            record_assembly_status "$SAMPLE" "failed" "" \
-                "unicycler: see $LOG_DIR/${SAMPLE}.unicycler.log" "$(( $(date +%s) - START ))"
+        local UNI_RC=0
+        WATCH_LOG="$LOG_DIR/${SAMPLE}.unicycler.log" run_with_heartbeat "$SAMPLE / Unicycler assembly" unicycler -1 "$T1" -2 "$T2" -o "$ASMDIR" -t "$THREADS" \
+            > "$LOG_DIR/${SAMPLE}.unicycler.log" 2>&1 || UNI_RC=$?
+        if [[ "$UNI_RC" -ne 0 ]]; then
+            diagnose_failed_step "$LOG_DIR/${SAMPLE}.unicycler.log" "$UNI_RC" "$SAMPLE"
+            DIAG_RETRY="-"
+            handle_step_failure "Unicycler" "$SAMPLE" "$LOG_DIR/${SAMPLE}.unicycler.log" "$START"
             return 0
         fi
         if [[ -f "$ASMDIR/assembly.gfa" ]]; then
@@ -308,12 +390,14 @@ assemble_sample() {
         record_assembly_status "$SAMPLE" "rejected" "" "assembly selection: $ASM_SELECT_REASON" "$(( $(date +%s) - START ))"
         return 0
     fi
-    record_assembly_status "$SAMPLE" "completed" "$CONTIGS" "${ASM_SELECT_NOTE:-}" "$(( $(date +%s) - START ))"
+    local RETRY_PART="${ASM_RETRY_NOTE:+SPAdes $ASM_RETRY_NOTE}"
+    record_assembly_status "$SAMPLE" "completed" "$CONTIGS" "${RETRY_PART}${RETRY_PART:+${ASM_SELECT_NOTE:+; }}${ASM_SELECT_NOTE:-}" "$(( $(date +%s) - START ))"
 }
 
 declare -A PIDS
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
+    [[ -e "$STATUS_SHARDS/.stop" ]] && break      # a cause that belongs to the computer was found: do not try the rest
     if [[ "$MAX_PARALLEL_SAMPLES" -le 1 ]]; then
         assemble_sample "$SAMPLE" "$ASM" "$SRA"
     else
@@ -337,12 +421,19 @@ if [[ "$MAX_PARALLEL_SAMPLES" -gt 1 ]]; then
 fi
 
 # Assemble the final status file once, in the order a sequential run produced it.
+STOP_INFO=""
+[[ -e "$STATUS_SHARDS/.stop" ]] && STOP_INFO="$(cat "$STATUS_SHARDS/.stop")"
 shards=()
+N_NOT_TRIED=0
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
+    if [[ -n "$STOP_INFO" && ! -e "$STATUS_SHARDS/${SAMPLE}.tsv" ]]; then
+        record_assembly_status "$SAMPLE" "skipped" "" "not attempted: stage 3 stopped early (${STOP_INFO%%$'\t'*})" "" "${STOP_INFO%%$'\t'*}" "fix the cause above, then run the same plasbench run command again"
+        N_NOT_TRIED=$((N_NOT_TRIED + 1))
+    fi
     shards+=("$STATUS_SHARDS/${SAMPLE}.tsv")
 done < <(read_samples "$SAMPLE_SHEET")
-merge_shards "$STATUS" "$(printf 'sample\tstatus\tcontigs\treason\truntime_seconds')" "${shards[@]}"
+merge_shards "$STATUS" "$(printf 'sample\tstatus\tcontigs\treason\truntime_seconds\tcause\tadvice')" "${shards[@]}"
 rm -rf "$STATUS_SHARDS"
 if [[ "$ASSEMBLY_SELECTION_MODE" != "off" ]] && compgen -G "$ASM_SHARDS/*.tsv" > /dev/null; then
     { head -1 "$(ls "$ASM_SHARDS"/*.tsv | head -1)"; for f in "$ASM_SHARDS"/*.tsv; do tail -n +2 "$f"; done; } > "$RESULTS_DIR/assembly_candidates.tsv"
@@ -360,6 +451,17 @@ UNUSABLE="$(awk -F'\t' 'NR>1 && ($2=="failed" || $2=="skipped" || $2=="rejected"
 if [[ "$UNUSABLE" -gt 0 ]]; then
     warn "$UNUSABLE sample(s) produced no assembly; stage 4 will record their tools as skipped:"
     awk -F'\t' 'NR>1 && ($2=="failed" || $2=="skipped" || $2=="rejected") {printf "    %s\t%s\t%s\n", $1, $2, $4}' "$STATUS" >&2
+fi
+N_FAILED="$(awk -F'\t' 'NR>1 && $2=="failed"' "$STATUS" | wc -l | tr -d '[:space:]')"
+N_CAUSES="$(awk -F'\t' 'NR>1 && $2=="failed" && $6!="" {print $6}' "$STATUS" | sort -u | wc -l | tr -d '[:space:]')"
+if [[ "$N_FAILED" -gt 1 && "$N_CAUSES" -eq 1 && "$N_FAILED" -eq "$UNUSABLE" ]]; then
+    warn "All $N_FAILED samples failed for the same reason: $(awk -F'\t' 'NR>1 && $2=="failed" {print $6; exit}' "$STATUS"). One fix: $(awk -F'\t' 'NR>1 && $2=="failed" {print $7; exit}' "$STATUS")"
+fi
+if [[ -n "$STOP_INFO" ]]; then
+    IFS=$'\t' read -r STOP_CAUSE STOP_SAMPLE STOP_TITLE <<< "$STOP_INFO"
+    run_event stage_stopped "cause=$STOP_CAUSE" "sample=$STOP_SAMPLE" "not_attempted=$N_NOT_TRIED"
+    warn "Stage 3 stopped early at $STOP_SAMPLE: $STOP_TITLE ($STOP_CAUSE). This belongs to the computer, not the isolate, so every other sample would fail the same way ($N_NOT_TRIED not attempted). Fix it, then run the same plasbench run command again: finished isolates, downloads and trimmed reads are reused (there is no separate --resume option). Status: $STATUS"
+    exit 5
 fi
 if [[ "$USABLE" -eq 0 ]]; then
     die "no sample produced an assembly; nothing to benchmark (see $STATUS)"

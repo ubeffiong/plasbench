@@ -745,6 +745,11 @@ All are optional; the defaults are safe. Set them in the environment or in `conf
 | `PLASBENCH_STALL_SECONDS` | `600` | The window shows a running job as `stalled` after this many seconds without output (`0` turns it off). |
 | `PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS` | `21600` (6 h) | Time limit for every helper subprocess in `python/` (`0` or `off` removes it). |
 | `MIN_FREE_DISK_GB` | `20` | A warning (never a stop) before stage 1 when the drive has less free space (`0` turns it off). |
+| `PLASBENCH_SKIP_DISK_CHECK` | `0` | `1` skips the disk figures of the resource check made before stages 0, 2 and 3 (which otherwise stops with exit 6 when the estimated need does not fit). |
+| `PLASBENCH_SKIP_RESOURCE_CHECK` | `0` | `1` skips the whole resource check (disk, memory, CPUs, writable folders). |
+| `CAP_THREADS_TO_CPUS` | `1` | `THREADS` above the CPUs this process can use (affinity, container quota, WSL `processors=`) is lowered to them and the decision is printed; `0` keeps your number. |
+| `ASSEMBLER_AUTO_RETRY` | `1` | A SPAdes failure from lack of memory (or a stale output folder) is retried once, with fewer threads and a budget that fits the free memory; `0` never retries. |
+| `ANNOTATION_CACHE_DIR` | `<data>/.annotation_cache` | Finished reference annotations, keyed by the reference's SHA-256 and the annotation tools' versions, reused by later studies of the same isolate (empty turns it off). |
 | `PLASBENCH_LOCK_HEARTBEAT_SECONDS`, `PLASBENCH_LOCK_STALE_SECONDS` | `5`, `60` | A run holds `RESULTS_DIR/.run.lock` and touches `.run.lock.heartbeat`. A second run is refused while the holder is alive; a lock whose heartbeat is older than the stale limit is taken over even if its process id is alive (covers a killed run and a reused id). |
 | `ALLOW_INCONSISTENT_RUNS` | `0` | Aggregation stops when the run tables disagree (missing columns, non-finite values, a status that contradicts a score). `1` continues and still prints the count. |
 | `ALLOW_INPUT_MISMATCH` (or `--allow-input-mismatch`) | `0` | The report builder refuses a leaderboard that was not ranked from the scores it is given. `1` builds anyway. |
@@ -1259,6 +1264,55 @@ Empty sample sheet
 
 Missing executable
     Activate the plasbench Conda environment, then run plasbench check.
+
+The run stopped in stage 3: SPAdes failed
+    Stage 3 now reads the assembler's log, names the cause and says what to do, in one block:
+      "SPAdes failed for <isolate>: <cause> (<the log line>). What to do: ... Log: <path>"
+    The same cause and advice are in results/assembly_status.tsv (columns cause and advice),
+    in `plasbench status` / `plasbench diagnose`, and in the window's run panel. A cause that
+    belongs to the computer (disk full, a broken Python, a CPU feature, no writable folder)
+    would repeat for every isolate, so stage 3 stops at the first one with exit code 5 and the
+    rest are recorded as "not attempted". To continue after the fix, run the same
+    `plasbench run ...` command again: finished isolates, downloads and trimmed reads are
+    reused (there is no separate --resume option).
+
+    Cause                    What the log shows                          Check                     Fix
+    disk full                "No space left on device", Errno 28         df -h . ; df -h $TMPDIR   Free space. Under WSL the
+                                                                                                   Windows drive holding
+                                                                                                   Ubuntu's virtual disk (often
+                                                                                                   C:) must have room too.
+    out of memory            std::bad_alloc, "Out of memory", exit 137   free -h ; dmesg | tail    Retried once automatically
+                             or "OS return value: -9"                                              with half the threads and a
+                                                                                                   budget that fits the free
+                                                                                                   memory. Else lower THREADS /
+                                                                                                   ASSEMBLY_MEMORY_GB; WSL:
+                                                                                                   memory= in .wslconfig, then
+                                                                                                   wsl --shutdown.
+    SPAdes memory limit      "Memory limit ... exceeded"                 grep -i memory <log>      Same retry; raise --memory-gb.
+    too many threads         pthread_create, "Resource temporarily       nproc ; ulimit -a         plasbench run --threads N
+                             unavailable"                                                          (N = your CPUs; PlasBench
+                                                                                                   also caps THREADS to the
+                                                                                                   usable CPUs).
+    Python / distutils       ModuleNotFoundError, SyntaxError            spades.py --test          plasbench install-tools, or
+                                                                                                   SPAdes 4 on Python 3.12.
+    illegal instruction      "Illegal instruction", exit 132             uname -m ; lscpu          Re-install the tool here.
+    truncated / bad reads    "unexpected end of file", gzip errors       gzip -t <reads>           Delete the reads and run the
+                                                                                                   same command: stage 1 fetches
+                                                                                                   them again (the message gives
+                                                                                                   the exact rm command).
+    empty or too short       "no reads", k-mer larger than read length   zcat <reads> | head       Check MIN_READ_LEN, FASTP_EXTRA.
+    read-only / no TMPDIR    "Read-only file system", "Permission        ls -ld <folder>           Use a writable folder; avoid
+                             denied", "No usable temporary directory"                              studies on /mnt or synced
+                                                                                                   folders.
+    stale output folder      "output_dir is not empty", --continue       ls <data>/<isolate>/      Removed and retried once.
+    not recognised           anything else                               tail -30 <log>            The message quotes the last
+                                                                                                   15 lines; nothing is guessed.
+    Before stages 0, 2 and 3 a resource check (python/preflight_resources.py) looks at free disk
+    (study, data and temporary folders; under WSL also the Windows drive holding Ubuntu's disk),
+    memory, usable CPUs and writable folders, and prints "Resources check: ok" or the warnings.
+    A shortage stops with exit code 6. Set PLASBENCH_SKIP_DISK_CHECK=1 to try anyway.
+    WSL limits (memory, processors, swap) are set in C:\Users\<you>\.wslconfig and change only
+    after `wsl --shutdown`.
 
 The window shows an old "installed" answer, or a tool you just installed as "not found"
     The window remembers what it found on this computer for 30 seconds and refreshes it

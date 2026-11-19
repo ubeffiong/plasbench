@@ -690,6 +690,9 @@ cloud-sync warnings. **Refresh** looks again and marks drives plugged in since t
 **Evidence.** `plasbench/server_state.py`, `GET /api/server-state`, `POST /api/server/restart`; `test/test_stale_server.py`.
 **Status.** Fixed after v0.5.2 (next release). Not yet checked in a real browser or on a real desktop shortcut.
 
+### Q67. The run stopped in stage 3 with "SPAdes failed". What now?
+Read the block it printed: it names the cause from the assembler's log ("the disk is full", "the computer ran out of memory", "a read file is truncated", and so on), quotes the log line it is based on, and says what to do. The same cause and advice are in `results/assembly_status.tsv` (columns `cause` and `advice`) and in `plasbench status`. A cause that belongs to the computer (a full disk, a broken Python, a CPU feature, a folder that cannot be written) would repeat for every isolate, so the stage stops at the first isolate (exit code 5) instead of spending minutes on each; fix it and run the same `plasbench run ...` command again, and finished work is reused (there is no separate `--resume`). Out of memory is retried once, automatically, with half the threads and a memory budget that fits what is free now. A log PlasBench does not recognise is reported as "not recognised" with its last lines; nothing is guessed. Under WSL a full Windows drive (usually C:, which holds Ubuntu's virtual disk) makes Ubuntu report "No space left on device" even when `df` inside Ubuntu shows room; the resource check before stage 3 looks at that drive. See the User Guide, Troubleshooting.
+
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions
