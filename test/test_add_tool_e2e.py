@@ -86,12 +86,18 @@ def posix(path):
     return str(path).replace("\\", "/")
 
 
+def put(path, text):
+    """Write LF text (Path.write_text(newline=) needs Python 3.10, and the CI also runs 3.9)."""
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+
 def write_tool(name, manifest, files=None, root=None):
     folder = Path(root or TOOLS) / name
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / ut.MANIFEST).write_text(manifest, encoding="utf-8", newline="\n")
+    put(folder / ut.MANIFEST, manifest)
     for fname, text in (files or {}).items():
-        (folder / fname).write_text(text, encoding="utf-8", newline="\n")
+        put(folder / fname, text)
     return folder
 
 
