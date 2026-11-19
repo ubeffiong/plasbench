@@ -26,7 +26,7 @@ CATEGORIES = [
      ["discover-cohort", "discover-design-cohort", "review-candidates", "import-contributed-cohort", "resolve-contributed-cohort", "selection-report", "build-publication-cohorts", "curate-cohort", "validate-cohort",
       "build-ledger", "collect-truth-provenance", "derive-amr-truth", "promote-amr-truth", "audit-truth-labels", "prepare-contribution"]),
     ("results", "Results and analysis", "Reports, PDFs and standalone analyses of a completed run.",
-     ["status", "diagnose", "open-report", "report-pdf", "analysis", "candidate-dataset", "import-external-benchmark", "compare-published",
+     ["status", "diagnose", "open-report", "report-pdf", "check-results", "regenerate-visuals", "analysis", "candidate-dataset", "import-external-benchmark", "compare-published",
       "validate-orthogonal-evidence"]),
     ("meta", "Metagenomics track", "The separate graph-aware metagenomic track.",
      ["metagenomics", "audit-meta-cohort", "design-meta-synthetic", "validate-meta-intake", "materialize-meta-bmock12",
@@ -34,7 +34,7 @@ CATEGORIES = [
     ("help", "Help", "Guides and the concept note.", ["docs", "concept-note"]),
 ]
 # Shorthand spellings argparse registers as separate choices; the window shows each command once.
-ALIASES = {"meta": "metagenomics", "beta": "metagenomics"}
+ALIASES = {"meta": "metagenomics", "beta": "metagenomics", "rebuild-report": "regenerate-visuals"}
 
 
 def _jsonable(value):

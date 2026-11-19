@@ -330,6 +330,28 @@ def build_parser():
     report_pdf_group.add_argument("--report", type=Path, help="Path to benchmark.report.html.")
     report_pdf_group.add_argument("--results-dir", type=Path, help="Results directory containing benchmark.report.html.")
     report_pdf_parser.add_argument("--out", type=Path, help="PDF to write (default: next to the report, same name with .pdf).")
+    regen_parser = sub.add_parser(
+        "regenerate-visuals", aliases=["rebuild-report"],
+        help="Rebuild the per-sample files the report's figures need (alignments, truth tables, read QC) in an old or published results folder.")
+    regen_parser.add_argument("results_dir", type=Path, help="The finished run's results folder.")
+    regen_parser.add_argument("--data-dir", type=Path, help="The run's data folder (reference FASTAs, truth tables, reads); needed for what the results folder did not keep.")
+    regen_parser.add_argument("--cohort", type=Path, help="The cohort or sample-sheet TSV of the run (same as --samples).")
+    regen_parser.add_argument("--samples", type=Path, help="The sample-sheet TSV of the run.")
+    regen_parser.add_argument("--only", help="Comma-separated parts to rebuild: truth, paf, alignments, truth-features, qc, keep (default: all of these; scores is never rebuilt here).")
+    regen_parser.add_argument("--predictions-dir", type=Path,
+                              help="The original results folder, when this one did not keep the predictions; they are checked against scores.tsv before use.")
+    regen_parser.add_argument("--dry-run", action="store_true", help="Only say which sections are missing, which files cause it and which can be rebuilt; write nothing.")
+    regen_parser.add_argument("--yes", action="store_true", help="Rebuild without asking first.")
+    regen_parser.add_argument("--force", action="store_true", help="Rebuild files that are already present (never scores.tsv or the benchmark.* tables).")
+    regen_parser.add_argument("--report", action="store_true", help="Rebuild the HTML report afterwards (plasbench report on this folder).")
+    regen_parser.add_argument("--json", action="store_true", help="Print the result as JSON.")
+    check_results_parser = sub.add_parser(
+        "check-results", help="Say which report sections a finished results folder can draw, and which missing files stop the rest.")
+    check_results_parser.add_argument("results_dir", type=Path, help="The finished run's results folder.")
+    check_results_parser.add_argument("--data-dir", type=Path, help="The run's data folder, if it is still available.")
+    check_results_parser.add_argument("--cohort", type=Path, help="The cohort or sample-sheet TSV of the run (same as --samples).")
+    check_results_parser.add_argument("--samples", type=Path, help="The sample-sheet TSV of the run.")
+    check_results_parser.add_argument("--json", action="store_true", help="Print the result as JSON.")
     for status_name, status_help in (
             ("status", "Show what a run is doing now: stage, isolate and step, for how long, CPU and memory, progress so far, and plain hints when it looks stuck."),
             ("diagnose", "Like status, plus the busiest processes of the run: use it when a run seems stuck.")):
@@ -860,6 +882,23 @@ def main(argv=None):
         command = [sys.executable, str(root / "python" / "export_report_pdf.py"), "--report", str(report)]
         if args.out:
             command += ["--out", str(args.out)]
+        code = run(command, root)
+    elif args.command in ("regenerate-visuals", "rebuild-report", "check-results"):
+        checking = args.command == "check-results"
+        command = [sys.executable, str(root / "python" / "regenerate_visuals.py"), "check" if checking else "regenerate", str(Path(args.results_dir).resolve())]
+        for flag in ("data_dir", "cohort", "samples"):
+            if getattr(args, flag, None):
+                command += ["--" + flag.replace("_", "-"), str(Path(getattr(args, flag)).resolve())]
+        if args.json:
+            command.append("--json")
+        if not checking:
+            if args.only:
+                command += ["--only", args.only]
+            if args.predictions_dir:
+                command += ["--predictions-dir", str(Path(args.predictions_dir).resolve())]
+            for flag in ("dry_run", "yes", "force", "report"):
+                if getattr(args, flag):
+                    command.append("--" + flag.replace("_", "-"))
         code = run(command, root)
     elif args.command in ("status", "diagnose"):
         from . import studies

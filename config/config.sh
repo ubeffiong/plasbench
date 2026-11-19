@@ -741,6 +741,14 @@ export VISUALIZATION_MAX_BLOCKS_PER_TOOL="${VISUALIZATION_MAX_BLOCKS_PER_TOOL:-2
 # Largest aligned block rendered as base-level text in the local viewer.
 export VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP="${VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP:-2000}"
 
+# Keep the small per-sample inputs the report needs INSIDE the results folder (python/keep_report_inputs.py, end of stage 5): the truth
+# tables that otherwise live only in the data folder (truth, features, AMR, circularity, proteins, repeats) and a record/length/hash summary
+# of every tool's prediction. Reads, assemblies and reference FASTAs are never copied. With the default, a results folder copied to another
+# machine can rebuild its report and its figures (plasbench check-results RESULTS_DIR says which sections will draw). KEEP_REPORT_INPUTS=0
+# turns it off; KEEP_REPORT_INPUTS_MAX_KB is the budget per sample (files that would exceed it are listed as skipped in <sample>/report_inputs.json).
+export KEEP_REPORT_INPUTS="${KEEP_REPORT_INPUTS:-1}"
+export KEEP_REPORT_INPUTS_MAX_KB="${KEEP_REPORT_INPUTS_MAX_KB:-2048}"
+
 # --- Safety: stop early if the sample sheet is missing -----------------------
 if [[ ! -f "$SAMPLE_SHEET" ]]; then
     echo "WARNING: sample sheet not found at $SAMPLE_SHEET" >&2

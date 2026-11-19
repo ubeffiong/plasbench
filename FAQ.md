@@ -846,6 +846,8 @@ whole genome, chromosome-only, half, plasmid-free) in `test_scoring_controls.py`
 `test_scoring_real_minimap2.py`. When PlasBench cannot answer it says so rather than forcing a value: `not_evaluated`,
 `not_assessed`, `underpowered`, `unknown`, `no_close_reference`. **Answered.**
 
+**26a. Can an old or published results folder redraw the new report figures?** Only if it still holds the per-sample files they read. `plasbench check-results RESULTS_DIR` says which sections cannot draw and why, and `plasbench regenerate-visuals RESULTS_DIR --data-dir DIR` rebuilds the cheap ones (alignment blocks, truth and QC tables, structural calls) with the pipeline's own scripts, byte-identical to a fresh run (`test_regenerate_visuals.py`). It never changes scores or the `benchmark.*` tables, never overwrites an existing file without `--force`, and records what it wrote in `regenerated_inputs.json`, which the report shows in Run metadata. What it cannot rebuild (tool predictions that were not kept, reference FASTAs that were deleted, reads, a curated AMR table) it names, with the command to run once those are supplied. The inputs of each report section are in `docs/REPORT_INPUTS.md`; new runs keep them in the results folder (`KEEP_REPORT_INPUTS=1`). **Verified.**
+
 ### Part XV. Reproducibility and governance (Q431-455)
 
 **28. Reproducibility (Q431-445).** The run manifest records parameters, tool and cohort versions and image digests; cohort lock
