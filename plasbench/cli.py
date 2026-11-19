@@ -269,6 +269,7 @@ def build_parser():
                "  plasbench upgrade                 (latest release; also: Setup > Check for updates in the window)\n"
                "  plasbench ui --tab                (open the window in a normal browser tab)\n"
                "  plasbench desktop-icon            (put the PlasBench icon on the desktop; --remove undoes it)\n"
+               "  plasbench picker-check            (why does Browse not open the folder window? PASS or FAIL per step)\n"
                "  bash install_latest.sh --archive plasbench-<version>.tar.gz   (install a downloaded release with no network)\n"
                "  plasbench check --yes\n"
                "  plasbench install-tools core\n"
@@ -316,6 +317,13 @@ def build_parser():
     icon_parser.add_argument("--remove", action="store_true", help="Remove the PlasBench icons instead.")
     icon_parser.add_argument("--no-desktop", action="store_true",
                              help="Only the applications/Start menu entry, not an icon on the desktop.")
+    picker_parser = sub.add_parser(
+        "picker-check",
+        help="Check step by step why Browse does or does not open this computer's own folder window (WSL, Windows, macOS, Linux, Docker); prints PASS or FAIL per step.")
+    picker_parser.add_argument("--interactive", action="store_true",
+                               help="Leave the folder window open so you can choose a folder; prints the path that comes back.")
+    picker_parser.add_argument("--seconds", type=int, default=2, help="How long the self-test leaves its window open before closing it (default 2).")
+    picker_parser.add_argument("--json", action="store_true", help="Print the report as JSON.")
     demo_parser = sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
     demo_parser.add_argument("--open-report", action="store_true",
                              help="Open the completed demo report in your browser without asking.")
@@ -1011,6 +1019,9 @@ def main(argv=None):
         from .webui import serve
         serve(root, port=args.port, open_browser=not args.no_browser, tab=args.tab, new_instance=args.new_instance)
         return 0
+    if args.command == "picker-check":
+        from . import picker_check
+        return picker_check.main((["--interactive"] if args.interactive else []) + ["--seconds", str(args.seconds)] + (["--json"] if args.json else []))
     if args.command == "install-git":
         from . import install_git
         return install_git.main((["--force"] if args.force else []) + (["--dry-run"] if args.dry_run else []))
