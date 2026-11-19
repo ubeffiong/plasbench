@@ -168,6 +168,8 @@ def main():
     row = {r["parameter"]: r for r in data["rows"]}
     check("the window's data lists every decision with its plain text, status and the value this computer uses", len(data["rows"]) == len(rows) and row["dominant_study_share"]["current"] in ("0.30", "0.3") and not row["dominant_study_share"]["departs"], row["dominant_study_share"])
     env_file.write_text("export PLASBENCH_DOMINANT_SHARE=0.55\n", encoding="utf-8")
+    from plasbench import loadcache
+    loadcache.clear()   # the window remembers a file's fingerprint for loadcache.STAT_TTL (0.5 s); a save through the window clears it the same way
     row = {r["parameter"]: r for r in project.prereg()["rows"]}
     check("a setting that differs from the decision is flagged (this computer would not follow the plan)", row["dominant_study_share"]["departs"] and row["dominant_study_share"]["current"] == "0.55")
     html = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
