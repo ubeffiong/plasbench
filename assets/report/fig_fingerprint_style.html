@@ -1,0 +1,60 @@
+<style>
+/* Tool fingerprint (python/report_fig_fingerprint.py). Same look as the ladder, precision-recall and plasmid-map panels: figure left, collapsible
+   side panel right, tooltip box, 3px focus ring. The server-drawn tiles are the no-JavaScript and print version; the script adds behaviour only.
+   Colours use the report tokens (--ink, --muted, --line, --card, --green); the dark block applies only when the page sets data-theme="dark". */
+.fp-root{margin:12px 0;font:13px/1.45 Arial,Helvetica,sans-serif;color:var(--ink,#17231d);--fp-bg:var(--card,#fff);--fp-soft:#fbfcfb;--fp-chip:#fff;--fp-sel:#e6f0ff;--fp-ring:#1a5fb4}
+.fp-root *{box-sizing:border-box}
+.fp-key{display:flex;flex-wrap:wrap;gap:2px 14px;list-style:none;margin:0 0 4px;padding:0;font-size:12px}
+.fp-key b{display:inline-block;min-width:2.6em;font-family:Consolas,Menlo,monospace}
+.fp-scale{margin:0 0 8px;font-size:12px;color:var(--muted,#627067)}
+.fp-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
+.fp-bar .fp-sp{flex:1}
+.fp-btn{border:1px solid #b9c5bd;background:var(--fp-chip);color:var(--ink,#17231d);border-radius:6px;padding:5px 10px;cursor:pointer;font:600 12px Arial,sans-serif;line-height:1.2}
+.fp-btn:hover{background:#eef4ef}
+.fp-btn[aria-pressed=true],.fp-btn[aria-expanded=true].fp-primary{background:var(--green,#0c6b4f);color:#fff;border-color:var(--green,#0c6b4f)}
+.fp-root :focus-visible{outline:3px solid var(--fp-ring);outline-offset:2px}
+.fp-main{display:grid;grid-template-columns:minmax(0,1fr);border:1px solid var(--line,#d9e1da);background:var(--fp-bg);border-radius:10px;overflow:hidden}
+.fp-on .fp-main.fp-open{grid-template-columns:minmax(0,1fr) 340px}
+.fp-stage{min-width:0;padding:8px 12px 10px;position:relative}
+.fp-track h3{margin:6px 0 4px;font:700 14px Arial,sans-serif}
+.fp-track h3 small{font-weight:400;color:var(--muted,#627067)}
+.fp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px}
+.fp-tile{display:flex;flex-direction:column;align-items:center;border:1px solid var(--line,#d9e1da);border-radius:8px;padding:4px 4px 6px;background:var(--fp-bg);text-align:center;min-width:0}
+.fp-svg{display:block;width:100%;max-width:160px;height:auto}
+.fp-name{display:flex;align-items:center;gap:5px;font-weight:700;font-size:12px;max-width:100%}
+.fp-name i{display:inline-block;width:10px;height:10px;border-radius:2px;flex:none}
+.fp-sub{font-size:11px;color:var(--muted,#627067)}
+.fp-on .fp-tile{cursor:pointer}
+.fp-on .fp-tile:hover{border-color:#7aa6e0}
+.fp-tile[aria-pressed=true]{background:var(--fp-sel);border-color:var(--fp-ring);box-shadow:0 0 0 1px var(--fp-ring) inset}
+.fp-tile.fp-cmp{border-style:dashed;border-color:var(--fp-ring)}
+.fp-track details{margin:6px 0 4px}
+.fp-track details table{width:100%;font-size:12px}
+.fp-panel{border-left:1px solid var(--line,#d9e1da);background:var(--fp-soft);min-width:0;max-height:560px;overflow:auto;padding:10px 12px 14px}
+.fp-panel[hidden]{display:none}
+.fp-panel h3{margin:0 0 2px;font:700 15px Arial,sans-serif}
+.fp-panel h4{margin:12px 0 6px;font:700 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#627067)}
+.fp-panel table{width:100%;border-collapse:collapse;min-width:0}
+.fp-panel th,.fp-panel td{white-space:normal;padding:3px 5px;text-align:left;vertical-align:top;border-top:1px solid var(--line,#d9e1da);font-size:12px}
+.fp-panel th{background:#edf2ec;font-size:11px}
+.fp-panel a{color:#0a5a41}
+.fp-panel .fp-close{float:right}
+.fp-panel .fp-def{color:var(--muted,#627067);font-size:11.5px;display:block}
+.fp-panel .fp-na{color:var(--muted,#627067)}
+.fp-panel .fp-big{width:100%;max-width:230px;height:auto;display:block;margin:4px auto}
+.fp-lg{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;margin:4px 0}
+.fp-lg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}
+.fp-tip{position:absolute;z-index:5;max-width:270px;background:#14211b;color:#fff;border-radius:8px;padding:7px 10px;font:12px/1.35 Arial,sans-serif;pointer-events:none;box-shadow:0 4px 14px #0005}
+.fp-tip[hidden]{display:none}
+.fp-tip strong{display:block;font-size:13px;margin-bottom:3px}
+.fp-tip dl{display:grid;grid-template-columns:auto 1fr;gap:1px 8px;margin:0}
+.fp-tip dt{color:#b8cbc0}.fp-tip dd{margin:0}
+.fp-hit{background:#fff3b0;transition:background 1s}
+:root[data-theme="dark"] .fp-root{--fp-bg:#17211c;--fp-soft:#1d2923;--fp-chip:#22302a;--fp-sel:#1f3a5c;--fp-ring:#7aa6e0}
+:root[data-theme="dark"] .fp-panel th{background:#26332c}
+:root[data-theme="dark"] .fp-btn:hover{background:#2d3d35}
+:root[data-theme="dark"] .fp-panel a{color:#8fd1b5}
+@media (max-width:900px){.fp-on .fp-main.fp-open{grid-template-columns:minmax(0,1fr)}.fp-panel{border-left:0;border-top:1px solid var(--line,#d9e1da);max-height:none}}
+@media (max-width:520px){.fp-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.fp-stage{padding:6px}}
+@media print{.fp-bar,.fp-tip,.fp-panel{display:none!important}.fp-main{display:block;border:0}.fp-tile{break-inside:avoid}.fp-grid{grid-template-columns:repeat(4,1fr)}}
+</style>

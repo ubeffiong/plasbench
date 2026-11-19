@@ -56,7 +56,7 @@ try:
     check("identity and opacity follow the block", abs(sy.identity(block("x", 1, 0, 1, "+", 0, 1000, 0.97)) - 0.97) < 1e-3 and sy.opacity(0.999) > sy.opacity(0.97) > sy.opacity(0.9))
 
     page = "<html><nav><a href='#recommendations'>Recommendations</a></nav><section id='recommendations'></section></html>"
-    out = sy.inject(page, res)
+    out = sy.inject_legacy(page, res)
     check("the section and navigation link are added before Recommendations", "id='learn-synteny'" in out and "href='#learn-synteny'" in out
           and out.index("learn-synteny") < out.index("id='recommendations'"))
     polys = re.findall(r"<g class='sy-rib'[^>]*data-strand='([+-])'[^>]*>.*?<polygon[^>]*points='([^']*)'", out, flags=re.S)
@@ -93,18 +93,18 @@ try:
     many = [block(f"r{i}", 100000, i * 100, i * 100 + 80, "+", i * 100, i * 100 + 80) for i in range(sy.MAX_RIBBONS + 7)]
     write(res, "S2", {"toolA": many})
     cap = {l["tool"]: l for v in sy.load(res) if v[0] == "S2" for l in v[3]}["toolA"]
-    check("blocks beyond the cap are counted as not drawn", cap["omitted"] == 7 and "smaller block(s) not drawn" in sy.inject(page, res), cap["omitted"])
+    check("blocks beyond the cap are counted as not drawn", cap["omitted"] == 7 and "smaller block(s) not drawn" in sy.inject_legacy(page, res), cap["omitted"])
 
     for i in range(sy.MAX_VIEWS + 3):
         write(res, f"X{i:03d}", {"toolA": [block("a", 100000, 0, 1000, "+", 0, 1000)]})
-    capped = sy.inject(page, res)
+    capped = sy.inject_legacy(page, res)
     check("more plasmids than the cap are listed with how many were left out", f"Showing {sy.MAX_VIEWS} of" in capped and capped.count("class='sy-view'") == sy.MAX_VIEWS)
 
     write(os.path.join(tmp, "esc"), "S&x", {"<i>t</i>": [block("<u>r</u>", 1000, 0, 500, "+", 0, 500)]}, {"P1": {"length": 1000, "molecule_type": "PLASMID"}})
-    esc_out = sy.inject(page, os.path.join(tmp, "esc"))
+    esc_out = sy.inject_legacy(page, os.path.join(tmp, "esc"))
     check("sample, tool and record names are escaped", "S&amp;x" in esc_out and "S&x" not in esc_out and "<i>t</i>" not in esc_out and "<u>r</u>" not in esc_out)
 
-    empty = sy.inject(page, os.path.join(tmp, "nothing"))
+    empty = sy.inject_legacy(page, os.path.join(tmp, "nothing"))
     check("with no alignment blocks the section says it was not run and why", "Not run" in empty and "alignment_blocks.json" in empty)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)

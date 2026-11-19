@@ -1,0 +1,190 @@
+<script>
+/* Tool fingerprint, DOM layer. The tiles are server-drawn SVG; this wires hover/focus tooltips, click / Enter / Space to open the side panel,
+   arrow-key movement between tiles, Escape to close, and Compare (up to three tools overlaid). Needs PBFingerprint (fig_fingerprint_core). */
+(function () {
+'use strict';
+var F = window.PBFingerprint, host = document.getElementById('fp-root'), dataEl = document.getElementById('fp-data');
+if (!F || !host || !dataEl) { return; }
+var P; try { P = JSON.parse(dataEl.textContent); } catch (e) { return; }
+var main = host.querySelector('.fp-main'), stage = host.querySelector('.fp-stage'), panel = document.getElementById('fp-panel'), tip = document.getElementById('fp-tip');
+var NS = 'http://www.w3.org/2000/svg';
+var S = {sel: null, compare: false, cmp: []};
+var byId = {}; P.tracks.forEach(function (t) { t.tools.forEach(function (x) { x.trackLabel = t.label; x.of = t.of; byId[x.id] = x; }); });
+function el(tag, attrs, kids) {
+  var n = document.createElement(tag);
+  Object.keys(attrs || {}).forEach(function (k) { if (k === 'text') { n.textContent = attrs[k]; } else { n.setAttribute(k, attrs[k]); } });
+  (kids || []).forEach(function (c) { n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+  return n;
+}
+host.classList.add('fp-on');
+
+/* ---------- toolbar ---------- */
+var bar = el('div', {'class': 'fp-bar'});
+var cmpBtn = el('button', {type: 'button', 'class': 'fp-btn', 'aria-pressed': 'false', title: 'Click up to ' + P.max_compare + ' tools to overlay them', text: 'Compare tools'});
+var clearBtn = el('button', {type: 'button', 'class': 'fp-btn', text: 'Close panel'});
+var status = el('span', {'class': 'fp-sub', 'aria-live': 'polite'});
+bar.appendChild(cmpBtn); bar.appendChild(clearBtn); bar.appendChild(status);
+host.insertBefore(bar, main);
+cmpBtn.addEventListener('click', function () { S.compare = !S.compare; S.cmp = S.compare && S.sel ? [S.sel] : []; sync(); });
+clearBtn.addEventListener('click', function () { S.sel = null; S.cmp = []; S.compare = false; sync(); });
+
+/* ---------- tiles ---------- */
+var groups = [].slice.call(host.querySelectorAll('.fp-grid'));
+var tiles = [].slice.call(host.querySelectorAll('.fp-tile'));
+function rowText(x) {
+  var s = [];
+  P.axes.forEach(function (a, k) { s.push(a.label + ' ' + (x.v[k] === null ? 'not available' : F.fmtValue(x.v[k], 2))); });
+  return s.join(', ');
+}
+tiles.forEach(function (t) {
+  var x = byId[t.getAttribute('data-id')], g = t.parentNode, sibs = [].slice.call(g.children);
+  t.setAttribute('role', 'button'); t.setAttribute('aria-pressed', 'false');
+  t.setAttribute('tabindex', sibs[0] === t ? '0' : '-1');
+  t.setAttribute('aria-label', x.label + ', ' + x.trackLabel + ' track' + (x.rank ? ', rank ' + x.rank + ' of ' + x.of : '') + '. ' + rowText(x) + '. Press Enter for the panel.');
+  t.addEventListener('mouseenter', function () { showTip(t, x); }); t.addEventListener('mouseleave', hideTip);
+  t.addEventListener('focus', function () { showTip(t, x); }); t.addEventListener('blur', hideTip);
+  t.addEventListener('click', function () { pick(x.id); });
+  t.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(x.id); return; }
+    if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].indexOf(e.key) < 0) { return; }
+    e.preventDefault();
+    var cols = Math.max(1, Math.round(g.clientWidth / (t.offsetWidth + 8))), i = sibs.indexOf(t), j = F.gridMove(i, e.key, cols, sibs.length);
+    if (j !== i && j >= 0) { sibs.forEach(function (s) { s.setAttribute('tabindex', '-1'); }); sibs[j].setAttribute('tabindex', '0'); sibs[j].focus(); }
+  });
+});
+function showTip(node, x) {
+  tip.textContent = '';
+  tip.appendChild(el('strong', {text: x.label + ' (' + x.trackLabel + ')'}));
+  var dl = el('dl');
+  dl.appendChild(el('dt', {text: 'Rank'})); dl.appendChild(el('dd', {text: x.rank ? x.rank + ' of ' + x.of + ' by scorecard overall' : 'not ranked'}));
+  dl.appendChild(el('dt', {text: 'Isolates'})); dl.appendChild(el('dd', {text: x.n === null ? 'not recorded' : String(x.n)}));
+  P.axes.forEach(function (a, k) {
+    dl.appendChild(el('dt', {text: a.label})); dl.appendChild(el('dd', {text: x.v[k] === null ? 'not available' : F.fmtValue(x.v[k], 3)}));
+  });
+  tip.appendChild(dl); tip.appendChild(el('em', {text: 'Click or press Enter for the panel.'}));
+  tip.hidden = false;
+  var sb = stage.getBoundingClientRect(), nb = node.getBoundingClientRect();
+  tip.style.left = Math.max(4, Math.min(sb.width - 280, nb.left - sb.left + nb.width * 0.55)) + 'px';
+  tip.style.top = Math.max(4, nb.top - sb.top + nb.height * 0.5) + 'px';
+}
+function hideTip() { tip.hidden = true; }
+
+/* ---------- selection ---------- */
+function pick(id) {
+  hideTip();
+  if (S.compare) { S.cmp = F.toggleCompare(S.cmp, id, P.max_compare); S.sel = S.cmp.length ? S.cmp[S.cmp.length - 1] : null; }
+  else { S.sel = S.sel === id ? null : id; }
+  sync();
+}
+function sync() {
+  cmpBtn.setAttribute('aria-pressed', String(S.compare));
+  tiles.forEach(function (t) {
+    var id = t.getAttribute('data-id');
+    t.setAttribute('aria-pressed', String(S.compare ? S.cmp.indexOf(id) >= 0 : S.sel === id));
+    t.classList.toggle('fp-cmp', S.compare && S.cmp.indexOf(id) >= 0);
+  });
+  var open = S.compare ? S.cmp.length > 0 : !!S.sel;
+  panel.hidden = !open; main.classList.toggle('fp-open', open);
+  status.textContent = S.compare ? S.cmp.length + ' of ' + P.max_compare + ' chosen' : '';
+  panel.textContent = '';
+  if (open) { if (S.compare) { renderCompare(); } else { renderTool(byId[S.sel]); } }
+}
+function svgFor(list) {
+  var s = document.createElementNS(NS, 'svg');
+  s.setAttribute('viewBox', '0 0 ' + P.box + ' ' + P.box); s.setAttribute('class', 'fp-big'); s.setAttribute('role', 'img');
+  s.setAttribute('aria-label', 'Radar of ' + list.map(function (x) { return x.label; }).join(', ') + ' on a 0 to 1 scale');
+  var h = P.frame;
+  list.forEach(function (x) {
+    if (x.poly) { h += '<polygon points="' + x.poly + '" fill="' + x.colour + '" fill-opacity=".14" stroke="' + x.colour + '" stroke-width="1.8" stroke-linejoin="round" stroke-dasharray="' + x.dash + '"/>'; }
+  });
+  s.innerHTML = h;     // coordinates, colours and the frame are produced by the report builder, never by data
+  return s;
+}
+function closeBtn() {
+  var b = el('button', {type: 'button', 'class': 'fp-btn fp-close', text: 'Close', 'aria-label': 'Close the panel'});
+  b.addEventListener('click', function () { S.sel = null; S.cmp = []; S.compare = false; sync(); });
+  return b;
+}
+function leaderLink(x) {
+  var a = el('a', {href: '#' + P.leaderboard, text: 'Open the leaderboard' + (x ? ' (row: ' + x.label + ')' : '')});
+  a.addEventListener('click', function () {
+    setTimeout(function () {
+      var rows = [].slice.call(document.querySelectorAll('#' + P.leaderboard + ' tbody tr'));
+      rows.forEach(function (r) { r.classList.remove('fp-hit'); });
+      var hit = x && rows.filter(function (r) { var c = r.cells[0]; return c && c.textContent.trim().indexOf(x.label) === 0; })[0];
+      if (hit) { hit.classList.add('fp-hit'); hit.scrollIntoView({block: 'center'}); setTimeout(function () { hit.classList.remove('fp-hit'); }, 2500); }
+    }, 50);
+  });
+  return a;
+}
+function renderTool(x) {
+  panel.appendChild(closeBtn());
+  panel.appendChild(el('h3', {text: x.label}));
+  panel.appendChild(el('span', {'class': 'fp-sub', text: x.trackLabel + ' track' + (x.task ? ' · ' + x.task : '') + ' · ' + (x.rank ? 'rank ' + x.rank + ' of ' + x.of : 'not ranked') + ' · ' + (x.n === null ? 'isolates not recorded' : x.n + ' isolates')}));
+  panel.appendChild(svgFor([x]));
+  panel.appendChild(el('h4', {text: 'Every dimension'}));
+  var t = el('table'), head = el('tr');
+  ['Dimension', 'Plotted (0-1)', 'Value', 'Across isolates'].forEach(function (h) { head.appendChild(el('th', {scope: 'col', text: h})); });
+  t.appendChild(el('thead', {}, [head]));
+  var tb = el('tbody');
+  P.axes.forEach(function (a, k) {
+    var sp = x.ps && x.ps[k] ? F.spread(x.ps[k]) : null, r = el('tr'), c0 = el('td');
+    c0.appendChild(el('b', {text: a.code + ' ' + a.label + (a.unval ? ' †' : '')}));
+    c0.appendChild(el('span', {'class': 'fp-def', text: (a.def || a.name) + (a.inv ? ' Drawn inverted: plotted = 1 - value.' : '')}));
+    if (a.limit) { c0.appendChild(el('span', {'class': 'fp-def', text: 'Limits: ' + a.limit})); }
+    r.appendChild(c0);
+    r.appendChild(el('td', {'class': x.v[k] === null ? 'fp-na' : '', text: F.fmtValue(x.v[k], 3)}));
+    r.appendChild(el('td', {'class': x.raw[k] === null ? 'fp-na' : '', text: F.fmtValue(x.raw[k], a.digits) + (x.raw[k] !== null && a.unit === 'seconds' ? ' s' : '')}));
+    r.appendChild(el('td', {text: sp && sp.n ? sp.n + ' isolates: min ' + F.fmtValue(sp.min, a.digits) + ', median ' + F.fmtValue(sp.median, a.digits) + ', max ' + F.fmtValue(sp.max, a.digits) : 'not available'}));
+    tb.appendChild(r);
+  });
+  t.appendChild(tb); panel.appendChild(t);
+  if (x.ps && P.samples.length) {
+    var d = el('details'), tbl = el('table'), h2 = el('tr');
+    d.appendChild(el('summary', {text: 'Per-isolate values'}));
+    h2.appendChild(el('th', {scope: 'col', text: 'Isolate'}));
+    P.axes.forEach(function (a) { h2.appendChild(el('th', {scope: 'col', text: a.code})); });
+    tbl.appendChild(el('thead', {}, [h2]));
+    var b2 = el('tbody');
+    P.samples.forEach(function (s, i) {
+      var r = el('tr'); r.appendChild(el('td', {text: s}));
+      P.axes.forEach(function (a, k) { var v = x.ps[k] ? x.ps[k][i] : null; r.appendChild(el('td', {'class': v === null || v === undefined ? 'fp-na' : '', text: v === null || v === undefined ? 'n/a' : F.fmtValue(v, a.digits)})); });
+      b2.appendChild(r);
+    });
+    tbl.appendChild(b2); d.appendChild(tbl); panel.appendChild(d);
+  }
+  panel.appendChild(el('h4', {text: 'Where else'}));
+  var p = el('p'); p.appendChild(leaderLink(x)); panel.appendChild(p);
+  var q = el('p'); q.appendChild(el('a', {href: '#fig-heatmap', text: 'Open the tool heatmap'})); panel.appendChild(q);
+  panel.appendChild(el('p', {'class': 'fp-sub', text: 'The shape is a picture of the numbers; its area is not a score and ranks nothing.'}));
+}
+function renderCompare() {
+  var list = S.cmp.map(function (id) { return byId[id]; });
+  panel.appendChild(closeBtn());
+  panel.appendChild(el('h3', {text: 'Compare ' + list.length + ' tool' + (list.length === 1 ? '' : 's')}));
+  panel.appendChild(el('span', {'class': 'fp-sub', text: 'Same 0-1 scale as the tiles. Click a tile again to remove it; at ' + P.max_compare + ' the oldest is replaced.'}));
+  panel.appendChild(svgFor(list));
+  var lg = el('div', {'class': 'fp-lg'});
+  list.forEach(function (x) { var i = el('i'); i.style.background = x.colour; lg.appendChild(el('span', {}, [i, x.label + ' (' + x.trackLabel + ')'])); });
+  panel.appendChild(lg);
+  var t = el('table'), head = el('tr');
+  head.appendChild(el('th', {scope: 'col', text: 'Dimension'}));
+  list.forEach(function (x) { head.appendChild(el('th', {scope: 'col', text: x.label})); });
+  t.appendChild(el('thead', {}, [head]));
+  var tb = el('tbody');
+  P.axes.forEach(function (a, k) {
+    var r = el('tr'); r.appendChild(el('td', {text: a.code + ' ' + a.label}));
+    list.forEach(function (x) { r.appendChild(el('td', {'class': x.v[k] === null ? 'fp-na' : '', text: F.fmtValue(x.v[k], 3)})); });
+    tb.appendChild(r);
+  });
+  t.appendChild(tb); panel.appendChild(t);
+  var p = el('p'); p.appendChild(leaderLink(null)); panel.appendChild(p);
+}
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') { return; }
+  if (!tip.hidden) { hideTip(); return; }
+  if (!panel.hidden && host.contains(document.activeElement)) { var id = S.sel; S.sel = null; S.cmp = []; S.compare = false; sync(); var back = id && host.querySelector('.fp-tile[data-id="' + id.split(String.fromCharCode(34)).join('') + '"]'); if (back) { back.focus(); } }
+});
+sync();
+})();
+</script>

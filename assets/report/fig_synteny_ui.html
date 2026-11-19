@@ -1,0 +1,160 @@
+<script>
+/* Synteny view, DOM layer. The comparisons are server-drawn SVG folds; this adds the sample / plasmid / tool selectors, hover and focus tooltips,
+   click / Enter to open the side panel (alignment table, definitions, plasmid-map link), zoom and pan, arrow keys between bands, Escape to close.
+   Needs PBSynteny (fig_synteny_core). */
+(function () {
+'use strict';
+var Z = window.PBSynteny, host = document.getElementById('sx-root');
+if (!Z || !host) { return; }
+var main = host.querySelector('.sx-main'), stage = host.querySelector('.sx-stage'), panel = document.getElementById('sx-panel'), tip = document.getElementById('sx-tip');
+var pairs = [].slice.call(host.querySelectorAll('.sx-pair'));
+if (!pairs.length) { return; }
+var MAXZ = 12;
+var S = {cur: 0, sel: null, view: null, base: null};
+function el(tag, attrs, kids) {
+  var n = document.createElement(tag);
+  Object.keys(attrs || {}).forEach(function (k) { if (k === 'text') { n.textContent = attrs[k]; } else { n.setAttribute(k, attrs[k]); } });
+  (kids || []).forEach(function (c) { n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+  return n;
+}
+host.classList.add('sx-on');
+function uniq(list) { return list.filter(function (v, i) { return list.indexOf(v) === i; }); }
+function meta(p) { return {sample: p.getAttribute('data-sample'), plasmid: p.getAttribute('data-plasmid'), tool: p.getAttribute('data-tool')}; }
+var M = pairs.map(meta);
+
+/* ---------- selectors ---------- */
+var bar = el('div', {'class': 'sx-bar', role: 'group', 'aria-label': 'Choose a comparison'});
+function sel(label, id) { var s = el('select', {id: id, 'aria-label': label}); bar.appendChild(el('label', {}, [label, s])); return s; }
+var selSample = sel('Sample', 'sx-sample'), selPlasmid = sel('Plasmid', 'sx-plasmid'), selTool = sel('Tool', 'sx-tool');
+function fill(s, values, keep) {
+  var old = keep || s.value; s.textContent = '';
+  values.forEach(function (v) { s.appendChild(el('option', {value: v, text: v})); });
+  s.value = values.indexOf(old) >= 0 ? old : values[0];
+}
+function btn(label, fn, aria) { var b = el('button', {type: 'button', 'class': 'sx-btn', text: label}); if (aria) { b.setAttribute('aria-label', aria); } b.addEventListener('click', fn); bar.appendChild(b); return b; }
+btn('Previous', function () { go(S.cur - 1); }, 'Previous comparison');
+btn('Next', function () { go(S.cur + 1); }, 'Next comparison');
+btn('+', function () { zoom(1.5); }, 'Zoom in');
+btn('−', function () { zoom(1 / 1.5); }, 'Zoom out');
+btn('Reset view', resetView, 'Reset zoom and pan');
+var count = el('span', {'class': 'sx-print', 'aria-live': 'polite'}); count.style.display = 'inline'; bar.appendChild(count);
+host.insertBefore(bar, main);
+function syncSelects(fromSample, fromPlasmid) {
+  fill(selSample, uniq(M.map(function (m) { return m.sample; })), fromSample);
+  fill(selPlasmid, uniq(M.filter(function (m) { return m.sample === selSample.value; }).map(function (m) { return m.plasmid; })), fromPlasmid);
+  fill(selTool, uniq(M.filter(function (m) { return m.sample === selSample.value && m.plasmid === selPlasmid.value; }).map(function (m) { return m.tool; })));
+}
+function chosen() {
+  for (var i = 0; i < M.length; i++) { if (M[i].sample === selSample.value && M[i].plasmid === selPlasmid.value && M[i].tool === selTool.value) { return i; } }
+  return 0;
+}
+selSample.addEventListener('change', function () { syncSelects(selSample.value, null); go(chosen()); });
+selPlasmid.addEventListener('change', function () { syncSelects(selSample.value, selPlasmid.value); go(chosen()); });
+selTool.addEventListener('change', function () { go(chosen()); });
+
+/* ---------- showing one comparison ---------- */
+function svg() { return pairs[S.cur].querySelector('.sx-svg'); }
+function go(i) {
+  i = (i + pairs.length) % pairs.length; hideTip();
+  pairs.forEach(function (p, k) { p.classList.toggle('sx-cur', k === i); if (k === i) { p.open = true; } });
+  S.cur = i; S.sel = null;
+  var s = svg(); S.base = s.getAttribute('data-vb').split(' ').map(Number); S.view = S.base.slice();
+  fill(selSample, uniq(M.map(function (m) { return m.sample; })), M[i].sample);
+  syncSelects(M[i].sample, M[i].plasmid); selPlasmid.value = M[i].plasmid; syncSelects(M[i].sample, M[i].plasmid); selTool.value = M[i].tool;
+  count.textContent = (i + 1) + ' of ' + pairs.length;
+  stage.classList.remove('sx-dim'); renderPanel();
+}
+function applyView() { svg().setAttribute('viewBox', S.view.join(' ')); }
+function toUser(s, e) { var r = s.getBoundingClientRect(), v = S.view; return [v[0] + (e.clientX - r.left) / r.width * v[2], v[1] + (e.clientY - r.top) / r.height * v[3]]; }
+function zoom(f, at) {
+  var v = S.view, c = at || [v[0] + v[2] / 2, v[1] + v[3] / 2];
+  S.view = Z.zoomAt(v, S.base, c[0], c[1], f, MAXZ); applyView();
+}
+function resetView() { S.view = S.base.slice(); applyView(); }
+pairs.forEach(function (p) {
+  var s = p.querySelector('.sx-svg'), drag = null;
+  s.addEventListener('wheel', function (e) { if (!(e.ctrlKey || e.metaKey || document.activeElement === s)) { return; } e.preventDefault(); zoom(e.deltaY < 0 ? 1.25 : 0.8, toUser(s, e)); }, {passive: false});
+  s.addEventListener('pointerdown', function (e) {
+    if (e.target.closest('.sx-rib,.sx-rec')) { return; }
+    drag = {x: e.clientX, y: e.clientY, v: S.view.slice()}; s.classList.add('sx-drag'); try { s.setPointerCapture(e.pointerId); } catch (x) { /* older browsers */ }
+  });
+  s.addEventListener('pointermove', function (e) {
+    if (!drag) { return; }
+    var r = s.getBoundingClientRect();
+    S.view = Z.panBy(drag.v, S.base, -(e.clientX - drag.x) / r.width * drag.v[2], -(e.clientY - drag.y) / r.height * drag.v[3]); applyView();
+  });
+  function end() { drag = null; s.classList.remove('sx-drag'); }
+  s.addEventListener('pointerup', end); s.addEventListener('pointercancel', end);
+  s.addEventListener('keydown', function (e) {
+    if (e.target !== s) { return; }
+    var step = S.view[2] * 0.1, k = e.key;
+    if (k === '+' || k === '=') { zoom(1.5); } else if (k === '-' || k === '_') { zoom(1 / 1.5); } else if (k === '0') { resetView(); }
+    else if (k === 'ArrowLeft') { S.view = Z.panBy(S.view, S.base, -step, 0); applyView(); } else if (k === 'ArrowRight') { S.view = Z.panBy(S.view, S.base, step, 0); applyView(); }
+    else if (k === 'ArrowUp') { S.view = Z.panBy(S.view, S.base, 0, -step); applyView(); } else if (k === 'ArrowDown') { S.view = Z.panBy(S.view, S.base, 0, step); applyView(); } else { return; }
+    e.preventDefault();
+  });
+  [].forEach.call(p.querySelectorAll('.sx-rib,.sx-rec'), function (n) {
+    var t = n.querySelector('title');    /* the native tooltip text becomes the custom tooltip and the accessible name, so the two never show together */
+    if (t) { n.setAttribute('data-tip', t.textContent); n.setAttribute('aria-label', t.textContent.split(String.fromCharCode(10)).join('. ')); n.removeChild(t); }
+    n.addEventListener('mouseenter', function () { showTip(n); }); n.addEventListener('mouseleave', hideTip);
+    n.addEventListener('focus', function () { showTip(n); }); n.addEventListener('blur', hideTip);
+    n.addEventListener('click', function () { choose(n); });
+    n.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(n); return; }
+      var items = [].slice.call(p.querySelectorAll('.sx-rib,.sx-rec')), i = items.indexOf(n), j = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? i + 1 : (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? i - 1 : i);
+      if (j !== i && j >= 0 && j < items.length) { e.preventDefault(); e.stopPropagation(); items[j].focus(); }
+    });
+  });
+});
+function showTip(n) {
+  tip.textContent = n.getAttribute('data-tip') || ''; tip.hidden = false;
+  var sb = stage.getBoundingClientRect(), nb = n.getBoundingClientRect();
+  tip.style.left = Math.max(4, Math.min(sb.width - 310, nb.left - sb.left + nb.width / 2)) + 'px';
+  tip.style.top = Math.max(4, nb.top - sb.top + nb.height + 6) + 'px';
+}
+function hideTip() { tip.hidden = true; }
+
+/* ---------- selection and panel ---------- */
+function choose(n) {
+  hideTip();
+  S.sel = S.sel === n ? null : n; renderPanel();
+}
+function renderPanel() {
+  var p = pairs[S.cur];
+  [].forEach.call(p.querySelectorAll('.sx-sel'), function (x) { x.classList.remove('sx-sel'); });
+  [].forEach.call(p.querySelectorAll('.sx-hl'), function (x) { x.classList.remove('sx-hl'); });
+  stage.classList.toggle('sx-dim', !!S.sel);
+  panel.textContent = '';
+  if (!S.sel) { panel.hidden = true; main.classList.remove('sx-open'); return; }
+  var n = S.sel, rec = n.getAttribute('data-r'), b = n.getAttribute('data-b');
+  n.classList.add('sx-sel');
+  [].forEach.call(p.querySelectorAll('[data-r]'), function (x) { if (x.getAttribute('data-r') === rec) { x.classList.add('sx-hl'); } });
+  panel.hidden = false; main.classList.add('sx-open');
+  var m = M[S.cur], close = el('button', {type: 'button', 'class': 'sx-btn sx-close', text: 'Close', 'aria-label': 'Close the panel'});
+  close.addEventListener('click', function () { var k = S.sel; S.sel = null; renderPanel(); if (k) { k.focus(); } });
+  panel.appendChild(close);
+  panel.appendChild(el('h3', {text: m.tool + ' on ' + m.plasmid}));
+  panel.appendChild(el('span', {'class': 'sx-print', text: m.sample, style: 'display:inline'}));
+  panel.appendChild(el('div', {'class': 'sx-detail', text: n.getAttribute('data-tip')}));
+  panel.appendChild(el('h4', {text: 'Alignment blocks of this comparison'}));
+  var tbl = p.querySelector('.sx-aln').cloneNode(true);
+  [].forEach.call(tbl.querySelectorAll('tbody tr'), function (r) {
+    var mine = b !== null ? r.getAttribute('data-b') === b : r.cells[0].textContent === rec;
+    r.classList.toggle('sx-sel', mine);
+    r.style.cursor = 'pointer';
+    r.addEventListener('click', function () { var t = p.querySelector('.sx-rib[data-b="' + r.getAttribute('data-b') + '"]'); if (t) { S.sel = t; renderPanel(); t.focus(); } });
+  });
+  panel.appendChild(tbl);
+  panel.appendChild(el('h4', {text: 'How to read it'}));
+  panel.appendChild(el('p', {text: 'Orange untwisted bands are forward blocks. Blue hatched bands are reverse blocks: the record is inverted relative to the plasmid, so they cross. Opacity is the block identity (about 99% and above, 95 to 99%, below 95%). Records are placed in the order they land on the plasmid, on the same scale as the plasmid. Descriptive; it changes no score.'}));
+  panel.appendChild(el('h4', {text: 'Where else'}));
+  var a = el('p'); a.appendChild(el('a', {href: '#plasmid-maps', text: 'Open the plasmid map'})); panel.appendChild(a);
+}
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape' || !host.contains(document.activeElement) && tip.hidden) { return; }
+  if (!tip.hidden) { hideTip(); return; }
+  if (!panel.hidden) { var k = S.sel; S.sel = null; renderPanel(); if (k) { k.focus(); } }
+});
+go(0);
+})();
+</script>
