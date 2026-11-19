@@ -31,6 +31,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import __version__
+from . import server_state
 from . import cohort_info, fsutil, ghops, ghsignin, jobrunner, loadcache, netgate, runfolders, runprogress, ui_help, ui_schema
 from .gitops import GitError   # a refused git action is the user's error (400), not the server's
 from .terminal import Terminal, TerminalError
@@ -1653,11 +1654,14 @@ def make_handler(project: Project, jobs: Jobs):
                         on_record=lambda rec: session_log().event("terminal", **rec))
 
     def page() -> bytes:
-        mtime = PAGE_FILE.stat().st_mtime
+        # BEGIN server state: __PAGE_VERSION__ is the version of the FILES on disk, __VERSION__ stays this server's; the page compares them (a stale server is shown at once)
+        disk = server_state.disk_version()
+        mtime = (PAGE_FILE.stat().st_mtime, disk)
         if mtime != page_cache["mtime"]:
             html = PAGE_FILE.read_text(encoding="utf-8")
-            page_cache.update(mtime=mtime, body=html.replace("__VERSION__", __version__).encode("utf-8"))
+            page_cache.update(etag=f"{mtime[0]:.6f}-{mtime[1]}-{__version__}", mtime=mtime, body=html.replace("__PAGE_VERSION__", disk or __version__).replace("__VERSION__", __version__).encode("utf-8"))
         return page_cache["body"]
+        # END server state
 
     # A request the page repeats after a dropped connection must not run twice (a second "start the benchmark"): the page sends a fresh id with each POST and repeats the SAME id
     # when it retries, and the server answers a repeat with the response of the first run instead of running it again.
@@ -1699,7 +1703,11 @@ def make_handler(project: Project, jobs: Jobs):
                 self.send_header("Connection", "close")   # tell the client, or it reuses a connection that is about to be closed
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Referrer-Policy", "no-referrer")
-            self.send_header("Cache-Control", "public, max-age=3600" if (extra or {}).get("static") else "no-store")   # the mark is the same for a whole version
+            if (extra or {}).get("etag"):   # server state: the page is revalidated on every load (no-cache + ETag of its file time and versions), so a normal reload is never stale
+                self.send_header("ETag", extra["etag"])
+                self.send_header("Cache-Control", "no-cache")
+            else:
+                self.send_header("Cache-Control", "public, max-age=3600" if (extra or {}).get("static") else "no-store")   # the mark is the same for a whole version
             if ctype.startswith("text/html") and not (extra or {}).get("report"):
                 self.send_header("Content-Security-Policy",
                                  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
@@ -1765,7 +1773,16 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.send(403, KEY_PAGE.encode("utf-8"), "text/html; charset=utf-8")
             if path == "/":
                 PAGE_SEEN["t"] = time.time()   # a window loaded the page
-                return self.send(200, page(), "text/html; charset=utf-8", cookie=True)
+                body = page()
+                etag = f'"{page_cache["etag"]}"'   # BEGIN server state: revalidate the page every time
+                if self.headers.get("If-None-Match") == etag:
+                    self.send_response(304)
+                    self.send_header("ETag", etag)
+                    self.send_header("Cache-Control", "no-cache")
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return None
+                return self.send(200, body, "text/html; charset=utf-8", cookie=True, extra={"etag": etag})   # END server state
             if path.startswith("/view/"):
                 return self.serve_run_file(path[len("/view/"):])
             if not path.startswith("/api/"):
@@ -1834,6 +1851,10 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "isolates/scan/status":
                 return self.jsend(200, iso_scans().status(q.get("id", "")))
             # -- END scan a folder for isolates --
+            # BEGIN server state
+            if route == "server-state":   # is this server older than the files on disk (an update while the window was open)? Stats a few files, spawns nothing
+                return self.jsend(200, loadcache.ttl("server-state", 3.0, server_state.state))
+            # END server state
             # BEGIN workflow steps
             if route == "workflow":
                 from . import workflow_steps
@@ -2256,6 +2277,14 @@ def make_handler(project: Project, jobs: Jobs):
                 session_log().event("quit", forced=bool(running) and not keep or None, kept_running=len(running) if keep else None)
                 threading.Timer(0.3, self.server.shutdown).start()
                 return self.jsend(200, {"ok": True})
+            # BEGIN server state
+            if route == "server/restart":   # start a replacement server, then this one exits like Quit and keep running (detached runs are not touched)
+                result = server_state.restart(project.root, self.server.server_address[1], _instance_file(), spawn=server_state.spawn_detached)
+                if result.get("ok"):
+                    session_log().event("quit", restart=True)
+                    threading.Timer(1.5, self.server.shutdown).start()
+                return self.jsend(200, result)
+            # END server state
             if route == "workspace/set":
                 from . import workspace
                 if any(j["state"] in ("running", "cancelling") for j in jobs.list()):
