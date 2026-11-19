@@ -1271,6 +1271,15 @@ The window is slow to open its pages
     OneDrive folder) and keep PATH short; see docs/WINDOW_PERFORMANCE.md for what is
     cached and why.
 
+I updated PlasBench and the window shows errors like "no such API: workflow"
+    The window was open while PlasBench was updated: the page is the new one, the program
+    behind it is the old one. A banner at the bottom says so ("PlasBench was updated ...").
+    Press Restart window: a new PlasBench starts and the window moves to it; your runs are
+    detached and keep going. If the dialog says it cannot restart by itself, choose Quit
+    (Quit and keep running if a run is going) and start PlasBench again from its desktop
+    icon or with: plasbench ui. If a page only looks stuck or out of date, use Reload page
+    (clear cache) in the top bar, or press Ctrl+Shift+R (Cmd+Shift+R on a Mac).
+
 Platon database missing
     Install/mount the database and use --platon-db PATH, or run --platon off.
 
