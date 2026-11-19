@@ -848,9 +848,31 @@ must already exist), and the window's Study folder card and New study dialog hav
 so `--study NAME`, the Workspace page and the folder tree find it. **Add an existing study folder** registers a folder that already holds a `study.json`. A study on a drive that is
 disconnected is listed as "not available" with Remove from list; nothing is created in its place. Rename, copy and archive are offered only for studies inside the workspace.
 
-**Windows drives from Ubuntu (WSL).** "Choose a folder" lists Quick places and This PC; under WSL This PC shows the Windows drives Ubuntu has mounted (`C: (Windows)` is `/mnt/c`).
-You can type a Windows path (`D:\data`, `\\wsl.localhost\Ubuntu\home\me`); it is converted and both forms are shown. A drive that is not listed is not mounted: run in the Terminal tab,
-for drive E, `sudo mkdir -p /mnt/e && sudo mount -t drvfs E: /mnt/e` (PlasBench never runs it for you).
+**Choosing folders: the Explorer window and the built-in browser.** Every Browse button (and "Choose a folder", "Choose file") opens **the computer's own folder window**: on Windows
+(also when PlasBench runs in WSL) the real Explorer-style dialog with This PC, every drive including USB sticks and network drives, Quick access, search and the real capacity bars;
+on macOS the Finder dialog; on Linux zenity, kdialog or yad. The window is opened by PlasBench on this computer's desktop (it may appear behind the browser: the waiting dialog has
+**Bring it to front** and **Cancel**), and the folder you choose is put in the field and checked (does it exist, can it be written, is it a slow or cloud-synced drive).
+Where no folder window can open (no desktop session, SSH, a headless server, WSL without `powershell.exe` interop) PlasBench says why in one line and uses **the built-in browser**
+instead; you can also choose it yourself ("Use the built-in browser") and switch back with "Use the Explorer window"; the choice is remembered.
+
+*Quick pick without any dialog:* in Explorer click the address bar and copy the path, or hold Shift, right-click the folder and choose **Copy as path**, then paste it into the field.
+Pasted text is cleaned for you: `"D:\data\x"` (with quotes), `D:\data\x`, `\wsl.localhost\Ubuntu\home\me`, `file:///D:/data/x` and `This PC\Data (D:)\x` all work. **Open in Explorer**
+next to the field shows the current path in the real Explorer (also for a `/mnt/<drive>` folder, a `\wsl.localhost` path and a drive that is plugged in but not mounted in Ubuntu).
+
+*The built-in browser* has the places you use (Home, Desktop, Documents, Downloads, the Windows ones under WSL, the workspace, the data folder, recent folders), every Windows drive with
+its real size and free space as Windows reports it (units: GB = 2^30 bytes, as Explorer), Back / Forward / Up / Refresh, a breadcrumb for every folder, a path box (`~`, Windows paths and
+pasted Explorer paths), a filter, sort by name / size / modified, hidden files, New folder, and the keys Alt+Left / Alt+Right / Backspace / `/`.
+
+**Windows drives from Ubuntu (WSL).** A USB drive or network drive plugged in after WSL started is not mounted in Ubuntu. The built-in browser lists it anyway (letter, label,
+type, size) marked "not mounted in Ubuntu yet" with the exact command and a Copy button: for drive E, `sudo mkdir -p /mnt/e && sudo mount -t drvfs E: /mnt/e` in the Terminal tab
+(PlasBench never runs it for you). The folder window of Windows can show every drive, but a drive Ubuntu has not mounted still needs that command before PlasBench can read it; a
+network share (`\server\share`) cannot be mounted automatically: map it to a drive letter in Windows and mount that letter. Click Refresh (or return to the window) after plugging a
+drive in; a new drive is marked "new". Older versions showed the size of Ubuntu's own virtual disk for a leftover empty `/mnt/e` folder as if it were the drive; sizes now come from
+Windows itself and an unmounted folder shows none.
+
+**Frequently asked.** *Why does Browse not show my USB drive in the built-in browser?* Plugged in after WSL started: mount it as above. *Why does the folder window open behind the browser?*
+Windows may refuse to raise it: click Bring it to front or find it in the taskbar. *Can the page use the real Explorer without a dialog?* A web page cannot receive a real path from
+the browser, so PlasBench opens the dialog itself; Open in Explorer only shows a folder.
 
 **Speed and sync folders.** A Windows drive seen from Ubuntu is slower than Ubuntu's own disk for many small files and for git; a cloud-sync folder (OneDrive, Dropbox) can lock
 or re-upload large files mid-run; an external or network drive stops the run if it disconnects (running again continues from the finished steps). The folder check shows these

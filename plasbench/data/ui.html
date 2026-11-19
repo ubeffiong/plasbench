@@ -362,7 +362,12 @@ dialog.fschoose{width:min(860px,96vw)}.fsbody{display:grid;grid-template-columns
 @media (max-width:640px){.fsbody{grid-template-columns:1fr}.fsside{border-right:0;border-bottom:1px solid var(--line-2);padding:0 0 8px;max-height:24vh}}
 .fs-list{border:1px solid var(--line);border-radius:var(--radius);max-height:44vh;overflow:auto}
 .fs-list button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line-2);background:transparent;padding:5px 10px;cursor:pointer;font:inherit;color:inherit}
-.fs-list button:hover{background:var(--surface-2)}.fs-list button.sel{background:var(--select)}.fs-list .sz{margin-left:auto;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
+.fs-list button:hover{background:var(--surface-2)}.fs-list button.sel{background:var(--select)}.fsbar{margin-bottom:6px;gap:6px;flex-wrap:wrap}.fsbar input[type=text],.fsbar input[type=search]{flex:1;min-width:120px}.fs-list .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fs-list .mt{color:var(--mut);font-size:12px;min-width:120px;text-align:right}
+.fsside .cap{display:block;height:5px;border-radius:3px;background:var(--surface-3);margin:3px 0 1px;overflow:hidden}.fsside .cap i{display:block;height:100%;background:var(--primary)}
+.fsdrive{padding:5px 6px;border-radius:4px;font-size:13px}.fsdrive.off{background:var(--surface-2);margin:2px 0}.fsdrive code{display:block;font-size:11px;word-break:break-all;margin:3px 0}.fsdrive .sub{display:block;color:var(--mut);font-size:11px}
+.fsside .tag{display:inline-block;font-size:11px;padding:0 5px;border-radius:8px;background:var(--surface-3);color:var(--mut)}.fsside .tag.new{background:var(--primary);color:#fff}
+dialog.npdlg{width:min(460px,94vw)}
+.fs-list .sz{margin-left:auto;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
 .fs-list button .ico{color:var(--mut)}
 #toasts{position:fixed;right:16px;bottom:calc(var(--cons) + 16px);display:flex;flex-direction:column;gap:6px;z-index:90}
 .toast{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-left:3px solid var(--primary);padding:8px 12px;border-radius:var(--radius);box-shadow:var(--shadow-lg);font-size:13px;max-width:420px;display:flex;gap:8px;align-items:flex-start}
@@ -1092,10 +1097,15 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
 <dialog id="lbldlg" class="wide" aria-labelledby="lb_t"><div class="hd"><svg class="ico"><use href="#i-edit"/></svg><h3 id="lb_t">Label sequences</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
  <div class="bd"><p class="mut" style="margin-top:0">For each sequence of the reference, say whether it is a <b>plasmid</b> or the <b>chromosome</b>. Every tool is scored against these labels, so PlasBench never fills them in for you. "Header says" is what the FASTA header states; where it says nothing, the choice is yours. Do not decide by size alone.</p><div id="lb_body"></div></div>
  <div class="ft"><span class="mut small grow" id="lb_msg"></span><button class="btn sec" data-close>Cancel</button><button class="btn" id="lb_save">Save labels</button></div></dialog>
+<dialog id="npdlg" class="npdlg" role="dialog" aria-modal="true" aria-labelledby="np_title" aria-describedby="np_msg"><div class="hd"><svg class="ico"><use href="#i-folder"/></svg><h3 id="np_title">Choose a folder</h3></div>
+ <div class="bd"><p id="np_msg" aria-live="polite">Waiting for the folder window... (it may be behind this window)</p><p class="small mut">Choose a folder in the window that opened, then click Select Folder. Nothing here is changed until you do.</p></div>
+ <div class="ft"><button class="btn sec" id="np_inline" title="Browse inside this window instead of with the computer's folder window">Use the built-in browser</button><span class="grow"></span><button class="btn sec" id="np_front" title="If the folder window is hidden behind this window, bring it to the front">Bring it to front</button><button class="btn" id="np_cancel">Cancel</button></div></dialog>
 <dialog id="fsdlg" class="fschoose" role="dialog" aria-modal="true" aria-labelledby="fs_title" aria-describedby="fs_sel"><div class="hd"><svg class="ico"><use href="#i-folder"/></svg><h3 id="fs_title">Choose</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
  <div class="bd fsbody"><nav class="fsside" aria-label="Places" id="fs_side"></nav>
   <div class="fsmain"><nav class="crumbbar" id="fs_crumbs" aria-label="Folder path"></nav>
-   <div class="row" style="margin-bottom:6px"><button class="btn sec sm" id="fs_up" title="Up one folder">Up</button><input type="text" id="fs_path" aria-label="Path (a Windows path such as C:\Users\me\data also works)" title="Type or paste a path and press Enter. In Ubuntu a Windows path such as C:\Users\me\data or \\wsl.localhost\Ubuntu\home\me is converted."><button class="btn sec sm" id="fs_go" title="Show this folder">Go</button><button class="btn sec sm" id="fs_new" title="Create a new folder inside the folder shown">New folder</button></div>
+   <div class="row fsbar"><button class="btn sec sm" id="fs_back" title="Back (Alt+Left)" aria-label="Back" disabled>Back</button><button class="btn sec sm" id="fs_fwd" title="Forward (Alt+Right)" aria-label="Forward" disabled>Forward</button><button class="btn sec sm" id="fs_up" title="Up one folder (Backspace)">Up</button><input type="text" id="fs_path" aria-label="Path (a Windows path such as C:\Users\me\data also works)" title="Type or paste a path and press Enter: a Linux path, ~, a Windows path, a path copied in Explorer (Copy as path, the address bar) or a file:/// link."><button class="btn sec sm" id="fs_go" title="Show this folder">Go</button><button class="btn sec sm" id="fs_refresh" title="Look again (finds a drive you just plugged in)">Refresh</button><button class="btn sec sm" id="fs_new" title="Create a new folder inside the folder shown">New folder</button></div>
+   <div class="row fsbar"><input type="search" id="fs_filter" placeholder="Filter this folder (press /)" aria-label="Filter this folder"><select id="fs_sort" aria-label="Sort by"><option value="name">Sort: name</option><option value="size">Sort: size</option><option value="mtime">Sort: modified</option></select><label class="small"><input type="checkbox" id="fs_hidden"> Hidden files</label><button class="btn sec sm" id="fs_open" title="Show this folder in Explorer, the file manager of this computer">Open in Explorer</button><button class="btn sm" id="fs_native" title="Choose with the computer's own folder window" hidden>Use the Explorer window</button></div>
+   <div class="small mut" id="fs_note" aria-live="polite"></div>
    <div class="small mut" id="fs_win" aria-live="polite"></div>
    <div class="fs-list" id="fs_list" role="list"></div>
    <div id="fs_check" class="small" aria-live="polite" style="margin-top:6px"></div><div id="fs_help" class="small mut" style="margin-top:6px"></div></div></div>
@@ -5721,13 +5731,111 @@ function md(src) {
 /* ===================================================================================================
    File and folder picker
    =================================================================================================== */
-/* ---- "Choose a folder": quick places and This PC (in Ubuntu also the Windows drives) on the left, breadcrumb, a path box that accepts Windows paths, New folder, the folder check ---- */
-const FS = {cb: null, dir: true, sel: null, path: "", opener: null, side: null, tick: 0};
-const fsFree = n => n == null ? "" : ` · ${fmtGBytes(n)} free`;
-function pickPath(dir, cb, title, start) {
-  Object.assign(FS, {cb, dir, sel: null, opener: document.activeElement});
+/* ---- Browse: the computer's own folder window first (Explorer on Windows), the built-in browser as the fallback ---- */
+/* native-picker helpers (pure) */
+const fsDriveRe = /^[A-Za-z]:([\\/]|$)/;
+function normPasted(text) {
+  // what Explorer gives the user: Copy as path ("D:\data\x"), the address bar, file:/// links, and the breadcrumb form "This PC\Data (D:)\x"; returns {path} or {hint}
+  let t = String(text || "").trim();
+  while (t.length >= 2 && t[0] === t[t.length - 1] && (t[0] === '"' || t[0] === "'")) t = t.slice(1, -1).trim();
+  const f = t.match(/^file:(?:\/\/)?([^\/\\]*)(\/.*)?$/i);
+  if (f) {
+    let rest = f[2] || ""; try { rest = decodeURIComponent(rest); } catch {}
+    if (f[1] && f[1].toLowerCase() !== "localhost") return {path: "\\\\" + f[1] + rest.replace(/\//g, "\\")};
+    return {path: /^\/[A-Za-z]:(\/|$)/.test(rest) ? rest.slice(1) : (rest || "/")};
+  }
+  const root = t.match(/^(this pc|my computer|computer|network)\s*(?:[\\/>]|$)\s*/i);
+  if (root) {
+    const parts = t.slice(root[0].length).split(/\s*[\\/>]\s*/).map(x => x.trim()).filter(Boolean), d = parts.length ? parts[0].match(/\(([A-Za-z]):\)\s*$/) : null;
+    if (d && !/^network/i.test(t)) return {path: d[1].toUpperCase() + ":\\" + parts.slice(1).join("\\")};
+    return {hint: "That is the name Explorer shows in its breadcrumb bar, not a path. In Explorer click the empty part of the address bar (it turns into the real path, such as D:\\data), or hold Shift, right-click the folder and choose Copy as path, then paste it here."};
+  }
+  return {path: t};
+}
+const fsSizeText = n => n == null ? "" : n < 1024 ? n + " B" : fmtGBytes(n);
+const fsPct = p => p.total ? Math.max(0, Math.min(100, Math.round(100 * (p.total - p.free) / p.total))) : 0;
+function fsSortRows(rows, sort) {
+  const cmp = {name: (a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase(), undefined, {numeric: true}), size: (a, b) => (b.size || 0) - (a.size || 0) || a.name.localeCompare(b.name, undefined, {numeric: true}),
+               mtime: (a, b) => (b.mtime || 0) - (a.mtime || 0) || a.name.localeCompare(b.name, undefined, {numeric: true})}[sort] || ((a, b) => 0);
+  return rows.slice().sort((a, b) => (b.dir - a.dir) || cmp(a, b));
+}
+function fsFilterRows(rows, q) { q = (q || "").trim().toLowerCase(); return q ? rows.filter(r => r.name.toLowerCase().includes(q)) : rows; }
+/* end native-picker helpers */
+const NP = {caps: null, job: null};
+const npPref = () => { try { return localStorage.getItem("pb_picker") || ""; } catch { return ""; } };
+const npSetPref = v => { try { localStorage.setItem("pb_picker", v); } catch {} };
+const npHelp = k => (S.schema?.native_picker_help || {})[k]?.summary || "";
+const recentDirs = () => { try { return JSON.parse(localStorage.getItem("pb_recent_dirs") || "[]"); } catch { return []; } };
+const addRecent = p => { try { localStorage.setItem("pb_recent_dirs", JSON.stringify([p, ...recentDirs().filter(x => x !== p)].slice(0, 8))); } catch {} };
+function setHTML(el, html) { if (el._h !== html) { el._h = html; el.innerHTML = html; } }   // no rewrite (so no flicker, no lost focus) when nothing changed
+async function npCaps() {
+  if (!NP.caps) { try { NP.caps = await api("native-picker/capabilities"); } catch (e) { NP.caps = {available: false, reason: e.message}; } }
+  return NP.caps;
+}
+async function pickPath(dir, cb, title, start) {
+  const caps = await npCaps();
+  if (caps.available && npPref() !== "inline") return pickNative(dir ? "folder" : "file", cb, title, start);
+  const reason = caps.available ? "You chose the built-in browser. Use the Explorer window button to switch back." : `${(caps.reason || "No folder window is available here").replace(/^./, c => c.toUpperCase())}: using the built-in browser.`;
+  return pickInline(dir, cb, title, start, reason);
+}
+async function npValidate(dir, p) {
+  if (!dir || !p) return;
+  try {
+    const c = await api(`workspace/check?path=${encodeURIComponent(p)}`);
+    if (c.errors && c.errors.length) showMessage({title: "Check this folder", bodyHTML: checkHTML(c), danger: true});
+    else if (c.warnings && c.warnings.length) toast(c.warnings.join(" "), "");
+  } catch {}
+}
+async function pickNative(kind, cb, title, start, retried) {
+  const dir = kind === "folder", dlg = $("#npdlg"), opener = document.activeElement; NP.last = {dir, cb, title, start};
+  $("#np_title").textContent = title || (dir ? "Choose a folder" : "Choose a file");
+  $("#np_msg").textContent = "Waiting for the folder window... (it may be behind this window)";
+  $("#np_cancel").disabled = false;
+  dlg.showModal(); $("#np_cancel").focus();
+  let id;
+  try { id = (await api("native-picker/open", {kind, title: title || (dir ? "Choose a folder" : "Choose a file"), initial: start || ""})).id; }
+  catch (e) {
+    dlg.close();
+    if (/already open/i.test(e.message) && !retried) {
+      if (await askConfirm({title: "A folder window is already open", body: "Another Browse window is still open on this computer (it may be behind this window). Cancel it and open a new one?", confirmLabel: "Cancel it and open a new one", cancelLabel: "Keep it"})) {
+        try { await api("native-picker/cancel", {}); } catch {}
+        return pickNative(kind, cb, title, start, true);
+      }
+      return;
+    }
+    return pickInline(dir, cb, title, start, `The computer's folder window could not be opened (${e.message}): using the built-in browser.`);
+  }
+  const job = NP.job = {id, done: false};
+  let s = {state: "open"};
+  while (!job.done) {
+    await sleep(700);
+    try { s = await api(`native-picker/status?id=${id}`); } catch { continue; }
+    if (s.state !== "open") break;
+  }
+  const was = job.done; job.done = true; NP.job = null;
+  if (dlg.open) dlg.close();
+  try { opener && opener.focus && opener.focus(); } catch {}
+  if (was) return;                                   // the person cancelled or switched to the built-in browser
+  if (s.state === "chosen" && s.path) { addRecent(s.path); cb(s.path); if (s.warning) toast(s.warning, ""); npValidate(dir, s.path); }
+  else if (s.state === "cancelled") { /* nothing chosen */ }
+  else if (s.mount_hint) showMessage({title: "That drive is not mounted in Ubuntu yet", body: s.error, copy: s.mount_hint, buttonLabel: "Close"});
+  else pickInline(dir, cb, title, start, `The computer's folder window did not return a folder (${s.error || "unknown error"}): using the built-in browser.`);
+}
+$("#np_cancel").onclick = async () => { const j = NP.job; if (j) j.done = true; NP.job = null; $("#npdlg").close(); try { await api("native-picker/cancel", {}); } catch {} };
+$("#np_front").onclick = async () => { try { const r = await api("native-picker/front", {id: NP.job && NP.job.id}); if (!r.ok) toast(r.error || "Could not bring it to the front", "bad"); } catch (e) { toast(e.message, "bad"); } };
+$("#np_inline").onclick = async () => { const j = NP.job; if (j) j.done = true; NP.job = null; $("#npdlg").close(); npSetPref("inline"); try { await api("native-picker/cancel", {}); } catch {}
+  if (NP.last) pickInline(NP.last.dir, NP.last.cb, NP.last.title, NP.last.start, "You chose the built-in browser. Use the Explorer window button to switch back."); };
+$("#npdlg").addEventListener("cancel", e => { e.preventDefault(); $("#np_cancel").click(); });   // Escape cancels the folder window too
+
+/* ---- the built-in browser: favourites, recent folders, every drive with its real capacity, history, filter, sort, hidden files, New folder ---- */
+const FS = {cb: null, dir: true, sel: null, path: "", opener: null, side: null, req: 0, tick: 0, entries: [], hist: [], hi: -1, hidden: false, seen: null, newIds: [], title: "", start: ""};
+function pickInline(dir, cb, title, start, note) {
+  Object.assign(FS, {cb, dir, sel: null, opener: document.activeElement, hist: [], hi: -1, title, start});
+  NP.last = {dir, cb, title, start};
   $("#fs_title").textContent = title || (dir ? "Choose a folder" : "Choose a file"); $("#fs_ok").textContent = dir ? "Select this folder" : "Select";
-  $("#fs_new").hidden = !dir; $("#fsdlg").showModal(); fsLoad(start || "");
+  $("#fs_new").hidden = !dir; $("#fs_filter").value = ""; $("#fs_note").textContent = note || "";
+  $("#fs_native").hidden = !(NP.caps && NP.caps.available);
+  $("#fsdlg").showModal(); fsLoad(start || "", {refresh: true});
 }
 function checkHTML(r) {
   if (!r) return "";
@@ -5738,51 +5846,136 @@ function checkHTML(r) {
   if (r.windows) bits.push(`<div class="mut">Windows path: <span class="mono">${esc(r.windows)}</span></div>`);
   return bits.join("");
 }
-async function fsLoad(path) {
+const fsTypeLabel = t => ({removable: "USB / removable", network: "Network drive", optical: "Optical drive", internal: "Local disk", virtual: "Virtual disk"})[t] || "";
+function fsCap(p) {
+  if (p.total != null && p.free != null) return `<span class="cap" title="${esc(npHelp("drive_capacity"))}"><i style="width:${fsPct(p)}%"></i></span><span class="sub">${esc(fmtGBytes(p.free))} free of ${esc(fmtGBytes(p.total))}</span>`;
+  return p.free != null ? `<span class="sub">${esc(fsFree(p.free).replace(/^ · /, ""))}</span>` : "";
+}
+function fsDriveHTML(p) {
+  const nw = FS.newIds.includes(p.windows || p.path) ? ` <span class="tag new">new</span>` : "", type = fsTypeLabel(p.type) ? `<span class="sub">${esc(fsTypeLabel(p.type))}</span>` : "";
+  if (p.media === false) return `<div class="fsdrive off"><b>${esc(p.name)}</b>${nw}${type}<span class="sub">No disk in the drive.</span></div>`;
+  if (p.mounted === false) return `<div class="fsdrive off"><b>${esc(p.name)}</b>${nw}${type}${fsCap(p)}<span class="tag" title="${esc(npHelp("drive_unmounted"))}">not mounted in Ubuntu yet</span>` +
+    `<code>${esc(p.hint || "")}</code>${p.hint ? `<button type="button" class="btn sec sm" data-copy="${esc(p.hint)}">Copy mount command</button>` : ""}</div>`;
+  return `<button type="button" data-p="${esc(p.path)}" data-dir="1">${esc(p.name)}${nw}${type}<span class="sub">${esc(p.path)}</span>${fsCap(p)}</button>`;
+}
+function fsSide() {
+  const side = FS.side || {places: [], pc: []}, rec = recentDirs();
+  setHTML($("#fs_side"), `<h6>Quick places</h6>` + side.places.map(p => `<button type="button" data-p="${esc(p.path)}" data-dir="1">${esc(p.name)}</button>`).join("") +
+    (rec.length ? `<h6>Recent folders</h6>` + rec.map(p => `<button type="button" data-p="${esc(p)}" data-dir="1" title="${esc(p)}">${esc(p.split(/[\\/]/).filter(Boolean).pop() || p)}<span class="sub">${esc(p)}</span></button>`).join("") : "") +
+    `<h6>This PC</h6>` + (side.pc.length ? side.pc.map(fsDriveHTML).join("") : `<div class="small mut">No drives found.</div>`));
+}
+function fsCrumbs() {
+  const p = FS.path, seg = p ? p.split(/[\\/]+/).filter(Boolean) : [], isWin = /^[A-Za-z]:/.test(p), sep = isWin ? "\\" : "/"; let acc = "";
+  setHTML($("#fs_crumbs"), `<button type="button" data-p="" data-dir="1" title="Places and drives">This PC</button>` + seg.map((s, i) => { acc = isWin ? (i === 0 ? s + sep : acc + s + sep) : acc + sep + s;
+    return `<span class="sepc" aria-hidden="true">›</span>` + (i === seg.length - 1 ? `<span class="cur" aria-current="location">${esc(s)}</span>` : `<button type="button" data-p="${esc(acc)}" data-dir="1">${esc(s)}</button>`); }).join(""));
+}
+function fsList() {
+  const rows = fsSortRows(fsFilterRows(FS.entries, $("#fs_filter").value), $("#fs_sort").value);
+  const html = !FS.path ? `<div class="small mut" style="padding:8px">Choose a place or a drive on the left, or type or paste a path above.</div>` :
+    rows.map(e => `<button type="button" data-p="${esc(e.path)}" data-dir="${e.dir ? 1 : 0}" class="${FS.sel === e.path ? "sel" : ""}">${icon(e.dir ? "folder" : "file")}<span class="nm">${esc(e.name)}</span><span class="sz">${esc(e.dir ? "" : fsSizeText(e.size))}</span><span class="mt">${esc(fmtWhen(e.mtime))}</span></button>`).join("") ||
+    `<div class="mut small" style="padding:8px">${$("#fs_filter").value ? "Nothing matches the filter." : FS.dir ? "No sub-folders here." : "Nothing here."}</div>`;
+  setHTML($("#fs_list"), html);
+}
+const fmtWhen = t => t ? new Date(t * 1000).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}) : "";
+function fsButtons(r) {
+  $("#fs_up").disabled = !FS.path; $("#fs_back").disabled = FS.hi <= 0; $("#fs_fwd").disabled = FS.hi >= FS.hist.length - 1;
+  FS.sel = FS.dir && FS.path ? FS.path : (FS.dir ? null : FS.sel);
+  $("#fs_new").disabled = !FS.path; $("#fs_ok").disabled = FS.dir && !FS.path;
+  $("#fs_sel").textContent = FS.sel ? `Selected: ${FS.sel}` : (FS.dir ? "Open a folder, then Select" : "");
+  $("#fs_win").textContent = r && r.windows ? `Windows: ${r.windows}` : "";
+}
+async function fsLoad(path, o = {}) {
+  const mine = ++FS.req;
   try {
-    const r = await api(`browse?path=${encodeURIComponent(path)}&files=${FS.dir ? 0 : 1}`);
-    FS.path = r.path; $("#fs_path").value = r.path; $("#fs_up").disabled = !r.path; FS.sel = FS.dir && r.path ? r.path : null;
-    $("#fs_new").disabled = !r.path; $("#fs_ok").disabled = FS.dir && !r.path;
-    $("#fs_sel").textContent = FS.sel ? `Selected: ${FS.sel}` : (FS.dir ? "Open a folder, then Select" : "");
-    $("#fs_win").textContent = r.windows ? `Windows: ${r.windows}` : "";
-    if (!r.path) { FS.side = r; $("#fs_check").innerHTML = ""; }
-    const side = FS.side || {places: [], pc: []};
-    $("#fs_side").innerHTML = `<h6>Quick places</h6>` + side.places.map(p => `<button type="button" data-p="${esc(p.path)}" data-dir="1">${esc(p.name)}</button>`).join("") +
-      `<h6>This PC</h6>` + (side.pc.length ? side.pc.map(p => `<button type="button" data-p="${esc(p.path)}" data-dir="1">${esc(p.name)}<span class="sub">${esc(p.path)}${esc(fsFree(p.free))}</span></button>`).join("") : `<div class="small mut">No drives found.</div>`);
-    const seg = r.path ? r.path.split(/[\\/]+/).filter(Boolean) : [], isWin = /^[A-Za-z]:/.test(r.path), sep = isWin ? "\\" : "/"; let acc = isWin ? "" : "";
-    $("#fs_crumbs").innerHTML = `<button type="button" data-p="" data-dir="1" title="Places and drives">This PC</button>` + seg.map((p, i) => { acc = isWin ? (i === 0 ? p + sep : acc + p + sep) : acc + sep + p;
-      return `<span class="sepc" aria-hidden="true">›</span>` + (i === seg.length - 1 ? `<span class="cur" aria-current="location">${esc(p)}</span>` : `<button type="button" data-p="${esc(isWin ? acc : acc)}" data-dir="1">${esc(p)}</button>`); }).join("");
-    const rows = !r.path ? `<div class="small mut" style="padding:8px">Choose a place or a drive on the left, or type a path above.</div>` :
-      r.entries.map(e => `<button type="button" data-p="${esc(e.path)}" data-dir="${e.dir ? 1 : 0}">${icon(e.dir ? "folder" : "file")}<span>${esc(e.name)}</span>${e.size != null ? `<span class="sz">${(e.size / 1024).toFixed(e.size < 10240 ? 1 : 0)} KB</span>` : ""}</button>`).join("") || `<div class="mut small" style="padding:8px">No sub-folders here.</div>`;
-    $("#fs_list").innerHTML = rows;
+    const r = await api(`browse?path=${encodeURIComponent(path)}&files=${FS.dir ? 0 : 1}&hidden=${FS.hidden ? 1 : 0}${o.refresh ? "&refresh=1" : ""}`);
+    if (mine !== FS.req) return;
+    if (o.hist !== false) { FS.hist = FS.hist.slice(0, FS.hi + 1); if (FS.hist[FS.hist.length - 1] !== r.path) FS.hist.push(r.path); FS.hi = FS.hist.length - 1; }
+    FS.path = r.path; FS.entries = r.entries || []; $("#fs_path").value = r.path;
+    if (!r.path) {
+      FS.side = r;
+      const ids = (r.pc || []).map(p => p.windows || p.path);
+      FS.newIds = FS.seen ? ids.filter(i => !FS.seen.includes(i)) : []; FS.seen = ids;     // a drive plugged in since the last look is marked new
+      $("#fs_check").innerHTML = "";
+    }
+    fsButtons(r); fsSide(); fsCrumbs(); fsList();
     $("#fs_help").textContent = r.help || "";
-    const mine = ++FS.tick;
-    if (FS.dir && r.path) api(`workspace/check?path=${encodeURIComponent(r.path)}`).then(c => { if (mine === FS.tick) $("#fs_check").innerHTML = checkHTML(c); }).catch(() => {});
-  } catch (e) { $("#fs_help").textContent = e.message; $("#fs_check").innerHTML = `<div class="bad-t">${esc(e.message)}</div>`; }
+    const t = ++FS.tick;
+    if (FS.dir && r.path) api(`workspace/check?path=${encodeURIComponent(r.path)}`).then(c => { if (t === FS.tick) $("#fs_check").innerHTML = checkHTML(c); }).catch(() => {});
+  } catch (e) {
+    if (mine !== FS.req) return;
+    const m = /(sudo mkdir -p [^\n]+)$/.exec(e.message || "");
+    $("#fs_help").textContent = e.message;
+    $("#fs_check").innerHTML = `<div class="bad-t">${esc(e.message)}</div>` + (m ? `<button type="button" class="btn sec sm" data-copy="${esc(m[1])}">Copy mount command</button>` : "");
+  }
 }
 $("#fsdlg").addEventListener("click", e => {
+  const c = e.target.closest("[data-copy]"); if (c) { copyText(c.dataset.copy, "Mount command copied"); return; }
   const b = e.target.closest("[data-p]"); if (!b || !$("#fsdlg").contains(b)) return;
   if (b.dataset.dir === "1") fsLoad(b.dataset.p);
   else { FS.sel = b.dataset.p; $$("#fs_list button").forEach(x => x.classList.toggle("sel", x === b)); $("#fs_sel").textContent = `Selected: ${FS.sel}`; }
 });
 $("#fs_list").addEventListener("dblclick", e => { const b = e.target.closest("[data-p]"); if (b && b.dataset.dir === "0") $("#fs_ok").click(); });
-$("#fs_list").addEventListener("keydown", e => { if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return; const bs = [...$("#fs_list").querySelectorAll("button")], i = bs.indexOf(document.activeElement); if (i < 0) return;
-  e.preventDefault(); bs[Math.max(0, Math.min(bs.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))].focus(); });
+$("#fs_list").addEventListener("keydown", e => {
+  const bs = [...$("#fs_list").querySelectorAll("button")], i = bs.indexOf(document.activeElement); if (i < 0) return;
+  const to = {ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: bs.length - 1, PageDown: i + 8, PageUp: i - 8}[e.key]; if (to === undefined) return;
+  e.preventDefault(); bs[Math.max(0, Math.min(bs.length - 1, to))].focus(); });
 $("#fs_up").onclick = () => { const p = FS.path.replace(/[\\/]+$/, ""), up = p.replace(/[\\/][^\\/]*$/, ""); fsLoad(/^[A-Za-z]:$/.test(up) ? up + "\\" : /[\\/]/.test(p) ? (up || "/") : ""); };
-$("#fs_go").onclick = () => fsLoad($("#fs_path").value.trim());
-$("#fs_path").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); fsLoad(e.target.value.trim()); } };
+$("#fs_back").onclick = () => { if (FS.hi > 0) { FS.hi--; fsLoad(FS.hist[FS.hi], {hist: false}); } };
+$("#fs_fwd").onclick = () => { if (FS.hi < FS.hist.length - 1) { FS.hi++; fsLoad(FS.hist[FS.hi], {hist: false}); } };
+$("#fs_refresh").onclick = () => fsLoad(FS.path, {refresh: true, hist: false});
+function fsGo(text) { const n = normPasted(text); if (n.hint) { $("#fs_check").innerHTML = `<div class="warn-t">${icon("alert")} ${esc(n.hint)}</div>`; return; } fsLoad(n.path); }
+$("#fs_go").onclick = () => fsGo($("#fs_path").value);
+$("#fs_path").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); fsGo(e.target.value); } };
+$("#fs_path").addEventListener("paste", () => setTimeout(() => fsGo($("#fs_path").value), 0));
+$("#fs_filter").addEventListener("input", fsList);
+$("#fs_sort").addEventListener("change", fsList);
+$("#fs_hidden").addEventListener("change", e => { FS.hidden = e.target.checked; fsLoad(FS.path, {hist: false}); });
+$("#fs_open").onclick = () => openInExplorer(FS.path);
+$("#fs_native").onclick = () => { npSetPref(""); $("#fsdlg").close(); pickNative(FS.dir ? "folder" : "file", FS.cb, FS.title, FS.path || FS.start); };
+window.addEventListener("focus", () => { if ($("#fsdlg").open && !FS.path) fsLoad("", {refresh: true, hist: false}); });   // back from plugging a drive in: look again
 $("#fs_new").onclick = async () => {
   const name = await askText({title: "New folder", label: `Folder name (created inside ${FS.path})`, confirmLabel: "Create folder", validate: v => !v.trim() ? "Type a name" : /[\\/:*?"<>|]/.test(v) ? 'A name cannot contain / \\ : * ? " < > |' : v.length > 80 ? "At most 80 characters" : ""});
   if (name == null) return;
   try { const r = await api("fs/mkdir", {parent: FS.path, name}); await fsLoad(r.path); } catch (e) { toast(e.message, "bad"); }
 };
-$("#fs_ok").onclick = () => { if (!FS.sel) return toast(FS.dir ? "Open a folder first" : "Choose a file", "bad"); $("#fsdlg").close(); FS.cb && FS.cb(FS.sel); };
+$("#fs_ok").onclick = () => { if (!FS.sel) return toast(FS.dir ? "Open a folder first" : "Choose a file", "bad"); $("#fsdlg").close(); addRecent(FS.dir ? FS.sel : FS.sel.replace(/[\\/][^\\/]*$/, "")); FS.cb && FS.cb(FS.sel); };
 $("#fsdlg").addEventListener("close", () => { try { FS.opener && FS.opener.focus && FS.opener.focus(); } catch {} });
-$("#fsdlg").addEventListener("keydown", e => { if (e.key !== "Tab") return; const f = [...$("#fsdlg").querySelectorAll("button:not([disabled]):not([hidden]), input")].filter(x => x.offsetParent), i = f.indexOf(document.activeElement);
-  if (e.shiftKey && i === 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); } });
-document.addEventListener("click", e => { const b = e.target.closest("[data-browse]"); if (!b) return;
+$("#fsdlg").addEventListener("keydown", e => {
+  if (e.key === "Tab") { const f = [...$("#fsdlg").querySelectorAll("button:not([disabled]):not([hidden]), input, select")].filter(x => x.offsetParent), i = f.indexOf(document.activeElement);
+    if (e.shiftKey && i === 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); } return; }
+  const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName);
+  if (e.altKey && e.key === "ArrowLeft") { e.preventDefault(); $("#fs_back").click(); }
+  else if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); $("#fs_fwd").click(); }
+  else if (e.altKey && e.key === "ArrowUp") { e.preventDefault(); $("#fs_up").click(); }
+  else if (e.key === "Backspace" && !typing) { e.preventDefault(); $("#fs_up").click(); }
+  else if (e.key === "/" && !typing) { e.preventDefault(); $("#fs_filter").focus(); }
+});
+/* Open in Explorer: next to every Browse button (they are drawn by many pages, so one pass adds the button wherever a Browse button appears) */
+function openInExplorer(path) {      // the same reveal() the Open folder buttons use
+  if (!String(path || "").trim()) return toast("Type or choose a path first", "bad");
+  return window.reveal(String(path).trim());
+}
+function decorateBrowse() {
+  document.querySelectorAll("button[data-browse]").forEach(b => {
+    const id = b.dataset.browse;
+    if (!b.title && npHelp("browse")) b.title = npHelp("browse");
+    if (b.parentNode.querySelector(`[data-openexp="${CSS.escape(id)}"]`)) return;
+    const o = document.createElement("button"); o.type = "button"; o.className = "btn sec sm"; o.dataset.openexp = id; o.textContent = "Open in Explorer"; o.title = npHelp("open_explorer") || "Show this folder in Explorer";
+    const same = [...b.parentNode.querySelectorAll("button[data-browse]")].filter(x => x.dataset.browse === id); same[same.length - 1].after(o);
+  });
+}
+let decoratePending = false;
+new MutationObserver(() => { if (decoratePending) return; decoratePending = true; requestAnimationFrame(() => { decoratePending = false; decorateBrowse(); }); }).observe(document.body, {childList: true, subtree: true});
+decorateBrowse();
+document.addEventListener("click", e => {
+  const o = e.target.closest("[data-openexp]"); if (o) { const input = document.getElementById(o.dataset.openexp); openInExplorer(input && input.value); return; }
+  const b = e.target.closest("[data-browse]"); if (!b) return;
   const input = document.getElementById(b.dataset.browse);
   pickPath(b.dataset.dir === "1", p => { input.value = p; input.dispatchEvent(new Event("input", {bubbles:true})); input.dispatchEvent(new Event("change", {bubbles:true})); }, null, input.value || undefined); });
+document.addEventListener("paste", e => {      // a path copied in Explorer: Copy as path, the address bar, a file:/// link
+  const input = e.target; if (!input || input.tagName !== "INPUT" || !input.id || !document.querySelector(`[data-browse="${CSS.escape(input.id)}"]`)) return;
+  setTimeout(() => { const n = normPasted(input.value); if (n.hint) return toast(n.hint, "bad"); if (n.path !== input.value) { input.value = n.path; input.dispatchEvent(new Event("input", {bubbles: true})); input.dispatchEvent(new Event("change", {bubbles: true})); } }, 0);
+});
 
 /* ===================================================================================================
    Global search

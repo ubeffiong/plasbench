@@ -187,7 +187,26 @@ def parse_windows_disks(text) -> list:
         out.append({"letter": str(row["DeviceID"])[:1].upper(), "label": (row.get("VolumeName") or "").strip(), "drive_type": _int(row.get("DriveType")) or 0,
                     "fs": row.get("FileSystem") or None, "total": _int(row.get("Size")), "free": _int(row.get("FreeSpace")),
                     "provider": row.get("ProviderName") or "", "bus": (row.get("Bus") or "").strip() or None,
-                    "read_only": {1: True, 2: False, 3: False}.get(_int(row.get("Access")))})
+                    "read_only": {1: True, 2: False, 3: False}.get(_int(row.get("Access"))), "media": _int(row.get("Size")) is not None})
+    return out
+
+
+def parse_get_volume(text) -> list:
+    """`Get-Volume | Select DriveLetter,FileSystemLabel,DriveType,FileSystem,Size,SizeRemaining | ConvertTo-Json` -> the same dicts as parse_windows_disks (DriveType is a word:
+    Fixed, Removable, CD-ROM, Network, RAM Disk). Volumes without a drive letter are skipped."""
+    d = _json(text)
+    if isinstance(d, dict):
+        d = [d]
+    kinds = {"fixed": 3, "removable": 2, "network": 4, "cd-rom": 5, "ram disk": 6}
+    out = []
+    for row in d if isinstance(d, list) else []:
+        letter = str((row or {}).get("DriveLetter") or "").strip()[:1].upper() if isinstance(row, dict) else ""
+        if not letter.isalpha():
+            continue
+        size = _int(row.get("Size"))
+        out.append({"letter": letter, "label": (row.get("FileSystemLabel") or "").strip(), "drive_type": kinds.get(str(row.get("DriveType") or "").strip().lower(), 0),
+                    "fs": row.get("FileSystem") or None, "total": size, "free": _int(row.get("SizeRemaining")) if size is not None else None, "provider": "", "bus": None,
+                    "read_only": None, "media": size is not None})
     return out
 
 
@@ -206,6 +225,28 @@ def parse_wmic_csv(text) -> list:
         row.pop("Node", None)
         rows.append({k: v.strip() for k, v in row.items()})
     return rows
+
+
+VOLUME_PS = ("@(Get-Volume|Where-Object DriveLetter|Select-Object DriveLetter,FileSystemLabel,DriveType,FileSystem,Size,SizeRemaining)|ConvertTo-Json -Compress")
+
+
+def windows_disks(run=_run, which=shutil.which) -> list:
+    """Every Windows drive letter with its real size and free space, as Windows reports them (Win32_LogicalDisk through PowerShell: internal, USB and other removable drives,
+    network drives, optical drives, an empty card reader as a drive with no media), else Get-Volume, else wmic. It is the ONE source of drive capacity: the window's computer card and
+    the folder chooser both read it, so they agree. (Reading the size of /mnt/<letter> from Ubuntu is wrong when that folder is not a real mount: it is Ubuntu's own virtual disk.)"""
+    exe = which("powershell.exe") or which("powershell") or which("pwsh")
+    disks = []
+    if exe:
+        base = [exe, "-NoProfile", "-NonInteractive", "-Command"]
+        disks = parse_windows_disks(run(base + [DISKS_PS])) or parse_get_volume(run(base + [VOLUME_PS]))
+    if not disks:
+        wmic = which("wmic.exe") or which("wmic")
+        if wmic:
+            rows = parse_wmic_csv(run([wmic, "logicaldisk", "get", "DeviceID,VolumeName,DriveType,FileSystem,Size,FreeSpace,ProviderName,Access", "/format:csv"]))
+            disks = [{"letter": r["DeviceID"][:1].upper(), "label": r.get("VolumeName", ""), "drive_type": _int(r.get("DriveType")) or 0, "fs": r.get("FileSystem") or None,
+                      "total": _int(r.get("Size")), "free": _int(r.get("FreeSpace")), "provider": r.get("ProviderName", ""), "bus": None,
+                      "read_only": {1: True, 2: False, 3: False}.get(_int(r.get("Access"))), "media": _int(r.get("Size")) is not None} for r in rows if r.get("DeviceID")]
+    return disks
 
 
 def host_info(run=_run, in_wsl=False) -> dict | None:
@@ -228,12 +269,7 @@ def host_info(run=_run, in_wsl=False) -> dict | None:
                         "free": (_int(osr[0].get("FreePhysicalMemory")) or 0) * 1024 or None if osr else None,
                         "pagefile": None, "os": osr[0].get("Caption") if osr else None, "userprofile": None}
     if not disks:
-        wmic = shutil.which("wmic.exe") or shutil.which("wmic")
-        if wmic:
-            rows = parse_wmic_csv(run([wmic, "logicaldisk", "get", "DeviceID,VolumeName,DriveType,FileSystem,Size,FreeSpace,ProviderName,Access", "/format:csv"]))
-            disks = [{"letter": r["DeviceID"][:1].upper(), "label": r.get("VolumeName", ""), "drive_type": _int(r.get("DriveType")) or 0, "fs": r.get("FileSystem") or None,
-                      "total": _int(r.get("Size")), "free": _int(r.get("FreeSpace")), "provider": r.get("ProviderName", ""), "bus": None,
-                      "read_only": {1: True, 2: False, 3: False}.get(_int(r.get("Access")))} for r in rows if r.get("DeviceID")]
+        disks = windows_disks(run)
     if host is None and not disks:
         return None
     host = dict(host or {})
