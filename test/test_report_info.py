@@ -67,7 +67,7 @@ STUB = (
 # What a real demo build still prints as a lead right after an h2: the Summary section, and sections whose lead carries
 # a standing caveat in bold ('advisory only', 'descriptive only') or a data value. Kept on purpose; see report_info.STATUS.
 KEPT_AFTER_H2 = {"summary", "assembly-quality", "data-inventory", "cohort-qc", "replicon-recovery", "truth-label-audit",
-                 "accuracy-dimension", "bin-quality"}
+                 "accuracy-dimension", "bin-quality", "learn-readqc"}   # learn-readqc: "Descriptive evidence; the gate's own rule is in FAQ Q33." stays beside the heading
 
 
 def _span_end(page, start):
