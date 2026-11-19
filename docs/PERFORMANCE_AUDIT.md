@@ -381,3 +381,20 @@ The harnesses are outside the repository, in this session's scratchpad: `bench_m
 `bench_aggregate.py`, `bench_score.py`, `bench_kmers.py`, `proto_exact_mean.py`, `proto_permutation.py` and
 `parse_trace.py`. Each takes the project's `python/` directory as its first argument and changes nothing in
 the project. If the roadmap is approved, they become the before/after benchmarks.
+
+## Stage 2 reference annotation (about 6.5 minutes per isolate in a production run)
+
+What was measured and what was not. **Observed:** a WSL run of `public-v4` took about 6.5 minutes of stage 2 per isolate for three isolates (the user's log). **Read from the code, not timed:**
+`python/annotate_reference.py` already runs its callers (MOB-typer, abricate for AMR and replicons, AMRFinderPlus, ISEScan, ISFinder BLAST, barrnap) at the same time, gives ISEScan the whole
+thread allowance and AMRFinderPlus half; the isolates themselves run one after another unless `MAX_PARALLEL_SAMPLES` is raised. Which caller dominates on that machine was **not measured**;
+the code's own comment names ISEScan as the slowest (a de novo scan of a whole genome), which is an assumption here. Each caller's time is now printed as it finishes, and
+`data/<isolate>/stage2_timing.tsv` already records the annotation step, so the next run shows the split.
+**Changed, safely:** the annotation of an isolate does not depend on the study, so a finished annotation is cached in the data folder by the reference's SHA-256 and the callers' versions and databases
+(`ANNOTATION_CACHE_DIR`); a second study of the same isolate spends no annotation time. The cached table is byte-identical to a fresh one (`test/test_annotation_cache.py`). A caller is never
+skipped and no caller's output is dropped.
+
+## Stage 3 disk and memory (the figures the resource check uses)
+
+The disk need per isolate is an **estimate**: trimmed reads about equal to the raw compressed reads, plus SPAdes working files at 8 times the raw compressed reads (an assumption in the 5 to 10 times
+range; it was not measured on this project's data). With no reads on disk yet, 0.63 GB (downloads and results per isolate) plus working space for a typical 0.3 GB read set is used. It warns under twice
+the estimate and stops under the estimate; `PLASBENCH_SKIP_DISK_CHECK=1` overrides it.

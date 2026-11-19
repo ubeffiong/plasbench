@@ -203,6 +203,17 @@ export PLASBENCH_ONLINE_TIMEOUT="${PLASBENCH_ONLINE_TIMEOUT:-5}"
 export ALLOW_ALL_TOOLS_FAILED="${ALLOW_ALL_TOOLS_FAILED:-0}"
 # Warn (never stop) before stage 1 when the drive holding the data folder has less than this many GB free. 0 turns the warning off.
 export MIN_FREE_DISK_GB="${MIN_FREE_DISK_GB:-20}"
+# Before stages 0, 2 and 3 PlasBench checks free disk (study, data and temporary folders, and under WSL the Windows drive holding Ubuntu's virtual disk), memory,
+# usable CPUs and writable folders (python/preflight_resources.py). Too little disk for the isolates still to do stops the stage (exit 6) with the figures.
+# 1 skips the disk figures only (the writable-folder and memory checks still run). Default 0.
+export PLASBENCH_SKIP_DISK_CHECK="${PLASBENCH_SKIP_DISK_CHECK:-0}"
+# 1 skips the whole resource check. Default 0.
+export PLASBENCH_SKIP_RESOURCE_CHECK="${PLASBENCH_SKIP_RESOURCE_CHECK:-0}"
+# 1 (default) lowers THREADS to the CPUs this process can really use (CPU count, affinity, container quota, WSL processors=) when you ask for more; 0 keeps your number.
+export CAP_THREADS_TO_CPUS="${CAP_THREADS_TO_CPUS:-1}"
+# 1 (default): when SPAdes fails for lack of memory, stage 3 retries that isolate ONCE with half the threads and a memory budget that fits the memory free now (never above
+# it), or once more after removing its own unfinished assembly folder. Never more than one retry. 0 never retries; the failure is still diagnosed.
+export ASSEMBLER_AUTO_RETRY="${ASSEMBLER_AUTO_RETRY:-1}"
 # Time limit, in seconds, for every helper subprocess in python/ (subsampling, alignment helpers, analysis scripts). 0 or off removes the limit. Default 21600 (6 hours).
 export PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS="${PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS:-21600}"
 # A run holds RESULTS_DIR/.run.lock and touches .run.lock.heartbeat every this many seconds, so a second run on the same results folder is refused.
@@ -635,6 +646,10 @@ export REPORT_MAPPING_AMBIGUITY="${REPORT_MAPPING_AMBIGUITY:-1}"
 # Absent callers are recorded as "not evaluated", never as absent features.
 export RUN_REFERENCE_ANNOTATION="${RUN_REFERENCE_ANNOTATION:-1}"
 export ANNOTATION_AMR_DB="${ANNOTATION_AMR_DB:-ncbi}"
+# Finished reference annotations are kept here, keyed by the reference's SHA-256 and the annotation tools' versions and databases, so a second study of the same
+# isolate reuses them (the truth annotation does not depend on the study). The stored result is byte-identical to a fresh one; the provenance file says it was reused.
+# Empty turns the cache off. Default: .annotation_cache inside the data folder.
+export ANNOTATION_CACHE_DIR="${ANNOTATION_CACHE_DIR-$DATA_DIR/.annotation_cache}"
 export ANNOTATION_REPLICON_DB="${ANNOTATION_REPLICON_DB:-plasmidfinder}"
 # Opt-in (default off): stage 2 also writes data/<sample>/truth_amr.draft.tsv from the
 # AMRFinderPlus rows (python/derive_amr_truth.py). A draft is never scored: review it and

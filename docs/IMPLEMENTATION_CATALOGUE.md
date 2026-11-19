@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 208 analysis modules, 28 registered tools and baselines (20 real tools), 219 registered
-outputs, 54 run switches, 437 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 209 analysis modules, 28 registered tools and baselines (20 real tools), 219 registered
+outputs, 54 run switches, 438 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -195,6 +195,11 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
 - **Limits.** The QC thresholds are not platform-specific (the pilot is Illumina paired reads from public runs). Running every tool on
   every alternative assembly is a separate run per condition (3.5).
 
+- **Assembly failure diagnosis and resource check** (`assembler_diagnosis.py`, `preflight_resources.py`, stage 3, `ASSEMBLER_AUTO_RETRY`, `CAP_THREADS_TO_CPUS`, `PLASBENCH_SKIP_DISK_CHECK`). When fastp, SPAdes or Unicycler fails, the log is classified (disk full, out of memory,
+  memory limit, threads, CPU feature, broken Python, truncated reads, mismatched mates, short or empty reads, read-only or missing files, stale output folder, missing tool, network, or "not recognised" with the last lines) and one block names the cause, the evidence line and the advice;
+  `assembly_status.tsv` gains `cause` and `advice`. A cause that belongs to the computer stops stage 3 at the first isolate (exit 5); out of memory and a stale folder get one retry. Before stages 0, 2 and 3 free disk (including the Windows drive holding the WSL virtual disk),
+  memory, usable CPUs and writable folders are checked against an estimate. Reference annotation is cached by reference checksum and tool versions (`ANNOTATION_CACHE_DIR`).
+  **Tests.** `test_assembler_diagnosis.py` (fixtures written from knowledge of the message formats, not captured logs), `test_preflight_resources.py`, `test_stage3_failure_diagnosis.sh`, `test_annotation_cache.py`, `test_run_status.py`.
 ### 3.10 Candidate multiplicity: when a tool reports several sequences for one plasmid
 
 - **What.** Every predicted record is kept and accounted for. Per true plasmid the report gives the candidate count, the best single candidate's coverage, the **combined
@@ -371,7 +376,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-208 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+209 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -427,6 +432,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 | Module | What it does |
 |---|---|
+| `assembler_diagnosis.py` | Say WHY an assembler (or a read-preparation tool) failed, from the tail of its log, and what to do about it. |
 | `assembler_sensitivity.py` | does the tool ranking depend on the assembly the tools were given? |
 | `assembly_adequacy.py` | Per-sample assembly adequacy: can the assembly support plasmid reconstruction at all? |
 | `assembly_qc_gate.py` | flag assemblies that look mixed or contaminated before a |
@@ -614,6 +620,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `multiqc_note.py` | The one plain-language note on MultiQC versus PlasBench's own QC panel, shared by every place that shows it. |
 | `performance_drivers.py` | What drives per-plasmid reconstruction accuracy? A multivariable, study-clustered regression per tool. |
 | `plsdb_novelty.py` | How novel is each truth plasmid against PLSDB, and does recovery depend on it? |
+| `preflight_resources.py` | Check, before the heavy stages, that the computer has what they need: disk, memory, CPUs and writable folders. |
 | `prereg_admin.py` | read, confirm and change PlasBench's pre-registered scoring decisions, and keep a record of who decided what and when. |
 | `qc_pilot.py` | A short-read QC pilot on real reads: the first part of each run's paired FASTQ files, measured with short_read_qc.py. |
 | `regenerate_visuals.py` | say which report sections a finished results folder can draw, and rebuild the cheap missing inputs in place. |
@@ -624,7 +631,6 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `run_status.py` | What is this run doing right now, and why might it look stuck? |
 | `setting_ranges.py` | The one table of what each numeric Scoring-decision setting accepts (config/setting_ranges.tsv), and the checks built on it. |
 | `source_install.py` | Install the source-distributed tools PlasBench can run, pinned, isolated and verified. |
-| `tool_install_proof.py` | Prove, on a clean Linux runner, that every tool PlasBench installs really installs (.github/workflows/tool-install-proof.yml). |
 
 
 ## 7. Every output file and where the report shows it

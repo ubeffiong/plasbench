@@ -162,7 +162,7 @@ def main():
     args = parser.parse_args()
     rows = []
     if args.data_dir.is_dir():
-        for sample_dir in sorted(p for p in args.data_dir.iterdir() if p.is_dir()):
+        for sample_dir in sorted(p for p in args.data_dir.iterdir() if p.is_dir() and not p.name.startswith(".")):
             rows.extend(audit_sample(sample_dir.name, sample_dir, args.chromid_min_bp, args.large_plasmid_bp))
     else:
         sys.stderr.write(f"[audit_truth_labels] data directory not found: {args.data_dir}; "
