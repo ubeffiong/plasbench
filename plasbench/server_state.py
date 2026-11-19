@@ -1,6 +1,6 @@
 """Is this running window server older than the files on disk? And restarting it safely.
 
-The server's Python code is fixed in memory when it starts, but the page (plasbench/data/ui.html) is re-read from disk. After an update (plasbench upgrade, update.sh, a git pull, a
+The server's Python code is fixed in memory when it starts, but the page (plasbench/data/ui.html) is re-read from disk. After an update (plasbench upgrade, update.sh, a source update, a
 release install) while a window is open, the NEW page is therefore served by the OLD server, and the page calls routes the old server does not have ("no such API: workflow").
 At start the server records a fingerprint of its code (the package version and the size and modification time of every plasbench/*.py file); `state()` compares it with the disk
 without importing anything and without starting a process. `restart()` starts a replacement server and leaves the old one to exit; runs are detached (plasbench/jobrunner.py) and
