@@ -39,6 +39,7 @@ def wait(cond, seconds=40):
 def job_with_exit(jobs, code, argv):
     job = jobs._launch([sys.executable, "-u", "-c", f"import sys\nprint('the notice')\nsys.exit({code})"], "fake", "fake", None, list(argv), "plasbench", ROOT)
     wait(lambda: jobs.jobs[job["id"]]["state"] in ("done", "failed"))
+    wait(lambda: "[PlasBench]" in jobs.get(job["id"])["log"] or jobs.jobs[job["id"]]["state"] == "done", 10)   # the closing line is appended just after the state changes
     return job["id"]
 
 
