@@ -24,3 +24,7 @@ Everything here, including `benchmark.report.html` and `benchmark.leaderboard.*`
 - The run predates two later checks: the unaligned-sequence columns of the binning score and the run-table consistency check, so those are not in its tables.
 
 The manifest and logs contain the paths of the machine that produced the run.
+
+## Files regenerated after the run
+
+Added 19 November 2026 (not part of the 14 November run, and listed with the hash of every input in `regenerated_inputs.json`): for `upec_ecpf5` and `upec_ecpf7` only, `truth.tsv`, `visualization/alignment_blocks.json` and the structural tables, a prediction summary per tool, and the QC rows of those two isolates in `short_read_qc.tsv`, for the tools `mob_recon` and `plasmidspades` (the predictions were taken from an earlier two-isolate run and accepted only because their record count and length equal the rows of `scores.tsv`). The other eight isolates, and `platon` and `baseline_coverage`, are not covered, so the synteny, plasmid-map and QC sections are partial. Scores, the `benchmark.*` tables and `benchmark.report.html` are unchanged. What is still needed, and the command to run, are in `docs/COHORT1_REBUILD_STATUS.md`; `plasbench check-results results_real_cohort1 --cohort cohorts/public-v1.tsv` shows the state.

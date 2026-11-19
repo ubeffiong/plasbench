@@ -260,6 +260,10 @@ def _file_entries():
         S("{sample}/{tool}.proteins.tsv", pt, "Predicted proteins", "annotate_proteins.py", "feature-preservation", "partly", "Compared with the truth proteins."),
         S("{sample}/{tool}.proteins.provenance.json", pt, "Predicted protein provenance", "annotate_proteins.py", None, "partly", "Provenance." + explorer),
         S("{sample}/{tool}.replicon_hits.tsv", pt, "Replicon marker hits (baseline)", "04_run_tools.sh", None, "partly", "Input of the replicon baseline." + explorer),
+        S("{sample}/{tool}.prediction_summary.tsv", pt, "Prediction summary kept for report rebuilds (record, length, sequence hash)", "keep_report_inputs.py", "method", "partly",
+          "Lets a rebuild check that predictions supplied later are the ones that were scored." + explorer),
+        S("{sample}/report_inputs.json", ps, "Which report inputs were kept in the results folder", "keep_report_inputs.py", "method", "partly",
+          "Lists the small per-sample inputs copied beside the results so the report can be rebuilt elsewhere." + explorer),
         # ---- run-level files -------------------------------------------------------------------------------------------------
         S("scores.tsv", ag, "Scores, one row per sample and tool", "score_plasmids.py", "scores", "shown", "Table with filters and download.", expected=True),
         S("score_failures.tsv", ag, "Runs that could not be scored", "05_score.sh", "outcome-states", "shown", "Listed with the reason.", expected=False),
@@ -273,6 +277,7 @@ def _file_entries():
         S("run_manifest.json", ag, "Run manifest (versions, settings)", "write_manifest.py", "method", "shown", "Method and reproducibility section.", expected=True),
         S("orthogonal_validation.summary.json", ag, "Orthogonal-evidence summary", "validate_orthogonal_evidence.py", "orthogonal-evidence", "shown", "Summarised."),
         S("samples.tsv", ag, "Sample sheet", "curate_cohort.py", "samples", "shown", "Sample metadata drives the strata and the drill-down.", expected=True),
+        S("regenerated_inputs.json", ag, "Files rebuilt after the run", "regenerate_visuals.py", "metadata", "shown", "Run metadata says which files were regenerated after the run, when and from what."),
         S("selected_candidates/{any}", ag, "Selected candidate downloads", "select_unknown_sample.py", "selected", "shown", "Linked from the selection cards."),
         S("benchmark.report.html", ag, "This report", "build_html_report.py", None, "shown", "The report itself."),
         S("benchmark.manifest.json", ag, "Benchmark manifest", "write_manifest.py", "method", "partly", "Settings appear in the method section."),

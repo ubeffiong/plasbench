@@ -1,0 +1,827 @@
+{
+  "entries": [
+    {
+      "action": "measured from the read pairs of 2 sample(s) (short_read_qc.py); 8 sample(s) without reads will have no row",
+      "file": "short_read_qc.tsv",
+      "inputs": [
+        {
+          "bytes": 111262885,
+          "input": "upec_ecpf5/SRR11905454_1.fastq.gz",
+          "partial": false,
+          "sha256": "e2462ad1746ba95d158b24ee7f9880321fdef7fe11950d1895b301fd2e1053ee"
+        },
+        {
+          "bytes": 113847932,
+          "input": "upec_ecpf5/SRR11905454_2.fastq.gz",
+          "partial": false,
+          "sha256": "4ddb63247d63d903297b7731bfd6675ef64e63fb3d89da5a6c84bdc57d78ae66"
+        },
+        {
+          "bytes": 107743125,
+          "input": "upec_ecpf7/SRR11905453_1.fastq.gz",
+          "partial": false,
+          "sha256": "525604b7f84b761e96e5bd0187bd6355482e40ebae65a2ef191973f7e6a843c2"
+        },
+        {
+          "bytes": 110420239,
+          "input": "upec_ecpf7/SRR11905453_2.fastq.gz",
+          "partial": false,
+          "sha256": "9fd9e1fe8493ed95c6382010890b40011c5c184a77f78b81636a018f746444c1"
+        }
+      ],
+      "inputs_sha256": "fc2303fbccfdb10630e1bd7676c68b7c17cd63bce1391f63f6bf57f5d935ed75",
+      "kind": "qc",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:21:03Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "measured from the read pairs of 2 sample(s) (short_read_qc.py); 8 sample(s) without reads will have no row",
+      "file": "short_read_qc_status.tsv",
+      "inputs": [
+        {
+          "bytes": 111262885,
+          "input": "upec_ecpf5/SRR11905454_1.fastq.gz",
+          "partial": false,
+          "sha256": "e2462ad1746ba95d158b24ee7f9880321fdef7fe11950d1895b301fd2e1053ee"
+        },
+        {
+          "bytes": 113847932,
+          "input": "upec_ecpf5/SRR11905454_2.fastq.gz",
+          "partial": false,
+          "sha256": "4ddb63247d63d903297b7731bfd6675ef64e63fb3d89da5a6c84bdc57d78ae66"
+        },
+        {
+          "bytes": 107743125,
+          "input": "upec_ecpf7/SRR11905453_1.fastq.gz",
+          "partial": false,
+          "sha256": "525604b7f84b761e96e5bd0187bd6355482e40ebae65a2ef191973f7e6a843c2"
+        },
+        {
+          "bytes": 110420239,
+          "input": "upec_ecpf7/SRR11905453_2.fastq.gz",
+          "partial": false,
+          "sha256": "9fd9e1fe8493ed95c6382010890b40011c5c184a77f78b81636a018f746444c1"
+        }
+      ],
+      "inputs_sha256": "fc2303fbccfdb10630e1bd7676c68b7c17cd63bce1391f63f6bf57f5d935ed75",
+      "kind": "qc",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:21:03Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "predictions copied from --predictions-dir (verified: record count (21) and total length (148790 bp) match the scores.tsv row); alignments copied with them",
+      "file": "upec_ecpf5/mob_recon.pred_vs_ref.paf",
+      "inputs": [
+        {
+          "bytes": 149558,
+          "input": "predictions:upec_ecpf5/pred_mob_recon.plasmid.fasta",
+          "partial": false,
+          "sha256": "d8d3b6f9552549d835e100eddf944172df8512c9978ed48aa0f99331f2d77e7e"
+        },
+        {
+          "bytes": 4248,
+          "input": "predictions:upec_ecpf5/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "7d20e30b066836ff23b978f60c468f2883ef5d32102a61594d281fd3ac6dc6e9"
+        }
+      ],
+      "inputs_sha256": "80cf3cae4dbc5fba4d783d7aadaa37e0c4b3960e69cd92bed8aa4d61b0d5ebdb",
+      "kind": "paf",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:26Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "written from the prediction (keep_report_inputs.py)",
+      "file": "upec_ecpf5/mob_recon.prediction_summary.tsv",
+      "inputs": [
+        {
+          "bytes": 149558,
+          "input": "upec_ecpf5/pred_mob_recon.plasmid.fasta",
+          "partial": false,
+          "sha256": "d8d3b6f9552549d835e100eddf944172df8512c9978ed48aa0f99331f2d77e7e"
+        }
+      ],
+      "inputs_sha256": "a5eadb09bb3609479d06b80d24aeb55cfe589dec41bfee60e4c7ac25ec4aced1",
+      "kind": "keep",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:27Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "predictions copied from --predictions-dir (verified: record count (5) and total length (15158 bp) match the scores.tsv row); alignments copied with them",
+      "file": "upec_ecpf5/plasmidspades.pred_vs_ref.paf",
+      "inputs": [
+        {
+          "bytes": 15642,
+          "input": "predictions:upec_ecpf5/pred_plasmidspades.plasmid.fasta",
+          "partial": false,
+          "sha256": "59a9c59d081b32e3d60a3bd4bea183d309741a51ce9d3a6b673e505e85192937"
+        },
+        {
+          "bytes": 1412,
+          "input": "predictions:upec_ecpf5/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "cb9bdc3b3e5aba35946b89d35c6b9aa928de9843e54bc95e1a52c3fdc2b9cba9"
+        }
+      ],
+      "inputs_sha256": "4cbb248bbc5607b8f2e29c6801d5af5eb590665cf2f861043b50706d775f1056",
+      "kind": "paf",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:26Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "written from the prediction (keep_report_inputs.py)",
+      "file": "upec_ecpf5/plasmidspades.prediction_summary.tsv",
+      "inputs": [
+        {
+          "bytes": 15642,
+          "input": "upec_ecpf5/pred_plasmidspades.plasmid.fasta",
+          "partial": false,
+          "sha256": "59a9c59d081b32e3d60a3bd4bea183d309741a51ce9d3a6b673e505e85192937"
+        }
+      ],
+      "inputs_sha256": "6c123e67bfb99dce6d182efb10554d8a6919ad8d5681f082aa535a228819d56f",
+      "kind": "keep",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:27Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "predictions copied from --predictions-dir (verified: record count (21) and total length (148790 bp) match the scores.tsv row); alignments copied with them",
+      "file": "upec_ecpf5/pred_mob_recon.plasmid.fasta",
+      "inputs": [
+        {
+          "bytes": 149558,
+          "input": "predictions:upec_ecpf5/pred_mob_recon.plasmid.fasta",
+          "partial": false,
+          "sha256": "d8d3b6f9552549d835e100eddf944172df8512c9978ed48aa0f99331f2d77e7e"
+        },
+        {
+          "bytes": 4248,
+          "input": "predictions:upec_ecpf5/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "7d20e30b066836ff23b978f60c468f2883ef5d32102a61594d281fd3ac6dc6e9"
+        }
+      ],
+      "inputs_sha256": "80cf3cae4dbc5fba4d783d7aadaa37e0c4b3960e69cd92bed8aa4d61b0d5ebdb",
+      "kind": "paf",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:26Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "predictions copied from --predictions-dir (verified: record count (5) and total length (15158 bp) match the scores.tsv row); alignments copied with them",
+      "file": "upec_ecpf5/pred_plasmidspades.plasmid.fasta",
+      "inputs": [
+        {
+          "bytes": 15642,
+          "input": "predictions:upec_ecpf5/pred_plasmidspades.plasmid.fasta",
+          "partial": false,
+          "sha256": "59a9c59d081b32e3d60a3bd4bea183d309741a51ce9d3a6b673e505e85192937"
+        },
+        {
+          "bytes": 1412,
+          "input": "predictions:upec_ecpf5/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "cb9bdc3b3e5aba35946b89d35c6b9aa928de9843e54bc95e1a52c3fdc2b9cba9"
+        }
+      ],
+      "inputs_sha256": "4cbb248bbc5607b8f2e29c6801d5af5eb590665cf2f861043b50706d775f1056",
+      "kind": "paf",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:26Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "called from truth.tsv and the alignments (call_structural_variants.py)",
+      "file": "upec_ecpf5/structural_events.tsv",
+      "inputs": [
+        {
+          "bytes": 122,
+          "input": "upec_ecpf5/truth.tsv",
+          "partial": false,
+          "sha256": "f96df9190b2a8f635162ef1849838c44b22455af7f660771d4863f71f25404c7"
+        },
+        {
+          "bytes": 4248,
+          "input": "upec_ecpf5/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "7d20e30b066836ff23b978f60c468f2883ef5d32102a61594d281fd3ac6dc6e9"
+        },
+        {
+          "bytes": 1412,
+          "input": "upec_ecpf5/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "cb9bdc3b3e5aba35946b89d35c6b9aa928de9843e54bc95e1a52c3fdc2b9cba9"
+        }
+      ],
+      "inputs_sha256": "fd9a7a1f4d7db3f9f441aea908e6b6aa42ac29faba9a38b54266e3382749045a",
+      "kind": "alignments",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:27Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "called from truth.tsv and the alignments (call_structural_variants.py)",
+      "file": "upec_ecpf5/structural_summary.tsv",
+      "inputs": [
+        {
+          "bytes": 122,
+          "input": "upec_ecpf5/truth.tsv",
+          "partial": false,
+          "sha256": "f96df9190b2a8f635162ef1849838c44b22455af7f660771d4863f71f25404c7"
+        },
+        {
+          "bytes": 4248,
+          "input": "upec_ecpf5/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "7d20e30b066836ff23b978f60c468f2883ef5d32102a61594d281fd3ac6dc6e9"
+        },
+        {
+          "bytes": 1412,
+          "input": "upec_ecpf5/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "cb9bdc3b3e5aba35946b89d35c6b9aa928de9843e54bc95e1a52c3fdc2b9cba9"
+        }
+      ],
+      "inputs_sha256": "fd9a7a1f4d7db3f9f441aea908e6b6aa42ac29faba9a38b54266e3382749045a",
+      "kind": "alignments",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:27Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "copied from the data folder",
+      "file": "upec_ecpf5/truth.tsv",
+      "inputs": [
+        {
+          "bytes": 122,
+          "input": "data:upec_ecpf5/truth.tsv",
+          "partial": false,
+          "sha256": "f96df9190b2a8f635162ef1849838c44b22455af7f660771d4863f71f25404c7"
+        }
+      ],
+      "inputs_sha256": "75a9e3ceeea18e8aa4a2f92f237043f3fb66ebda92d810b0031edd77d10d3cc7",
+      "kind": "truth",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:26Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "built from truth.tsv, the alignments and the predictions (build_visualization_data.py); only for the tools whose alignments exist (mob_recon, plasmidspades), not platon, baseline_coverage",
+      "file": "upec_ecpf5/visualization/alignment_blocks.json",
+      "inputs": [
+        {
+          "bytes": 122,
+          "input": "upec_ecpf5/truth.tsv",
+          "partial": false,
+          "sha256": "f96df9190b2a8f635162ef1849838c44b22455af7f660771d4863f71f25404c7"
+        },
+        {
+          "bytes": 5346850,
+          "input": "upec_ecpf5/reference.fna",
+          "partial": false,
+          "sha256": "b000a32e61b9580b887a00b421d7f36bf4c6cbf074974af6f59d409a8a457f72"
+        },
+        {
+          "bytes": 4248,
+          "input": "upec_ecpf5/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "7d20e30b066836ff23b978f60c468f2883ef5d32102a61594d281fd3ac6dc6e9"
+        },
+        {
+          "bytes": 1412,
+          "input": "upec_ecpf5/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "cb9bdc3b3e5aba35946b89d35c6b9aa928de9843e54bc95e1a52c3fdc2b9cba9"
+        },
+        {
+          "bytes": 149558,
+          "input": "upec_ecpf5/pred_mob_recon.plasmid.fasta",
+          "partial": false,
+          "sha256": "d8d3b6f9552549d835e100eddf944172df8512c9978ed48aa0f99331f2d77e7e"
+        },
+        {
+          "bytes": 15642,
+          "input": "upec_ecpf5/pred_plasmidspades.plasmid.fasta",
+          "partial": false,
+          "sha256": "59a9c59d081b32e3d60a3bd4bea183d309741a51ce9d3a6b673e505e85192937"
+        },
+        {
+          "bytes": 57,
+          "input": "upec_ecpf5/truth_features.tsv",
+          "partial": false,
+          "sha256": "61482e89b9981a8242d268efd480ab085a8680c6f2862beec8786f279e133aa5"
+        }
+      ],
+      "inputs_sha256": "3c29b8c3d3980f69c497b91db94d8c95729c2d53d1eee520db4dcfd0e47afbf4",
+      "kind": "alignments",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:26Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "called from truth.tsv and the alignments (call_structural_variants.py)",
+      "file": "upec_ecpf5/visualization/structural_calls.json",
+      "inputs": [
+        {
+          "bytes": 122,
+          "input": "upec_ecpf5/truth.tsv",
+          "partial": false,
+          "sha256": "f96df9190b2a8f635162ef1849838c44b22455af7f660771d4863f71f25404c7"
+        },
+        {
+          "bytes": 4248,
+          "input": "upec_ecpf5/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "7d20e30b066836ff23b978f60c468f2883ef5d32102a61594d281fd3ac6dc6e9"
+        },
+        {
+          "bytes": 1412,
+          "input": "upec_ecpf5/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "cb9bdc3b3e5aba35946b89d35c6b9aa928de9843e54bc95e1a52c3fdc2b9cba9"
+        }
+      ],
+      "inputs_sha256": "fd9a7a1f4d7db3f9f441aea908e6b6aa42ac29faba9a38b54266e3382749045a",
+      "kind": "alignments",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:27Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "built from truth.tsv, the alignments and the predictions (build_visualization_data.py); only for the tools whose alignments exist (mob_recon, plasmidspades), not platon, baseline_coverage",
+      "file": "upec_ecpf5/visualization/structural_metrics.tsv",
+      "inputs": [
+        {
+          "bytes": 122,
+          "input": "upec_ecpf5/truth.tsv",
+          "partial": false,
+          "sha256": "f96df9190b2a8f635162ef1849838c44b22455af7f660771d4863f71f25404c7"
+        },
+        {
+          "bytes": 5346850,
+          "input": "upec_ecpf5/reference.fna",
+          "partial": false,
+          "sha256": "b000a32e61b9580b887a00b421d7f36bf4c6cbf074974af6f59d409a8a457f72"
+        },
+        {
+          "bytes": 4248,
+          "input": "upec_ecpf5/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "7d20e30b066836ff23b978f60c468f2883ef5d32102a61594d281fd3ac6dc6e9"
+        },
+        {
+          "bytes": 1412,
+          "input": "upec_ecpf5/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "cb9bdc3b3e5aba35946b89d35c6b9aa928de9843e54bc95e1a52c3fdc2b9cba9"
+        },
+        {
+          "bytes": 149558,
+          "input": "upec_ecpf5/pred_mob_recon.plasmid.fasta",
+          "partial": false,
+          "sha256": "d8d3b6f9552549d835e100eddf944172df8512c9978ed48aa0f99331f2d77e7e"
+        },
+        {
+          "bytes": 15642,
+          "input": "upec_ecpf5/pred_plasmidspades.plasmid.fasta",
+          "partial": false,
+          "sha256": "59a9c59d081b32e3d60a3bd4bea183d309741a51ce9d3a6b673e505e85192937"
+        },
+        {
+          "bytes": 57,
+          "input": "upec_ecpf5/truth_features.tsv",
+          "partial": false,
+          "sha256": "61482e89b9981a8242d268efd480ab085a8680c6f2862beec8786f279e133aa5"
+        }
+      ],
+      "inputs_sha256": "3c29b8c3d3980f69c497b91db94d8c95729c2d53d1eee520db4dcfd0e47afbf4",
+      "kind": "alignments",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:26Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "predictions copied from --predictions-dir (verified: record count (15) and total length (125569 bp) match the scores.tsv row); alignments copied with them",
+      "file": "upec_ecpf7/mob_recon.pred_vs_ref.paf",
+      "inputs": [
+        {
+          "bytes": 126115,
+          "input": "predictions:upec_ecpf7/pred_mob_recon.plasmid.fasta",
+          "partial": false,
+          "sha256": "c0d8dfa913a9e2b413761db84eccda92759d55a1eb696e9fb71e6728d9a7f769"
+        },
+        {
+          "bytes": 3396,
+          "input": "predictions:upec_ecpf7/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "be55377c73a807d22b93a5c70f2a449eb3702c020e12e0b8de2be9092ee32b84"
+        }
+      ],
+      "inputs_sha256": "0453caf4fb08b5e6970c442dcec8ab35efd0799c47c0801f40babb2180fe9064",
+      "kind": "paf",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:26Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "written from the prediction (keep_report_inputs.py)",
+      "file": "upec_ecpf7/mob_recon.prediction_summary.tsv",
+      "inputs": [
+        {
+          "bytes": 126115,
+          "input": "upec_ecpf7/pred_mob_recon.plasmid.fasta",
+          "partial": false,
+          "sha256": "c0d8dfa913a9e2b413761db84eccda92759d55a1eb696e9fb71e6728d9a7f769"
+        }
+      ],
+      "inputs_sha256": "c5e051a3f0edf929466763a90686fc634f31bbad31a98de85c7d6442722990fc",
+      "kind": "keep",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:27Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "predictions copied from --predictions-dir (verified: record count (29) and total length (144283 bp) match the scores.tsv row); alignments copied with them",
+      "file": "upec_ecpf7/plasmidspades.pred_vs_ref.paf",
+      "inputs": [
+        {
+          "bytes": 148046,
+          "input": "predictions:upec_ecpf7/pred_plasmidspades.plasmid.fasta",
+          "partial": false,
+          "sha256": "f766b949151efb21326bb0364a2eaacb8473fc317c3c11c95faa8485859276b2"
+        },
+        {
+          "bytes": 6144,
+          "input": "predictions:upec_ecpf7/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "381ef4f03d755cd637ed016c138b0ed012f445994b8fdbd08cca935a19d69f26"
+        }
+      ],
+      "inputs_sha256": "076482c65f218b73171ecb8fcb1450712ff1ba6cf84d66268070a89d2414a961",
+      "kind": "paf",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:26Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "written from the prediction (keep_report_inputs.py)",
+      "file": "upec_ecpf7/plasmidspades.prediction_summary.tsv",
+      "inputs": [
+        {
+          "bytes": 148046,
+          "input": "upec_ecpf7/pred_plasmidspades.plasmid.fasta",
+          "partial": false,
+          "sha256": "f766b949151efb21326bb0364a2eaacb8473fc317c3c11c95faa8485859276b2"
+        }
+      ],
+      "inputs_sha256": "741fbb89d3b8f22532efc68eddeed6617119440900a7abb7e4be57ba4ed20486",
+      "kind": "keep",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:27Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "predictions copied from --predictions-dir (verified: record count (15) and total length (125569 bp) match the scores.tsv row); alignments copied with them",
+      "file": "upec_ecpf7/pred_mob_recon.plasmid.fasta",
+      "inputs": [
+        {
+          "bytes": 126115,
+          "input": "predictions:upec_ecpf7/pred_mob_recon.plasmid.fasta",
+          "partial": false,
+          "sha256": "c0d8dfa913a9e2b413761db84eccda92759d55a1eb696e9fb71e6728d9a7f769"
+        },
+        {
+          "bytes": 3396,
+          "input": "predictions:upec_ecpf7/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "be55377c73a807d22b93a5c70f2a449eb3702c020e12e0b8de2be9092ee32b84"
+        }
+      ],
+      "inputs_sha256": "0453caf4fb08b5e6970c442dcec8ab35efd0799c47c0801f40babb2180fe9064",
+      "kind": "paf",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:26Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "predictions copied from --predictions-dir (verified: record count (29) and total length (144283 bp) match the scores.tsv row); alignments copied with them",
+      "file": "upec_ecpf7/pred_plasmidspades.plasmid.fasta",
+      "inputs": [
+        {
+          "bytes": 148046,
+          "input": "predictions:upec_ecpf7/pred_plasmidspades.plasmid.fasta",
+          "partial": false,
+          "sha256": "f766b949151efb21326bb0364a2eaacb8473fc317c3c11c95faa8485859276b2"
+        },
+        {
+          "bytes": 6144,
+          "input": "predictions:upec_ecpf7/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "381ef4f03d755cd637ed016c138b0ed012f445994b8fdbd08cca935a19d69f26"
+        }
+      ],
+      "inputs_sha256": "076482c65f218b73171ecb8fcb1450712ff1ba6cf84d66268070a89d2414a961",
+      "kind": "paf",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:26Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "called from truth.tsv and the alignments (call_structural_variants.py)",
+      "file": "upec_ecpf7/structural_events.tsv",
+      "inputs": [
+        {
+          "bytes": 149,
+          "input": "upec_ecpf7/truth.tsv",
+          "partial": false,
+          "sha256": "f1c9f06fc4ddcee7a28d44f76d387006db2a3b5f2f4a14b4967ab6fd7177e157"
+        },
+        {
+          "bytes": 3396,
+          "input": "upec_ecpf7/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "be55377c73a807d22b93a5c70f2a449eb3702c020e12e0b8de2be9092ee32b84"
+        },
+        {
+          "bytes": 6144,
+          "input": "upec_ecpf7/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "381ef4f03d755cd637ed016c138b0ed012f445994b8fdbd08cca935a19d69f26"
+        }
+      ],
+      "inputs_sha256": "8d02fc354996dc9d04e56fcb25fb1e06cf8d65ebfecfa29f40b7c628e9fb0361",
+      "kind": "alignments",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:27Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "called from truth.tsv and the alignments (call_structural_variants.py)",
+      "file": "upec_ecpf7/structural_summary.tsv",
+      "inputs": [
+        {
+          "bytes": 149,
+          "input": "upec_ecpf7/truth.tsv",
+          "partial": false,
+          "sha256": "f1c9f06fc4ddcee7a28d44f76d387006db2a3b5f2f4a14b4967ab6fd7177e157"
+        },
+        {
+          "bytes": 3396,
+          "input": "upec_ecpf7/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "be55377c73a807d22b93a5c70f2a449eb3702c020e12e0b8de2be9092ee32b84"
+        },
+        {
+          "bytes": 6144,
+          "input": "upec_ecpf7/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "381ef4f03d755cd637ed016c138b0ed012f445994b8fdbd08cca935a19d69f26"
+        }
+      ],
+      "inputs_sha256": "8d02fc354996dc9d04e56fcb25fb1e06cf8d65ebfecfa29f40b7c628e9fb0361",
+      "kind": "alignments",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:27Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "copied from the data folder",
+      "file": "upec_ecpf7/truth.tsv",
+      "inputs": [
+        {
+          "bytes": 149,
+          "input": "data:upec_ecpf7/truth.tsv",
+          "partial": false,
+          "sha256": "f1c9f06fc4ddcee7a28d44f76d387006db2a3b5f2f4a14b4967ab6fd7177e157"
+        }
+      ],
+      "inputs_sha256": "a5df7d46480c0b2746eb209a290a2ae785b9ea4751fa73180aab1eae673e32e5",
+      "kind": "truth",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:26Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "built from truth.tsv, the alignments and the predictions (build_visualization_data.py); only for the tools whose alignments exist (mob_recon, plasmidspades), not platon, baseline_coverage",
+      "file": "upec_ecpf7/visualization/alignment_blocks.json",
+      "inputs": [
+        {
+          "bytes": 149,
+          "input": "upec_ecpf7/truth.tsv",
+          "partial": false,
+          "sha256": "f1c9f06fc4ddcee7a28d44f76d387006db2a3b5f2f4a14b4967ab6fd7177e157"
+        },
+        {
+          "bytes": 5196229,
+          "input": "upec_ecpf7/reference.fna",
+          "partial": false,
+          "sha256": "6fb764caf99bc06956108e4adda8b986e1fb98a1720987304fa30270ebdd1a5b"
+        },
+        {
+          "bytes": 3396,
+          "input": "upec_ecpf7/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "be55377c73a807d22b93a5c70f2a449eb3702c020e12e0b8de2be9092ee32b84"
+        },
+        {
+          "bytes": 6144,
+          "input": "upec_ecpf7/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "381ef4f03d755cd637ed016c138b0ed012f445994b8fdbd08cca935a19d69f26"
+        },
+        {
+          "bytes": 126115,
+          "input": "upec_ecpf7/pred_mob_recon.plasmid.fasta",
+          "partial": false,
+          "sha256": "c0d8dfa913a9e2b413761db84eccda92759d55a1eb696e9fb71e6728d9a7f769"
+        },
+        {
+          "bytes": 148046,
+          "input": "upec_ecpf7/pred_plasmidspades.plasmid.fasta",
+          "partial": false,
+          "sha256": "f766b949151efb21326bb0364a2eaacb8473fc317c3c11c95faa8485859276b2"
+        },
+        {
+          "bytes": 57,
+          "input": "upec_ecpf7/truth_features.tsv",
+          "partial": false,
+          "sha256": "61482e89b9981a8242d268efd480ab085a8680c6f2862beec8786f279e133aa5"
+        }
+      ],
+      "inputs_sha256": "661023a62c7dabecbc2e2ea64e8c6df887eab93bd72b01cf21d28e2824a07feb",
+      "kind": "alignments",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:27Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "called from truth.tsv and the alignments (call_structural_variants.py)",
+      "file": "upec_ecpf7/visualization/structural_calls.json",
+      "inputs": [
+        {
+          "bytes": 149,
+          "input": "upec_ecpf7/truth.tsv",
+          "partial": false,
+          "sha256": "f1c9f06fc4ddcee7a28d44f76d387006db2a3b5f2f4a14b4967ab6fd7177e157"
+        },
+        {
+          "bytes": 3396,
+          "input": "upec_ecpf7/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "be55377c73a807d22b93a5c70f2a449eb3702c020e12e0b8de2be9092ee32b84"
+        },
+        {
+          "bytes": 6144,
+          "input": "upec_ecpf7/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "381ef4f03d755cd637ed016c138b0ed012f445994b8fdbd08cca935a19d69f26"
+        }
+      ],
+      "inputs_sha256": "8d02fc354996dc9d04e56fcb25fb1e06cf8d65ebfecfa29f40b7c628e9fb0361",
+      "kind": "alignments",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:27Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    },
+    {
+      "action": "built from truth.tsv, the alignments and the predictions (build_visualization_data.py); only for the tools whose alignments exist (mob_recon, plasmidspades), not platon, baseline_coverage",
+      "file": "upec_ecpf7/visualization/structural_metrics.tsv",
+      "inputs": [
+        {
+          "bytes": 149,
+          "input": "upec_ecpf7/truth.tsv",
+          "partial": false,
+          "sha256": "f1c9f06fc4ddcee7a28d44f76d387006db2a3b5f2f4a14b4967ab6fd7177e157"
+        },
+        {
+          "bytes": 5196229,
+          "input": "upec_ecpf7/reference.fna",
+          "partial": false,
+          "sha256": "6fb764caf99bc06956108e4adda8b986e1fb98a1720987304fa30270ebdd1a5b"
+        },
+        {
+          "bytes": 3396,
+          "input": "upec_ecpf7/mob_recon.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "be55377c73a807d22b93a5c70f2a449eb3702c020e12e0b8de2be9092ee32b84"
+        },
+        {
+          "bytes": 6144,
+          "input": "upec_ecpf7/plasmidspades.pred_vs_ref.paf",
+          "partial": false,
+          "sha256": "381ef4f03d755cd637ed016c138b0ed012f445994b8fdbd08cca935a19d69f26"
+        },
+        {
+          "bytes": 126115,
+          "input": "upec_ecpf7/pred_mob_recon.plasmid.fasta",
+          "partial": false,
+          "sha256": "c0d8dfa913a9e2b413761db84eccda92759d55a1eb696e9fb71e6728d9a7f769"
+        },
+        {
+          "bytes": 148046,
+          "input": "upec_ecpf7/pred_plasmidspades.plasmid.fasta",
+          "partial": false,
+          "sha256": "f766b949151efb21326bb0364a2eaacb8473fc317c3c11c95faa8485859276b2"
+        },
+        {
+          "bytes": 57,
+          "input": "upec_ecpf7/truth_features.tsv",
+          "partial": false,
+          "sha256": "61482e89b9981a8242d268efd480ab085a8680c6f2862beec8786f279e133aa5"
+        }
+      ],
+      "inputs_sha256": "661023a62c7dabecbc2e2ea64e8c6df887eab93bd72b01cf21d28e2824a07feb",
+      "kind": "alignments",
+      "plasbench_version": "0.5.0",
+      "regenerated_at": "2026-11-19T05:20:27Z",
+      "run_plasbench_version": "0.2.3",
+      "tool_versions": {
+        "python": "3.14.3"
+      }
+    }
+  ],
+  "last_command": "regenerate-visuals results_real_cohort1 --samples cohorts/public-v3.tsv --data-dir F:/tmp/plasbench_run/data --predictions-dir F:/tmp/plasbench_run/out/results --yes",
+  "note": "These files were regenerated after the run by plasbench regenerate-visuals; they were not written by the original run.",
+  "schema_version": "1"
+}

@@ -1,0 +1,2 @@
+tool	record_id	event_type	span_bp	query_start	query_end	left_target	left_target_end	right_target	right_target_start	left_strand	right_strand	min_mapq	validated	detail
+plasmidspades	NODE_3_length_10893_cov_22.604960_component_0	inter_replicon_junction	4561	6332	6332	NZ_CP054233.1	53514	NZ_CP054232.1	1816012	+	-	60	False	record joins NZ_CP054233.1 and NZ_CP054232.1

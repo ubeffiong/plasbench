@@ -1,0 +1,3 @@
+tool	alignment_breakpoints	reverse_orientation_blocks	multi_truth_target_records	order_conflicts	structural_concordance_proxy	meaning
+mob_recon	3	10	0	1	0.066667	Diagnostic proxy from retained primary PAF blocks; not a validated structural-correctness score.
+plasmidspades	3	8	0	2	0.071429	Diagnostic proxy from retained primary PAF blocks; not a validated structural-correctness score.
