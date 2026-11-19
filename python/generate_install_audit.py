@@ -48,7 +48,7 @@ def build() -> str:
         "",
         "What happens when a tool is enabled and a run, `plasbench check --yes`, `plasbench install-tools` or the window needs it, per tool. Revisions are 40-character commit",
         "SHAs resolved from the release tag on the date shown; a tag or branch name is never what is fetched. Times are estimates unless stated: nothing here was timed on a",
-        "real conda solve.",
+        "real conda solve. The *CI proof* column is what `.github/workflows/tool-install-proof.yml` showed on a clean Linux runner (config/install_proof_result.json).",
         "",
         "## How installation works now",
         "",
@@ -64,9 +64,21 @@ def build() -> str:
         "",
         "## Per tool",
         "",
-        "| Tool | Profile | How installed | Pinned version / revision | Source | Size | Internet | Install time | Verification | Status after this change |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Tool | Profile | How installed | Pinned version / revision | Source | Size | Internet | Install time | Verification | CI proof | Status after this change |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
+    proof_file = ROOT / "config" / "install_proof_result.json"
+    proof = json.loads(proof_file.read_text(encoding="utf-8")) if proof_file.is_file() else {"profiles": {}}
+
+    def proof_cell(profile, install_mode):
+        if install_mode == "builtin":
+            return "n/a (built in)"
+        result = proof["profiles"].get(profile)
+        if not result:
+            return "not yet run"
+        label = {"pass": "installed and verified", "expected-manual": "exit 20 with its reason (expected)"}.get(result["status"], "FAILED: " + (result.get("problem") or "see the run"))
+        return f"{label}, {result['minutes']} min, {proof['date']} ([run]({proof['run_url']}))"
+
     for row in rows:
         tool, profile = row["tool"], row["profile"]
         entry = registry.get(profile)
@@ -92,7 +104,7 @@ def build() -> str:
             pin = "see 'How installed'"
             internet = "none" if row["install_mode"] == "builtin" else "yes (conda, pypi)"
             status = "automated (already)" if row["automated"] == "yes" else "see notes"
-        lines.append(f"| {tool} | {profile} | {how} | {pin} | {source} | {size} | {internet} | {minutes} | {verify} | {status} |")
+        lines.append(f"| {tool} | {profile} | {how} | {pin} | {source} | {size} | {internet} | {minutes} | {verify} | {proof_cell(profile, row['install_mode'])} | {status} |")
     manual = {n: e for n, e in registry.items() if e["mode"] == "manual"}
     lines += ["", "## Tools that cannot be installed automatically, with the evidence", ""]
     for name, entry in manual.items():

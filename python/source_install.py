@@ -240,7 +240,8 @@ def plan_text(name: str, entry: dict, layout: Layout | None = None) -> str:
         lines.append("  Environment  : a dedicated, isolated environment" + (f" at {layout.install}" if layout else "") + ", built from:")
         for step in steps:
             what = {"conda_create": lambda s: "conda packages " + " ".join(s["packages"]), "conda_file": lambda s: "the conda environment file " + s["path"] + " of that revision",
-                    "pip_requirements": lambda s: "pip requirements " + s["path"].lstrip("@"), "pip_install": lambda s: "pip install of " + s["target"]}[step["type"]](step)
+                    "pip_requirements": lambda s: "pip requirements " + s["path"].lstrip("@"), "pip_install": lambda s: "pip install of " + s["target"],
+            "clear_execstack": lambda s: "clearing the executable-stack request of " + s["glob"] + " (recent glibc refuses to load such libraries)"}[step["type"]](step)
             lines.append(f"      - {what}")
     else:
         lines.append("  Environment  : none (the tool builds its own on first use; see below)")

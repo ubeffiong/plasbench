@@ -84,5 +84,12 @@ with _t.TemporaryDirectory() as _d:
     check("clear_execstack clears only the X flag of PT_GNU_STACK (rw- stays), once", changed and not again and int.from_bytes(so.read_bytes()[68:72], "little") == 6)
     txt = Path(_d) / "notelf.so"; txt.write_text("hello")
     check("a file that is not an ELF64 is left alone", si.clear_execstack(txt) is False and txt.read_text() == "hello")
+plans = {}
+for _name, _entry in si.load()["profiles"].items():
+    try:
+        plans[_name] = si.plan_text(_name, _entry, si.Layout(Path("/m/envs/plasbench"), "plasbench", _name))
+    except Exception as exc:  # noqa: BLE001 - the failure is the finding
+        plans[_name] = repr(exc)
+check("every profile's install plan can be printed (a step type the plan does not know crashed the PLASMe install on CI)", all(not v.startswith(("KeyError", "TypeError")) for v in plans.values()), plans)
 print("FAILED: " + ", ".join(FAILED) if FAILED else "ALL PASS")
 sys.exit(1 if FAILED else 0)

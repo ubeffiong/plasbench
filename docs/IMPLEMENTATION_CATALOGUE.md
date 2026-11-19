@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 207 analysis modules, 28 registered tools and baselines (20 real tools), 219 registered
-outputs, 54 run switches, 434 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 208 analysis modules, 28 registered tools and baselines (20 real tools), 219 registered
+outputs, 54 run switches, 437 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -371,7 +371,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-207 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+208 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -624,6 +624,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `run_status.py` | What is this run doing right now, and why might it look stuck? |
 | `setting_ranges.py` | The one table of what each numeric Scoring-decision setting accepts (config/setting_ranges.tsv), and the checks built on it. |
 | `source_install.py` | Install the source-distributed tools PlasBench can run, pinned, isolated and verified. |
+| `tool_install_proof.py` | Prove, on a clean Linux runner, that every tool PlasBench installs really installs (.github/workflows/tool-install-proof.yml). |
 
 
 ## 7. Every output file and where the report shows it

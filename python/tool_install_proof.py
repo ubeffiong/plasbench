@@ -215,6 +215,27 @@ def aggregate(folder, summary=None):
     return 0
 
 
+RESULT = ROOT / "config" / "install_proof_result.json"
+
+
+def record(folder, run_url, date):
+    """Keep what a proof run showed (docs/TOOL_INSTALL_AUDIT.md's 'CI proof' column is generated from it): per profile the status, minutes and version, with the run's URL and date."""
+    profiles = {}
+    for path in sorted(Path(folder).rglob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if isinstance(data, dict) and "profile" in data and "status" in data:
+            profiles[data["profile"]] = {"status": data["status"], "minutes": round((data.get("duration_seconds") or 0) / 60, 1), "version": data.get("version", ""),
+                                         "problem": data.get("problem", "")}
+    with open(RESULT, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump({"run_url": run_url, "date": date, "profiles": profiles}, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    print(f"recorded {len(profiles)} profiles from {run_url}")
+    return 0
+
+
 def matrix(only):
     config = load_config()
     names = [p for p in config["profiles"] if not only or p in only]
@@ -234,6 +255,10 @@ def main(argv=None):
     a = sub.add_parser("aggregate")
     a.add_argument("folder")
     a.add_argument("--summary", default=os.environ.get("GITHUB_STEP_SUMMARY", ""))
+    rec = sub.add_parser("record")
+    rec.add_argument("folder")
+    rec.add_argument("--run-url", required=True)
+    rec.add_argument("--date", required=True)
     sub.add_parser("check")
     args = parser.parse_args(argv)
     if args.command == "profiles":
@@ -247,6 +272,8 @@ def main(argv=None):
         return 0
     if args.command == "run":
         return run_profile(args.profile, args.out, args.env)
+    if args.command == "record":
+        return record(args.folder, args.run_url, args.date)
     if args.command == "aggregate":
         return aggregate(args.folder, args.summary or None)
     problems = check()
