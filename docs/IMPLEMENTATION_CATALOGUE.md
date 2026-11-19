@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 198 analysis modules, 28 registered tools and baselines (20 real tools), 216 registered
-outputs, 54 run switches, 420 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 201 analysis modules, 28 registered tools and baselines (20 real tools), 216 registered
+outputs, 54 run switches, 426 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -371,7 +371,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-198 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+201 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -553,6 +553,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `report_fig_binerrors.py` | Binning error profile: why a binner scores as it does, not only how much. |
 | `report_fig_complexity.py` | FIGURE 'Does isolate complexity explain performance?' (section fig-complexity). |
 | `report_fig_facets.py` | stratified small-multiples heatmaps: tools across, strata down, one panel per metric, one shared 0-1 colour bar. |
+| `report_fig_fingerprint.py` | FIGURE 'Fingerprint of each tool' (section fig-radar), compact small-multiples version. |
 | `report_fig_heatmap.py` | FIGURE 'Performance of every tool across every metric' (section fig-heatmap). |
 | `report_fig_ladder.py` | the reconstruction ladder: from contigs to a verified plasmid, and which score judges each step. |
 | `report_fig_landscape.py` | the 3D landscape figure: accuracy, completeness and structural fidelity (section id fig-landscape). |
@@ -560,6 +561,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `report_fig_presence.py` | a clustered presence/absence matrix of the truth plasmids and their features, with prevalence bars and a tool overlay. |
 | `report_fig_radar.py` | FIGURE 'Fingerprint of each tool' (section fig-radar): a radar chart per analysis track, one polygon per tool. |
 | `report_fig_stats.py` | two statistical figures of the report: CPRR distributions and a forest plot of CPRR differences. |
+| `report_fig_synteny.py` | the redesigned synteny view (section learn-synteny): one comparison at a time, truth plasmid on top, one tool's records below. |
 | `report_figures.py` | the figure modules of the report, injected in one place. |
 | `report_help.py` | a "?" help button on every section and every tab of the report, opening one shared help dialog. |
 | `report_help_text.py` | the words behind the "?" help button on every section and tab of the HTML report. |
@@ -615,6 +617,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `run_consistency.py` | Do the run tables agree before anything is ranked? |
 | `run_multiqc.py` | Optional MultiQC companion: run `multiqc` over the fastp (and QUAST) outputs of a run into results/multiqc/. Never fails the run. |
 | `run_status.py` | What is this run doing right now, and why might it look stuck? |
+| `setting_ranges.py` | The one table of what each numeric Scoring-decision setting accepts (config/setting_ranges.tsv), and the checks built on it. |
 
 
 ## 7. Every output file and where the report shows it
