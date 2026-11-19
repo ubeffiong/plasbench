@@ -1551,19 +1551,25 @@ def read_study_file(root, raw: str) -> dict:
             "text": data.decode("utf-8", "replace")}
 
 
-def browse(path: str, files: bool, project=None) -> dict:
+def browse(path: str, files: bool, project=None, hidden: bool = False, refresh: bool = False) -> dict:
     """The folder chooser's listing. An empty path is the root view: Quick places (Home, the workspace, the PlasBench folder, the shared data folder) and This PC (drive letters;
     in WSL the Windows drives; on Linux /mnt, /media/$USER; on macOS /Volumes). A typed Windows or \\\\wsl.localhost path is converted to the Linux path in WSL."""
     from . import chooser
     wsl = chooser.in_wsl()
     if not path:
-        places, pc = [], chooser.pc_places()
+        disks = None
+        if wsl or os.name == "nt":      # every Windows volume with its real size (USB, network, unmounted): the same list the computer card reads
+            from . import computer_info
+            if refresh:
+                loadcache.forget("win-disks")
+            disks, _ = loadcache.swr("win-disks", 8.0, computer_info.windows_disks)
+        places, pc = [], chooser.pc_places(disks=disks)
         if project is not None:
             from . import studies
             from .cli import configured_data_dir
-            places = chooser.quick_places(project.root, studies.workspace(project.root), configured_data_dir(project.root))
+            places = chooser.quick_places(project.root, studies.workspace(project.root), configured_data_dir(project.root), wsl=wsl)
         else:
-            places = chooser.quick_places(Path.cwd(), Path.home())
+            places = chooser.quick_places(Path.cwd(), Path.home(), wsl=wsl)
         help_text = ("A drive that is not listed is not mounted in Ubuntu. To mount a drive (E: as the example), run this in the Terminal tab; PlasBench never runs it for you: "
                      + chooser.mount_command("E")) if wsl else ""
         return {"path": "", "parent": None, "windows": "", "wsl": wsl, "places": places, "pc": pc, "help": help_text, "entries": places + pc}
@@ -1579,18 +1585,21 @@ def browse(path: str, files: bool, project=None) -> dict:
     entries = []
     try:
         for child in sorted(p.iterdir(), key=lambda c: (not c.is_dir(), c.name.lower())):
-            if child.name.startswith("."):
+            if child.name.startswith(".") and not hidden:
                 continue
             try:
                 is_dir = child.is_dir()
             except OSError:
                 continue
             if is_dir or files:
-                entry = {"name": child.name, "path": str(child), "dir": is_dir}
-                if not is_dir:
-                    try:
-                        entry["size"] = child.stat().st_size
-                    except OSError:
+                entry = {"name": child.name, "path": str(child), "dir": is_dir, "mtime": None}
+                try:
+                    st = child.stat()
+                    entry["mtime"] = int(st.st_mtime)
+                    if not is_dir:
+                        entry["size"] = st.st_size
+                except OSError:
+                    if not is_dir:
                         entry["size"] = None
                 entries.append(entry)
             if len(entries) >= 1500:
@@ -1720,6 +1729,10 @@ def make_handler(project: Project, jobs: Jobs):
         def jsend(self, code, obj):
             self.send(code, json.dumps(obj, default=str).encode("utf-8"))
 
+        def loopback(self):
+            """True when the request comes from this computer itself (the window is localhost-only; the folder window opens on this machine's desktop)."""
+            return str(self.client_address[0]).split("%")[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+
         def host_ok(self):
             host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
             return host in ("127.0.0.1", "localhost", "::1")
@@ -1789,6 +1802,16 @@ def make_handler(project: Project, jobs: Jobs):
 
         def api_get(self, route, q):
             state = load_state()
+            # ---- native folder window (plasbench/native_picker.py): additive block, GET side ----
+            if route in ("native-picker/capabilities", "native-picker/status"):
+                if not self.loopback():
+                    raise PermissionError("the computer's folder window can only be opened from the computer this window runs on")
+                from . import native_picker
+                if route == "native-picker/status":
+                    return self.jsend(200, native_picker.status(q.get("id", "")))
+                caps = loadcache.ttl(("native-picker-caps",), 60.0, native_picker.capabilities)     # only looks for programs; starts nothing
+                return self.jsend(200, dict(caps, exe=None))
+            # ---- end native folder window ----
             if route == "info":
                 info = project.info()
                 info["token_header"] = "X-PlasBench-Token"
@@ -1862,7 +1885,7 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "files/read":
                 return self.jsend(200, read_study_file(project.root, q.get("path", "")))
             if route == "browse":
-                return self.jsend(200, browse(q.get("path", ""), q.get("files") == "1", project))
+                return self.jsend(200, browse(q.get("path", ""), q.get("files") == "1", project, q.get("hidden") == "1", q.get("refresh") == "1"))
             if route == "docs":
                 return self.jsend(200, {"docs": project.docs()})
             if route == "doc":
@@ -2288,6 +2311,20 @@ def make_handler(project: Project, jobs: Jobs):
                 folder = studies.add_existing(project.root, self.linux_path(data.get("path", "")))
                 session_log().event("study_added", path=str(folder))
                 return self.jsend(200, {"path": str(folder), "name": folder.name})
+            # ---- native folder window (plasbench/native_picker.py): additive block, POST side ----
+            if route in ("native-picker/open", "native-picker/cancel", "native-picker/front"):
+                if not self.loopback():
+                    raise PermissionError("the computer's folder window can only be opened from the computer this window runs on")
+                from . import native_picker
+                if route == "native-picker/cancel":
+                    return self.jsend(200, native_picker.cancel(data.get("id")))
+                if route == "native-picker/front":
+                    return self.jsend(200, native_picker.bring_to_front(data.get("id")))
+                kind = data.get("kind", "folder")
+                started = native_picker.start(kind if kind in ("folder", "file", "save") else "folder", str(data.get("title", ""))[:200], data.get("initial") or None,
+                                              data.get("filters") if isinstance(data.get("filters"), list) else None)
+                return self.jsend(409 if started.get("busy") else 200, started)
+            # ---- end native folder window ----
             if route == "fs/mkdir":
                 from . import chooser
                 made = chooser.make_folder(self.linux_path(data.get("parent", "")), data.get("name", ""))
@@ -2365,10 +2402,7 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "usertools/upload":
                 return self.jsend(200, store_tool_upload(data.get("name"), data.get("filename"), data.get("text")))
             if route == "reveal":
-                target = Path(data.get("path", ""))
-                if not target.exists():
-                    raise FileNotFoundError(f"{target} does not exist")
-                return self.jsend(200, fsutil.reveal(target))
+                return self.jsend(200, fsutil.reveal_typed(data.get("path", "")))
             raise FileNotFoundError(f"no such API: {route}")
 
         # ---------------------------------------------------------------- git (plasbench/gitops.py)

@@ -13,6 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+- **Browse opens the computer's own folder window.** Every Browse / Choose a folder button now opens the real Explorer-style dialog (Windows, and WSL through `powershell.exe`; Finder on macOS; zenity, kdialog or yad on Linux) with every drive, USB stick and network location, and the chosen folder is converted for Ubuntu (`D:\x` to `/mnt/d/x`) and checked. Routes `/api/native-picker/{capabilities,open,status,cancel,front}` (token and loopback only, one dialog at a time, a timeout or Cancel kills the process); `plasbench/native_picker.py`. Where no desktop window exists the page says why and uses the built-in browser. Open in Explorer sits next to every path field, and pasted Explorer paths (Copy as path, the address bar, `file:///`, `This PC\Data (D:)\x`) are cleaned.
+- **Built-in folder browser.** Lists every Windows drive (USB, network, not mounted, no disk) with its real size and free space from Windows and a Copy button for the exact `mount -t drvfs` command; fixes the false capacity (an empty `/mnt/e` folder reported Ubuntu's own virtual disk); adds Desktop, Documents, Downloads, recent folders, Back, Forward, Refresh, filter, sort, hidden files and keyboard keys. The computer card and the chooser read one drive list.
+
 ## [0.5.2] - 2026-11-19
 Summary. Nothing in this release changes a score, a ranking or a threshold.
 - **Install and computer.** `plasbench install-tools` exits 20 ("manual step needed", nothing failed) for profiles PlasBench never installs for you; settings carry ranges that the window checks; the This-computer card shows CPUs, memory, limits, the Windows host behind WSL and every drive; the Version control page's description is a tooltip. Built-in, manual, dry-run and inspection install profiles need no internet: the command-line pre-flight, the window's gating and `/api/net/status` (`offline_install`) agree.
