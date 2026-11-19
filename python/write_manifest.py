@@ -55,7 +55,7 @@ def checksum_record(path, warnings, category):
                 "checksum_error": str(error)}
 
 
-def user_tool_records():
+def user_tool_records(results_dir=None):
     """Provenance for the user tools this run selected (USER_TOOLS): manifest path and checksum, task, track, run
     mode and the version its version_command reports. Returns (records, method_versions keyed by tool)."""
     selection = os.environ.get("USER_TOOLS", "").strip()
@@ -83,8 +83,14 @@ def user_tool_records():
                          "task": tool.task, "analysis_track": tool.track, "run_mode": tool.get("run", "mode"),
                          "output_format": tool.get("output", "format"), "install": tool.get("install", "method", "none"),
                          "citation": tool.get("tool", "citation"), "version": version}
+        # Tasks (one registry row each), where the tool came from (method, URL or path, checksum, size) and the output type
+        # each row used for each sample, as recorded by the converter (docs/ADDING_TOOLS.md).
+        records[name].update(tool.run_record())
+        if results_dir:
+            records[name]["output_choices"] = user_tools.chosen_outputs(results_dir, tool)
         # The report's "Tool version" column and filter show this, so readers see the tool was user-declared.
-        versions[name] = f"{version} (user tool)"
+        for tool_id, _ in tool.task_ids():   # each task row of a multi-task tool carries the same version
+            versions[tool_id] = f"{version} (user tool)"
     return records, versions
 
 
@@ -289,7 +295,7 @@ def main():
         if path.is_file():
             outputs[path.name] = checksum_record(path, manifest_warnings, "output")
     selected_candidates = collect_selected_candidates(Path(args.results_dir), manifest_warnings)
-    user_records, user_versions = user_tool_records()
+    user_records, user_versions = user_tool_records(args.results_dir)
     manifest = {
         "schema_version": "1.0", "tool": "PlasBench", "tool_version": tool_version(),
         "generated_at": datetime.now(timezone.utc).isoformat(),

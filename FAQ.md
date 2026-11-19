@@ -275,6 +275,21 @@ every input the report accepts, and that `plasbench analysis --list` reaches the
 `test/test_demo_end_to_end.py` runs the offline demo and asserts each layer reaches its table and its HTML section.
 **Status.** Fixed here. Before this, `derive_amr_truth.py` was reachable only from tests.
 
+### Q20c. Can I add my own tool, one that does several tasks, or one I only have as a download or a folder?
+
+Yes, with one manifest (`plasbench tools new`, [docs/ADDING_TOOLS.md](docs/ADDING_TOOLS.md)). `task = classification, binning_reconstruction`
+declares a tool that does several: the command runs once per sample and the same output is converted for each task, so the tool
+appears in each task's own leaderboard (labelled with the task) and is never ranked across tasks. A task is only offered when the
+declared output can honestly produce it: bins give classification, labels give binning only as one flagged bin per plasmid contig,
+and a plasmid FASTA gives sequence reassembly only; anything else is a validation error that says what to add. The tool can come
+from conda, pip, an **https** URL (`method = url`, optionally pinned with a sha256; archives are extracted safely, nothing runs
+at validation) or a file or folder on this computer (`method = local`, copied with a recorded checksum by default). `format = auto`
+recognises the tool's output files by their content and fails loudly, listing what it saw, rather than guessing.
+
+### Q20d. What does each optional step or tool add, and how do I see the whole chain?
+**Answer.** On **Tools** and on **New benchmark** (step *Tools*), the **Workflow** view lays the run out as ordered steps (download, truth, assemble, tools, score, report, long-read tools, operational). Each tool or optional step has an On/Off switch, a one-line description, badges for what it needs (database, internet, an earlier step) and its added time, memory and disk per isolate; a bar at the top totals the selection and says *estimated*. Switching something that needs a disabled step offers to switch that on too. The figures are labelled: *measured* (real runs in `results_real_cohort1`: assembly, MOB-recon, Platon, plasmidSPAdes), *documented* (README or config.sh) or *not measured*, which is shown as such and left out of the total, never counted as zero. Off is plum with a cross and On is green with a tick; an item at its default shows its default state's colour and a *changed* tag marks what you altered.
+**Status.** Implemented here (`plasbench/workflow_steps.py`, `config/workflow_steps.tsv`; `test/test_workflow_steps.py`, `test/test_workflow_ui.py`). Most optional analyses have no timing yet.
+
 ### Q21. Is the per-plasmid side file safe against stale results?
 **Answer.** It is rewritten on each scoring run, but a tool removed from a later run leaves its old
 `*.per_plasmid.tsv` behind, and the stratifier globs the results directory. `scores.tsv` has the same
@@ -432,15 +447,19 @@ and flagged a mixed or oversized *assembly* afterwards (`assembly_qc_gate.py`, a
   reject limit in `config/short_read_qc_thresholds.tsv`;
 - `SHORT_READ_QC_MODE=report` (default) records the decision and flags the sample but excludes only an integrity failure; `enforce` also excludes a
   threshold REJECT (status `rejected`: not assembled, tools skipped as "short-read QC rejected", never scored as a tool failure); `off` skips it;
-- outputs: `results/short_read_qc.tsv`, `short_read_qc_status.tsv` and a MultiQC-style table in the report with a cohort PASS/WARN/REJECT summary.
-**Not done.** Taxonomic contamination screening (it needs a database; the table says `not_evaluated`), and an automatic with-and-without-warned-samples
-sensitivity analysis (the report gives the counts so it can be done).
+- outputs: `results/short_read_qc.tsv`, `short_read_qc_status.tsv` and, in the report, a MultiQC-style QC panel (`python/report_readqc_panel.py`): General statistics with inline bars and Copy table / Configure columns / Scatter plot / Violin plot / Export as CSV, distributions with the threshold lines, a side panel per sample (each metric as a gauge against its limit, why it passed, warned or was rejected, its assembly selection), the thresholds with their status and hash, and a "What the reviewer asked" box. A run without the table says *Not measured in this run* and gives the command; the offline demo shows clearly labelled SYNTHETIC QC (`python/make_demo_readqc.py`, refuses to run on real samples).
+**Not done.** Taxonomic contamination screening (it needs a database; the table says `not_evaluated`). The with-and-without-flagged-samples check is
+descriptive: the panel ranks the tools by mean F1 with and without the flagged samples when `scores.tsv` is beside the QC table, and says when it cannot.
 **Evidence.** `python/short_read_qc.py`; `test/test_short_read_qc.py` (good, warning-level and reject-level reads, every integrity failure, the
 shipped thresholds, and that every threshold row names a metric that is really measured); `test/test_short_read_qc_stage.sh` (stage 3 and stage 4
 in all three modes).
 **Status.** Implemented and tested. **The thresholds are provisional**: they are conservative starting points, not universal cut-offs. They must be set
 from pilot data on the intended platform and then frozen (mark every row `frozen`; the file's hash is written to every QC row) before the main
 benchmark. That is why `enforce` is not the default.
+
+### Q33a. Does PlasBench use MultiQC? Which should I look at, MultiQC or the built-in QC panel?
+**Answer.** No, PlasBench does not use MultiQC to make its QC (that is fastp plus `python/short_read_qc.py`). The report's QC panel is PlasBench's own, modelled on MultiQC's layout. Real MultiQC is an optional companion: `plasbench install-tools multiqc`, then `MULTIQC_REPORT=auto` (default) runs it in stage 6 over the fastp and QUAST outputs into `results/multiqc/`, and the panel links to the report (it is never embedded). The built-in panel has PlasBench's thresholds, decisions and selection outcome and works offline in one file; MultiQC has more plots, is a separate file and knows nothing of the thresholds. Both read the same files, so shared figures should agree closely (the panel measures the first read pairs; fastp counts every read); if they differ a lot, compare the files. A MultiQC failure never fails a run.
+**Evidence.** `python/run_multiqc.py`, `python/multiqc_note.py`, `test/test_run_multiqc.py` (a fake `multiqc` on PATH). **Not verified** against a real MultiQC install in this repository's tests.
 
 ### Q34. How is noise picked up when a tool reports more than one sequence for a plasmid?
 **Answer.** Already present: a one-to-one bin match (Hungarian), split and merge outcomes, per-plasmid recovery states, CPRR, and the predicted-sequence
@@ -619,6 +638,22 @@ the independent-truth subset of public-v4 is still to be done.
 
 ### Q58. Where are the logs of a run?
 **Answer.** In the study folder: `logs/run_<date>-<time>.log` is everything the run printed, including the heartbeats (`logs/run.latest.log` points at the newest; the newest 20 are kept, `LOG_RETENTION_RUNS`; `RUN_CONSOLE_LOG=0` turns it off); `logs/<sample>.<step>.log` is each tool's own output; `results/run_events.jsonl` has one JSON line per event (stage start and end, isolate steps, command start and end with exit code and seconds, heartbeats with CPU and memory, warnings), safe to read by machine; `results/stage_timing.tsv` has seconds per stage. Events carry names and numbers only, never environment variables or commands.
+**Status.** New after v0.5.0.
+
+### Q59. PlasBench says "needs the internet" but my browser works. What do I do?
+**Answer.** Run `plasbench net`: it tests each service separately. "DNS is not working" with a working connection is common in WSL2 or behind a VPN (`wsl --shutdown` in PowerShell, turn the VPN off or on, or set a DNS server); one service down while others work means that service (NCBI, ENA, GitHub, conda) is down or blocked, and the message names a way round it (for example `READ_SOURCE=ena`, or `--local-inputs` with files you place yourself); a sign-in or certificate message points at a captive portal or proxy. To work offline on purpose set `PLASBENCH_OFFLINE=1`; scoring, reports and runs on files already on disk keep working. See the User Guide, "When You Are Offline".
+**Status.** New after v0.5.0.
+
+### Q60. Why does the window sign in with a pop-up and a code instead of taking me to GitHub?
+**Answer.** It uses GitHub's device flow through the GitHub CLI: the window shows a one-time code and opens github.com in a small pop-up it controls, so you never leave PlasBench; approving there signs you in and closes the pop-up. No app has to be registered and the page never sees a token. If your browser blocks the pop-up, the window shows the address with an Open button. Without the GitHub CLI, install it (the window shows the command) or sign in with a personal access token, which is passed over standard input only.
+**Status.** Done after v0.5.0 (next release); not exercised against a real account in the tests.
+
+### Q61. A button is greyed out with "Needs the internet". Why, and can I still work?
+**Answer.** The top bar checks the internet and each service (GitHub, NCBI, SRA, ENA, PyPI, conda, Zenodo, PLSDB). A control that needs an unreachable service looks disabled with the reason and advice; it stays focusable, and clicking it checks again at that moment. Local work (scoring, reports, studies, settings, a run whose reads are already on disk) never needs the internet. `PLASBENCH_OFFLINE=1` forces offline mode on purpose.
+**Status.** Done after v0.5.0 (next release).
+
+### Q62. My reads and reference genomes are in one big folder. Do I have to name every file?
+**Answer.** No. Use **Your own isolates > Scan a folder** in the window, or `plasbench scan-isolates FOLDER` (add `--write-sheet config/local.tsv` to place what it finds). It looks through the sub-folders, pairs the reads by their names (`_R1/_R2`, `_1/_2`, lanes, SRA style), picks the complete reference for each isolate and tells you why, and ignores BAMs, logs, PDFs, spreadsheets and assembler output such as `contigs.fasta`. It changes nothing in your folder; whatever it is unsure of is shown as an issue with the alternatives, never chosen silently. **Limit.** It matches by folder and file names and the start of each file, so a reference sitting in the right folder but from another strain looks right; check every isolate marked "check" and run the quick test. See the guide section "Add isolates from a folder".
 **Status.** New after v0.5.0.
 
 ## Part 2. The reviewer question bank, section by section

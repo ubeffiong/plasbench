@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 188 analysis modules, 28 registered tools and baselines (20 real tools), 212 registered
-outputs, 54 run switches, 396 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 198 analysis modules, 28 registered tools and baselines (20 real tools), 216 registered
+outputs, 54 run switches, 420 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -254,7 +254,7 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
 
 - **What.** A user declares a tool in one manifest; PlasBench installs it, runs it, converts its output to the standard prediction files, scores it and reports it, with the same
   evaluation task and track rules as built-in tools. Commands: `plasbench tools list|validate|show|new|add|install`.
-- **Where.** `python/user_tools.py`, `user_tool_adapter.py`, `docs/ADDING_TOOLS.md`; PR #46. **Tests.** `test_user_tools_manifest.py`, `test_user_tool_adapter.py`, `test_user_tool_stage.sh`.
+- **Where.** `python/user_tools.py`, `user_tool_adapter.py`, `user_tool_detect.py`, `user_tool_source.py`, `docs/ADDING_TOOLS.md`; PR #46 (several tasks, URL/local sources and `format = auto` added afterwards). **Tests.** `test_user_tools_manifest.py`, `test_user_tool_adapter.py`, `test_user_tool_detect.py`, `test_user_tool_source.py`, `test_user_tool_multitask.py`, `test_user_tool_stage.sh`, `test_user_tool_multitask_stage.sh`.
 
 ### 3.17 The HTML report
 
@@ -371,7 +371,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-188 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+198 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -501,6 +501,8 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `tool_capabilities.py` | Read the versioned PlasBench tool-capability registry. |
 | `tool_installer_registry.py` | Inspect and validate the install contract for every supported adapter. |
 | `user_tool_adapter.py` | Convert a user tool's output into PlasBench's prediction files, driven by its manifest's [output] mapping. |
+| `user_tool_detect.py` | Recognise what a user tool wrote, by CONTENT, for `[output] format = auto` (docs/ADDING_TOOLS.md, "Auto-detect"). |
+| `user_tool_source.py` | Where a user tool comes from: download it (https only), or locate it on this computer (docs/ADDING_TOOLS.md, "Where the tool comes from"). |
 | `user_tools.py` | User-added tools: declare a plasmid tool in one manifest and PlasBench installs, runs, scores and reports it. |
 | `write_manifest.py` | Write a portable, machine-readable provenance manifest for a PlasBench run. |
 | `write_operational_override_report.py` | Write a selection report for an explicit --tool override. |
@@ -544,14 +546,18 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `report_amr_regions.py` | resistance-region comparison: does each tool keep the AMR genes AND the mobile context around them, on the right plasmid? |
 | `report_collapse.py` | fold the tables that a figure now draws into closed <details>, in one place. |
 | `report_common.py` | shared building blocks for the report modules added in the HTML overhaul. |
+| `report_compare_apply.py` | turn the report's metric-by-tool tables into comparison tables (python/report_compare_table.py), keeping each original table. |
+| `report_compare_table.py` | the comparison table: a QUAST-style grid of metrics (rows, in groups) by tools (columns) that opens into a side panel. |
 | `report_condense.py` | shorten the report page from the inside: sub-tabs, windowed long tables, consistent table typography. |
 | `report_dimensions.py` | HTML sections for the further benchmark dimensions, built from stage-6 tables. |
 | `report_fig_binerrors.py` | Binning error profile: why a binner scores as it does, not only how much. |
 | `report_fig_complexity.py` | FIGURE 'Does isolate complexity explain performance?' (section fig-complexity). |
+| `report_fig_facets.py` | stratified small-multiples heatmaps: tools across, strata down, one panel per metric, one shared 0-1 colour bar. |
 | `report_fig_heatmap.py` | FIGURE 'Performance of every tool across every metric' (section fig-heatmap). |
 | `report_fig_ladder.py` | the reconstruction ladder: from contigs to a verified plasmid, and which score judges each step. |
 | `report_fig_landscape.py` | the 3D landscape figure: accuracy, completeness and structural fidelity (section id fig-landscape). |
 | `report_fig_pr.py` | the interactive precision-recall figure (section `fig-pr`). |
+| `report_fig_presence.py` | a clustered presence/absence matrix of the truth plasmids and their features, with prevalence bars and a tool overlay. |
 | `report_fig_radar.py` | FIGURE 'Fingerprint of each tool' (section fig-radar): a radar chart per analysis track, one polygon per tool. |
 | `report_fig_stats.py` | two statistical figures of the report: CPRR distributions and a forest plot of CPRR differences. |
 | `report_figures.py` | the figure modules of the report, injected in one place. |
@@ -567,6 +573,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `report_post.py` | the post-processing steps that reshape the finished report page, in one fixed order. |
 | `report_prune.py` | a section or tab that holds only a "Not run" notice is not shown; what was not run is listed once, in Run metadata. |
 | `report_question_bank.py` | HTML report sections that answer reviewer |
+| `report_readqc_panel.py` | The short-read QC panel: a MultiQC-style, interactive view of the QC gate, with a side panel for every sample. |
 | `report_recommend_evidence.py` | the evidence panel under the operational recommendation (plan D5). |
 | `report_reviewers.py` | Three dashboards for the report: short-read QC, assembly selection and reconstruction multiplicity. |
 | `report_scorecard.py` | a weighted benchmark SCORECARD shown beside the existing composite. |
@@ -597,6 +604,8 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `data_nature.py` | Is this run made of synthetic (demo) data, real data, or a mix? A mix is refused, and a synthetic run says so inside its report. |
 | `download_progress.py` | How far a read download has got, for the run log. |
 | `intake.py` | Bring your own isolates: get the sheet right, point at your folders, check that PlasBench can see and use what you have. |
+| `make_demo_readqc.py` | SYNTHETIC short-read QC and assembly-candidate tables for the six isolates of the offline demonstration. Never for real data. |
+| `multiqc_note.py` | The one plain-language note on MultiQC versus PlasBench's own QC panel, shared by every place that shows it. |
 | `performance_drivers.py` | What drives per-plasmid reconstruction accuracy? A multivariable, study-clustered regression per tool. |
 | `plsdb_novelty.py` | How novel is each truth plasmid against PLSDB, and does recovery depend on it? |
 | `prereg_admin.py` | read, confirm and change PlasBench's pre-registered scoring decisions, and keep a record of who decided what and when. |
@@ -604,31 +613,32 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `relabel_cohort_provenance.py` | Recompute a cohort sheet's truth_assembly_strategy and truth_polish_reads from the sheet's own assembly_method and assembly_sequencing_technology columns. |
 | `resolve_contributed_cohort.py` | verify importer candidates against NCBI, run the |
 | `run_consistency.py` | Do the run tables agree before anything is ranked? |
+| `run_multiqc.py` | Optional MultiQC companion: run `multiqc` over the fastp (and QUAST) outputs of a run into results/multiqc/. Never fails the run. |
 | `run_status.py` | What is this run doing right now, and why might it look stuck? |
 
 
 ## 7. Every output file and where the report shows it
 
-212 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
+216 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
 
 | Output | Written by | Report section | Shown | What it holds |
 |---|---|---|---|---|
 | `assembly_candidates.tsv` | assembly_selection.py | learn-assembly | shown | Assembly candidates and the selection: Per candidate assembly: contigs, N50, length, GC, read support, eligibility, and which was selected and why. |
 | `assembly_status.tsv` | 03_assemble.sh | health | partly | How each assembly ended: Failures are counted in the health summary. |
 | `benchmark.accuracy.masked.tsv` | mask_accuracy.py | accuracy-dimension | partly | Accuracy with low-confidence truth masked: Quoted beside the accuracy table. |
-| `benchmark.accuracy.tsv` | alignment_accuracy.py | accuracy-dimension | shown | Nucleotide accuracy: Table. |
+| `benchmark.accuracy.tsv` | alignment_accuracy.py | accuracy-dimension | shown | Nucleotide accuracy: Comparison table (python/report_compare_table.py): metrics by tools shaded by rank, with a side panel; the plain table is kept in a closed fold. |
 | `benchmark.amr_placement.tsv` | score_amr_placement.py | amr-placement | shown | AMR placement: Per-tool correct-plasmid rate bars beside the 3D ring tower; table collapsed under the view. |
 | `benchmark.assembler_sensitivity.tsv` | assembler_sensitivity.py | learn-stability | partly | Assembler sensitivity: Per task: does the leader change with the assembly? Written only when ASSEMBLER_SENSITIVITY_RUNS is set. |
 | `benchmark.assembly_adequacy.tsv` | assembly_adequacy.py | learn-adequacy | shown | Assembly adequacy: Table. |
 | `benchmark.assembly_qc.tsv` | assembly_qc_gate.py | assembly-quality | shown | Assembly quality gate, all samples: The gate result of every sample is tabulated. |
-| `benchmark.bin_quality.tsv` | bin_quality.py | bin-quality | shown | Bin quality tiers: Table. |
+| `benchmark.bin_quality.tsv` | bin_quality.py | bin-quality | shown | Bin quality tiers: Comparison table (python/report_compare_table.py): metrics by tools shaded by rank, with a side panel; the plain table is kept in a closed fold. |
 | `benchmark.candidate_intervals.tsv` | candidate_multiplicity.py | learn-multiplicity | shown | Where each candidate lies on each plasmid: Drawn as tracks of candidates against the reference plasmid. |
 | `benchmark.candidate_multiplicity.tsv` | candidate_multiplicity.py | learn-multiplicity | shown | Candidates per plasmid: Per truth plasmid: candidates, best and combined coverage, redundancy, outcome. |
 | `benchmark.candidates.tsv` | candidate_multiplicity.py | learn-multiplicity | shown | Every predicted record: Per candidate: relationship to the others, chimera partners, off-target and unmapped bases. |
 | `benchmark.clonal_groups.tsv` | clonal_groups.py | cohort-qc | shown | Clonal groups of isolates: The groups and their members are listed under the cohort QC flags. |
 | `benchmark.cohort_qc_flags.tsv` | flag_cohort_outliers.py | cohort-qc | shown | Cohort QC flags: Table. |
-| `benchmark.composite.tsv` | composite_score.py | composite | shown | Five-dimension composite: Table. |
-| `benchmark.composite_sensitivity.tsv` | composite_score.py | composite | shown | Composite weight sensitivity: Table. |
+| `benchmark.composite.tsv` | composite_score.py | composite | shown | Five-dimension composite: Comparison table (python/report_compare_table.py): metrics by tools shaded by rank, with a side panel; the plain table is kept in a closed fold. |
+| `benchmark.composite_sensitivity.tsv` | composite_score.py | composite | shown | Composite weight sensitivity: Comparison table (python/report_compare_table.py): metrics by tools shaded by rank, with a side panel; the plain table is kept in a closed fold. |
 | `benchmark.contig_crosscheck.tsv` | contig_crosscheck.py | contig-layer | shown | Contig cross-check: Marker on each 3D bar, per-tool rows in the detail panel (CSV export), full table collapsed under the view. |
 | `benchmark.copy_number.tsv` | copy_number.py | learn-copynumber | shown | Copy number: Table. |
 | `benchmark.cprr_threshold_sweep.tsv` | aggregate_results.py | leaderboard | partly | CPRR threshold sweep: Only the area under the sweep (cprr_auc) is shown, in the leaderboard; the per-threshold table is a downloadable file. |
@@ -636,7 +646,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `benchmark.database_overlap.tsv` | flag_database_overlap.py | database-membership | shown | Truth plasmids present in tool databases: Table. |
 | `benchmark.database_provenance.tsv` | database_provenance.py | database-membership | shown | Tool and database provenance: Validation tier, database version, source, release date and checksum of each tool, in Truth plasmids in tool databases. |
 | `benchmark.dataset_features.tsv` | characterise_dataset.py | isolate-difficulty | shown | Dataset characteristics: One row per isolate; every column marked as knowable without a reference or not (Isolate difficulty tab). |
-| `benchmark.feature_preservation.tsv` | feature_preservation.py | feature-preservation | shown | Feature preservation: Table. |
+| `benchmark.feature_preservation.tsv` | feature_preservation.py | feature-preservation | shown | Feature preservation: Comparison table (python/report_compare_table.py): metrics by tools shaded by rank, with a side panel; the plain table is kept in a closed fold. |
 | `benchmark.headline_design.tsv` | headline_design.py | headline-design | shown | Headline design (units of analysis): Table. |
 | `benchmark.input_consistency.tsv` | run_consistency.py | leaderboard | partly | Run tables that disagree: Empty when the tables agree; otherwise a banner above the ranking and this list. |
 | `benchmark.input_fingerprint.json` | aggregate_results.py | leaderboard | partly | Input fingerprint: Which score table and tool set the leaderboard was ranked from; the report refuses a leaderboard paired with different scores. |
@@ -647,11 +657,11 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `benchmark.leave_taxon_out.tsv` | leave_taxon_out.py | taxon-transfer | shown | Leave-taxon-out transfer: Table. |
 | `benchmark.manifest.json` | write_manifest.py | method | partly | Benchmark manifest: Settings appear in the method section. |
 | `benchmark.metadata_completeness.tsv` | aggregate_results.py | metadata-completeness | shown | Metadata completeness: Table. |
-| `benchmark.missing_regions.tsv` | alignment_accuracy.py | accuracy-dimension | shown | Missing regions: Table. |
-| `benchmark.ngoc.tsv` | feature_preservation.py | feature-preservation | shown | Gene order conservation: Table. |
+| `benchmark.missing_regions.tsv` | alignment_accuracy.py | accuracy-dimension | shown | Missing regions: Comparison table (python/report_compare_table.py): metrics by tools shaded by rank, with a side panel; the plain table is kept in a closed fold. |
+| `benchmark.ngoc.tsv` | feature_preservation.py | feature-preservation | shown | Gene order conservation: Comparison table (python/report_compare_table.py): metrics by tools shaded by rank, with a side panel; the plain table is kept in a closed fold. |
 | `benchmark.outcome_states.tsv` | aggregate_results.py | outcome-states | shown | Run outcome states: Table. |
 | `benchmark.paired_comparisons.tsv` | aggregate_results.py | statistics | shown | Paired tool comparisons: Table. |
-| `benchmark.performance.tsv` | performance_summary.py | performance | shown | Computational performance: Table. |
+| `benchmark.performance.tsv` | performance_summary.py | performance | shown | Computational performance: Comparison table (python/report_compare_table.py): metrics by tools shaded by rank, with a side panel; the plain table is kept in a closed fold. |
 | `benchmark.performance_drivers.json` | performance_drivers.py | learn-drivers | shown | Performance-drivers models: Per tool: plasmids, studies, R2, the size effect, drivers left out and warnings; or why it was not estimable. |
 | `benchmark.performance_drivers.tsv` | performance_drivers.py | learn-drivers | shown | Performance drivers: Per tool and term: effect on per-plasmid recovery, 95% interval, status and the variance the driver explains. |
 | `benchmark.plaseval_gate.json` | plaseval_gate.py | learn-agreement | shown | PlasEval gate verdict: PASS, FAIL, PARTIAL, NOT_RUN or NO_DATA, with the tolerance, the original's commit and the counts. |
@@ -704,6 +714,9 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `benchmark.{track}.leaderboard.md` | aggregate_results.py | files | shown | Per-track leaderboard as Markdown: Linked from the Run files panel. |
 | `benchmark.{track}.leaderboard.tsv` | aggregate_results.py | leaderboard | shown | Per-track leaderboard: One table per track. |
 | `download_status.tsv` | 01_download.sh | health | partly | How each download ended: Failures are counted in the health summary. |
+| `multiqc/multiqc_data/{any}` | run_multiqc.py | learn-readqc | partly | MultiQC data folder: MultiQC's own parsed data, kept beside its report and listed in the Artifact explorer. |
+| `multiqc/multiqc_report.html` | run_multiqc.py | learn-readqc | shown | MultiQC report (optional companion): Linked from the QC panel as the Full MultiQC report (never embedded); written only when multiqc is installed and MULTIQC_REPORT is not off. |
+| `multiqc/multiqc_run.json` | run_multiqc.py | learn-readqc | shown | MultiQC step status: Whether the optional MultiQC step ran, its version and any failure; the QC panel's MultiQC note reads it. |
 | `orthogonal_validation.summary.json` | validate_orthogonal_evidence.py | orthogonal-evidence | shown | Orthogonal-evidence summary: Summarised. |
 | `quast_diagnostics.tsv` | run_quast_diagnostics.py | quast-diagnostics | shown | QUAST diagnostics, merged: Table. |
 | `run_manifest.json` | write_manifest.py | method | shown | Run manifest (versions, settings): Method and reproducibility section. |
@@ -711,17 +724,18 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `score_failures.tsv` | 05_score.sh | outcome-states | shown | Runs that could not be scored: Listed with the reason. |
 | `scores.tsv` | score_plasmids.py | scores | shown | Scores, one row per sample and tool: Table with filters and download. |
 | `selected_candidates/{any}` | select_unknown_sample.py | selected | shown | Selected candidate downloads: Linked from the selection cards. |
-| `short_read_qc.tsv` | short_read_qc.py | learn-readqc | shown | Short-read QC metrics: Per sample: read pairs, depth, quality, adapters, duplication, pair synchrony, the decision and its reasons. |
-| `short_read_qc_status.tsv` | short_read_qc.py | learn-readqc | shown | Short-read QC decision: PASS, WARN or REJECT per sample and the action taken. |
+| `short_read_qc.provenance.json` | make_demo_readqc.py | learn-readqc | shown | Marker: the QC tables are synthetic: Written only by the offline demo's generator; the QC panel then carries a Synthetic note. |
+| `short_read_qc.tsv` | short_read_qc.py | learn-readqc | shown | Short-read QC metrics: The QC panel (MultiQC-style): General statistics with inline bars, per-metric distributions with the threshold lines, a side panel per sample with each metric as a gauge against its threshold, and the earlier table under All values. Not measured in this run is said when the table is absent. |
+| `short_read_qc_status.tsv` | short_read_qc.py | learn-readqc | shown | Short-read QC decision: PASS, WARN or REJECT per sample and the action taken: Decisions and reasons in the QC panel. |
 | `tool_outcomes.tsv` | aggregate_results.py | outcome-states | partly | Outcome of each tool run: Folded into outcome states. |
 | `tool_status.tsv` | 04_run_tools.sh | outcome-states | shown | How each run ended: Every run's status and reason. |
 | `{any}.log` | scripts/*.sh | None | partly | Run logs: Kept for debugging. It is listed in the Artifact explorer only. |
-| `benchmark.leaderboard.tsv::Base-level accuracy` | aggregate_results.py | leaderboard | shown | Leaderboard columns: Base-level accuracy: Mean and interval columns of the leaderboard; every column is under More columns of the leaderboard. |
+| `benchmark.leaderboard.tsv::Base-level accuracy` | aggregate_results.py | leaderboard | shown | Leaderboard columns: Base-level accuracy: Mean and interval columns of the leaderboard, as a comparison table (per-isolate values in its side panel) with the plain table folded; every column is under More columns of the leaderboard. |
 | `benchmark.leaderboard.tsv::Bins` | aggregate_results.py | bin-diagnostics | shown | Leaderboard columns: Bins: Mean bin F1 and clustering agreement are shown; the counts are in the download; every column is under More columns of the leaderboard. |
 | `benchmark.leaderboard.tsv::Calibration` | aggregate_results.py | baselines-calibration | shown | Leaderboard columns: Calibration: Shown for tools that give probabilities; every column is under More columns of the leaderboard. |
 | `benchmark.leaderboard.tsv::Contig layer` | aggregate_results.py | contig-layer | shown | Leaderboard columns: Contig layer: Compared with the reference layer; every column is under More columns of the leaderboard. |
 | `benchmark.leaderboard.tsv::Database leakage` | aggregate_results.py | database-membership | shown | Leaderboard columns: Database leakage: Recovery inside and outside the tool database; every column is under More columns of the leaderboard. |
-| `benchmark.leaderboard.tsv::Plasmid recovery` | aggregate_results.py | leaderboard | shown | Leaderboard columns: Plasmid recovery: Recall, circular and perfect recovery and CPRR are in the leaderboard and graded-tiers views; every column is under More columns of the leaderboard. |
+| `benchmark.leaderboard.tsv::Plasmid recovery` | aggregate_results.py | leaderboard | shown | Leaderboard columns: Plasmid recovery: Recall, circular and perfect recovery and CPRR are in the leaderboard and graded-tiers comparison tables (the plain tables are folded under them); every column is under More columns of the leaderboard. |
 | `benchmark.leaderboard.tsv::Predicted-sequence burden` | aggregate_results.py | robustness-main | shown | Leaderboard columns: Predicted-sequence burden: Unmapped, off-truth and multi-mapped shares and the precision gap, in Ranking confidence; every column is under More columns of the leaderboard. |
 | `benchmark.leaderboard.tsv::Rank and basis` | aggregate_results.py | leaderboard | shown | Leaderboard columns: Rank and basis: Rank, basis and significance are columns of the leaderboard; every column is under More columns of the leaderboard. |
 | `benchmark.leaderboard.tsv::Run counts` | aggregate_results.py | leaderboard | shown | Leaderboard columns: Run counts: Completed and failed runs are shown; the failure sub-counts are in the download; every column is under More columns of the leaderboard. |
@@ -767,14 +781,14 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `{sample}/truth.tsv` | make_truth.py / build_hybrid_truth.py | samples | shown | Truth table (molecule labels): Sample drill-down and every score are computed from it; label audit summarises it. |
 | `{sample}/truth_amr.draft.tsv` | derive_amr_truth.py | None | partly | Auto-derived AMR truth draft: A draft for curation, never scored. It is listed in the Artifact explorer only. |
 | `{sample}/truth_amr.scored.tsv` | 05_score.sh | None | partly | AMR truth restricted to scored plasmids: Intermediate of the scorer. It is listed in the Artifact explorer only. |
-| `{sample}/truth_amr.tsv` | validate_amr_truth.py | amr-placement | partly | Curated truth AMR genes: Gene counts and placement appear; the curated list is not shown. |
+| `{sample}/truth_amr.tsv` | validate_amr_truth.py | fig-presence | shown | Curated truth AMR genes: Drawn as the AMR gene-class and gene blocks of the feature matrix (prevalence bars, per-plasmid table); gene counts and placement also appear in AMR placement. |
 | `{sample}/truth_circular.scored.tsv` | 05_score.sh | None | partly | Circular truth restricted to scored plasmids: Intermediate of the scorer. It is listed in the Artifact explorer only. |
 | `{sample}/truth_circular.tsv` | make_truth.py | scores | partly | Truth circular plasmids: Appears as circular-truth recovery in the score table. |
 | `{sample}/truth_depth.tsv` | 02_truth.sh | None | partly | Read depth of the truth: Input of the depth-window step. It is listed in the Artifact explorer only. |
 | `{sample}/truth_depth_anomalies.tsv` | truth_depth_anomalies.py | learn-truthqc | shown | Depth-anomaly regions on the truth: The regions are marked on the depth strip; the per-replicon summary is tabulated. |
 | `{sample}/truth_depth_anomaly_summary.tsv` | truth_depth_anomalies.py | learn-truthqc | shown | Depth-anomaly summary per replicon: Merged into the depth-anomaly table. |
 | `{sample}/truth_depth_windows.tsv` | truth_depth_anomalies.py | learn-truthqc | shown | Read-depth windows along the truth: Drawn as a depth strip per sample with the anomalous regions marked. |
-| `{sample}/truth_features.tsv` | annotate_reference.py | replicon-recovery | partly | Annotated features of the reference: Replicon and relaxase labels feed recovery by plasmid type; features are not tabulated. |
+| `{sample}/truth_features.tsv` | annotate_reference.py | fig-presence | shown | Annotated features of the reference: Drawn as the replicon, MOB and other feature blocks of the feature matrix (with a per-plasmid table); the labels also feed recovery by plasmid type (replicon-recovery) and the strata of the facet heatmaps. |
 | `{sample}/truth_labels.tsv` | label_truth_evidence.py | truth-label-audit | partly | Evidence label per truth replicon: Evidence-label counts are summarised; the per-replicon rows are not. |
 | `{sample}/truth_long_read_depth.tsv` | 02_truth.sh | learn-copynumber | partly | Long-read depth of truth replicons: Gives the truth copy number; the depths are not listed. |
 | `{sample}/truth_long_reads.paf` | 02_truth.sh | None | partly | Long reads mapped to the truth: Intermediate. It is listed in the Artifact explorer only. |

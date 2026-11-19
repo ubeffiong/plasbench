@@ -119,8 +119,7 @@ def main() -> int:
         for raw_line in truth_path.read_text(encoding="utf-8").splitlines():
             fields = raw_line.split(chr(9))
             repaired.append(chr(9).join(field.strip() for field in fields))
-        truth_path.write_text(chr(10).join(repaired) + chr(10),
-                              encoding="utf-8", newline=chr(10))
+        truth_path.write_bytes((chr(10).join(repaired) + chr(10)).encode("utf-8"))   # Path.write_text(newline=) is Python 3.10+
         print(f"fixed: trimmed whitespace on {len(whitespace)} line(s) of {truth_path}")
         print("Re-run the same command to verify the result.")
         return 0

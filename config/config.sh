@@ -192,6 +192,12 @@ export DOWNLOAD_CONFIRM="${DOWNLOAD_CONFIRM:-1}"
 # Before stage 1 downloads, PlasBench asks ENA for the exact compressed size of each run that the cohort's lock file has no base count for, so the estimate is real and
 # names the largest read set. 0 skips the lookup (it is also skipped when READ_SOURCE=sra, which never uses ENA).
 export ENA_SIZE_LOOKUP="${ENA_SIZE_LOOKUP:-1}"
+# Work offline on purpose. 1 switches every online-only action off at once (downloads, installs, upgrades, NCBI/ENA lookups, GitHub): each says plainly that it needs the
+# internet instead of trying. Scoring, reports and runs on files already on disk (--local-inputs) keep working. 0 (default) = use the internet when it is needed.
+export PLASBENCH_OFFLINE="${PLASBENCH_OFFLINE:-0}"
+# Seconds to wait for each service when PlasBench checks the connection before an online step (config/network_services.tsv lists the services; `plasbench net` shows them).
+# Raise it on a slow or satellite link. Default 5.
+export PLASBENCH_ONLINE_TIMEOUT="${PLASBENCH_ONLINE_TIMEOUT:-5}"
 # --- Run health and reliability ------------------------------------------------
 # Stage 4 exits with code 4 when every tool run failed, because there is nothing to score. 1 continues anyway with a warning (the report is then empty of results).
 export ALLOW_ALL_TOOLS_FAILED="${ALLOW_ALL_TOOLS_FAILED:-0}"
@@ -658,6 +664,14 @@ export DIFFICULTY_FEATURES_THREADS="${DIFFICULTY_FEATURES_THREADS:-$THREADS}"
 export RUN_QUAST_DIAGNOSTICS="${RUN_QUAST_DIAGNOSTICS:-0}"
 export QUAST_DIAGNOSTICS_THREADS="${QUAST_DIAGNOSTICS_THREADS:-$THREADS}"
 export QUAST_DIAGNOSTICS_MIN_CONTIG="${QUAST_DIAGNOSTICS_MIN_CONTIG:-0}"
+
+# Optional MultiQC companion (python/run_multiqc.py, stage 6, before the report is built). PlasBench's own QC panel in the report is NOT made with
+# MultiQC (QC is fastp plus python/short_read_qc.py); MultiQC is the community-standard view of the same fastp (and QUAST) output files, with more plots
+# (per-base quality, adapter content, duplication). auto (default) = run `multiqc` only when it is installed (plasbench install-tools multiqc); on = always
+# try, and warn when it is missing; off = never. It writes results/multiqc/multiqc_report.html (a separate file the report links to, never embeds) and can
+# never fail a run: a problem is a warning in run_events.jsonl and a note in the report's QC panel.
+export MULTIQC_REPORT="${MULTIQC_REPORT:-auto}"
+export MULTIQC_TIMEOUT_SECONDS="${MULTIQC_TIMEOUT_SECONDS:-600}"
 
 # Optional operational-mode (no-truth) nearest-reference screen -- EXPERIMENTAL
 # AND UNVALIDATED (python/classify_operational_plasmid.py,

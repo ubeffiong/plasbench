@@ -6,6 +6,8 @@ Everything here is also in the window: **plasbench ui** then **Your own isolates
 
 ## The short version
 
+(One mixed folder with sub-folders? `plasbench scan-isolates FOLDER` finds each isolate's reads and reference by itself; see the [User Guide](USER_GUIDE.md#add-isolates-from-a-folder). The steps below are the sheet-first route, and stay as they are.)
+
 1. **Get the sheet** (only if you want to write it yourself): `plasbench intake template local --out config/local.tsv`, or press **Download template** in the window.
 2. **Find your files:** `plasbench intake scan /path/to/your/folder` (the window: **Find my files**, then choose the folder). Nothing is copied or changed.
 3. **Place them:** `plasbench intake stage /path/to/your/folder`. This copies (or links) the files to where PlasBench expects them and writes the sheet.

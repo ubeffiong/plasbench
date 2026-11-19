@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -340,6 +341,11 @@ def build_parser():
         status_parser.add_argument("--json", action="store_true", help="Print the summary as JSON, for scripts and the window.")
         status_parser.add_argument("--watch", type=int, metavar="SECONDS", help="Repeat every SECONDS until you press Ctrl+C.")
     sub.add_parser("test", help="Run the complete offline regression suite.")
+    net_parser = sub.add_parser(
+        "net", help="Check which online services this computer can reach (NCBI, ENA, GitHub, conda, ...) and what to do when one is not.")
+    net_parser.add_argument("--service", action="append", default=[], metavar="NAME",
+                            help="Check only this service (repeatable; names are in config/network_services.tsv). Default: all.")
+    net_parser.add_argument("--json", action="store_true", help="Print the answer as JSON, for scripts and the window.")
     upgrade_parser = sub.add_parser(
         "upgrade",
         help="Download the latest release and reuse this install's shared reads and databases.",
@@ -368,6 +374,21 @@ def build_parser():
     local_parser.add_argument("--link", choices=("copy", "symlink", "hardlink"), default="copy",
                               help="How to place the input files (default: copy).")
     local_parser.add_argument("--force", action="store_true", help="Overwrite an existing truth.tsv.")
+
+    scan_parser = sub.add_parser(
+        "scan-isolates",
+        help="Point at ONE folder: find each isolate's paired reads and complete reference in it (changes nothing unless --write-sheet).",
+        description="Looks through FOLDER and its sub-folders for paired FASTQ reads, reference genomes, sequence reports and truth tables, and shows what it "
+                    "would use for each isolate, how sure it is and what needs your attention. Exit code 0: every isolate is complete; 3: some need attention. "
+                    "With --write-sheet the complete ones are placed exactly as init-local would. Guide: docs/USER_GUIDE.md, 'Add isolates from a folder'. See also `plasbench intake scan/stage`, the sheet-first route to the same placement (docs/INPUT_GUIDE.md).")
+    scan_parser.add_argument("folder", type=Path, help="The folder to look through (sub-folders are searched).")
+    scan_parser.add_argument("--json", action="store_true", help="Print the full result as JSON instead of a table.")
+    scan_parser.add_argument("--max-depth", type=int, default=6, help="How many folder levels down to look (default 6).")
+    scan_parser.add_argument("--max-files", type=int, default=200000, help="Stop after this many files (default 200000).")
+    scan_parser.add_argument("--write-sheet", metavar="SHEET", help="Also place the isolates and write/append this sample sheet (for example config/local.tsv), through the same code as init-local.")
+    scan_parser.add_argument("--data-dir", type=Path, help="Where sample directories live (default: the configured shared data directory).")
+    scan_parser.add_argument("--link", choices=("copy", "symlink", "hardlink"), default="copy", help="How to place the input files with --write-sheet (default: copy).")
+    scan_parser.add_argument("--yes", action="store_true", help="With --write-sheet, also place isolates that only need review (never ones with an error).")
 
     intake_parser = sub.add_parser(
         "intake",
@@ -528,20 +549,32 @@ def build_parser():
     conda_parser.add_argument("--yes", action="store_true", help="Install without an interactive confirmation prompt.")
     conda_parser.add_argument("--prefix", type=Path, help="Install location (default: $HOME/miniforge3).")
     install_parser = sub.add_parser("install-tools", help="Install, inspect, or verify registered bioinformatics tool profiles.")
-    install_parser.add_argument("profile", nargs="?", default="core", help="list, plan, validate, locked, core, assembly, metagenomics, reconstruction, simulate, quast, long-read, annotation, annotation-prokka, ppr-meta, plsmd, mobilome-map, gplas, gplas2, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, rfplasmid, plasmidhunter, plasmer, plascope, all, or a conda package name.")
+    install_parser.add_argument("profile", nargs="?", default="core", help="list, plan, validate, locked, core, assembly, metagenomics, reconstruction, simulate, quast, multiqc, long-read, annotation, annotation-prokka, ppr-meta, plsmd, mobilome-map, gplas, gplas2, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, rfplasmid, plasmidhunter, plasmer, plascope, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     install_parser.add_argument("--yes", action="store_true", help="Use non-interactive mode for supported installer profiles; database setup remains explicit in 'plasbench check --yes'.")
     tools_parser = sub.add_parser(
-        "tools", help="Add your own plasmid tool: create, validate, list and install user tool manifests (docs/ADDING_TOOLS.md).")
+        "tools", help="Add your own plasmid tool (one or several tasks; from conda, pip, an https URL or a folder on this computer): create, validate, list and install user tool manifests (docs/ADDING_TOOLS.md).")
     tools_sub = tools_parser.add_subparsers(dest="tools_command", required=True)
     tools_sub.add_parser("list", help="Every user tool PlasBench can see, with its task, track, run mode and output format.")
-    tools_validate = tools_sub.add_parser("validate", help="Check every manifest (or one); exit 1 with each problem listed.")
+    tools_validate = tools_sub.add_parser("validate", help="Check every manifest (or one); exit 1 with each problem listed. Prints, per task, whether it is native, derived or not possible from the declared output, and the tool's source.")
     tools_validate.add_argument("name", nargs="?")
     tools_show = tools_sub.add_parser("show", help="Print one tool's manifest as PlasBench reads it.")
     tools_show.add_argument("name")
     tools_new = tools_sub.add_parser("new", help="Write a commented manifest template to fill in.")
     tools_new.add_argument("name", help="Tool name: lower-case letters, digits and _.")
     tools_new.add_argument("--dir", type=Path, help="Where to create it (default: ~/.plasbench/tools).")
+    tools_new.add_argument("--task", default="binning_reconstruction", metavar="A[,B]",
+                           help="What the tool does: binning_reconstruction, sequence_reassembly, classification; a comma list for a tool that does several "
+                                "(the command runs once; each task gets its own leaderboard row). Default: binning_reconstruction.")
+    tools_new.add_argument("--source", choices=("installed", "conda", "pip", "url", "local", "script"), default="conda",
+                           help="Where the tool comes from: installed (already on PATH), conda, pip, url (an https download), local (a folder or file on this "
+                                "computer) or script (an install script beside the manifest). Default: conda.")
+    tools_new.add_argument("--url", default="", help="With --source url: the https URL of an archive (.zip .tar.gz .tgz .tar.xz .tar.bz2), a git repository or a file. http, ftp and file are refused.")
+    tools_new.add_argument("--sha256", default="", help="With --source url: the SHA-256 the download must have (a different file is refused; without it a warning is shown).")
+    tools_new.add_argument("--local-path", default="", help="With --source local: the file or folder on this computer ('~' and Windows paths work).")
+    tools_new.add_argument("--output-format", default="", metavar="F[,F]|auto",
+                           help="What the tool writes: contig_bins, contig_labels, plasmid_fasta, fasta_dir, adapter; a comma list for several, or auto to let "
+                                "PlasBench recognise the files by content. Default: what the task needs.")
     tools_add = tools_sub.add_parser("add", help="Validate a tool folder (or manifest) and copy it to ~/.plasbench/tools.")
     tools_add.add_argument("path", type=Path)
     tools_install = tools_sub.add_parser("install", help="Install a user tool from its [install] section (same as install-tools NAME).")
@@ -811,6 +844,95 @@ def build_parser():
     return parser
 
 
+def network_commands(root):
+    """{(command, sub): {"flag": str, "services": set}} from the `used_by` column of config/network_services.tsv.
+
+    A used_by entry that starts with "plasbench " names a command: "plasbench upgrade", "plasbench tools add" (a sub-command),
+    "plasbench validate-cohort --online" (only with that flag). Entries that are file paths are for test/test_network_declared.py."""
+    from . import netcheck
+    return netcheck.command_table(Path(root) / "config" / netcheck.CATALOGUE_NAME)
+
+
+def network_preflight(args, root):
+    """Refuse an online-only command before it does anything when the services it needs are unreachable. Returns the message, or None.
+
+    Only the cases that certainly go online are checked: an action that can be done from files on disk must not demand the internet
+    (`run` and `check` decide that themselves, in stage 1 and scripts/00_setup.sh)."""
+    command = args.command
+    table = network_commands(root)
+    sub_name = ""
+    if command == "tools":
+        sub_name = getattr(args, "tools_command", "") or ""
+        source = str(getattr(args, "path", "") or "").replace("\\", "/")
+        if sub_name == "add" and not re.match(r"^(https?|git|ssh):/|^git@", source):
+            return None                      # a folder or manifest on disk
+    elif command == "analysis":
+        sub_name = getattr(args, "name", "") or ""
+    elif command == "install-tools" and getattr(args, "profile", "") in ("list", "plan", "validate"):
+        return None                          # registry inspection only
+    entry = table.get((command, sub_name))
+    if entry is None:
+        return None
+    if entry["flag"] and not getattr(args, entry["flag"].lstrip("-").replace("-", "_"), False):
+        return None
+    from . import netcheck
+    try:
+        netcheck.require(sorted(entry["services"]), action=f"plasbench {command}" + (f" {sub_name}" if sub_name else ""))
+    except netcheck.NoInternet as exc:
+        return exc.message
+    return None
+
+
+def net_command(args):
+    from . import netcheck
+    answer = netcheck.check(args.service or None)
+    if args.json:
+        print(json.dumps(answer, indent=2))
+    else:
+        print(netcheck.status_table(answer))
+    return 0 if answer["state"] in ("online", "assumed_online") else 3
+
+
+def scan_isolates_command(args, root):
+    """plasbench scan-isolates FOLDER: print what was found; with --write-sheet place the isolates in-process (same function as init-local)."""
+    from . import isolate_scan
+    res = isolate_scan.scan(args.folder, max_depth=args.max_depth, max_files=args.max_files)
+    samples = res["samples"]
+    need = [s for s in samples if s["status"] != "ready"]
+    if args.json:
+        print(isolate_scan.dump(res))
+    else:
+        short = lambda p: Path(p).name if p else "-"  # noqa: E731
+        print(f"{'sample':<22}{'reads 1':<28}{'reads 2':<28}{'reference':<26}{'confidence':<11}status / issues")
+        for s in samples:
+            issues = "; ".join(i["message"] for i in s["issues"] if i["level"] != "info")
+            print(f"{s['sample_id']:<22.21}{short(s['reads_1']):<28.27}{short(s['reads_2']):<28.27}{short(s['reference']):<26.25}{s['confidence']:<11}{s['status']}" + (f": {issues}" if issues else ""))
+        for u in res["unrecognised"]:
+            print(f"  ignored/unmatched: {u['count']} x {u['kind']}")
+        for key, n in sorted(res["skipped"].items()):
+            print(f"  skipped: {n} x {key.replace('_', ' ')}")
+        for w in res["warnings"]:
+            print(f"  warning: {w}")
+        print(f"{len(samples)} isolate(s): {len(samples) - len(need)} complete, {len(need)} need attention.")
+    code = 0 if samples and not need and not res["cancelled"] and not res["warnings"] else 3
+    if args.write_sheet:
+        sheet = Path(args.write_sheet)
+        sheet = sheet if sheet.is_absolute() else root / sheet
+        data_dir = args.data_dir or configured_data_dir(root)
+        review = [s for s in samples if s["status"] == "review"]
+        confirm = args.yes
+        if review and not confirm and sys.stdin.isatty() and not args.json:
+            confirm = input(f"{len(review)} isolate(s) only need review (see above). Place them anyway? [y/N] ").strip().lower() in ("y", "yes")
+        done = isolate_scan.stage(samples, data_dir, sheet, link=args.link, confirm=confirm, root=root)
+        out = sys.stderr if args.json else sys.stdout
+        for r in done["results"]:
+            print(f"{'placed ' if r['ok'] else 'skipped'} {r['sample_id']}" + ("" if r["ok"] else ": " + " ".join(r["messages"])), file=out)
+        print(f"{len(done['staged'])} placed in {data_dir}; sheet: {sheet}", file=out)
+        if len(done["staged"]) < len(samples):
+            code = 3
+    return code
+
+
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -831,12 +953,18 @@ def main(argv=None):
     # Without this explicit check, invoking the CLI from a random directory
     # failed later with a shell "file not found" message. The report opener is
     # deliberately standalone; every other command needs the release tree.
+    if args.command == "net":
+        raise SystemExit(net_command(args))
     if args.command != "open-report" and not is_project_root(root):
         parser.error(
             f"{root} is not a PlasBench release/source directory (scripts/run_all.sh missing). "
             "Run 'cd \"$PB\"' using the installation directory from the README, "
             "or pass --project-root /path/to/plasbench before the command."
         )
+    problem = network_preflight(args, root)
+    if problem:
+        print(f"[plasbench] ERROR: {problem}", file=sys.stderr)
+        raise SystemExit(3)
     if args.command == "ui":
         from .webui import serve
         serve(root, port=args.port, open_browser=not args.no_browser, tab=args.tab, new_instance=args.new_instance)
@@ -848,6 +976,8 @@ def main(argv=None):
         from . import desktop
         return desktop.main(["--project-root", str(root)] + (["--remove"] if args.remove else [])
                             + (["--no-desktop"] if args.no_desktop else []))
+    if args.command == "scan-isolates":
+        raise SystemExit(scan_isolates_command(args, root))
     if args.command == "demo":
         code = run([bash_command(), "test/run_demo.sh"], root)
     elif args.command == "open-report":
@@ -1099,6 +1229,11 @@ def main(argv=None):
                 command.append(args.name)
             if args.tools_command == "new" and args.dir:
                 command.extend(["--dir", str(args.dir)])
+            if args.tools_command == "new":
+                for flag, value in (("--task", args.task), ("--source", args.source), ("--url", args.url), ("--sha256", args.sha256),
+                                    ("--local-path", args.local_path), ("--output-format", args.output_format)):
+                    if value:
+                        command.extend([flag, value])
             if args.tools_command == "add":
                 command.append(str(args.path.resolve()))
             code = run(command, root)

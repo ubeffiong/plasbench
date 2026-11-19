@@ -30,6 +30,10 @@ def fetch_latest(timeout: float = 8.0) -> dict:
 def check(current: str, fetch=fetch_latest) -> dict:
     """{current, latest, newer, url, error}. A network failure is reported, never raised."""
     result = {"current": current, "latest": "", "newer": False, "url": f"https://github.com/{REPO}/releases/latest", "error": ""}
+    from . import netcheck
+    if netcheck.forced_offline():
+        result["error"] = "PLASBENCH_OFFLINE=1 is set, so PlasBench does not look for updates. Unset it to check."
+        return result
     try:
         release = fetch()
     except urllib.error.URLError as exc:

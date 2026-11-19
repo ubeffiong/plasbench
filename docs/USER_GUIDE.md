@@ -731,6 +731,8 @@ to the circularity guard: a sample is skipped unless its long reads are
 declared independent of its truth assembly, or the tool's own
 `*_ALLOW_CIRCULAR_TRUTH` override is set (see `docs/COHORTS.md`).
 
+**Your own tool in the window.** On *Add your own tool*, the **Task** box takes one or more tasks (the first is the primary; a binner can also be scored as a classifier, and the Check box says per task whether it is native, derived from another output, or not possible). **Source** says where the tool comes from: already installed, conda or pip, a download from an https address (give its SHA-256 so a changed file is refused), a file or folder on this computer (copy records a checksum; link follows the file), or your own install script. PlasBench runs code you download or point to, so only use sources you trust; nothing is downloaded or run until you press *Save & install*. Small scripts and adapters (up to 5 MB) can be uploaded from your computer; a large tool is located or downloaded, never uploaded. A tool may list several **outputs** (or *Detect automatically* with candidate file patterns). The Tools page and the benchmark wizard show one chip per task and where each of your tools comes from.
+
 ### Run reliability, timing and run-state settings (new in 0.5.0)
 
 All are optional; the defaults are safe. Set them in the environment or in `config/local.env`.
@@ -755,6 +757,31 @@ New files in a results folder: `.run.lock` and `.run.lock.heartbeat` (while a ru
 
 Exit codes of a stage: `0` success, `3` an adapter found no output from its tool, `4` every tool run failed. The window shows these as `failed`, `completed_with_warnings`, `stalled` and `retrying`.
 
+### Add isolates from a folder
+
+See also `plasbench intake scan` / `intake stage` ([Input guide](INPUT_GUIDE.md)): the sheet-first route to the same placement, which stays available.
+
+If your reads and reference genomes are in one folder (with sub-folders, and other files mixed in), you do not have to name each file. In the window, **Your own isolates > Scan a folder**; on the command line:
+
+```
+plasbench scan-isolates /path/to/folder                 # look; changes nothing
+plasbench scan-isolates /path/to/folder --json          # the same, for scripts
+plasbench scan-isolates /path/to/folder --write-sheet config/local.tsv    # also place the complete isolates
+```
+
+The result is a table: for each isolate, the reads (1 and 2), the reference, a confidence (high, medium, low) and what needs attention. The exit code is 0 when every isolate is complete and 3 when some need attention. **Scanning never modifies the folder.** `--write-sheet` calls the same function as `plasbench init-local` for each isolate (so `--link copy|symlink|hardlink` behaves the same); isolates with an error are never placed, and isolates that only need review (for example lanes to be joined) are placed only with `--yes` or when you confirm in the window.
+
+What is recognised:
+
+- **Paired reads:** `_R1/_R2`, `_1/_2`, `.1/.2`, `-1/-2`, `_R1_001/_R2_001`, SRA style `SRR..._1.fastq.gz`; `.fastq` or `.fq`, any letter case. Illumina lanes (`S1_L001`, `S1_L002`) are one isolate, listed and flagged; they are joined by gzip concatenation (nothing is decompressed) only after you confirm. A missing mate is an error. Reads must be gzipped.
+- **Reference:** a plain FASTA of the complete genome. Chosen by how close it is to the isolate (same folder, the isolate's folder, the sample name in the file name) and by evidence in the file (an NCBI accession such as `NZ_`/`NC_`/`CP` in the header, the words complete genome, plasmid or chromosome, a few sequences, genome-sized length, a folder or file name such as reference, truth, complete, closed, hybrid). Each choice shows its reasons ("Why these files") and the runners-up as alternatives you can switch to.
+- **Never a reference:** `contigs.fasta`, `scaffolds.fasta`, assembly graphs, anything in a SPAdes, Unicycler, Flye, Shovill, SKESA, MEGAHIT or similar folder, FASTA with `NODE_` or `depth=` headers.
+- **Also used:** `sequence_report.jsonl` and a `truth.tsv` that sit with the isolate.
+- **Ignored and counted:** BAM/SAM, documents, spreadsheets, logs, hidden folders, `.git`, `__pycache__`, `node_modules`, `results`, `logs`, symbolic-link folders (loops are never followed), online-only cloud files (never opened), unreadable folders (a warning), and unpaired or long-read FASTQ (not used by `init-local`).
+- **Limits:** `--max-depth` (default 6 levels) and `--max-files` (default 200000).
+
+It never guesses silently: two equally good references, two read pairs with one name, a missing reference, a reference that looks like a draft or is under 20 kb, two samples sharing a reference, and ids that had to be changed (only letters, digits, `.`, `_`, `-` are allowed; ids that differ only in capital letters are made unique) are all shown as issues. The matching uses folder and file names and the first part of each file, so it can be wrong: a reference in the right folder but belonging to another strain looks right. Check every isolate marked "check", and run the quick test (`plasbench intake check`) before a long run.
+
 ### Downloads: sizes, progress and the SRA Toolkit
 
 Stage 1 downloads each isolate's reference assembly and its paired reads.
@@ -777,6 +804,18 @@ Stage 1 downloads each isolate's reference assembly and its paired reads.
 | `ENA_PORTAL_URL` | ENA's file-report address | Point the lookup at a mirror. |
 
 **Run status in the window.** Every ongoing run on the Runs page, and the panel that appears under the console when a run has printed nothing for a while, has a Run status panel: a chip (Running / Finished / Stopped: cut off / Not running), what the run is doing now (stage, isolate, step and how long that command has run), CPU and memory of the run's processes, this computer's free memory, swap and disk, the progress counts, the newest log with its age and last line, and a "What this means" list of plain-words hints with the evidence behind each (shown as a warning only when they mention memory or disk). It refreshes every 5 seconds while it is on screen. Buttons: Refresh, Copy diagnosis (a text to paste into a message), Open the console log and Open run_events.jsonl. The "Downloads and reliability" card of New benchmark has a checkbox, on by default, to keep a console log of the run in the study (`logs/run_*.log`; `RUN_CONSOLE_LOG=0` when unchecked) and a field for how many are kept (`LOG_RETENTION_RUNS`, default 20).
+
+### Signing in to GitHub from the window
+
+On **Version control** the GitHub card has **Sign in to GitHub**. It opens a small pop-up window of the PlasBench window (not your normal browser tab) at github.com and shows a one-time code in large type: type or paste it there and approve. When GitHub confirms, the pop-up closes, the window says "Signed in as <user>", and `git push` and `git pull` use the sign-in (PlasBench runs `gh auth setup-git`). If the browser blocks the pop-up, the window shows the address with an Open button; if you close it by mistake, **I closed it by mistake: open again** opens it again. The sign-in uses GitHub's device flow through the GitHub CLI (`gh`), so there is no app to register, and the page never sees a token. If `gh` is not installed the window says so, shows the install command for your system (`winget install --id GitHub.cli`, `brew install gh`, `conda install -c conda-forge gh` or `sudo apt install gh`) and offers **Use a token**: a personal access token (scopes `repo`, and `workflow` if you push workflow files) is sent once, over standard input, to `gh auth login --with-token`; it is not stored or logged. **Sign out** and **Switch account** are on the same card.
+
+### Publishing and pull requests from the window
+
+The same card covers the everyday GitHub work: **Create repository on GitHub** (owner or organisation, public or private, description; it adds `origin` and pushes the first branch), **Clone from GitHub** (list or search), **Branches** (switch, push with upstream, delete a merged local branch, delete a branch on GitHub), **New pull request** (title, description, base, head, draft, reviewers, labels; it offers to push the branch first), **Pull requests** (open, closed, merged; view state, checks, reviews, mergeability, changed files and comments; check out, mark ready, close, reopen, comment, merge by merge commit, squash or rebase, optionally deleting the branch or waiting for checks), **Checks** (workflow runs of the branch, with failing names and addresses, and re-run of the failed ones), **Issues** (list, create, comment, close) and **Releases** (list, create a tag and push it, create a release from a tag). Reading shows a dialog; changing something runs as a job in the console with its command line as the first line (tokens removed). Nothing is force-pushed. Deleting a branch, closing a pull request and merging ask first and say what will happen; merging with failing checks, conflicts or a requested change names the risk and asks you to confirm it. Failures are explained in plain sentences (not signed in opens the sign-in dialog; no permission; branch protection; conflicts; no remote).
+
+### Offline
+
+The top bar shows **Online**, **Limited**, **DNS problem** or **Offline** (and "Offline (forced)" when `PLASBENCH_OFFLINE=1`). Hover for each service's state and the advice, click to check again; it re-checks every 30 s while the window is visible. A control that needs the internet (sign in, push, pull, clone, check for updates, installs, discovery, downloading runs) looks disabled with the reason when its service is unreachable, and clicking it checks again at that moment before it says no. The server refuses such a job with a clear message instead of starting it. A run whose reads and references are already on disk (or `--local-inputs`, or the metagenomics track) still starts offline. Scoring, reports, studies, the folder tree, settings and documents never need the internet.
 
 ### Where your data and studies live
 
@@ -817,6 +856,33 @@ A long run is quiet by nature, so PlasBench writes down what it is doing as it g
 - **Files.** In the study: `logs/run_<date>-<time>.log` (everything the run printed; `logs/run.latest.log` points at the newest; the newest `LOG_RETENTION_RUNS` = 20 are kept; `RUN_CONSOLE_LOG=0` turns it off), `logs/<isolate>.<step>.log` (each tool's own output) and `results/run_events.jsonl` (one JSON line per stage start and end, isolate step, command start and end with exit code and seconds, heartbeat and warning; names and numbers only, never environment variables or commands). `results/stage_timing.tsv` has the seconds per stage.
 - **A run that was cut off** (the terminal, WSL or the computer ended it) shows as *stopped* with the hint that re-running resumes: finished isolates and tool results are reused.
 
+## The workflow at a glance
+
+The window shows the whole run as one chain, in order, so you can see what each step does, what you can add to it and what it costs. Open it on **Tools** (what runs by default on this computer) or on **New benchmark**, step *Tools* (what runs this time), and choose **Workflow** at the top; **List** is the plain list. Both views change the same settings, so they always agree.
+
+```text
+0 Check and install -> 1 Download -> 2 Reference truth -> 3 QC, trim and assemble -> 4 Run the tools
+  -> 5 Score -> 6 Aggregate and report -> 7 Long-read and hybrid tools -> 8 Operational reconstruction
+  (and, separately, the Metagenomics track)
+```
+
+Each step is a card. Inside it every item says what it does in one line and shows a switch:
+
+- **Always on** items are the core of the stage and cannot be switched off. **Optional** steps (extra analyses) and **alternative tools** have a switch.
+- **On** is green with a tick; **Off** is plum with a cross and a dashed outline. The word is always written, so colour is never the only cue. **An item at its default shows its default state in that state's colour**: a tool that is off by default shows *Off* until you switch it on. An item you changed from its default also carries a **changed** tag, and a small *default* link puts it back (on New benchmark it is *use saved*). Green help marks, amber warnings and red errors keep their own meaning.
+- **Badges** show what an item needs: a database, the internet (always, or only the first time), an earlier step, or an input such as long reads.
+- Turning on something that needs an earlier step that is off offers to turn that on too; turning off a step others need warns you and offers to turn them off as well. Nothing is changed until you choose.
+- **What can I add here?** under each card lists the optional items that are off, with their cost and a *Turn on* button. **Enabled extras** at the top lists what you have switched on beyond the default chain (and what you switched off).
+- Your own tools (added with a manifest) appear under *Run the tools*, marked *your tool*.
+
+**The estimate.** The bar at the top says, for example, *this selection adds about 14.4 min, 4.4 GB peak memory and 630 MB disk per isolate, estimated*, and recalculates on every change; choose *Per 10 isolates* to scale it. Time and disk add up over the items that are on; memory is the largest single tool (they run one after another unless you raise the parallel settings); a one-off database download is shown separately. Every figure says where it comes from:
+
+- **measured**: taken from a real run in this repository (`results_real_cohort1`, 10 isolates). At present these are assembly (median 5.9 min), MOB-recon (0.9 min, 2.95 GB peak), Platon (1.0 min, 4.4 GB), plasmidSPAdes (median 6.6 min, mean 12.7 min, 3.8 GB) and the coverage baseline (under a second);
+- **documented**: a stated requirement or size, not re-measured (the 630 MB per isolate and the 2.9 GB and 2.7 GB databases in the README, the 32 GB memory floor Plasmer documents);
+- **not measured**: no figure exists. The field is blank, the item is listed under the total as *not measured*, and the total says *at least*; it is never counted as zero.
+
+Treat the numbers as a guide for planning time and disk. They depend on read depth (a very deep isolate can take many times the median) and on your computer. Where the window says *not measured*, run one isolate and look at `tool_status.tsv`, which records `runtime_seconds` and `peak_rss_kb` for every tool. The chain and its figures live in `config/workflow_steps.tsv`, one row per item, and `plasbench/workflow_steps.py` reads it; a test fails if a tool in the registry, a stage script or a setting is missing from it, so adding a tool means adding its row.
+
 ## Workflow
 
 `plasbench run` runs stages 0-6. Select stages explicitly to resume or iterate:
@@ -843,6 +909,15 @@ plasbench run 4 --force-rerun-tools
 Stages preserve completed outputs where safe. Stage 4 only reuses a tool result
 when it has both a prediction FASTA and completion marker. Failed, skipped, and
 reused states are written to `results/tool_status.tsv`.
+
+## MultiQC and the built-in QC panel: which to use
+
+PlasBench does **not** use MultiQC to make its QC: read quality is measured by fastp and `python/short_read_qc.py`, and the report's **Short-read QC** panel is PlasBench's own, modelled on MultiQC's layout. Real MultiQC is an optional companion.
+
+- **Built-in panel.** PlasBench's thresholds (PASS, WARN, REJECT with the reason), the assembly selection outcome and the answers to a reviewer's questions, offline in the one report file. It shows only the metrics PlasBench computes.
+- **MultiQC.** The community-standard view of the same fastp (and QUAST) files, with more plots (per-base quality, adapter content, duplication). It needs a separate install (`plasbench install-tools multiqc`), is a separate file (`results/multiqc/multiqc_report.html`, linked from the panel, never embedded) and knows nothing of PlasBench's thresholds.
+- **Setting.** `MULTIQC_REPORT=auto|on|off` (default `auto`: run it only when `multiqc` is installed; `on` warns when it is missing; `off` never). `MULTIQC_TIMEOUT_SECONDS` (600) limits it. A MultiQC problem never fails a run: it is a warning in `run_events.jsonl` and a note in the panel.
+- **If they differ.** Both read the same files, so a figure both show should agree closely; the panel measures the first read pairs of the raw files, fastp reports every read it processed, so small differences are expected. If they differ a lot, check they were made from the same run and sample, then read `results/short_read_qc.tsv` and the sample's `fastp.json`: the files are the record.
 
 ## Outputs
 
@@ -1124,6 +1199,18 @@ when `RUN_RECOMMENDATION_MODEL=1`; omit `--read-depth-x` and it is imputed
 with the training-set mean. Only tools already eligible in
 `benchmark.recommendations.tsv`'s `overall` scope are ever considered --
 the model never live-recommends a tool nobody validated.
+
+## When You Are Offline
+
+PlasBench checks for the internet before anything that needs it, and says so in one plain sentence before it does any work (`plasbench net` shows the same check: which services answer, and advice).
+
+**Works offline:** scoring, aggregation and the HTML report (`plasbench report`, `report-pdf`), the demo, runs on files already on disk (`plasbench run ... --local-inputs`, or any run whose reference and reads are already downloaded: stage 1 asks for the internet only for what it has to fetch), `import-contributed-cohort`, `plasbench tools list/validate/new` and adding a tool from a folder, viewing studies in the window, and every tool that is already installed.
+
+**Needs the internet:** stage 1 downloads (NCBI Datasets, SRA, ENA), `install-tools`, `check --yes` when something is missing, database downloads (Zenodo, PLSDB, Figshare), `upgrade`, the update check, `validate-cohort --online`, `discover-*`, `resolve-contributed-cohort`, `curate-cohort`, `prepare-contribution`, adding a tool from a URL, and GitHub sign-in in the window.
+
+The message names the service and the reason: no network at all; DNS not working (in WSL run `wsl --shutdown` in PowerShell, check the VPN, or set a DNS server); one service down while the rest work; a sign-in page, proxy or certificate error in the way. A download that starts online and then loses the connection pauses and resumes by itself.
+
+Settings (environment variables, also in the window's Settings): `PLASBENCH_OFFLINE=1` refuses every online-only action at once, on purpose (for an offline session or a metered link); `PLASBENCH_ONLINE_TIMEOUT` is the seconds to wait for each service (default 5); `PLASBENCH_ASSUME_ONLINE=1` skips the check altogether (tests, or a network that only reaches a local mirror). The services and which commands use them are listed in `config/network_services.tsv`.
 
 ## Console Messages
 

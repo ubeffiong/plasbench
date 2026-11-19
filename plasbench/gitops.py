@@ -730,6 +730,23 @@ def create_branch(repo, name: str, switch: bool = True):
     run(repo, "switch", "-c", n) if switch else run(repo, "branch", n)
 
 
+def delete_branch(repo, name: str):
+    """Delete a LOCAL branch that is fully merged (git branch -d: never -D, so unmerged work is not thrown away) and is not the one checked out."""
+    n = valid_branch(name)
+    if info(repo).get("branch") == n:
+        raise ValueError("this is the branch you are on: switch to another branch first")
+    run(repo, "branch", "-d", n)
+
+
+def create_tag(repo, name: str, message: str = ""):
+    """An annotated tag on the current commit."""
+    n = (name or "").strip()
+    if not re.match(r"^[A-Za-z0-9._/-]{1,100}$", n) or n.startswith("-") or ".." in n:
+        raise ValueError("tag name: letters, numbers, . _ - and / only")
+    run(repo, "check-ref-format", f"refs/tags/{n}")
+    run(repo, "tag", "-a", n, "-m", (message or n)[:500])
+
+
 def checkout(repo, name: str):
     n = valid_branch(name)
     if any(f["staged"] or f["unstaged"] for f in info(repo)["files"] if not f["untracked"]):
@@ -757,6 +774,27 @@ def remove_remote(repo, name: str):
 # The credential helper and ssh settings are deliberately left alone: pushing needs them.
 SAFE_NET = ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull,
             "-c", "protocol.ext.allow=never", "-c", "uploadpack.packObjectsHook="]
+
+
+NETWORK_OPS = ("fetch", "pull", "push", "clone", "gh_login", "gh_setup_git", "gh_create")
+
+
+def require_network(op: str, repo=None, url: str = "") -> None:
+    """Refuse a network operation before it starts when the connectivity layer (plasbench/netcheck.py, through the window's adapter netgate) says its service is unreachable.
+
+    clone needs the host of `url`; fetch, pull and push need the host of the first remote; the sign-in and repository-creation operations need GitHub. Raises netgate.Offline
+    (the window answers 503 with the service, state and advice); local operations never call this."""
+    if op not in NETWORK_OPS:
+        return
+    from . import netgate
+    if op in ("gh_login", "gh_setup_git", "gh_create"):
+        services = ["github"]
+    else:
+        if op != "clone":
+            remotes = info(repo).get("remotes") or []
+            url = remotes[0]["url"] if remotes else ""
+        services = netgate.git_services(url)
+    netgate.require(services, f"git {op}")
 
 
 def argv(op: str, repo, **kw) -> list[str]:

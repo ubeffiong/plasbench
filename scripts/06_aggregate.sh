@@ -457,6 +457,10 @@ python3 "$HERE/../python/write_manifest.py" \
     --data-dir "$DATA_DIR" --results-dir "$RESULTS_DIR" \
     --out "$RESULTS_DIR/run_manifest.json"
 
+# Optional MultiQC companion over the fastp (and QUAST) outputs (MULTIQC_REPORT: auto runs it only when multiqc is installed). It never fails the run: a problem is a
+# warning event and a note in the report's QC panel, which links to results/multiqc/multiqc_report.html when it exists.
+python3 "$HERE/../python/run_multiqc.py" --data-dir "$DATA_DIR" --results-dir "$RESULTS_DIR" || warn "the optional MultiQC step stopped unexpectedly; the report is unaffected"
+
 # The interactive cohort dashboard repeats the heatmap and metric tables and adds about 1 MB: embedded only when REPORT_EMBED_DASHBOARD=1.
 REPORT_FLAGS=()
 if [ "${REPORT_EMBED_DASHBOARD:-0}" = "1" ]; then REPORT_FLAGS+=(--embed-dashboard); fi

@@ -40,6 +40,7 @@ from collect_truth_provenance import get_json  # noqa: E402
 from discover_ncbi_cohort import runinfo_for_biosample  # noqa: E402
 from truth_provenance import classify_method  # noqa: E402
 from validate_cohort import verify_row  # noqa: E402
+from plasbench_common import net_require  # noqa: E402
 
 TAXON_REPORT = "https://api.ncbi.nlm.nih.gov/datasets/v2/genome/taxon/{}/dataset_report"
 COLUMNS = ["sample_id", "assembly_accession", "sra_run", "organism", "truth_technology", "truth_quality_tier",
@@ -89,6 +90,7 @@ def main():
     ap.add_argument("--evidence-out", required=True)
     ap.add_argument("--api-key", default=os.environ.get("NCBI_API_KEY"))
     args = ap.parse_args()
+    net_require(["ncbi", "ncbi_datasets"], action="Discovering a design cohort at NCBI")
     delay = 0.12 if args.api_key else 0.4
 
     existing = read_rows(args.existing)

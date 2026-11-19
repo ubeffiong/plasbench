@@ -1,0 +1,101 @@
+<script>
+/* PlasBench comparison table, core: pure functions (row-wise rank shading, quartiles and outliers, CSV, column moves).
+   Mirrored in python/report_compare_table.py (the static grid and the tests); test/test_report_compare_table.py checks both agree number by number.
+   Vanilla JS, no libraries; works from file://. */
+(function (root) {
+'use strict';
+var STEPS = 10;
+var ESC_RE = new RegExp('[&<>\u0022\u0027]', 'g'), ESC_MAP = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '\u0022': '&quot;', '\u0027': '&#39;'};
+function esc(s) { return String(s == null ? '' : s).replace(ESC_RE, function (c) { return ESC_MAP[c]; }); }
+function ok(v) { return typeof v === 'number' && isFinite(v); }
+function same(a, b) { return Math.abs(a - b) <= 1e-12 * Math.max(1, Math.abs(a), Math.abs(b)); }
+
+/* Rank shading of ONE row. values: numbers or null (missing / not assessed). dir: 'higher' | 'lower' | anything else (no direction).
+   Cells are ranked by value, never shaded by raw value: rank 1 is best, tied cells share the average of the ranks they span.
+   t = (m - rank) / (m - 1) with m assessed cells, so the best is 1 (blue), the median 0.5 (white) and the worst 0 (red); bucket = round(t * 10).
+   status: ok | no_direction | too_few (fewer than two assessed) | all_tied (nothing to separate). Only status ok is shaded. */
+function rankShade(values, dir) {
+  var n = values.length, out = {status: 'ok', m: 0, t: [], rank: [], bucket: [], best: []}, i, idx = [];
+  for (i = 0; i < n; i++) { out.t.push(null); out.rank.push(null); out.bucket.push(null); out.best.push(false); if (ok(values[i])) idx.push(i); }
+  out.m = idx.length;
+  if (dir !== 'higher' && dir !== 'lower') { out.status = 'no_direction'; return out; }
+  if (idx.length < 2) { out.status = 'too_few'; return out; }
+  var sgn = dir === 'higher' ? -1 : 1;
+  idx.sort(function (a, b) { var d = sgn * values[a] - sgn * values[b]; return same(values[a], values[b]) ? a - b : (d < 0 ? -1 : 1); });
+  var groups = [], g = [idx[0]];
+  for (i = 1; i < idx.length; i++) {
+    if (same(values[idx[i]], values[g[0]])) g.push(idx[i]); else { groups.push(g); g = [idx[i]]; }
+  }
+  groups.push(g);
+  var pos = 1, m = idx.length;
+  for (var k = 0; k < groups.length; k++) {
+    var size = groups[k].length, avg = pos + (size - 1) / 2;
+    for (var j = 0; j < size; j++) {
+      var c = groups[k][j];
+      out.rank[c] = avg;
+      if (groups.length > 1) { out.t[c] = (m - avg) / (m - 1); out.bucket[c] = Math.floor(out.t[c] * STEPS + 0.5); out.best[c] = (k === 0); }
+    }
+    pos += size;
+  }
+  if (groups.length === 1) out.status = 'all_tied';
+  return out;
+}
+
+/* Quartiles by linear interpolation between order statistics (the usual 'type 7'); null for an empty list. */
+function quantile(sorted, p) {
+  var n = sorted.length; if (!n) return null;
+  var h = (n - 1) * p, lo = Math.floor(h), hi = Math.ceil(h);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (h - lo);
+}
+function quartiles(values) {
+  var v = values.filter(ok).sort(function (a, b) { return a - b; });
+  if (!v.length) return null;
+  return {n: v.length, min: v[0], q1: quantile(v, 0.25), median: quantile(v, 0.5), q3: quantile(v, 0.75), max: v[v.length - 1]};
+}
+/* Tukey fences (1.5 x IQR); fewer than 4 values are never called outliers. Returns the indexes of the outlying values. */
+function outliers(values) {
+  var idx = [], i; for (i = 0; i < values.length; i++) if (ok(values[i])) idx.push(i);
+  if (idx.length < 4) return [];
+  var q = quartiles(values), iqr = q.q3 - q.q1, lo = q.q1 - 1.5 * iqr, hi = q.q3 + 1.5 * iqr;
+  return idx.filter(function (i) { return values[i] < lo - 1e-12 || values[i] > hi + 1e-12; });
+}
+/* Per-isolate pairs [[name, value], ...] ordered best to worst for the direction (ties keep their input order); no direction keeps the input order. */
+function rankIsolates(pairs, dir) {
+  var p = pairs.filter(function (x) { return ok(x[1]); }).map(function (x, i) { return [x[0], x[1], i]; });
+  if (dir === 'higher' || dir === 'lower') {
+    var s = dir === 'higher' ? -1 : 1;
+    p.sort(function (a, b) { return same(a[1], b[1]) ? a[2] - b[2] : (s * a[1] < s * b[1] ? -1 : 1); });
+  }
+  return p.map(function (x) { return [x[0], x[1]]; });
+}
+/* CSV: a text that a spreadsheet could read as a formula is prefixed with an apostrophe; numbers are left alone. */
+function csvCell(s) {
+  s = String(s == null ? '' : s);
+  if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?([eE][-+]?\d+)?$/.test(s)) s = "'" + s;
+  var q = String.fromCharCode(34);
+  if (s.indexOf(q) >= 0 || s.indexOf(',') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0) s = q + s.split(q).join(q + q) + q;
+  return s;
+}
+function csvText(rows) { return rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n') + '\r\n'; }
+/* A new order after moving the item at `from` to `to` (both clamped); the input is not changed. */
+function moveItem(arr, from, to) {
+  var a = arr.slice(); if (from < 0 || from >= a.length) return a;
+  to = Math.max(0, Math.min(a.length - 1, to));
+  var x = a.splice(from, 1)[0]; a.splice(to, 0, x); return a;
+}
+/* Order of column indexes by mean rank over the rows (best first). ranks: rows of rank arrays (null = no rank); a column with no rank goes last. */
+function meanRankOrder(ranks, ncol) {
+  var s = [], c = [], i, j;
+  for (j = 0; j < ncol; j++) { s.push(0); c.push(0); }
+  for (i = 0; i < ranks.length; i++) for (j = 0; j < ncol; j++) if (ranks[i][j] != null) { s[j] += ranks[i][j]; c[j]++; }
+  var order = []; for (j = 0; j < ncol; j++) order.push(j);
+  var key = function (j) { return c[j] ? s[j] / c[j] : Infinity; };
+  order.sort(function (a, b) { var d = key(a) - key(b); return d === 0 || (key(a) === Infinity && key(b) === Infinity) ? a - b : (d < 0 ? -1 : 1); });
+  return order;
+}
+var api = {STEPS: STEPS, esc: esc, rankShade: rankShade, quartiles: quartiles, outliers: outliers, rankIsolates: rankIsolates, csvCell: csvCell, csvText: csvText,
+  moveItem: moveItem, meanRankOrder: meanRankOrder};
+root.PBCT = api;
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>

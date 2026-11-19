@@ -882,12 +882,21 @@ run_plasgraph2() {
 # only while its fingerprint (manifest and its files, rendered command, inputs) is unchanged.
 USER_TOOL_LIST=()
 if [[ -n "${ONLY_TOOL:-}" ]]; then
-    python3 "$PROJECT_ROOT/python/user_tools.py" names --enabled "$ONLY_TOOL" >/dev/null 2>&1 && USER_TOOL_LIST=("$ONLY_TOOL")
+    if USER_TOOL_NAMES="$(python3 "$PROJECT_ROOT/python/user_tools.py" names --enabled "$ONLY_TOOL" 2>/dev/null)" && [[ -n "$USER_TOOL_NAMES" ]]; then
+        mapfile -t USER_TOOL_LIST <<< "$(printf '%s' "$USER_TOOL_NAMES" | tr -d '\r')"   # a per-task id selects its tool
+    fi
 elif [[ -n "${USER_TOOLS:-}" ]]; then
     USER_TOOL_NAMES="$(python3 "$PROJECT_ROOT/python/user_tools.py" names --enabled "$USER_TOOLS")" \
         || die "USER_TOOLS=$USER_TOOLS: see the error above (plasbench tools list shows the installed user tools)"
     [[ -n "$USER_TOOL_NAMES" ]] && mapfile -t USER_TOOL_LIST <<< "$(printf '%s' "$USER_TOOL_NAMES" | tr -d '\r')"
 fi
+# Every registry id the selected tools produce: <name> and, for a multi-task tool, <name>__<task> (one status row each).
+USER_TOOL_IDS=()
+for ut in "${USER_TOOL_LIST[@]}"; do
+    while IFS= read -r uid; do
+        uid="${uid%$'\r'}"; [[ -n "$uid" ]] && USER_TOOL_IDS+=("$uid")
+    done < <(python3 "$PROJECT_ROOT/python/user_tools.py" task-ids "$ut" 2>/dev/null || printf '%s\n' "$ut")
+done
 [[ ${#USER_TOOL_LIST[@]} -gt 0 ]] && log "User tools: ${USER_TOOL_LIST[*]}"
 
 # The conda-family solver that installed a user tool's environment, to run the command inside it.
@@ -901,60 +910,107 @@ user_tool_runner() {
     return 1
 }
 
+# Record one outcome for every task row of the tool (a tool with several tasks has one row per task: <name>, <name>__<task>).
+# Uses IDS (id=task pairs), SAMPLE; the outcome carries no prediction file.
+user_tool_status_all() {
+    local status="$1" reason="$2" elapsed="${3:-}" pair
+    for pair in "${IDS[@]}"; do record_status "$SAMPLE" "${pair%%=*}" "$status" "" "$reason" "$elapsed"; done
+}
+
+# Convert the tool's output (one run) into one task row's prediction files. Uses SPEC, SAMPLE, CONTIGS, RDIR, LOGF.
+user_tool_convert() {
+    local TOOL="$1" task="$2" elapsed="${3:-}" note err
+    local PRED="$RDIR/pred_${TOOL}.plasmid.fasta" DONE="$RDIR/.${TOOL}.complete" ERRF="$RDIR/.${TOOL}.adapter.err"
+    rm -f "$PRED" "$DONE" "$RDIR/pred_${TOOL}".{bins.tsv,candidates.fasta,scores.tsv}
+    if note="$(python3 "$PROJECT_ROOT/python/user_tool_adapter.py" --tool "$TOOL" --task "$task" --output "${SPEC[output]}" \
+            --contigs "$CONTIGS" --out-fasta "$PRED" --sample "$SAMPLE" 2>"$ERRF")"; then
+        cat "$ERRF" >> "$LOGF" 2>/dev/null || true; rm -f "$ERRF"
+        mark_complete "$DONE"
+        record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "user tool (${SPEC[mode]}); $(printf '%s' "$note" | tr '\n\t' '  ' | cut -c1-300)" "$elapsed"
+    else
+        err="$(tr '\n\t' '  ' < "$ERRF" 2>/dev/null | cut -c1-400)"
+        cat "$ERRF" >> "$LOGF" 2>/dev/null || true; rm -f "$ERRF" "$PRED" "$DONE"
+        warn "$TOOL ($task) output for $SAMPLE does not fit PlasBench's mapping; skipped (see $LOGF)"
+        record_status "$SAMPLE" "$TOOL" "skipped" "" "output unusable for this assembly: see $LOGF${err:+ ($err)}"
+    fi
+}
+
 run_user_tool() {
     local TOOL="$1" SAMPLE="$2" SDIR="$3" RDIR="$4" CONTIGS="$5" T1="$6" T2="$7"
-    local OUT="$RDIR/$TOOL" PRED="$RDIR/pred_${TOOL}.plasmid.fasta" DONE="$RDIR/.${TOOL}.complete"
-    local LOGF="$LOG_DIR/${SAMPLE}.${TOOL}.log" key value why
+    local PRIMARY="$1" OUT="$RDIR/$1"
+    local LOGF="$LOG_DIR/${SAMPLE}.${TOOL}.log" key value why pair id task
     local -A SPEC=()
+    local -a IDS=("$PRIMARY=")
     while IFS=$'\t' read -r key value; do
         [[ -n "$key" ]] && SPEC[$key]="${value%$'\r'}"
     done < <(python3 "$PROJECT_ROOT/python/user_tools.py" run-spec "$TOOL" --sample "$SAMPLE" --contigs "$CONTIGS" \
                  --graph "$SDIR/assembly_graph.gfa" --reads-1 "$T1" --reads-2 "$T2" \
                  --long-reads "$SDIR/${LONG_READS_FILE:-long_reads.fastq.gz}" --outdir "$OUT" \
                  --threads "${USER_TOOL_THREADS:-4}" 2>>"$LOGF")
+    [[ -n "${SPEC[task_ids]:-}" ]] && read -r -a IDS <<< "${SPEC[task_ids]}"
     if [[ -z "${SPEC[mode]:-}" ]]; then
-        record_status "$SAMPLE" "$TOOL" "skipped" "" "manifest unusable: plasbench tools validate $TOOL"; return 0
+        user_tool_status_all "skipped" "manifest unusable: plasbench tools validate $TOOL"; return 0
     fi
     # Long-read and hybrid user tools obey the same circularity rule as the built-ins (scripts/lib.sh).
     if ! why="$(long_read_truth_eligible "$TOOL" "$SAMPLE")"; then
-        record_status "$SAMPLE" "$TOOL" "skipped" "" "truth is not independent of the long reads this tool would be given ($why)"
+        user_tool_status_all "skipped" "truth is not independent of the long reads this tool would be given ($why)"
         return 0
     fi
     if [[ -n "${SPEC[missing]:-}" ]]; then
-        record_status "$SAMPLE" "$TOOL" "skipped" "" "${SPEC[missing]}"; return 0
+        user_tool_status_all "skipped" "${SPEC[missing]}"; return 0
     fi
-    # Read by tool_fingerprint: the manifest folder's checksum and the exact command (or the imported file).
+    # Read by tool_fingerprint: the manifest folder's checksum (with the tool's source: URL, pinned checksum, recorded
+    # download or linked files) and the exact command (or the imported file).
     local USER_TOOL_SIGNATURE="${SPEC[checksum]}|${SPEC[command]:-import}"
     local OUTFILE=""; [[ "${SPEC[mode]}" == "import" ]] && OUTFILE="${SPEC[output]}"
-    if is_complete "$DONE" "$PRED"; then
-        log "  $TOOL: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+    # The command runs ONCE per sample. Every task row is converted from its output; a row whose result is current is
+    # reused, unless the command itself has to run again (then every row is converted afresh).
+    local -a REUSED=() TODO=()
+    for pair in "${IDS[@]}"; do
+        id="${pair%%=*}"
+        TOOL="$id"
+        if is_complete "$RDIR/.${id}.complete" "$RDIR/pred_${id}.plasmid.fasta"; then REUSED+=("$pair"); else TODO+=("$pair"); fi
+    done
+    TOOL="$PRIMARY"
+    local PRIMARY_REUSED=0 r
+    for r in "${REUSED[@]}"; do [[ "${r%%=*}" == "$PRIMARY" ]] && PRIMARY_REUSED=1; done
+    if [[ "$PRIMARY_REUSED" -eq 0 ]]; then REUSED=(); TODO=("${IDS[@]}"); fi
+    for pair in "${REUSED[@]}"; do
+        id="${pair%%=*}"
+        log "  $id: reusing completed result"
+        record_status "$SAMPLE" "$id" "reused" "$RDIR/pred_${id}.plasmid.fasta" "completed result reused"
+    done
+    [[ ${#TODO[@]} -gt 0 ]] || return 0
+    local START; START=$(profile_start)
+    if [[ "$PRIMARY_REUSED" -eq 0 ]]; then
+        local TODO_IDS=""; for pair in "${TODO[@]}"; do TODO_IDS+="${pair%%=*} "; done
+        rm -f "$RDIR/pred_${PRIMARY}.plasmid.fasta" "$RDIR/.${PRIMARY}.complete"
+        log "  $PRIMARY ($SAMPLE, user tool, ${SPEC[mode]}${SPEC[task_ids]:+; rows: ${TODO_IDS% }}) ..."
+        if [[ "${SPEC[mode]}" == "command" ]]; then
+            rm -rf "$OUT"; mkdir -p "$OUT"
+            local -a RUNNER=()
+            if [[ "${SPEC[env]}" != "path" && "${SPEC[install]}" != "none" ]]; then
+                mapfile -t RUNNER < <(user_tool_runner "${SPEC[env_name]}" || true)
+                [[ ${#RUNNER[@]} -gt 0 ]] || warn "$TOOL: environment ${SPEC[env_name]} not found; running from PATH (install it with: plasbench install-tools $TOOL)"
+            fi
+            local TOOL_TIMEOUT_SECONDS="${SPEC[timeout]:-${TOOL_TIMEOUT_SECONDS:-}}"
+            if ! profile_exec_in_dir "$OUT" "${RUNNER[@]}" bash -c "${SPEC[command]}" > "$LOGF" 2>&1; then
+                for pair in "${TODO[@]}"; do rm -f "$RDIR/pred_${pair%%=*}.plasmid.fasta" "$RDIR/.${pair%%=*}.complete"; done
+                warn "$TOOL failed for $SAMPLE; excluded from scoring"
+                IDS=("${TODO[@]}"); user_tool_status_all "failed" "see $LOGF" "$(profile_elapsed "$START")"
+                return 0
+            fi
+        fi
+    elif [[ "${SPEC[mode]}" == "command" && ! -e "${SPEC[output]}" ]]; then
+        IDS=("${TODO[@]}"); user_tool_status_all "skipped" "the tool's output ${SPEC[output]} is gone; re-run with FORCE_RERUN_TOOLS=1"
         return 0
     fi
-    rm -f "$PRED" "$DONE" "$RDIR/pred_${TOOL}".{bins.tsv,candidates.fasta,scores.tsv}
-    log "  $TOOL ($SAMPLE, user tool, ${SPEC[mode]}) ..."
-    local START; START=$(profile_start)
-    if [[ "${SPEC[mode]}" == "command" ]]; then
-        rm -rf "$OUT"; mkdir -p "$OUT"
-        local -a RUNNER=()
-        if [[ "${SPEC[env]}" != "path" && "${SPEC[install]}" != "none" ]]; then
-            mapfile -t RUNNER < <(user_tool_runner "${SPEC[env_name]}" || true)
-            [[ ${#RUNNER[@]} -gt 0 ]] || warn "$TOOL: environment ${SPEC[env_name]} not found; running from PATH (install it with: plasbench install-tools $TOOL)"
-        fi
-        local TOOL_TIMEOUT_SECONDS="${SPEC[timeout]:-${TOOL_TIMEOUT_SECONDS:-}}"
-        if ! profile_exec_in_dir "$OUT" "${RUNNER[@]}" bash -c "${SPEC[command]}" > "$LOGF" 2>&1; then
-            rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"
-            record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOGF" "$(profile_elapsed "$START")"
-            return 0
-        fi
-    fi
-    if python3 "$PROJECT_ROOT/python/user_tool_adapter.py" --tool "$TOOL" --output "${SPEC[output]}" \
-            --contigs "$CONTIGS" --out-fasta "$PRED" >> "$LOGF" 2>&1; then
-        mark_complete "$DONE"
-        record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "user tool (${SPEC[mode]})" "$(profile_elapsed "$START")"
-    else
-        rm -f "$PRED" "$DONE"; warn "$TOOL output for $SAMPLE does not fit PlasBench's mapping; skipped (see $LOGF)"
-        record_status "$SAMPLE" "$TOOL" "skipped" "" "output unusable for this assembly: see $LOGF"
-    fi
+    local first=1
+    for pair in "${TODO[@]}"; do
+        id="${pair%%=*}"; task="${pair#*=}"
+        user_tool_convert "$id" "$task" "$([[ $first -eq 1 ]] && profile_elapsed "$START" || true)"
+        first=0
+    done
 }
 
 process_sample() {
@@ -983,8 +1039,12 @@ process_sample() {
         tool_enabled RUN_BASELINE_COVERAGE baseline_coverage && record_status "$SAMPLE" "baseline_coverage" "skipped" "" "$SKIP_REASON"
         tool_enabled RUN_BASELINE_REFERENCE baseline_reference && record_status "$SAMPLE" "baseline_reference" "skipped" "" "$SKIP_REASON"
         tool_enabled RUN_BASELINE_REPLICON baseline_replicon && record_status "$SAMPLE" "baseline_replicon" "skipped" "" "$SKIP_REASON"
-        local ut
-        for ut in "${USER_TOOL_LIST[@]}"; do record_status "$SAMPLE" "$ut" "skipped" "" "assembly contigs unavailable"; done
+        local ut uid
+        for ut in "${USER_TOOL_LIST[@]}"; do
+            while IFS= read -r uid; do
+                [[ -n "$uid" ]] && record_status "$SAMPLE" "${uid%$'\r'}" "skipped" "" "assembly contigs unavailable"
+            done < <(python3 "$PROJECT_ROOT/python/user_tools.py" task-ids "$ut" 2>/dev/null || printf '%s\n' "$ut")
+        done
         return 0
     fi
     log "=== Run tools on $SAMPLE ==="
@@ -1046,7 +1106,7 @@ wait
 shards=()
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
-    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasmidec plasgraph2 baseline_coverage baseline_reference plsmd baseline_replicon plasbin_flow "${USER_TOOL_LIST[@]}"; do
+    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasmidec plasgraph2 baseline_coverage baseline_reference plsmd baseline_replicon plasbin_flow "${USER_TOOL_IDS[@]}"; do
         shards+=("$STATUS_SHARDS/${SAMPLE}.${tool}.tsv")
     done
 done < <(read_samples "$SAMPLE_SHEET")

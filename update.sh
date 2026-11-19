@@ -104,6 +104,15 @@ else
     MIGRATE=1
 fi
 
+# Updating downloads from GitHub: say so plainly, before any work, when there is no internet (scripts/lib.sh require_internet).
+if [[ -f "$HERE/scripts/lib.sh" ]]; then
+    # shellcheck source=scripts/lib.sh
+    source "$HERE/scripts/lib.sh"
+fi
+if declare -F require_internet >/dev/null 2>&1; then
+    require_internet --action "plasbench upgrade" --hint "Your current install keeps working. Download the release archive on a computer with internet and run scripts/install_latest.sh --archive FILE." github
+fi
+
 say "checking the latest release on GitHub..."
 LATEST_JSON="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest")" || {
     echo "ERROR: could not reach GitHub's API. Check your network and try again," >&2

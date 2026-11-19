@@ -71,6 +71,7 @@ else
 fi
 
 mkdir -p "$PLASSEMBLER_DB"
+require_internet --action "Downloading the Plassembler database" --hint "Download it on a computer with internet and copy it to $PLASSEMBLER_DB." zenodo
 log "Running plassembler download ..."
 plassembler download -d "$PLASSEMBLER_DB" || die "plassembler download failed; check network access and see its output above"
 database_present "$PLASSEMBLER_DB" || die "plassembler download reported success but $PLASSEMBLER_DB has no .msh sketch"

@@ -19,7 +19,7 @@ CATEGORIES = [
     ("setup", "Set up", "Install, check and update PlasBench and its tools.",
      ["ui", "desktop-icon", "check", "install-conda", "install-git", "install-tools", "tools", "upgrade", "test"]),
     ("benchmark", "Benchmark", "Run benchmarks on cohorts or your own isolates.",
-     ["demo", "run", "init-local", "intake", "report", "reconstruct", "select-candidates", "select-unknown"]),
+     ["demo", "run", "init-local", "scan-isolates", "intake", "report", "reconstruct", "select-candidates", "select-unknown"]),
     ("sweeps", "Depth and quality sweeps", "How far sequencing can be cut before recovery degrades.",
      ["depth-ladder", "depth-report", "read-quality-ladder", "read-quality-report"]),
     ("cohorts", "Cohorts and truth", "Find, curate and validate isolates and their reference truth.",
@@ -31,7 +31,7 @@ CATEGORIES = [
     ("meta", "Metagenomics track", "The separate graph-aware metagenomic track.",
      ["metagenomics", "audit-meta-cohort", "design-meta-synthetic", "validate-meta-intake", "materialize-meta-bmock12",
       "normalize-meta-classifier", "import-mobilome-evidence"]),
-    ("help", "Help", "Guides and the concept note.", ["docs", "concept-note"]),
+    ("help", "Help", "Guides and the concept note.", ["docs", "concept-note", "net"]),
 ]
 # Shorthand spellings argparse registers as separate choices; the window shows each command once.
 ALIASES = {"meta": "metagenomics", "beta": "metagenomics"}
@@ -136,7 +136,10 @@ def schema():
         categories.append({"id": "more", "title": "More commands", "blurb": "Other commands.", "commands": rest})
     globals_ = [a for a in top["args"] if a["dest"] != "command"]
     return {"commands": commands, "categories": categories, "global_args": globals_, "aliases": ALIASES,
-            "wizard_help": {k: ui_help.tooltip(v) for k, v in ui_help.WIZARD.items()}}
+            "wizard_help": {k: ui_help.tooltip(v) for k, v in ui_help.WIZARD.items()},
+            "github_help": {k: ui_help.tooltip(v) for k, v in ui_help.GITHUB.items()},
+            "usertool_help": {k: ui_help.tooltip(v) for k, v in ui_help.USERTOOL.items()},
+            "report_notes": ui_help.REPORT_NOTES}
 
 
 def validate_argv(argv):

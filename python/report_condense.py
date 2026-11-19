@@ -367,7 +367,7 @@ def transform_with_stats(page):
         if sid and skip_reason(sid):
             continue
         classes = set(_attr(_CLASS, tbl.attrs).split())
-        if "rpt-t" in classes or "data-rpt-table" in tbl.attrs:
+        if "rpt-t" in classes or "data-rpt-table" in tbl.attrs or "ct-grid" in classes:   # a comparison table has its own filter and column controls
             continue
         windowed = tbl.body_rows > WINDOW_AFTER
         if not (windowed or in_tabbed(tbl.start)):

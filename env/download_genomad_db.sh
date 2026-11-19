@@ -50,6 +50,7 @@ if [[ "$ASSUME_YES" -ne 1 ]]; then
 fi
 
 mkdir -p "$OUTPUT_DIR"
+require_internet --action "Downloading the geNomad database" --hint "Download it on a computer with internet (genomad download-database DIR) and copy it to $OUTPUT_DIR." zenodo
 log "Running genomad download-database (this can take a while)..."
 genomad download-database "$OUTPUT_DIR" || die "genomad download-database failed"
 

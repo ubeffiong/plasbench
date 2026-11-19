@@ -81,7 +81,7 @@ def main():
         text = report.read_text(encoding="utf-8")
         check("every section and tab has an entry", rh.missing(text) == [], rh.missing(text))
         sections_and_tabs = len(re.findall(r"<section id='", text)) + len(re.findall(r"<div class='rpt-panel' id='", text))
-        buttons = len(re.findall(r"class='rpt-help-btn' data-help='", text))
+        buttons = len(re.findall(r"class='rpt-help-btn' data-help='(?!compare-table')", text))   # a comparison table carries its own button (data-help='compare-table')
         check("every section and tab has a button", buttons == sections_and_tabs, (buttons, sections_and_tabs))
         m = re.search(r"<script type='application/json' id='rpt-help-data'>(.*?)</script>", text, re.S)
         payload = json.loads(m.group(1).replace("<\\/", "</")) if m else {"items": {}}

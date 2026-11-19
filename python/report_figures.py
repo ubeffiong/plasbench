@@ -15,13 +15,15 @@ but raises is NOT hidden: the exception propagates and fails the build, because 
   fig-pr            report_fig_pr             interactive precision-recall plot
   fig-radar         report_fig_radar          radar fingerprint of each tool per track (a view over the heatmap's data)
   fig-complexity    report_fig_complexity     F1 of each tool on each isolate against the isolate characteristics (dataset features)
+  fig-facets        report_fig_facets         small-multiples heatmaps: tools by stratum, one panel per metric, click a cell for its isolates or plasmids
+  fig-presence      report_fig_presence       clustered presence/absence matrix of truth plasmids and features, prevalence bars, tool outcome overlay
 
 Standard library only.
 """
 import importlib
 
-FIGURE_MODULES = ["report_fig_ladder", "report_fig_landscape", "report_fig_heatmap", "report_fig_stats", "report_fig_pr", "report_fig_radar", "report_fig_complexity"]
-FIGURE_SECTIONS = ["fig-ladder", "fig-landscape", "fig-heatmap", "fig-distributions", "fig-forest", "fig-pr", "fig-radar", "fig-complexity"]
+FIGURE_MODULES = ["report_fig_ladder", "report_fig_landscape", "report_fig_heatmap", "report_fig_stats", "report_fig_pr", "report_fig_radar", "report_fig_complexity", "report_fig_facets", "report_fig_presence"]
+FIGURE_SECTIONS = ["fig-ladder", "fig-landscape", "fig-heatmap", "fig-distributions", "fig-forest", "fig-pr", "fig-radar", "fig-complexity", "fig-facets", "fig-presence"]
 
 
 def inject(page, results_dir, data_dir, scores_path):

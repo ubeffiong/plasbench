@@ -77,6 +77,7 @@ if [[ "$ASSUME_YES" -ne 1 ]]; then
     esac
 fi
 
+require_internet --action "Installing Miniforge" --hint "Install Miniforge by hand (see INSTALL.md), or on a computer with internet download the installer and copy it here, then re-run." github
 have curl || have wget || die "need 'curl' or 'wget' to download the installer"
 fetch() {  # fetch URL DEST
     if have curl; then curl -fsSL -o "$2" "$1"; else wget -q -O "$2" "$1"; fi

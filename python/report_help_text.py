@@ -193,6 +193,20 @@ HELP = {
         "A downward slope shows a tool struggling as the characteristic grows; a flat cloud shows it does not matter for that tool.",
         "Explains low scores by the kind of isolate, and shows which characteristics could be known in advance.",
         "Each chart says whether the characteristic is knowable without a reference or needs it. With few isolates the correlation is a description, not evidence of cause; under five isolates it is not computed."),
+    "fig-facets": H(
+        "How each tool performs under each condition at once: sequencing depth, species, reference tier, plasmid size and more.",
+        "Per-isolate scores (precision, recall, F1, CPRR) from the score table, and per-plasmid results (recovered, CPRR correct, completeness) when the per-sample folders are present; the strata come from the sample sheet, the reference tiers and the truth tables.",
+        "Columns are tools, rows are conditions nested in blocks (you choose both from the strata the data record), and each panel is one metric on one shared 0 to 1 colour scale. A cell is the mean (or, for CPRR and recovered share, the pooled share) over the isolates or plasmids in it, and shows its n.",
+        "Brighter is better. A hatched cell has fewer than three units: it is labelled with its n and should not be read as a result. A dashed empty cell has no data (never zero). Click a cell to list the isolates or plasmids in it, their values, a strip plot and the interval.",
+        "Shows where a tool is strong or weak across conditions, which one overall ranking number hides, and which conditions are too thinly covered to say.",
+        "Cells hold few units in a small run. The interval for a mean is the range of the units, not a confidence interval; for a share it is a Wilson interval over plasmids, not cluster-aware. Conditions are not controlled: depth and species can be confounded with study. The table under the figure holds every cell."),
+    "fig-presence": H(
+        "Which resistance genes, replicon types, mobility types and other features each truth plasmid carries, and whether each tool recovered it.",
+        "The truth annotation tables of each sample (resistance genes, replicon and mobility features, other annotated gene classes) and, for the tool overlay, the per-plasmid results of each tool.",
+        "Plasmids are clustered on the features they carry (Jaccard distance, average linkage, deterministic). Bars above each block give the share of annotated plasmids that carry the feature, with n. Choosing a tool colours each present feature by that tool's real outcome on the plasmid.",
+        "Blue is present, blank is annotated and absent, hatched is not annotated (different from absent). With a tool chosen: solid is recovered, striped partly recovered, hollow red outline missed. Click a plasmid row or a feature column for its details.",
+        "Shows whether recovery depends on what a plasmid carries, for example whether a tool misses plasmids with a given resistance gene or replicon type.",
+        "Only features an annotation table lists appear; nothing is inferred. Prevalence is among plasmids annotated for that block. The clustering is a visual aid, not a phylogeny. Few plasmids give wide intervals; the table under the figure holds every plasmid."),
     "fig-pr": H(
         "The trade-off between finding plasmid sequence (recall) and not calling chromosome by mistake (precision).",
         "Plasmid bases recovered and falsely called, from tools that write a score for each call.",
@@ -200,6 +214,17 @@ HELP = {
         "The closer a line is to the top-right corner, the better.",
         "Shows how a tool behaves if you make it stricter or looser.",
         "If no tool wrote a curve file for a track, the figure says so and nothing is drawn."),
+    "compare-table": H(
+        "A grid that compares tools metric by metric, with the best and worst tool of every row shaded. Click anything in it for the detail behind it.",
+        "The same numbers as the plain table folded under it (it is kept, under 'Table'), plus the per-isolate values from the scores table where the run has them.",
+        "Each row is one metric. Tools are ranked inside the row, using the direction in the metric registry (higher or lower is better). The shade comes from the rank "
+        "(worst red, median white, best blue), not from the raw value, so a single huge value cannot hide the differences between the others. Tied tools share a rank.",
+        "Tick 'Show heatmap' to shade, untick to see plain numbers. A star marks the best tool in a row. A hatched cell was not assessed or is missing; it is never shaded and never zero. "
+        "A row says why it is not shaded when its direction is not defined, when fewer than two tools were assessed, or when all tools tie. Click a cell for the isolates behind it, "
+        "a metric name for its definition and source, a tool name for its profile. Drag a column handle, or use the arrow keys on it, to re-order; 'Download CSV' saves what is shown.",
+        "It shows quickly which tool leads on which measure, and which of the isolates drive a value, without leaving the page.",
+        "Shading compares tools within one row of one table, so it is not comparable across rows, tracks or tasks. With few isolates a spread is a description, not evidence of a difference. "
+        "Rank hides how far apart two tools are: read the values. Filtering tools re-ranks the rows among the tools still shown."),
     "fig-ladder": H(
         "A map of how this benchmark scores a result, from raw contigs to a verified plasmid.",
         "No data; it explains the five scoring steps.",
@@ -465,16 +490,16 @@ HELP = {
         "It is optional, and it never changes a benchmark score."),
     "learn-readqc": H(
         "Whether each sample's raw reads were fit to assemble, decided before any tool ran.",
-        "One row per sample from the short-read QC gate.",
-        "Each read pair is measured (file integrity, read count, estimated depth, read length, GC) against thresholds fixed before the run and given PASS, WARN or REJECT with reasons.",
-        "PASS proceeds. WARN proceeds with a flag. REJECT is excluded from the primary analysis when the gate is set to enforce.",
+        "One row per sample from the short-read QC gate, shown as a MultiQC-style panel: a section list, a General statistics table with inline bars and a toolbar (Copy table, Configure columns, Scatter plot, Violin plot, Export as CSV), and a record per sample.",
+        "Each read pair is measured (file integrity, read count, estimated depth, Phred, Q30, read length, GC, adapters, duplication) against the thresholds and given PASS, WARN or REJECT with reasons. Click a sample, a row or a point, to open its record: each metric as a gauge against its limits, why it passed, warned or was rejected, and its assembly selection.",
+        "PASS proceeds. WARN proceeds with a flag. REJECT is excluded from the primary analysis when the gate is set to enforce. The panel also shows what the reviewer asked: how quality was assessed, the thresholds and their status and hash, what was excluded, whether the flagged samples change the ranking, and how the assembly was selected. All sections print stacked, in full.",
         "Separates poor sequencing data from a poor tool.",
-        "The thresholds are provisional and not platform-specific."),
+        "A run with no QC table says Not measured in this run and gives the command that produces it. A table marked Synthetic is the offline demo's, not a measurement. Check the thresholds status: provisional values are not universal cut-offs."),
     "learn-assembly": H(
         "Which short-read assembly the tools were run on, and why.",
-        "One column per candidate assembly with its measured quality.",
+        "One column per candidate assembly with its measured quality, as in QUAST's comparison table.",
         "Each candidate is measured and a declared rule picks one from those measurements only, never from a score; ineligible candidates are marked and their samples skipped.",
-        "The marked column is the one used. Colour runs from worst to best across the candidates.",
+        "The starred, outlined column is the one used, with the reason beneath. Colour runs from worst to best across the candidates; the Show heatmap box switches it off.",
         "A tool should not be blamed for an assembly it was given.",
         "Running every tool on every alternative assembly is a separate run per condition."),
     "learn-multiplicity": H(

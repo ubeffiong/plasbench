@@ -218,6 +218,8 @@ def main():
 
     plsmd = group_plsmd(read_tsv(PLSMD_RAW))
     if args.fetch_ena:
+        from plasbench_common import net_require
+        net_require(["ena"], action="Fetching ENA run records (--fetch-ena)")
         n = fetch_ena(list(plsmd["filtered"]) + list(plsmd["novel"]), ENA_META)
         print(f"Wrote {ENA_META}: {n} run record(s)")
         return

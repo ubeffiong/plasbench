@@ -603,3 +603,47 @@ def balanced_order(rows, seed=20260916, main_min=BALANCE_MAIN_MIN):
                     order.append(queues[species][position])
             position += 1
     return order
+
+
+# --- internet checks (plasbench/netcheck.py, loaded by path so a script run as `python python/x.py` needs no package install) -------------------------
+_NETCHECK = []
+
+
+def netcheck_module():
+    """plasbench/netcheck.py as a module, or None when it cannot be found (a stripped-down copy of the scripts)."""
+    if not _NETCHECK:
+        module = None
+        try:
+            import importlib.util
+            path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "plasbench", "netcheck.py")
+            spec = importlib.util.spec_from_file_location("plasbench_netcheck_by_path", path)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules["plasbench_netcheck_by_path"] = module     # dataclass-free, but keeps pickling and repeated loads sane
+            spec.loader.exec_module(module)
+        except Exception:  # noqa: BLE001 - the check is a courtesy; a script still runs without it
+            module = None
+        _NETCHECK.append(module)
+    return _NETCHECK[0]
+
+
+def net_require(services, action="", code=1, any_of=False, hint="", probe=True):
+    """Pre-flight for a script that needs the internet: when a service is unreachable, print one plain sentence on stderr and exit with `code`.
+
+    Call it before any work, and only on the paths that really fetch (an action that can be done from files on disk must not demand the internet).
+    probe=False only honours PLASBENCH_OFFLINE (no connection test): for a helper that runs once per sample and explains a real failure afterwards."""
+    module = netcheck_module()
+    if module is None or (not probe and not module.forced_offline()):
+        return
+    try:
+        module.require(services, action=action, any_of=any_of, hint=hint)
+    except module.NoInternet as exc:
+        sys.stderr.write(f"ERROR: {exc.message}\n")
+        raise SystemExit(code)
+
+
+def net_explain(exc, service="internet", action="", quiet_if_up=False):
+    """One plain sentence for a network call that failed (replaces a library traceback); falls back to the exception text."""
+    module = netcheck_module()
+    if module is None:
+        return "" if quiet_if_up else f"{action or 'The request'} failed: {exc}"
+    return module.explain(exc, service, action, quiet_if_up)

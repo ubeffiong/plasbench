@@ -20,6 +20,7 @@ import html
 import math
 import os
 
+import report_readqc_panel as qp
 from report_svg import OKABE_ITO, esc, line, num, svg_close, svg_open, text
 
 SECTIONS = [("learn-readqc", "Short-read QC"), ("learn-assembly", "Assembly selection"), ("learn-multiplicity", "Reconstruction multiplicity"),
@@ -39,6 +40,9 @@ CSS = """<style>
 .rv table{border-collapse:collapse;font-size:.9em}.rv th,.rv td{border:1px solid rgba(128,128,128,.35);padding:3px 8px;text-align:right}
 .rv th:first-child,.rv td:first-child{text-align:left}.rv td.rv-l{text-align:left}
 .rv details{margin:8px 0}.rv summary{cursor:pointer;font-weight:600}
+.qp-h{background:var(--heat);color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}.qp-noheat .qp-h{background:none;color:inherit}
+.rv table td.qp-sel,.rv table th.qp-sel{border-left:2px solid #0072B2;border-right:2px solid #0072B2}.qp-heatbox{font-weight:600}
+@media print{.qp-noheat .qp-h{background:var(--heat);color:#111}.qp-heatbox{display:none}}
 .rv-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.88em;margin:6px 0}.rv-legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 </style>"""
 
@@ -95,13 +99,21 @@ def compact(x, digits=3):
 
 
 # ----------------------------------------------------------------------------------------------- A. short-read QC
-def readqc_section(qc, status_rows=None):
+def readqc_section(qc, status_rows=None, ctx=None):
+    """The short-read QC section: the interactive panel (python/report_readqc_panel.py) with the earlier table kept in a fold, "All values"."""
+    ctx = ctx or {}
     lead = ("Each sample's raw read pair is measured before assembly and given a decision. <strong>Descriptive evidence; the gate's own "
             "rule is in FAQ Q33.</strong>")
     if not qc:
-        return section("learn-readqc", "Short-read QC", lead, note(
-            "Not run: results/short_read_qc.tsv was not produced (SHORT_READ_QC_MODE=off, or stage 3 has not run). Without it nothing "
-            "records whether a read set was fit to assemble."))
+        return section("learn-readqc", "Short-read QC", lead, qp.not_measured(ctx.get("results_dir", "")))
+    panel = qp.build(qc, ctx.get("results_dir", ""), ctx.get("thresholds"), status_rows if status_rows is not None else ctx.get("status_rows"),
+                     ctx.get("candidates"), ctx.get("scores"), ctx.get("synthetic"))
+    return section("learn-readqc", "Short-read QC", lead,
+                   panel + "<details class='qp-all'><summary>All values</summary>" + _readqc_legacy(qc) + "</details>")
+
+
+def _readqc_legacy(qc):
+    """The earlier plain view: decision bar, reasons, table with inline bars and the thresholds note (kept so nothing is removed)."""
     counts = {k: sum(1 for r in qc if r.get("qc_status") == k) for k in ("PASS", "WARN", "REJECT")}
     total = len(qc) or 1
     W, H, left = 760, 56, 8
@@ -155,7 +167,7 @@ def readqc_section(qc, status_rows=None):
                 + "Taxonomic contamination is not screened here (it needs a database); an unreadable, truncated, empty or malformed file is "
                   "always rejected. Report the passed, flagged and excluded counts with any result, and check whether the flagged samples "
                   "change the conclusion.", caution=policy != "frozen")
-    return section("learn-readqc", "Short-read QC", lead, "".join(svg) + why + table + foot)
+    return "".join(svg) + why + table + foot
 
 
 # ----------------------------------------------------------------------------------------------- B. assembly selection
@@ -177,12 +189,12 @@ def heat(t):
     return "#%02x%02x%02x" % rgb
 
 
-def assembly_section(candidates):
+def assembly_section(candidates, ctx=None):
+    ctx = ctx or {}
     lead = ("Every candidate assembly is measured from the assembly itself and kept; the policy chooses from that evidence only, "
             "<strong>never from the truth or a benchmark score</strong>.")
     if not candidates:
-        return section("learn-assembly", "Assembly selection", lead, note(
-            "Not run: results/assembly_candidates.tsv was not produced (ASSEMBLY_SELECTION_MODE=off, or stage 3 has not run)."))
+        return section("learn-assembly", "Assembly selection", lead, qp.not_measured(ctx.get("results_dir", ""), "assembly selection"))
     by = {}
     for r in candidates:
         by.setdefault(r["sample"], []).append(r)
@@ -194,40 +206,52 @@ def assembly_section(candidates):
     primary = candidates[0].get("primary", "")
     summary = ("<p>Policy <strong>" + esc(policy) + "</strong> (configured assembler " + esc(primary) + "): selected "
                + ", ".join(f"{esc(k)} for {n} sample(s)" for k, n in sorted(tally.items())) + ".</p>")
-    legend = ("<div class='rv-legend'><span><i style='background:" + heat(0) + "'></i>Worst</span><span><i style='background:" + heat(.5)
+    synthetic = ctx.get("synthetic")
+    if synthetic is None:
+        synthetic = qp.is_synthetic(ctx.get("results_dir", ""))
+    flag = f"<div class='insight caution qp-synthetic' role='note'><p><strong>Synthetic.</strong> {esc(qp.SYNTHETIC_NOTE)}</p></div>" if synthetic else ""
+    legend = ("<div class='rv-legend'><label class='qp-heatbox'><input type='checkbox' id='qp-heat' checked> Show heatmap</label>"
+              "<span><i style='background:" + heat(0) + "'></i>Worst</span><span><i style='background:" + heat(.5)
               + ";border:1px solid #bbb'></i>Median</span><span><i style='background:" + heat(1) + "'></i>Best</span>"
-              "<span>Colour compares candidates within a row; total length and GC are not coloured (neither direction is better).</span></div>")
+              "<span>Colour compares candidates within a row; total length and GC are not coloured (neither direction is better). "
+              "The selected assembly is marked with a star and a heavy outline.</span></div>")
     blocks = []
     for i, (sample, rows) in enumerate(sorted(by.items())):
         names = [r["assembler"] for r in rows]
-        head = "".join(f"<th>{esc(r['assembler'])}{' &#9733; selected' if r.get('selected') == 'yes' else ''}</th>" for r in rows)
+        sel = [r.get("selected") == "yes" for r in rows]
+        head = "".join(f"<th{' class=qp-sel' if sel[j] else ''}>{esc(r['assembler'])}{' &#9733; selected' if sel[j] else ''}</th>" for j, r in enumerate(rows))
         body = []
         for label, key, direction in MEASURES:
             values = [number(r.get(key)) for r in rows]
             known = [v for v in values if v is not None]
             cells = []
-            for v in values:
+            for j, v in enumerate(values):
+                cls = " qp-sel" if sel[j] else ""
                 if v is None:
-                    cells.append(f"<td>{esc(next((r.get(key) for r in rows if number(r.get(key)) is None and r.get(key)), '-'))}</td>")
+                    cells.append(f"<td class='{cls.strip()}'>{esc(next((r.get(key) for r in rows if number(r.get(key)) is None and r.get(key)), '-'))}</td>")
                     continue
                 shown = f"{v:.3f}" if key == "mapped_read_fraction" else (f"{v:.2f}" if key == "gc_percent" else f"{v:,.0f}")
                 if direction and len(known) > 1 and max(known) != min(known):
                     t = (v - min(known)) / (max(known) - min(known))
                     t = t if direction == "high" else 1 - t
-                    cells.append(f"<td style='background:{heat(t)};color:#111'>{shown}</td>")
+                    cells.append(f"<td class='qp-h{cls}' style='--heat:{heat(t)}'>{shown}</td>")
                 else:
-                    cells.append(f"<td>{shown}</td>")
+                    cells.append(f"<td class='{cls.strip()}'>{shown}</td>")
             body.append(f"<tr><th class='rv-l'>{esc(label)}</th>{''.join(cells)}</tr>")
-        elig = "".join(f"<td class='rv-l' title='{esc(r.get('reasons') or '')}'>{'eligible' if r.get('eligible') == 'yes' else 'not eligible'}"
-                       f"{(': ' + esc(r.get('reasons'))) if r.get('reasons') else ''}</td>" for r in rows)
+        elig = "".join(f"<td class='rv-l{' qp-sel' if sel[j] else ''}' title='{esc(r.get('reasons') or '')}'>{'eligible' if r.get('eligible') == 'yes' else 'not eligible'}"
+                       f"{(': ' + esc(r.get('reasons'))) if r.get('reasons') else ''}</td>" for j, r in enumerate(rows))
         body.append(f"<tr><th class='rv-l'>Eligibility</th>{elig}</tr>")
         why = next((r.get("selection_reason") for r in rows if r.get("selection_reason")), "")
         table = (f"<div class='panel' style='overflow-x:auto'><table><thead><tr><th class='rv-l'>{esc(sample)}</th>{head}</tr></thead>"
-                 f"<tbody>{''.join(body)}</tbody></table></div><p class='small'>{esc(why)}</p>")
+                 f"<tbody>{''.join(body)}</tbody></table></div><p class='small'><strong>Reason:</strong> {esc(why or 'no reason recorded')}</p>")
         blocks.append(f"<details{' open' if i == 0 else ''}><summary>{esc(sample)}: {len(names)} candidate(s)</summary>{table}</details>")
     foot = note("Assemblers being compared are not 'selected': keep each as its own input condition. The alternatives above are retained "
                 "for a sensitivity analysis; running every tool on each alternative is not done yet.", caution=False)
-    return section("learn-assembly", "Assembly selection", lead, summary + legend + "".join(blocks) + foot)
+    return section("learn-assembly", "Assembly selection", lead, flag + summary + legend + "".join(blocks) + foot + "<script>" + HEAT_JS + "</script>")
+
+
+HEAT_JS = ("(function(){var c=document.getElementById('qp-heat'),s=document.getElementById('learn-assembly');if(!c||!s)return;"
+           "c.addEventListener('change',function(){s.classList.toggle('qp-noheat',!c.checked)})})();")
 
 
 # ----------------------------------------------------------------------------------------------- C. multiplicity
@@ -491,14 +515,16 @@ def refaudit_section(rows):
 
 def inject(page, results_dir):
     r = lambda name: read_tsv(os.path.join(results_dir, name))  # noqa: E731
-    sections = (readqc_section(r("short_read_qc.tsv")) + assembly_section(r("assembly_candidates.tsv"))
+    candidates = r("assembly_candidates.tsv")
+    ctx = {"results_dir": results_dir, "candidates": candidates, "status_rows": r("short_read_qc_status.tsv"), "scores": r("scores.tsv")}
+    sections = (readqc_section(r("short_read_qc.tsv"), None, ctx) + assembly_section(candidates, ctx)
                 + multiplicity_section(r("benchmark.candidate_multiplicity.tsv"), r("benchmark.candidates.tsv"),
                                        r("benchmark.candidate_intervals.tsv"))
                 + refaudit_section(r("benchmark.reference_evidence_audit.tsv"))
                 + stability_section(r("benchmark.ranking_stability.tsv"), r("benchmark.study_sensitivity.tsv"), r("benchmark.species_sensitivity.tsv")))
     anchor = "<section id='recommendations'>"
     if anchor in page:
-        page = page.replace(anchor, CSS + sections + anchor, 1)
+        page = page.replace(anchor, CSS + qp.CSS + sections + anchor, 1)
         nav_anchor = "<a href='#recommendations'>Recommendations</a>"
         links = "".join(f"<a href='#{sid}'>{esc(label)}</a>" for sid, label in SECTIONS)
         page = page.replace(nav_anchor, links + nav_anchor, 1)

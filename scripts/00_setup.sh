@@ -263,6 +263,13 @@ fi
 if [[ "${RUN_QUAST_DIAGNOSTICS:-0}" -eq 1 ]]; then
     check_tool quast.py quast 0
 fi
+# MultiQC is an optional companion to the report's own QC panel (MULTIQC_REPORT; python/run_multiqc.py). In the default `auto` mode a missing one is only noted: it must not
+# turn every setup into an "install now?" prompt that ends in a failure. With MULTIQC_REPORT=on the user asked for it, so a missing one is offered like any optional tool.
+if [[ "${MULTIQC_REPORT:-auto}" == "on" ]]; then
+    check_tool multiqc multiqc 0
+elif [[ "${MULTIQC_REPORT:-auto}" != "off" ]]; then
+    if have multiqc; then log "  [ok]   multiqc (optional)"; else log "  [--]   multiqc not installed (optional; the report's own QC panel does not need it: plasbench install-tools multiqc)"; fi
+fi
 if [[ "${RUN_PROTEIN_ANNOTATION:-0}" -eq 1 ]]; then
     if [[ "$PROTEIN_ANNOTATION_ENGINE" == "bakta" ]]; then
         check_tool bakta annotation
@@ -381,6 +388,15 @@ for profile in "${!NEEDED_PROFILES[@]}"; do echo "  - install-tools profile: $pr
 [[ "$NEED_PLASCOPE_DB" -eq 1 ]] && echo "  - a PlaScope database (E. coli and/or Klebsiella; needs a URL you provide, see prompt below)"
 for note in "${UNFIXABLE[@]:-}"; do [[ -n "$note" ]] && echo "  (not automatic) $note"; done
 echo
+
+# Installing needs the internet; checking does not. Say so (naming what is unreachable) before asking, only when something must be fetched.
+NET_NEEDS=()
+[[ "$NEED_CONDA" -eq 1 ]] && NET_NEEDS+=(github)
+[[ ${#NEEDED_PROFILES[@]} -gt 0 ]] && NET_NEEDS+=(conda pypi github)
+[[ "$NEED_PLATON_DB" -eq 1 || "$NEED_MOBSUITE_DB" -eq 1 || "$NEED_BAKTA_DB" -eq 1 || "$NEED_PLASSEMBLER_DB" -eq 1 || "$NEED_GENOMAD_DB" -eq 1 || "$NEED_PLASME_DB" -eq 1 ]] && NET_NEEDS+=(zenodo)
+if [[ ${#NET_NEEDS[@]} -gt 0 ]]; then
+    require_internet --action "Installing the missing tools and databases" --hint "The check above worked offline. Connect and run 'plasbench check --yes' again, or install them on a computer with internet (see INSTALL.md)." "${NET_NEEDS[@]}"
+fi
 
 PROCEED=0
 if [[ "$ASSUME_YES" -eq 1 ]]; then

@@ -104,6 +104,8 @@ class Entrez:
         self.last = 0.0
 
     def _get(self, tool, **params):
+        from plasbench_common import net_require
+        net_require(["ncbi"], action="Resolving publication isolates at NCBI")
         params.update({"retmode": "json", "tool": "plasbench", "email": self.email})
         endpoint = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/{tool}.fcgi"
         if self.key:   # the key goes in the POST body, never in the URL (proxy logs, tracebacks)
@@ -127,6 +129,8 @@ class Entrez:
         """Assembly method and sequencing technology from the NCBI Datasets report, cached under 'info:<accession>'."""
         key = "info:" + assembly_accession
         if key not in self.cache:
+            from plasbench_common import net_require
+            net_require(["ncbi_datasets"], action="Reading assembly reports from NCBI Datasets")
             url = f"https://api.ncbi.nlm.nih.gov/datasets/v2/genome/accession/{assembly_accession}/dataset_report"
             request = urllib.request.Request(url, headers={"api-key": self.key} if self.key else {})
             info = {}

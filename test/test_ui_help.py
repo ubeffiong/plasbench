@@ -34,7 +34,7 @@ def check(name, ok, detail=""):
 def main():
     sch = ui_schema.schema()
     cmds = {c["name"]: c for c in sch["commands"]}
-    for name in ("run", "demo", "reconstruct", "report", "intake"):
+    for name in ("run", "demo", "reconstruct", "report", "intake", "scan-isolates"):
         args = cmds[name]["args"]
         empty = [a["dest"] for a in args if not (a.get("tooltip") or {}).get("summary")]
         check(f"{name}: every argument has tooltip text", args and not empty, empty)
@@ -92,6 +92,37 @@ def main():
     check("fieldHTML, the Settings rows and the wizard draw the info button",
           html.count("tipBtn(") >= 5 and "tipBtn(a.tooltip" in html and "tipBtn(r.tooltip" in html and 'wizTip("cohort")' in html)
     check("no external library is loaded for it", not re.search(r'<script[^>]+src=|tippy|popper', html))
+    print("Add your own tool")
+    uh = sch["usertool_help"]
+    bare = [k for k, t in uh.items() if not t.get("summary")]
+    check(f"all {len(uh)} Add-your-own-tool controls have tooltip text", uh and not bare, bare)
+    html = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
+    used = set(re.findall(r'utTip\("([a-z_0-9]+)"\)', html)) | set(re.findall(r'"(?:src|out)_[a-z_0-9]+"|"(?:task|source|outputs|upload)"', html))
+    used = {u.strip('"') for u in used}
+    names = set(re.findall(r'"(?:tool|install)\.\w+": "([a-z_0-9]+)"', html)) | set(re.findall(r'\w+: "(out_[a-z_0-9]+)"', html))
+    missing = sorted((used | names) - set(uh))
+    check("every tooltip key the page asks for exists", not missing, missing)
+    check("Task: lists the three tasks, says the first is primary, and mentions native / derived / not possible",
+          set(c for c, _ in uh["task"]["choices"]) == {"classification", "binning_reconstruction", "sequence_reassembly"} and "first task chosen is the primary" in uh["task"]["summary"]
+          and all(w in uh["task"]["when"] for w in ("native", "derived", "not possible")))
+    check("Source: the five sources are listed and the trust warning is in the tooltip", len(uh["source"]["choices"]) == 5 and "only use sources you trust" in uh["source"]["when"].lower())
+    check("SHA-256: recommended, 64 hex characters, 'not pinned' is the default", "64 hexadecimal" in uh["src_sha256"]["summary"] and uh["src_sha256"]["default"] == "not pinned" and "Recommended" in uh["src_sha256"]["when"])
+    check("URL: https only; kind lists auto, archive, git, file; ref is for git", "https" in uh["src_url"]["summary"] and [c for c, _ in uh["src_kind"]["choices"]] == ["auto", "archive", "git", "file"] and "git" in uh["src_ref"]["summary"])
+    check("local: link and copy are explained as the manifest means them", [c for c, _ in uh["src_mode"]["choices"]] == ["link", "copy"] and "checksum" in dict(uh["src_mode"]["choices"])["copy"] and "{src}" in uh["src_path"]["summary"])
+    check("upload: up to 5 MB, scripts and adapters; large tools are located, not uploaded", "5 MB" in uh["upload"]["summary"] and "located" in uh["upload"]["summary"])
+    check("output: every format has a meaning, plus Detect automatically", set(c for c, _ in uh["out_format"]["choices"]) == {"contig_bins", "contig_labels", "plasmid_fasta", "fasta_dir", "adapter", "auto"})
+    check("the tooltips are true to the manifest: the keys they name are real", all(uh[k]["setting"].startswith("[install]") for k in ("src_url", "src_sha256", "src_kind", "src_ref", "src_build", "src_path", "src_mode", "src_script"))
+          and uh["task"]["setting"] == "[tool] task" and "candidates" in uh["out_candidates"]["setting"])
+    check("the help dictionaries have a sentence for every task, format and install source", set(ui_help.TASK_HELP) >= {"classification", "binning_reconstruction", "sequence_reassembly"}
+          and set(ui_help.FORMAT_HELP) >= {"contig_bins", "contig_labels", "plasmid_fasta", "fasta_dir", "adapter", "auto"} and set(ui_help.SOURCE_HELP) >= {"none", "conda", "pip", "url", "local", "script"})
+
+    import user_tools
+    check("the tooltip sentences are python/user_tools.py's own (one source, no drift)", ui_help.TASK_HELP == user_tools.TASK_HELP and ui_help.FORMAT_HELP == user_tools.FORMAT_HELP and ui_help.SOURCE_HELP == user_tools.SOURCE_HELP)
+
+    block = html.split("QCNOTE-BEGIN", 1)[-1].split("QCNOTE-END", 1)[0] if "QCNOTE-BEGIN" in html else ""
+    check("the Runs & reports view has a delimited, collapsible QC note drawn from ui_help.REPORT_NOTES['qc'] (title + text) through the schema",
+          "<details" in block and 'id="qcnote_title"' in block and 'id="qcnote_text"' in block and "renderQcNote" in html and ".report_notes" in html
+          and ui_schema.schema()["report_notes"]["qc"]["title"] == ui_help.REPORT_NOTES["qc"]["title"] and ui_schema.schema()["report_notes"]["qc"]["text"] == ui_help.REPORT_NOTES["qc"]["text"] and ui_help.REPORT_NOTES["qc"]["text"])
     node = shutil.which("node")
     if node:
         script = max(re.findall(r"<script[^>]*>(.*?)</script>", html, re.S), key=len)

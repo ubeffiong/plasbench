@@ -30,7 +30,7 @@ def read(*parts):
 
 
 # Tools the operating system provides; not installed by PlasBench.
-SYSTEM = {"python3", "bash", "git", "gzip", "tar", "curl", "sha256sum", "wslview", "wslpath", "timeout"}
+SYSTEM = {"python3", "bash", "git", "gzip", "tar", "curl", "sha256sum", "wslview", "wslpath", "timeout", "true"}
 
 # binary -> (conda package, routes that must exist). env = environment.yml, lock = the conda lock,
 # profile = an env/install_tools.sh profile installs it, check = scripts/00_setup.sh checks it.
@@ -54,6 +54,9 @@ TABLE = {
     "prefetch": ("sra-tools", {"env", "profile", "check"}),
     "fasterq-dump": ("sra-tools", {"env", "profile", "check"}),
     "quast.py": ("quast", {"profile", "check"}),
+    # MultiQC is an optional companion to the report's own QC panel (MULTIQC_REPORT, python/run_multiqc.py): profile + advisory check, like quast. It has its own
+    # isolated environment (install_isolated), so it is deliberately NOT in environment.yml or the lock: the main environment must not carry its plotting stack.
+    "multiqc": ("multiqc", {"profile", "check"}),
     "genomad": ("genomad", {"profile"}),
     "flye": ("flye", {"profile"}),
     "trycycler": ("trycycler", {"profile"}),

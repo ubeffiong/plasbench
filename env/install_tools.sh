@@ -16,6 +16,9 @@ case "$PROFILE" in
     ;;
 esac
 
+# Everything below installs packages (conda channels, PyPI, GitHub): stop here, before touching the environment, when there is no internet.
+require_internet --action "Installing the '$PROFILE' tools" --hint "Tools that are already installed keep working offline. Install on a computer with internet, or use --local-inputs runs with the tools you have." conda pypi github
+
 # Resolve the environment to an absolute PREFIX and install with -p, never -n.
 #
 # `-n NAME` means "look under this solver's own root prefix", and the solvers
@@ -75,6 +78,14 @@ if [[ "$USER_PLAN" == ENV$'\t'* ]]; then
             echo "  verify: ${STEP[1]}"
             "$SOLVER_BIN" run -n "$USER_ENV" bash -c "${STEP[1]}" >/dev/null 2>&1 || bash -c "${STEP[1]}" >/dev/null 2>&1 \
                 || { echo "ERROR: '${STEP[1]}' failed after installing $PROFILE" >&2; exit 1; }
+            continue
+        fi
+        # BUILD runs a url/local tool's build_command inside its source folder (STEP[2]), in the tool's environment when it has one.
+        if [[ "${STEP[0]}" == "BUILD" ]]; then
+            echo "  build in ${STEP[2]}: ${STEP[1]}"
+            BUILD_RUN=(bash -c "${STEP[1]}")
+            "$SOLVER_BIN" env list 2>/dev/null | awk '{print $1}' | grep -qx "$USER_ENV" && BUILD_RUN=("$SOLVER_BIN" run -n "$USER_ENV" bash -c "${STEP[1]}")
+            ( cd "${STEP[2]}" && "${BUILD_RUN[@]}" ) || { echo "ERROR: build_command failed in ${STEP[2]}" >&2; exit 1; }
             continue
         fi
         [[ "${STEP[0]}" == "{CONDA}" ]] && STEP[0]="$SOLVER_BIN"
@@ -350,6 +361,12 @@ EOF
  # RUN_DIFFICULTY_FEATURES) has no bioconda package at all -- there is no
  # profile for it here; see INSTALL.md for its manual-binary install steps.
  quast) PKGS=(quast);;
+ multiqc)
+    # Optional companion to the report's own QC panel (MULTIQC_REPORT, python/run_multiqc.py). Own environment, like the other tools with their own
+    # dependency set, so its Python and plotting libraries never touch the main one; pinned so the report it draws does not drift between installs.
+    install_isolated multiqc MultiQC "multiqc" "" "multiqc --version"         -c conda-forge -c bioconda -- "multiqc=1.25.2" "python=3.11"
+    exit $?
+    ;;
  plasme)
     # PLASMe is distributed as a git checkout with its own conda env file,
     # not a bioconda package -- there is no package for this profile to

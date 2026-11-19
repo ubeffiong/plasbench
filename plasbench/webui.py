@@ -31,7 +31,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import __version__
-from . import cohort_info, fsutil, jobrunner, runfolders, runprogress, ui_help, ui_schema
+from . import cohort_info, fsutil, ghops, ghsignin, jobrunner, netgate, runfolders, runprogress, ui_help, ui_schema
 from .gitops import GitError   # a refused git action is the user's error (400), not the server's
 from .terminal import Terminal, TerminalError
 from .sessionlog import SessionLog, describe as describe_event
@@ -61,6 +61,63 @@ REPORT_CSP = ("default-src 'none'; img-src 'self' data:; style-src 'unsafe-inlin
               "sandbox allow-scripts allow-downloads allow-popups allow-popups-to-escape-sandbox")
 
 
+_signin = [None]
+_signin_lock = threading.Lock()
+
+
+def github_cmd():
+    """The GitHub CLI as an argv prefix (replaceable in tests), or None when gh is not installed."""
+    from . import gitops
+    path = gitops.find_gh()
+    return [path] if path else None
+
+
+def signin() -> "ghsignin.SignIn":
+    """The one device-flow sign-in manager of this server (created when first used)."""
+    with _signin_lock:
+        if _signin[0] is None:
+            _signin[0] = ghsignin.SignIn(github_cmd() or ["gh"])
+        elif _signin[0].gh_cmd != (github_cmd() or ["gh"]):
+            _signin[0].gh_cmd = github_cmd() or ["gh"]
+        return _signin[0]
+
+
+def reads_present(argv, env) -> bool:
+    """Are the reads and a reference of every sample of this run's sheet already in the data folder? (Then `plasbench run` needs no download and may start offline.)"""
+    root = _PROJECT_ROOT[0]
+    if root is None:
+        return False
+    flag = lambda *names: next((argv[i + 1] for i, a in enumerate(argv[:-1]) if a in names), None)    # noqa: E731
+    sheet = flag("-s", "--samples")
+    cohort = flag("-c", "--cohort")
+    path = Path(sheet) if sheet else (root / "cohorts" / f"{cohort}.tsv" if cohort else Path(os.environ.get("SAMPLE_SHEET") or root / "config" / "accessions.tsv"))
+    if not path.is_absolute():
+        path = root / path
+    header, rows = None, []
+    with path.open(encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if line.startswith("#") or not line.strip():
+                continue
+            cells = line.rstrip("\r\n").split("\t")
+            if header is None:
+                header = cells
+            else:
+                rows.append(dict(zip(header, cells)))
+    if not rows or "sample_id" not in (header or []):
+        return False
+    from .cli import configured_data_dir
+    data_dir = Path(flag("-d", "--data-dir")) if flag("-d", "--data-dir") else configured_data_dir(root)
+    for row in rows:
+        folder = data_dir / row["sample_id"]
+        if not folder.is_dir():
+            return False
+        names = [p.name.lower() for p in folder.iterdir() if p.is_file() and p.stat().st_size > 0]
+        if sum(1 for n in names if ".fastq" in n or n.endswith((".fq", ".fq.gz"))) < 2 or not any(n.endswith((".fna", ".fna.gz", ".fa", ".fasta", ".fa.gz", ".fasta.gz")) for n in names):
+            return False
+    return True
+
+
+_PROJECT_ROOT = [None]
 RELIABILITY_GROUP = "Reliability and downloads"
 # Environment settings the window may pass with a job (Jobs.start): the Settings keys of config/config.sh plus the download and reliability
 # names the wizard's "Downloads and reliability" card sets. Anything else (LD_PRELOAD, PATH ...) is refused.
@@ -128,9 +185,51 @@ def _sheet_header(path: Path) -> list:
 
 
 # --------------------------------------------------------------------------------------------- project facts
+# -- Add your own tool: help text, a tool's summary, and the small-file upload ----------------------------------------------------------------------
+UPLOAD_MAX_BYTES = 5 * 1024 * 1024      # scripts and adapters only: a large tool binary is located on this computer or downloaded, never uploaded
+UPLOAD_BODY_MAX = 8 * 2**20             # the request may be a little larger than the file (JSON escaping), so the size message below is the one the user sees
+_TOOL_NAME = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
+_UPLOAD_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ -]{0,99}$")
+
+
+def user_tool_summary(tool):
+    """{"tasks", "install_source", "install_mode", "sha256"} of one user tool for the tool lists: every task it declares, where it comes from
+    (installed, conda, pip, script, url, local), the url/local mode and the pinned checksum. Read from the manifest's own source_summary."""
+    src = tool.source_summary()
+    method = src.get("method") or "none"
+    return {"tasks": list(tool.tasks), "install_source": {"none": "installed"}.get(method, method), "install_mode": src.get("mode", ""),
+            "sha256": src.get("sha256", "") if method in ("url", "local") else ""}
+
+
+def store_tool_upload(name, filename, text, home=None):
+    """Write `text` as <home>/.plasbench/tools/<name>/<filename> and return {"ok", "path" (the relative path for the manifest), "folder", "bytes"}.
+    Refused (ValueError): a tool name that is not a manifest name, a file name that is a path (separator, drive colon, '..', leading dot) or the manifest itself,
+    text that is not text, or more than UPLOAD_MAX_BYTES. Line endings are stored as LF so a script runs under bash."""
+    if not isinstance(name, str) or not _TOOL_NAME.match(name):
+        raise ValueError("give the tool a name first (lower-case letters, digits and _, starting with a letter): the name is its folder")
+    if (not isinstance(filename, str) or not filename or any(c in filename for c in "/\\:\x00") or ".." in filename
+            or filename.startswith(".") or not _UPLOAD_NAME.match(filename)):
+        raise ValueError("the file name must be a plain name: no folders, no '..', no leading dot")
+    if filename.lower() == "plasbench-tool.ini":
+        raise ValueError("plasbench-tool.ini is the manifest; use Save for that")
+    if not isinstance(text, str) or "\x00" in text:
+        raise ValueError("only text files (scripts and adapters) can be uploaded; locate a binary on this computer instead")
+    raw = text.replace("\r\n", "\n").encode("utf-8")
+    if len(raw) > UPLOAD_MAX_BYTES:
+        raise ValueError(f"the file is {len(raw) / 2**20:.1f} MB; uploads are limited to {UPLOAD_MAX_BYTES // 2**20} MB. Locate a large file on this computer instead")
+    folder = (Path(home) if home else Path.home()) / ".plasbench" / "tools" / name
+    target = (folder / filename).resolve()
+    if folder.resolve() not in target.parents:
+        raise ValueError("the file name must be a plain name")
+    folder.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(raw)
+    return {"ok": True, "path": filename, "folder": str(folder), "bytes": len(raw)}
+
+
 class Project:
     def __init__(self, root: Path):
         self.root = Path(root).resolve()
+        _PROJECT_ROOT[0] = self.root
         self.python_dir = self.root / "python"
         if str(self.python_dir) not in sys.path:
             sys.path.insert(0, str(self.python_dir))
@@ -340,6 +439,12 @@ class Project:
                 dbrel = {r["tool"]: r for r in csv.DictReader(handle, delimiter="\t") if r.get("tool")}
         defaults = {row["key"]: row for row in self.settings()}
         local = self.local_env()
+        mine = {}
+        try:   # your own tools: every task, where the tool comes from, and whether a download or copy is pinned by checksum
+            for n, t in self.user_tools().discover().items():
+                mine[n] = user_tool_summary(t)
+        except Exception:  # noqa: BLE001 - the Tools page still lists everything without it
+            mine = {}
         out = []
         for name, row in caps.items():
             inst = installers.get(name, {})
@@ -360,6 +465,8 @@ class Project:
                 "database": (dbrel.get(name) or {}).get("database", ""),
                 "database_release": (dbrel.get(name) or {}).get("database_release_date", ""),
             })
+            if name in mine:
+                out[-1].update(mine[name])
         return out
 
     def user_tools(self):
@@ -900,6 +1007,14 @@ class Jobs:
             from .exitcodes import explain
             reason = "cancelled from the window" if state == "cancelled" else explain(code)
             self._append_log(job_id, f"\n[PlasBench] ERROR: the command stopped: {reason} (exit {code}).\n")
+            if job.get("kind") == "git" and state != "cancelled":      # a git / GitHub failure, in plain words (not signed in, no permission, conflicts ...)
+                try:
+                    from . import ghops
+                    said = ghops.translate_error(_tail_bytes(self._paths(job_id)["log"], 3000).decode("utf-8", "replace"))
+                    if said["action"]:
+                        self._append_log(job_id, f"[PlasBench] {said['message']}\n")
+                except Exception:  # noqa: BLE001
+                    pass
         session_log().event("job_end", job=job_id, label=job["label"], state=job["state"], exit=code, seconds=round(job["ended"] - job["started"], 1))
 
     def display_state(self, job: dict) -> str:
@@ -1006,12 +1121,13 @@ class Jobs:
             clean[key] = value
         return clean or None
 
-    def start_git(self, command: list, label: str, cwd) -> dict:
-        """A git network operation built by plasbench.gitops.argv (never from the request): runs like any job."""
+    def start_git(self, command: list, label: str, cwd, program: str = "git") -> dict:
+        """A git (or, with program="gh", GitHub CLI) network operation built by plasbench.gitops.argv / plasbench.ghops (never from the request as text): runs like any job, with
+        its command line written first in the log (tokens removed)."""
         from . import gitops
         if any(j.get("kind") == "git" and j["state"] in ("running", "cancelling") for j in self.jobs.values()):
             raise ValueError("another git operation is still running: wait for it to finish")
-        shown = gitops.redact(" ".join(shlex.quote(str(a)) for a in ["git"] + list(command[1:])))
+        shown = gitops.redact(" ".join(shlex.quote(str(a)) for a in [program] + list(command[1:])))
         env = {"GIT_TERMINAL_PROMPT": "0"}
         return self._launch(list(command), shown, label, env, [], "git", cwd)
 
@@ -1483,9 +1599,9 @@ def make_handler(project: Project, jobs: Jobs):
             origin = self.headers.get("Origin")
             return origin is None or urlparse(origin).netloc == self.headers.get("Host", "")
 
-        def body(self) -> dict:
+        def body(self, limit=5 * 2**20) -> dict:
             length = int(self.headers.get("Content-Length") or 0)
-            if length > 5 * 2**20:
+            if length > limit:
                 raise ValueError("request too large")
             raw = self.rfile.read(length) if length else b"{}"
             return json.loads(raw.decode("utf-8") or "{}")
@@ -1514,6 +1630,12 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.send(404, b"not found", "text/plain; charset=utf-8")
             try:
                 return self.api_get(path[len("/api/"):], q)
+            except netgate.Offline as exc:
+                return self.jsend(503, exc.payload())
+            except ghops.RiskError as exc:
+                return self.jsend(409, {"error": str(exc), "risks": exc.risks, "needs_confirm": True})
+            except ghops.GhError as exc:
+                return self.jsend(401 if exc.action == "signin" else 400, {"error": str(exc), "action": exc.action, "detail": exc.detail})
             except runfolders.RunFolderError as exc:
                 return self.jsend(exc.status, {"error": str(exc), "status": exc.status})
             except (FileNotFoundError, KeyError) as exc:
@@ -1533,11 +1655,32 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, ui_schema.schema())
             if route == "update-check":
                 from . import updatecheck
+                netgate.require("github", "check for updates")
                 return self.jsend(200, updatecheck.check(__version__, updatecheck.fetch_latest))
+            if route == "net/status":              # the Online / Offline indicator and the gating of every internet-dependent control
+                names = [n for n in (q.get("services") or "").split(",") if n in netgate.SERVICES] or None
+                out = netgate.status(names)
+                out["commands"] = {k: (v if v is not None else None) for k, v in netgate.NET_COMMANDS.items()}
+                out["subcommands"] = netgate.SUBCOMMAND_NET
+                out["forced_offline"] = netgate.forced_offline()
+                return self.jsend(200, out)
+            if route == "github/account":
+                return self.jsend(200, ghsignin.account(github_cmd()))
+            if route == "github/signin/status":
+                return self.jsend(200, signin().status())
             if route == "env":
                 return self.jsend(200, {"checks": project.env_checks()})
             if route == "tools":
                 return self.jsend(200, {"tools": project.tools()})
+            # -- BEGIN scan a folder for isolates (plasbench/isolate_scan.py) --
+            if route == "isolates/scan/status":
+                return self.jsend(200, iso_scans().status(q.get("id", "")))
+            # -- END scan a folder for isolates --
+            # BEGIN workflow steps
+            if route == "workflow":
+                from . import workflow_steps
+                return self.jsend(200, workflow_steps.payload(project.root, workflow_steps.current_values(project.settings())))
+            # END workflow steps
             if route == "intake/defaults":
                 return self.jsend(200, project.intake_defaults())
             if route == "intake/template":
@@ -1685,13 +1828,15 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "usertools":
                 ut = project.user_tools()
                 tools = ut.discover()
-                return self.jsend(200, {"tools": [{"name": n, "display": t.display_name, "task": t.task, "track": t.track,
-                                                   "mode": t.get("run", "mode"), "format": t.get("output", "format"),
-                                                   "install": t.get("install", "method", "none"), "path": str(t.path)}
+                return self.jsend(200, {"tools": [dict({"name": n, "display": t.display_name, "task": t.task, "track": t.track,
+                                                        "mode": t.get("run", "mode"), "format": t.get("output", "format"), "tasks": t.tasks,
+                                                        "formats_list": t.formats, "source": t.source_summary(),
+                                                        "install": t.get("install", "method", "none"), "path": str(t.path)}, **user_tool_summary(t))
                                                   for n, t in sorted(tools.items())],
-                                        "search_path": [str(p) for p in ut.search_path()],
+                                        "search_path": [str(p) for p in ut.search_path()], "upload_max_bytes": UPLOAD_MAX_BYTES,
                                         "placeholders": ut.PLACEHOLDERS, "formats": ut.FORMATS, "tasks": ut.TASKS,
-                                        "tracks": ut.TRACKS, "install_methods": ut.INSTALL_METHODS, "schema": {k: sorted(v) for k, v in ut.SCHEMA.items()}})
+                                        "tracks": ut.TRACKS, "install_methods": ut.INSTALL_METHODS, "task_help": ut.TASK_HELP,
+                                        "format_help": ut.FORMAT_HELP, "source_help": ut.SOURCE_HELP, "schema": {k: sorted(v) for k, v in ut.SCHEMA.items()}})
             if route == "usertools/get":
                 ut = project.user_tools()
                 tool = ut.discover().get(q.get("name", ""))
@@ -1758,8 +1903,14 @@ def make_handler(project: Project, jobs: Jobs):
                         return self.send(code, body, ctype)
                     return self.jsend(504, {"error": "the first attempt of this request did not finish"})
             try:
-                data = self.body()
+                data = self.body(UPLOAD_BODY_MAX if route == "usertools/upload" else 5 * 2**20)
                 return self.api_post(route, data)
+            except netgate.Offline as exc:
+                return self.jsend(503, exc.payload())
+            except ghops.RiskError as exc:
+                return self.jsend(409, {"error": str(exc), "risks": exc.risks, "needs_confirm": True})
+            except ghops.GhError as exc:
+                return self.jsend(401 if exc.action == "signin" else 400, {"error": str(exc), "action": exc.action, "detail": exc.detail})
             except runfolders.RunFolderError as exc:
                 return self.jsend(exc.status, {"error": str(exc), "status": exc.status})
             except (FileNotFoundError, KeyError) as exc:
@@ -1774,7 +1925,41 @@ def make_handler(project: Project, jobs: Jobs):
                 argv = data.get("argv")
                 if not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv):
                     raise ValueError("argv must be a non-empty list of strings")
+                netgate.require_job(argv, data.get("env") or {}, "start this command", reads_present=lambda: reads_present(argv, data.get("env") or {}))
                 return self.jsend(200, jobs.start(argv, data.get("label", ""), data.get("env") or None))
+            if route == "github/signin/start":
+                cmd = github_cmd()
+                if not cmd:
+                    raise ValueError("the GitHub CLI (gh) is not installed: " + " or ".join(ghsignin.install_commands()))
+                netgate.require("github", "sign in to GitHub")
+                try:
+                    out = signin().start()
+                except RuntimeError as exc:
+                    raise ValueError(str(exc))
+                session_log().event("github_signin_started", pid_id=out.get("pid_id"))        # the one-time code is not a secret to log, but nothing else is recorded either
+                return self.jsend(200, out)
+            if route == "github/op":
+                return self.jsend(200, self.github_op(data))
+            if route == "github/signin/cancel":
+                return self.jsend(200, signin().cancel())
+            if route == "github/signout":
+                cmd = github_cmd()
+                if not cmd:
+                    raise ValueError("the GitHub CLI (gh) is not installed")
+                out = ghsignin.sign_out(cmd)
+                session_log().event("github_signout", ok=out["ok"])
+                return self.jsend(200, out)
+            if route == "github/signin/token":
+                cmd = github_cmd()
+                if not cmd:
+                    raise ValueError("the GitHub CLI (gh) is not installed: " + " or ".join(ghsignin.install_commands()))
+                netgate.require("github", "check the token")
+                token = data.get("token")
+                if not isinstance(token, str):
+                    raise ValueError("send the token as text")
+                out = ghsignin.sign_in_with_token(cmd, token)
+                session_log().event("github_signin_token", user=out.get("user"))              # never the token
+                return self.jsend(200, out)
             if route.startswith("jobs/") and route.endswith("/input"):
                 text = data.get("text", "")
                 if not isinstance(text, str):
@@ -1790,6 +1975,35 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "validate":
                 ok, message = ui_schema.validate_argv(data.get("argv") or [])
                 return self.jsend(200, {"ok": ok, "message": message})
+            # -- BEGIN scan a folder for isolates (plasbench/isolate_scan.py): reads only until "add" --
+            if route == "isolates/scan":
+                folder = str(data.get("path") or "").strip()
+                if not folder:
+                    raise ValueError("choose a folder to scan")
+                if not Path(folder).expanduser().is_dir():
+                    raise ValueError(f"{folder} is not a folder that can be read from here")
+                depth = max(1, min(int(data.get("max_depth") or 6), 12))
+                return self.jsend(200, {"id": iso_scans().start(Path(folder).expanduser(), depth)})
+            if route == "isolates/scan/cancel":
+                return self.jsend(200, iso_scans().cancel(str(data.get("id") or "")))
+            if route == "isolates/add":
+                from . import isolate_scan
+                item = iso_scans().get(str(data.get("scan_id") or ""))
+                if item["state"] != "done":
+                    raise ValueError("that scan is not finished; scan again")
+                data_dir, samples = project.intake_paths(data)
+                chosen = data.get("selections") or {}
+                if not isinstance(chosen, dict):
+                    raise ValueError("selections must be an object")
+                include = {str(x) for x in (data.get("include") or [])}
+                link = str(data.get("link") or "copy")
+                if link not in ("copy", "symlink", "hardlink"):
+                    raise ValueError("link must be copy, symlink or hardlink")
+                done = isolate_scan.stage(item["result"]["samples"], data_dir, samples, link=link, confirm=bool(data.get("confirm")),
+                                          selections=chosen, root=project.root, include=include)
+                session_log().event("isolates_added_from_folder", isolates=len(done["staged"]), samples=str(samples))
+                return self.jsend(200, done)
+            # -- END scan a folder for isolates --
             if route.startswith("intake/"):
                 module = project.intake()
                 what = route[len("intake/"):]
@@ -1972,6 +2186,8 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, self.validate_manifest(data.get("text", "")))
             if route == "usertools/save":
                 return self.jsend(200, self.save_manifest(data.get("text", ""), bool(data.get("overwrite"))))
+            if route == "usertools/upload":
+                return self.jsend(200, store_tool_upload(data.get("name"), data.get("filename"), data.get("text")))
             if route == "reveal":
                 target = Path(data.get("path", ""))
                 if not target.exists():
@@ -2024,6 +2240,44 @@ def make_handler(project: Project, jobs: Jobs):
                 if requested:
                     raise
                 return gitops.valid_repo(str(ws), self.git_roots())
+
+        def github_op(self, body: dict) -> dict:
+            """Every GitHub action of the Version control page (plasbench/ghops.py): reads run now and return parsed data; writes run as jobs in the console; a merge that would go wrong
+            is refused (409 with the risks) until the user confirmed them in the dialog."""
+            from . import gitops
+            op = str(body.get("op") or "")
+            args = body.get("args") if isinstance(body.get("args"), dict) else {}
+            if op not in ghops.READ_OPS | ghops.WRITE_OPS | ghops.LOCAL_OPS:
+                raise ValueError("unknown GitHub action")
+            repo = None if op in ("orgs", "repo_list", "repo_search") else self.git_repo(body.get("repo"))
+            if op in ghops.LOCAL_OPS:
+                if op == "branch_delete":
+                    gitops.delete_branch(repo, args.get("name", ""))
+                else:
+                    gitops.create_tag(repo, args.get("name", ""), args.get("message", ""))
+                session_log().event("github_" + op, name=args.get("name"))
+                return {"ok": True}
+            cmd = github_cmd()
+            if not cmd:
+                raise ValueError("the GitHub CLI (gh) is not installed: " + " or ".join(ghsignin.install_commands()))
+            netgate.require("github", f"GitHub: {op}")
+            if op in ghops.READ_OPS:
+                if op == "branch_remote_list":
+                    raise ValueError("unknown GitHub action")
+                result, shown = ghops.run_read(op, cmd, repo, **args)
+                return {"op": op, "result": result, "command": shown}
+            if op == "pr_merge" and not body.get("risk_confirmed"):
+                view, _ = ghops.run_read("pr_view", cmd, repo, number=args.get("number"))
+                risks = ghops.merge_risks(view)
+                if risks:
+                    raise ghops.RiskError("Merging now would go wrong: " + "; ".join(risks) + ".", risks)
+            if op in ("branch_delete_remote", "tag_push"):
+                command, program = ghops.git_build(op, gitops.find_git() or "git", repo, **args), "git"
+            else:
+                command, program = ghops.build(op, cmd, repo, **args), "gh"
+            job = jobs.start_git(command, f"github {op.replace('_', ' ')}", repo, program=program)
+            session_log().event("github_" + op, job=job["id"])
+            return {"job": job, "command": ghops.shown(command)}
 
         def git_op(self, body: dict) -> dict:
             """Every git action. Quick ones run now; fetch/pull/push/clone/GitHub run as jobs in the console."""
@@ -2078,6 +2332,7 @@ def make_handler(project: Project, jobs: Jobs):
                     info = gitops.info(repo)
                     raise ValueError(f"confirm the push: {info.get('ahead', 0)} commit(s) on '{info.get('branch')}' will be "
                                      f"sent to " + (info["remotes"][0]["url"] if info.get("remotes") else "the remote"))
+                gitops.require_network(op, repo, body.get("url") or "")
                 dest = None
                 if op == "clone":
                     dest = gitops.valid_repo(str(Path(body.get("dest", "")).parent), self.git_roots()) / Path(body.get("dest", "")).name
@@ -2094,6 +2349,9 @@ def make_handler(project: Project, jobs: Jobs):
         def validate_manifest(self, text):
             import tempfile
             ut = project.user_tools()
+            # The richer, pure result (per-task derivation, source summary, outputs) comes from user_tools.validate_text;
+            # the keys the window already reads (ok, problems, warnings, row, plan) keep their meaning.
+            rich = ut.validate_text(text)
             with tempfile.TemporaryDirectory() as tmp:
                 path = Path(tmp) / "plasbench-tool.ini"
                 path.write_text(text, encoding="utf-8")
@@ -2101,15 +2359,17 @@ def make_handler(project: Project, jobs: Jobs):
                     tool = ut.UserTool(path)
                 except ut.ManifestError as exc:
                     problems = [l.strip()[2:] for l in str(exc).splitlines()[1:] if l.strip().startswith("- ")] or [str(exc)]
-                    return {"ok": False, "problems": problems}
-                warnings = []
+                    return dict(rich, ok=False, problems=problems)
                 if tool.name in ut.builtin_tools():
-                    return {"ok": False, "problems": [f"'{tool.name}' is a built-in PlasBench tool; choose another name"]}
+                    return dict(rich, ok=False, problems=[f"'{tool.name}' is a built-in PlasBench tool; choose another name"])
+                warnings = list(rich.get("warnings", []))
                 for key in ("script",):
                     if tool.get("install", key) and not Path(tool.resolve(tool.get("install", key))).is_file():
-                        warnings.append(f"[install] {key} = {tool.get('install', key)} must be saved beside the manifest")
-                return {"ok": True, "problems": [], "warnings": warnings, "row": tool.capability_row(),
-                        "plan": tool.install_plan()}
+                        message = f"[install] {key} = {tool.get('install', key)} must be saved beside the manifest"
+                        if message not in warnings:
+                            warnings.append(message)
+                return dict(rich, ok=True, problems=[], warnings=warnings, row=tool.capability_row(),
+                            rows=[tool.capability_row(task) for _, task in tool.task_ids()], plan=tool.install_plan())
 
         def save_manifest(self, text, overwrite):
             ut = project.user_tools()
@@ -2211,6 +2471,17 @@ class _LaunchLock:
                 self.path.unlink()
             except OSError:
                 pass
+
+
+_ISO_SCANS = []
+
+
+def iso_scans():
+    """The window's background folder scans (plasbench/isolate_scan.Scans): start, poll, cancel. Bounded; a scan only reads."""
+    if not _ISO_SCANS:
+        from .isolate_scan import Scans
+        _ISO_SCANS.append(Scans())
+    return _ISO_SCANS[0]
 
 
 def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: bool = True, tab: bool = False,

@@ -6,7 +6,9 @@ export_report_pdf.py -- save the HTML report as one PDF with a headless Edge or 
     plasbench report-pdf --report results/benchmark.report.html [--out report.pdf]
 
 The report carries its own print stylesheet (python/report_layout.py, assets/report/layout_print.html): a cover with the contents, then every
-view in order, each starting on a new page, every fold open, the notes from the info popovers inline, A4 landscape with page numbers. The browser
+view in order, each starting on a new page, every fold open, the notes from the info popovers inline, A4 landscape with page numbers. A comparison table
+(python/report_compare_table.py) prints as its complete static grid with its heat shading kept, without its side panel and toolbar, and its original table
+fold open. The browser
 prints that stylesheet; this script only finds the browser, opens the report with ?print=1 (which opens the folds and lets the interactive figures
 settle before printing), and waits for the widgets with --virtual-time-budget.
 

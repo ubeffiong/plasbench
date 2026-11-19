@@ -143,6 +143,17 @@ _RECONSTRUCT = {
     "log_dir": {"summary": "Directory for tool logs.", "when": "Leave empty for the configured logs folder."},
 }
 
+_SCAN = {
+    "folder": {"summary": "The folder to look through; sub-folders are searched. Nothing in it is changed."},
+    "json": {"summary": "Print the full result as JSON (for scripts) instead of a table."},
+    "max_depth": {"summary": "How many folder levels below FOLDER to look into.", "when": "Raise it only if your files are nested deeper than 6 levels."},
+    "max_files": {"summary": "Stop after looking at this many files, so a huge folder cannot hang the scan."},
+    "write_sheet": {"summary": "After the scan, place each complete isolate and write or append this sample sheet, using the same code as init-local.", "when": "Leave empty to only look."},
+    "data_dir": {"summary": "Where each isolate gets its own folder when placing.", "when": "Leave empty for the configured data folder."},
+    "link": {"summary": "How the input files are placed when writing the sheet.", "choices": {"copy": "Copy the files (uses disk space, original untouched).", "symlink": "Make symbolic links to the originals.", "hardlink": "Make hard links (no extra space, same disk only)."}},
+    "yes": {"summary": "Also place isolates that only need review (for example lanes to be joined). Isolates with an error are never placed."},
+}
+
 _INTAKE = {
     "action": {"summary": "What to do with your own isolates.",
                "choices": {"template": "Write a sample sheet (or truth table) to fill in, with the rules as comments.",
@@ -157,7 +168,7 @@ _DEMO = {
     "no_report_prompt": dict(_RUN["no_report_prompt"], summary="Do not offer to open the completed demo report. The window always sets this so the run never stops to ask a question."),
 }
 
-ARGS = {"run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONSTRUCT, "intake": _INTAKE}
+ARGS = {"run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONSTRUCT, "intake": _INTAKE, "scan-isolates": _SCAN}
 
 # Wizard controls that are not command-line options. Keys are the control names used by the page.
 WIZARD = {
@@ -166,6 +177,13 @@ WIZARD = {
     "sample_sheet": {"summary": "A sample sheet you prepared, or one built on the Your own isolates page: columns sample_id, assembly_accession, sra_run.", "flag": "--samples", "setting": "SAMPLE_SHEET"},
     "local_inputs": ARGS["run"]["local_inputs"] | {"flag": "--local-inputs"},
     "stages": dict(_RUN["stages"], flag="positional stage numbers"),
+    "workflow_view": {"summary": "The chain of steps a run goes through, in order, with the tools and optional steps you can switch in each. Workflow shows the chain; List shows the plain list. Both change the same settings, so they always agree.",
+                      "when": "Use Workflow to see what each extra adds before you switch it on."},
+    "workflow_estimate": {"summary": "What the items that are on add, per isolate or per 10 isolates. Time and disk add up; memory is the largest single tool. Every figure is an estimate and says where it comes from: measured on real isolates in this repository, documented by the tool or the README, or not measured. A tool with no figure is named, never counted as zero, so a total that includes one is a lower bound.",
+                          "choices": {"measured": "Taken from a real run in results_real_cohort1 (10 isolates).", "documented": "A stated requirement or size (README, config.sh), not re-measured.", "not measured": "No figure exists yet; the total leaves it out and says so."},
+                          "when": "Treat the total as a guide to plan time and disk, not a promise."},
+    "workflow_colours": {"summary": "On is green with a tick. Off is plum with a cross and a dashed outline. The word is always written too, so colour is never the only cue. An item at its default shows its default state in that state's colour: a default-off tool shows Off until you switch it on. An item you changed from its default also carries a 'changed' tag. Green help marks, amber warnings and red errors keep their own meaning.",
+                         "when": "Look for the 'changed' tag to see what you altered."},
     "tool_state": {"summary": "Per tool: default, on or off for this run only.",
                    "choices": {"default": "Use the RUN_<TOOL> setting saved for this computer (Tools page).", "on": "Run it this time.", "off": "Skip it this time."},
                    "when": "Leave on default unless this run should differ from your saved choice."},
@@ -202,6 +220,26 @@ WIZARD = {
                                  "setting": "ENA_DOWNLOAD_CONNECTIONS", "when": "Leave empty for the default (4). Only affects ENA downloads."},
 }
 
+# The Version control page's GitHub controls and the Online / Offline indicator (shown as tooltips by the page).
+GITHUB = {
+    "signin": {"summary": "Sign in to GitHub in a pop-up window: PlasBench shows a one-time code, you approve it on GitHub, and git push and pull then use the sign-in. The page never sees a token.", "when": "Needs the GitHub CLI (gh); without it, use a personal access token."},
+    "token": {"summary": "Sign in with a personal access token instead of the pop-up: the token is sent once, over standard input, to the GitHub CLI and is never stored or shown.", "when": "Give the token the repo scope (and workflow if you push workflow files)."},
+    "signout": {"summary": "Sign out of GitHub on this computer (gh auth logout). Nothing on GitHub changes.", "when": "Use Switch account to sign in as someone else."},
+    "create_repo": {"summary": "Create the repository on GitHub (your account or an organisation, public or private), add it as origin and push the first branch.", "when": "Keep it private unless you are sure: run folders can hold sample data."},
+    "clone": {"summary": "List or search your GitHub repositories and clone one into a folder."},
+    "branches": {"summary": "Switch, push (setting the upstream) and delete branches. Delete only removes a fully merged local branch; deleting on GitHub removes the remote branch. Nothing is force-pushed."},
+    "new_pr": {"summary": "Ask GitHub to merge one branch into another: title, description, base, head, draft, reviewers, labels. The branch is pushed first if needed."},
+    "prs": {"summary": "Open, closed and merged pull requests: view (checks, reviews, mergeability, changed files, comments), check out, mark ready, close, reopen and merge."},
+    "merge": {"summary": "Merge a pull request. Choose merge, squash or rebase, whether to delete the branch, or to wait for checks and merge automatically (only if the repository allows it).",
+              "choices": {"merge": "A merge commit keeps every commit.", "squash": "One commit for the whole pull request.", "rebase": "Replays the commits on top of the base branch."},
+              "when": "With failing checks, conflicts or a requested change PlasBench names the risk and asks you to confirm."},
+    "checks": {"summary": "Checks (CI) of a pull request or branch, with the failing names and addresses; re-run only the failed ones."},
+    "issues": {"summary": "List, create, comment on and close issues."},
+    "releases": {"summary": "List releases, create a tag (and push it), create a release from a tag with notes."},
+    "net_indicator": {"summary": "Whether the internet and each service PlasBench needs are reachable. Controls that need an unreachable service are switched off with the reason; local work is never blocked. Click for details and to check again.",
+                      "choices": {"Online": "Everything checked is reachable.", "Limited": "Some services are unreachable.", "DNS problem": "Names cannot be looked up: the connection may be up but names fail.", "Offline": "No connection.", "Offline (forced)": "PLASBENCH_OFFLINE=1 is set."}},
+}
+
 # Settings page: per setting, what the section comment in config.sh does not already say.
 SETTINGS = {
     "READ_SOURCE": WIZARD["read_source"],
@@ -218,9 +256,33 @@ SETTINGS = {
     "ENA_DOWNLOAD_CONNECTIONS": WIZARD["ena_download_connections"], "NETWORK_RETRIES": WIZARD["network_retries"],
     "RUN_CONSOLE_LOG": WIZARD["console_log"], "LOG_RETENTION_RUNS": WIZARD["log_retention_runs"],
 }
+# MultiQC versus the built-in QC panel: ONE text (python/multiqc_note.py), shown in the report's QC panel and PDF, here as the help of the MULTIQC_REPORT setting and
+# as REPORT_NOTES["qc"] for the window's Report-view / QC area.
+def _multiqc_text():
+    import sys
+    from pathlib import Path
+    folder = str(Path(__file__).resolve().parent.parent / "python")
+    if folder not in sys.path:
+        sys.path.insert(0, folder)
+    try:
+        import multiqc_note
+        return multiqc_note.TITLE, multiqc_note.text()
+    except ImportError:          # a trimmed install without python/: say so rather than show nothing
+        return "MultiQC or the built-in panel?", "The report's QC panel is PlasBench's own; MultiQC is an optional companion (plasbench install-tools multiqc)."
+
+
+_MQ_TITLE, _MQ_TEXT = _multiqc_text()
+SETTINGS["MULTIQC_REPORT"] = {"summary": "Whether to also run the optional MultiQC over the fastp (and QUAST) outputs and link its report from the QC panel. " + _MQ_TEXT,
+                              "choices": {"auto": "Run MultiQC only when it is installed (plasbench install-tools multiqc). The default.",
+                                          "on": "Always try, and warn when MultiQC is missing. A failure never stops the run.",
+                                          "off": "Never run MultiQC."},
+                              "when": "Leave on auto. MultiQC adds plots (per-base quality, adapter content, duplication); it does not change any decision or score.",
+                              "setting": "MULTIQC_REPORT"}
+SETTINGS["MULTIQC_TIMEOUT_SECONDS"] = {"summary": "The limit, in seconds, for the optional MultiQC command (default 600). A timeout is a warning, not a failure."}
+REPORT_NOTES = {"qc": {"title": _MQ_TITLE, "text": _MQ_TEXT, "setting": "MULTIQC_REPORT"}}
 # Settings shown together in the "Reliability and downloads" group (only those config.sh defines).
 RELIABILITY_KEYS = ["READ_SOURCE", "MAX_RUN_DOWNLOAD_GB", "WARN_RUN_DOWNLOAD_GB", "PREFETCH_FAIL_LIMIT", "NETWORK_RETRIES", "NETWORK_RETRY_DELAY_SECONDS",
-                    "ENA_DOWNLOAD_CONNECTIONS", "PRESERVE_DOWNLOADS", "TOOL_RETRIES", "TOOL_TIMEOUT_SECONDS", "ALLOW_ALL_TOOLS_FAILED", "RUN_CONSOLE_LOG", "LOG_RETENTION_RUNS"]
+                    "ENA_DOWNLOAD_CONNECTIONS", "PLASBENCH_OFFLINE", "PLASBENCH_ONLINE_TIMEOUT", "PRESERVE_DOWNLOADS", "TOOL_RETRIES", "TOOL_TIMEOUT_SECONDS", "ALLOW_ALL_TOOLS_FAILED", "RUN_CONSOLE_LOG", "LOG_RETENTION_RUNS"]
 
 
 def _default_text(default, kind=None):
@@ -256,3 +318,75 @@ def setting_tooltip(row, carried=""):
     out = tooltip(dict(entry, summary=summary), default=row.get("default"), setting=row["key"])
     out["flag"] = ""
     return out
+
+
+# ---- Add your own tool: what the page's new controls mean (the manifest keys are documented in docs/ADDING_TOOLS.md) ----------------------------------
+# The sentences are python/user_tools.py's own (TASK_HELP, FORMAT_HELP, SOURCE_HELP: the window sends those to the page); test_ui_help checks these copies are identical,
+# so the tooltips and the page cannot drift apart.
+TASK_HELP = {
+    "binning_reconstruction": "Groups assembly contigs into plasmids (bins); scored with bin-level metrics such as completeness, purity and CPRR.",
+    "sequence_reassembly": "Writes predicted plasmid sequence (a FASTA); scored on how well the sequence matches the true plasmids.",
+    "classification": "Labels each contig plasmid or chromosome, optionally with a probability; scored per base with F1 and PR-AUC.",
+}
+FORMAT_HELP = {
+    "contig_bins": "A table with one row per contig and the bin (plasmid) it belongs to; serves binning, and classification (a contig in any bin is plasmid).",
+    "contig_labels": "A table with one row per contig and a plasmid/chromosome label and/or a probability; serves classification, and binning only as one flagged bin per plasmid contig.",
+    "plasmid_fasta": "One FASTA of predicted plasmid sequence, each record its own plasmid; serves sequence reassembly only.",
+    "fasta_dir": "A folder with one FASTA file per predicted plasmid; serves sequence reassembly only.",
+    "adapter": "Your own script converts the tool's output into PlasBench's native files for the tasks named in adapter_tasks.",
+    "auto": "PlasBench looks at the files listed in candidates and recognises each by its content; an ambiguous or unrecognisable output is an error, never a guess.",
+}
+SOURCE_HELP = {
+    "conda": "Installs the named conda packages into the tool's own environment.",
+    "pip": "Installs the named pip packages into the tool's own environment.",
+    "script": "Runs an install script that ships beside the manifest.",
+    "url": "Downloads the tool from an https URL (archive, git repository or single file) into the manifest's src/ folder, checking its sha256 when you give one.",
+    "local": "Uses a tool already on this computer: a copy (recorded with a checksum, reproducible) or a link (used in place, can change under the benchmark).",
+    "none": "Nothing to install: the command is already on PATH.",
+}
+
+USERTOOL = {
+    "task": {"summary": "What the tool does. A tool may do more than one task; it is then scored on each, using the same output where PlasBench can derive one result from another. The first task chosen is the primary one.",
+             "choices": dict(TASK_HELP), "setting": "[tool] task", "default": "none",
+             "when": "Beside each task the page shows, from the Check panel, whether it is native (the output already is that result), derived from another output, or not possible (and why)."},
+    "task_primary": {"summary": "The first task in the list is the primary task: it names the tool's row in the tables and is the one the tool is ranked on first. Move a task left or right to change it.",
+                     "setting": "[tool] task (first item)"},
+    "source": {"summary": "Where the tool comes from. Nothing is downloaded or run until you press Save & install.",
+               "choices": {"Already installed": SOURCE_HELP["none"], "Package manager": "conda or pip: " + SOURCE_HELP["conda"],
+                           "Download from a URL": SOURCE_HELP["url"], "A file or folder on this computer": SOURCE_HELP["local"], "My own install script": SOURCE_HELP["script"]},
+               "setting": "[install] method", "default": "conda",
+               "when": "PlasBench will run code you download or point to. Only use sources you trust."},
+    "src_url": {"summary": "The https address to download the tool from. Only https is accepted; http and other schemes are refused.", "setting": "[install] url", "when": "Required for a download."},
+    "src_sha256": {"summary": "The expected SHA-256 checksum of the download (64 hexadecimal characters). When given, PlasBench refuses a download that does not match, so the tool cannot change under you.",
+                   "setting": "[install] sha256", "default": "not pinned", "when": "Recommended. Without it PlasBench cannot tell if the file changed since you checked it."},
+    "src_kind": {"summary": "What the URL points to.", "setting": "[install] kind", "default": "auto",
+                 "choices": {"auto": "Decide from the address and the file name.", "archive": "A .zip, .tar.gz or similar archive that is unpacked.", "git": "A git repository that is cloned (see ref).",
+                             "file": "A single file, kept as it is."}},
+    "src_ref": {"summary": "For a git repository: the tag, branch or commit to check out. A tag or commit keeps the result reproducible.", "setting": "[install] ref", "when": "Only for kind = git."},
+    "src_build": {"summary": "An optional command run after the download or copy to build the tool (for example make). It runs in the tool's folder.", "setting": "[install] build_command", "when": "Leave empty when the tool needs no build."},
+    "src_path": {"summary": "A file or folder already on this computer. Use {src} in the run command to refer to it. Choose... opens the folder browser, which lists every drive.", "setting": "[install] path"},
+    "src_mode": {"summary": "How PlasBench uses the local path.", "setting": "[install] mode", "default": "link",
+                 "choices": {"link": "Follow the file where it is. It always uses the current contents, but the result changes if the file changes.",
+                             "copy": "Copy it into the tool's folder and record a checksum. Reproducible: the copy does not change when the original does."}},
+    "src_script": {"summary": "Your own install script, saved beside the manifest and run as script <environment name>. Upload it here if it is small.", "setting": "[install] script"},
+    "upload": {"summary": "Upload a small file (a script or an adapter, up to 5 MB) from this computer. It is stored in the tool's own folder, under the tool's name, and the manifest then refers to it. Large tool programs are located on this computer or downloaded, not uploaded.",
+               "when": "Give the tool a name first: the name is its folder."},
+    "outputs": {"summary": "What the tool writes. A tool can write more than one kind of output: add one row per output. PlasBench reads each, and uses the one that fits each task you chose (for example contig bins can be turned into plasmid/chromosome labels).",
+                "setting": "[output] format and [output.<format>]", "when": "Detect automatically lists file patterns instead and PlasBench works out the shape."},
+    "out_format": {"summary": "The shape of this output.", "choices": dict(FORMAT_HELP), "setting": "[output] format"},
+    "out_path": {"summary": "Where the tool writes this output, relative to {outdir}.", "setting": "[output] path"},
+    "out_candidates": {"summary": "File name patterns (globs) to try under {outdir}, separated by commas, for example bins.tsv, *.labels.tsv. PlasBench reads whichever one exists and recognises its shape.", "setting": "[output] candidates",
+                       "when": "If two patterns match files of different shapes PlasBench says it is ambiguous instead of guessing."},
+    "out_delimiter": {"summary": "What separates the columns of the table.", "choices": {"tab": "Tab-separated.", "comma": "Comma-separated.", "semicolon": "Semicolon-separated.", "whitespace": "Any run of spaces."}, "setting": "delimiter", "default": "tab"},
+    "out_header": {"summary": "Whether the first row of the table holds column names.", "choices": {"yes": "Columns are given by name or number.", "no": "Columns must be given by number, starting at 1."}, "setting": "header", "default": "yes"},
+    "out_contig_column": {"summary": "The column holding the contig name: its header name, or its number starting at 1.", "setting": "contig_column"},
+    "out_bin_column": {"summary": "The column holding the bin (plasmid) each contig belongs to.", "setting": "bin_column"},
+    "out_label_column": {"summary": "The column holding the plasmid or chromosome label.", "setting": "label_column"},
+    "out_plasmid_values": {"summary": "The label values that mean plasmid, separated by commas, for example plasmid, Plasmid, 1. Any other value means chromosome.", "setting": "plasmid_values"},
+    "out_score_column": {"summary": "A column of probabilities between 0 and 1. It adds a precision-recall curve to the results.", "setting": "score_column"},
+    "out_threshold": {"summary": "Without a label column, a contig whose score is at least this value is a plasmid.", "setting": "threshold", "default": "0.5"},
+    "out_fasta_glob": {"summary": "Which files in the folder are plasmid FASTA files, for example plasmid_*.fasta.", "setting": "fasta_glob", "default": "*.fa, *.fasta, *.fna"},
+    "out_adapter": {"summary": "A script beside the manifest that is run as adapter <output> <contigs> <predictions fasta>.", "setting": "adapter"},
+    "out_contig_id_from": {"summary": "How to turn the tool's contig ids into PlasBench's.", "choices": {"": "Use them as written.", "first_token": "Keep the first word of each id."}, "setting": "contig_id_from"},
+    "out_contig_id_strip": {"summary": "A regular expression removed from each contig id, for example _length_.*$.", "setting": "contig_id_strip_regex"},
+}

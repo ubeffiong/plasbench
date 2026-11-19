@@ -436,6 +436,44 @@ if [[ "$LOCAL_INPUTS_ONLY" == "1" ]]; then
     fi
 fi
 
+# Before any download: work out, the same way download_sample will, what this run has to FETCH, and refuse at once (naming the service
+# and what to do) when that needs the internet and there is none. Nothing is demanded when every file is already on disk, when
+# --local-inputs is used, or for a simulated sample's reads (made locally). READ_SOURCE=ena skips NCBI's SRA, READ_SOURCE=sra skips ENA,
+# and with auto either is enough (ENA is the fallback for the SRA Toolkit).
+require_downloads_online() {
+    local sample asm sra sdir truth long_run has_ref need_ref=0 need_reads=0 need_long=0 lacking=""
+    [[ "$LOCAL_INPUTS_ONLY" == "1" ]] && return 0
+    while IFS=$'\t' read -r sample asm sra; do
+        [[ -z "${sample:-}" ]] && continue
+        sdir="$DATA_DIR/$sample"
+        has_ref=1; [[ -z "$asm" || "$asm" == "NA" ]] && has_ref=0
+        truth="$(sample_column "$SAMPLE_SHEET" "$sample" truth_source)"
+        long_run="$(sample_column "$SAMPLE_SHEET" "$sample" long_read_sra_run)"
+        if [[ "$has_ref" -eq 1 && ! ( -s "$sdir/reference.fna" && -s "$sdir/sequence_report.jsonl" ) ]]; then
+            need_ref=1; lacking+=" $sample:reference"
+        fi
+        if [[ "$truth" != "simulated" ]] && ! { [[ -s "$sdir/${sra}_1.fastq.gz" && -s "$sdir/${sra}_2.fastq.gz" ]] && verify_downloads "$sdir"; }; then
+            need_reads=1; lacking+=" $sample:reads"
+        fi
+        if [[ "$truth" == "self_assembled_hybrid" && -n "$long_run" && ! -s "$sdir/${LONG_READS_FILE:-long_reads.fastq.gz}" ]]; then
+            need_long=1; lacking+=" $sample:long-reads"
+        fi
+    done < <(read_samples "$SAMPLE_SHEET")
+    [[ "$need_ref$need_reads$need_long" == "000" ]] && return 0
+    local hint="Connect, or place the lacking files in $DATA_DIR/<sample>/ and run with --local-inputs. Missing:${lacking:0:240}"
+    [[ "$need_ref" -eq 1 ]] && require_internet --action "Stage 1 (download the reference assemblies)" --hint "$hint" ncbi_datasets
+    if [[ "$need_reads" -eq 1 ]]; then
+        case "${READ_SOURCE:-auto}" in
+            ena) require_internet --action "Stage 1 (download reads from ENA)" --hint "$hint" ena ;;
+            sra) require_internet --action "Stage 1 (download reads from the SRA)" --hint "$hint" sra ;;
+            *)   require_internet --any --action "Stage 1 (download reads from the SRA or ENA)" --hint "$hint" sra ena ;;
+        esac
+    fi
+    [[ "$need_long" -eq 1 ]] && require_internet --action "Stage 1 (download long reads from the SRA)" --hint "$hint" sra
+    return 0
+}
+require_downloads_online
+
 confirm_download
 
 declare -A PIDS
