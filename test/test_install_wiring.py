@@ -136,6 +136,10 @@ def profiles():
         if isolated and current:
             labels[current].update(re.sub(r"[=<>].*", "", p.strip("'\"")) for p in isolated.group(1).split()
                                    if not p.startswith(("-", ";", "|", "&")))
+    # Source-built and verified-manual profiles are handled by python/source_install.py before the case statement (config/source_tools.json).
+    import json
+    for name in json.loads(read("config", "source_tools.json"))["profiles"]:
+        labels.setdefault(name, set())
     loop = re.search(r'ALL_PROFILES="([^"]+)"', text)
     return labels, (loop.group(1).split() if loop else [])
 

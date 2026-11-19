@@ -80,6 +80,10 @@ bash "$HERE/test_stage_dimensions.sh"
 bash "$HERE/test_stage_contig_metrics.sh"
 python3 "$HERE/test_install_wiring.py"
 bash "$HERE/test_install_all_optional.sh"
+# Tools install automatically, pinned and isolated, with consent (python/source_install.py): hermetic installs with fake conda/pip and a local upstream repository.
+bash "$HERE/test_source_install.sh"
+python3 "$HERE/test_tool_install_registry.py"
+python3 "$HERE/test_exit20_wrappers.py"
 python3 "$HERE/test_materialize_bmock12_truth.py"
 # Question-bank gaps (calibration, baselines, interpretation limits, metadata completeness).
 python3 "$HERE/test_question_bank_gaps.py"

@@ -1,0 +1,178 @@
+{
+  "_comment": "Source-distributed tools PlasBench installs for you, or (mode manual) cannot. Read by python/source_install.py. Every revision is a 40-hex COMMIT SHA resolved from the release tag on the researched date (the tag name is recorded for people, never used to fetch). Every URL is https. Never edit a pin without re-resolving it against the upstream URL in `sources` and updating `researched`.",
+  "schema": 1,
+  "profiles": {
+    "gplas2": {
+      "tools": ["gplas2_mob", "gplas2_external"],
+      "mode": "source",
+      "repo": "https://gitlab.com/mmb-umcu/gplas2.git",
+      "ref": "1.1.0",
+      "commit": "9ec35cf6674c41ad91afc582dcbe9b2eee9161b0",
+      "licence": "GPL-3.0 (LICENSE file in the repository)",
+      "download_mb": 21,
+      "disk_gb": 4,
+      "minutes": "15-40 (not measured; a conda solve of an old R 3.5 / Snakemake 5.5 stack)",
+      "env": {"python": null, "steps": [
+        {"type": "conda_file", "path": "envs/gplas.yaml"},
+        {"type": "pip_install", "target": ".", "args": ["--no-deps"]}
+      ]},
+      "commands": {"gplas": {"kind": "env_bin", "path": "gplas"}},
+      "verify": {"argv": ["gplas", "--help"], "expect": "--prediction", "why": "proves the gplas2 -P/--prediction flag that PlasBench's gplas2 modes need (bioconda's gplas 0.6.1 lacks it)"},
+      "inputs": ["gplas2_mob needs MOB-suite output (mob_recon profile); gplas2_external needs per-sample classifier tables you provide (--gplas2-external-predictions-dir)"],
+      "note": "envs/gplas.yaml pins linux-64 builds and lists the Anaconda 'defaults' channel as upstream wrote it. Requires ASSEMBLER=unicycler (SPAdes contig ids never match gplas2's GFA segment ids).",
+      "sources": ["https://gitlab.com/api/v4/projects/mmb-umcu%2Fgplas2/repository/tags", "https://gitlab.com/mmb-umcu/gplas2/-/blob/9ec35cf6674c41ad91afc582dcbe9b2eee9161b0/LICENSE", "https://gitlab.com/mmb-umcu/gplas2/-/blob/9ec35cf6674c41ad91afc582dcbe9b2eee9161b0/envs/gplas.yaml"],
+      "researched": "2026-11-19"
+    },
+    "plasme": {
+      "tools": ["plasme"],
+      "mode": "source",
+      "repo": "https://github.com/HubertTang/PLASMe.git",
+      "ref": "v1.1",
+      "commit": "ef0409bad9c8c9ee5d66d90812bf56b345d8dd1d",
+      "licence": "none declared (no LICENSE file in the repository; PlasBench clones it onto your computer for your own use and redistributes nothing)",
+      "download_mb": 24,
+      "disk_gb": 6,
+      "minutes": "10-30 (not measured; PyTorch 1.11 and CUDA 10.2 toolkit packages)",
+      "env": {"python": null, "steps": [
+        {"type": "conda_file", "path": "plasme.yaml"}
+      ]},
+      "commands": {"PLASMe.py": {"kind": "script", "path": "PLASMe.py", "interpreter": "python"}},
+      "verify": {"argv": ["PLASMe.py", "--help"], "expect": "", "why": "the script starts and imports its PyTorch/Biopython dependencies"},
+      "inputs": ["The PLASMe database (about 12.4 GB): installed by `plasbench check --yes` (env/download_plasme_db.sh)."],
+      "note": "plasme.yaml pins linux-64 builds from the pytorch, bioconda, conda-forge and Anaconda 'defaults' channels as upstream wrote it.",
+      "sources": ["https://api.github.com/repos/HubertTang/PLASMe/tags", "https://github.com/HubertTang/PLASMe/blob/ef0409bad9c8c9ee5d66d90812bf56b345d8dd1d/plasme.yaml"],
+      "researched": "2026-11-19"
+    },
+    "plasgraph2": {
+      "tools": ["plasgraph2"],
+      "mode": "source",
+      "repo": "https://github.com/cchauve/plASgraph2.git",
+      "ref": "v1.0.0",
+      "commit": "7bc4e92df8570ac2848599e57d5e59730ed5713f",
+      "licence": "none declared (no LICENSE file in the repository; PlasBench clones it onto your computer for your own use and redistributes nothing)",
+      "download_mb": 7,
+      "disk_gb": 3,
+      "minutes": "5-15 (not measured; TensorFlow 2.8.0 wheel from PyPI)",
+      "env": {"python": "3.8", "steps": [
+        {"type": "conda_create", "packages": ["python=3.8", "pip"], "channels": ["conda-forge"]},
+        {"type": "pip_requirements", "path": "requirements.txt"}
+      ]},
+      "commands": {"plASgraph2_classify.py": {"kind": "script", "path": "src/plASgraph2_classify.py", "interpreter": "python"}},
+      "verify": {"argv": ["plASgraph2_classify.py", "--help"], "expect": "", "why": "the script starts and imports TensorFlow and Spektral"},
+      "inputs": ["The pretrained model ships inside the checkout; PlasBench points PLASGRAPH2_MODEL_DIR at <install>/plasbench-src/model/ESKAPEE_model when you have not set it."],
+      "note": "requirements.txt pins exact versions (TensorFlow 2.8.0 etc.); the upstream README names Python 3.8.10.",
+      "sources": ["https://api.github.com/repos/cchauve/plASgraph2/tags", "https://github.com/cchauve/plASgraph2/blob/7bc4e92df8570ac2848599e57d5e59730ed5713f/requirements.txt"],
+      "researched": "2026-11-19"
+    },
+    "plasmidec": {
+      "tools": ["plasmidec"],
+      "mode": "source",
+      "repo": "https://gitlab.com/mmb-umcu/plasmidec.git",
+      "ref": "1.3.1",
+      "commit": "26abc74a7f795e80104816dba2c8b67512ce9804",
+      "licence": "MIT (LICENSE file in the repository)",
+      "download_mb": 20,
+      "disk_gb": 1,
+      "minutes": "1-2 for the checkout; about 20 more on the first run (upstream's own first-run step, not measured)",
+      "env": {"python": null, "steps": []},
+      "commands": {"plasmidEC.sh": {"kind": "script", "path": "plasmidEC.sh", "interpreter": "bash", "inherit_path": true}},
+      "verify": {"argv": ["plasmidEC.sh", "-h"], "expect": "usage", "why": "the launcher prints its usage"},
+      "inputs": ["plasmidEC.sh builds its own conda environments (plasmidEC_R, plasmidEC_centrifuge, plasmidEC_platon, plasmidEC_rfplasmid) and downloads the Centrifuge and Platon databases from Zenodo the first time it runs (about 20 minutes, internet needed). That step belongs to the tool and is not pinned by PlasBench."],
+      "note": "Pinned to release 1.3.1: it is the last release with the -s species, -c classifiers and -t threads options PlasBench's adapter passes. Release 1.4 (91fc1bc) removed them. conda must be on PATH when the tool runs.",
+      "sources": ["https://gitlab.com/api/v4/projects/mmb-umcu%2Fplasmidec/repository/tags", "https://gitlab.com/mmb-umcu/plasmidEC/-/blob/26abc74a7f795e80104816dba2c8b67512ce9804/plasmidEC.sh"],
+      "researched": "2026-11-19"
+    },
+    "plasbin_flow": {
+      "tools": ["plasbin_flow"],
+      "mode": "source",
+      "repo": "https://github.com/cchauve/PlasBin-flow.git",
+      "ref": "v1.1",
+      "commit": "49d34787c8d63715027c88e6db40ad513828204b",
+      "licence": "MIT (LICENSE file in the repository)",
+      "download_mb": 94,
+      "disk_gb": 2,
+      "minutes": "3-10 (not measured)",
+      "env": {"python": "3.9", "steps": [
+        {"type": "conda_create", "packages": ["python=3.9", "pip"], "channels": ["conda-forge"]},
+        {"type": "pip_requirements", "path": "@env/pins/plasbin_flow.requirements.txt"}
+      ]},
+      "commands": {"plasbin_flow.py": {"kind": "script", "path": "code/plasbin_flow.py", "interpreter": "python"}},
+      "verify": {"argv": ["plasbin_flow.py", "-h"], "expect": "", "why": "the script starts and imports gurobipy and networkx"},
+      "inputs": ["A Gurobi licence (free for academics, from gurobi.com): the pip package gurobipy runs only size-limited models without one. PlasBench cannot obtain a licence for you.", "A gzipped GFA with dp or KC tags, a plasmid-score file and a GC-probability file (PlasBench adapts the output; it does not run PlasBin-flow itself)."],
+      "note": "Upstream publishes no requirements file; the versions in env/pins/plasbin_flow.requirements.txt are the minimum versions its README states, each checked to exist on PyPI for CPython 3.9.",
+      "sources": ["https://api.github.com/repos/cchauve/PlasBin-flow/tags", "https://github.com/cchauve/PlasBin-flow/blob/49d34787c8d63715027c88e6db40ad513828204b/README.md"],
+      "researched": "2026-11-19"
+    },
+    "mobilome-map": {
+      "tools": ["mobilome_annotation_pipeline"],
+      "mode": "source",
+      "repo": "https://github.com/EBI-Metagenomics/mobilome-annotation-pipeline.git",
+      "ref": "v5.0.3",
+      "commit": "2170fd45b987e11a722f3d3a207a904b71341cac",
+      "licence": "Apache-2.0 (GitHub licence metadata and LICENSE file)",
+      "download_mb": 30,
+      "disk_gb": 1,
+      "minutes": "3-8 (not measured; Nextflow and a JDK from bioconda)",
+      "env": {"python": null, "steps": [
+        {"type": "conda_create", "packages": ["nextflow=25.04.8"], "channels": ["conda-forge", "bioconda"]}
+      ]},
+      "commands": {"nextflow": {"kind": "env_bin", "path": "nextflow"}},
+      "verify": {"argv": ["nextflow", "-version"], "expect": "version", "why": "Nextflow starts (the pipeline needs >= 24.04.0); the pinned pipeline checkout is verified by git rev-parse"},
+      "inputs": ["A container engine (Docker, Singularity or Apptainer) is needed when the pipeline runs: installing one needs administrator rights, which PlasBench never uses. The pipeline downloads its own container images and Nextflow plugins on its first run."],
+      "note": "The benchmark does not run this pipeline; it imports its GFF3 output as non-scoring evidence. Run it with: nextflow run <install>/plasbench-src -profile docker ...",
+      "sources": ["https://api.github.com/repos/EBI-Metagenomics/mobilome-annotation-pipeline/tags", "https://api.anaconda.org/package/bioconda/nextflow"],
+      "researched": "2026-11-19"
+    },
+    "plsmd": {
+      "tools": ["plsmd"],
+      "mode": "manual",
+      "repo": "https://github.com/Genomics-and-Metagenomics-Unit-57357/plsMD.git",
+      "ref": "main",
+      "commit": "9cbff566cdad115b8dd5801ea53ff75092aaeaf7",
+      "licence": "none declared (no LICENSE file in the repository)",
+      "download_mb": 40,
+      "disk_gb": 8,
+      "minutes": "not measured",
+      "commands": {},
+      "verify": {"argv": ["plsMD", "--help"], "expect": "", "why": ""},
+      "inputs": ["A PLSDB BLAST index (PLSMD_DB) and a Unicycler assembly."],
+      "manual": {
+        "reason": "Upstream distributes only a Dockerfile, not a release. The Dockerfile downloads 'Miniconda3-latest' and unpinned conda packages when it builds, so two builds of the same commit are not the same image; the repository's only tag (v1.0) predates the Dockerfile (labelled v1.2); there is no licence file; and running it needs a Docker daemon, whose installation needs administrator rights that PlasBench never uses.",
+        "evidence": ["https://github.com/Genomics-and-Metagenomics-Unit-57357/plsMD/blob/9cbff566cdad115b8dd5801ea53ff75092aaeaf7/Dockerfile", "https://api.github.com/repos/Genomics-and-Metagenomics-Unit-57357/plsMD/tags", "https://github.com/Genomics-and-Metagenomics-Unit-57357/plsMD/blob/9cbff566cdad115b8dd5801ea53ff75092aaeaf7/README.md"],
+        "recipe": [
+          "Install Docker yourself (needs administrator rights) and make sure `docker info` works.",
+          "git clone https://github.com/Genomics-and-Metagenomics-Unit-57357/plsMD.git && cd plsMD && git checkout 9cbff566cdad115b8dd5801ea53ff75092aaeaf7 && git rev-parse HEAD   (must print that 40-character revision)",
+          "docker build -t plsmd .   (add --build-arg DOWNLOAD_DB=true to fetch PLSDB during the build)",
+          "Record the image digest in your study notes: docker image inspect --format '{{.Id}}' plsmd",
+          "Put plsMD_wrapper.sh on PATH as `plsMD` (or set PLSMD_CMD), set PLSMD_DB to your PLSDB BLAST index, then run `plasbench check`."
+        ]
+      },
+      "researched": "2026-11-19"
+    },
+    "ppr-meta": {
+      "tools": ["ppr_meta"],
+      "mode": "manual",
+      "repo": "https://github.com/zhenchengfang/PPR-Meta.git",
+      "ref": "master",
+      "commit": "ab99c9102acdcf331c169900a60f1bdaa92aaeaa",
+      "licence": "LGPL-3.0 (GitHub licence metadata)",
+      "download_mb": 46,
+      "disk_gb": 5,
+      "minutes": "not measured",
+      "commands": {},
+      "verify": {"argv": ["PPR_Meta", "--help"], "expect": "", "why": ""},
+      "inputs": [],
+      "manual": {
+        "reason": "PPR-Meta's executable needs the MATLAB Runtime R2018a (v94), which MathWorks distributes only after a click-through licence on mathworks.com, so it cannot be fetched on your behalf; the Python side is Python 2.7 with TensorFlow 1.4.1 and Keras 2.0.8, all end of life, with no maintained conda package; the repository has no release that fixes these versions.",
+        "evidence": ["https://github.com/zhenchengfang/PPR-Meta/blob/ab99c9102acdcf331c169900a60f1bdaa92aaeaa/README.md", "https://api.anaconda.org/package/bioconda/ppr-meta", "https://www.mathworks.com/products/compiler/matlab-runtime.html"],
+        "recipe": [
+          "Install the MATLAB Runtime R2018a (v94) from https://www.mathworks.com/products/compiler/matlab-runtime.html (accept MathWorks' licence) and add its runtime/bin/sys/extern directories to LD_LIBRARY_PATH as the PPR-Meta README says.",
+          "Create a Python 2.7 environment with numpy, h5py, tensorflow==1.4.1 and keras==2.0.8 (README, 'Installation').",
+          "git clone https://github.com/zhenchengfang/PPR-Meta.git && cd PPR-Meta && git checkout ab99c9102acdcf331c169900a60f1bdaa92aaeaa && git rev-parse HEAD   (must print that 40-character revision)",
+          "Run PPR_Meta on your contigs, then: plasbench normalize-meta-classifier --tool ppr_meta --input result.csv --out tool/community.classification.tsv"
+        ]
+      },
+      "researched": "2026-11-19"
+    }
+  }
+}

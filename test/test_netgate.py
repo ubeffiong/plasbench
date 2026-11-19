@@ -132,16 +132,17 @@ def main():
 
     check("install-tools: an automatic profile needs its services; inspection, --dry-run, a manual profile (exit 20) and a built-in one fetch nothing",
           netgate.command_services(["install-tools", "core"]) == ["conda", "github", "pypi"] and netgate.command_services(["install-tools", "core", "--dry-run"]) == []
-          and netgate.command_services(["install-tools", "list"]) == [] and netgate.command_services(["install-tools", "gplas2"]) == [] and netgate.command_services(["install-tools", "plsmd", "--yes"]) == [])
+          and netgate.command_services(["install-tools", "list"]) == [] and netgate.command_services(["install-tools", "plsmd", "--yes"]) == []
+          and netgate.command_services(["install-tools", "gplas2", "--yes"]) == ["gitlab", "conda", "pypi"] and set(netgate.command_services(["install-tools", "plasme,gplas2"])) == {"github", "conda", "pypi", "gitlab"})
     netgate.set_backend(backend("offline"))
-    check("offline: install-tools gplas2 (a manual step, exit 20) is not refused, install-tools core is", netgate.require_job(["install-tools", "gplas2"], {}) is None)
+    check("offline: install-tools plsmd (a manual step, exit 20) is not refused, install-tools core is", netgate.require_job(["install-tools", "plsmd"], {}) is None)
     try:
         netgate.require_job(["install-tools", "core"], {})
         refused = False
     except netgate.Offline:
         refused = True
     check("offline: install-tools core is refused with a 503-shaped Offline", refused)
-    check("the profiles that fetch nothing are listed for the window (it does not grey those buttons out)", {"gplas2", "plsmd", "list"} <= set(netgate.offline_install_profiles()) and "core" not in netgate.offline_install_profiles())
+    check("the profiles that fetch nothing are listed for the window (it does not grey those buttons out)", {"plsmd", "ppr-meta", "list"} <= set(netgate.offline_install_profiles()) and "core" not in netgate.offline_install_profiles())
     check("the window skips the gating for those profiles and for --dry-run", "offlineInstall" in open(ROOT / "plasbench" / "data" / "ui.html", encoding="utf-8").read() and "offline_install" in open(ROOT / "plasbench" / "webui.py", encoding="utf-8").read())
 
     print("routes, offline")

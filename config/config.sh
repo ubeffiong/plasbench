@@ -539,6 +539,15 @@ export DECISION_PROFILE="${DECISION_PROFILE:-accuracy_first}"
 # results/<sample>/.<tool>.complete, and any change re-runs that tool. Set
 # FORCE_RERUN_TOOLS=1 to re-run every tool regardless.
 export FORCE_RERUN_TOOLS="${FORCE_RERUN_TOOLS:-0}"
+# INSTALL_MISSING_TOOLS=1: stage 0 installs any enabled tool that is not installed instead of stopping (plasbench run --install-missing-tools). Unset, a run with
+# no terminal stops at the first check and names every missing tool with the command that installs it; at a terminal it asks. The window asks, then sets it.
+export INSTALL_MISSING_TOOLS="${INSTALL_MISSING_TOOLS:-0}"
+# A plASgraph2 installed by `plasbench install-tools plasgraph2` carries its pretrained model: use it unless a model directory is set.
+if [[ -z "${PLASGRAPH2_MODEL_DIR:-}" && "${RUN_PLASGRAPH2:-0}" == "1" ]] && command -v plASgraph2_classify.py >/dev/null 2>&1; then
+    _pg_env="$(python3 "$PROJECT_ROOT/python/source_install.py" command-info plASgraph2_classify.py 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("env_prefix",""))' 2>/dev/null || true)"
+    [[ -n "$_pg_env" && -d "$_pg_env/plasbench-src/model/ESKAPEE_model" ]] && export PLASGRAPH2_MODEL_DIR="$_pg_env/plasbench-src/model/ESKAPEE_model"
+    unset _pg_env
+fi
 # Results from releases before fingerprints have an empty marker, so their inputs
 # cannot be checked and they re-run once. REUSE_UNFINGERPRINTED=1 reuses them
 # unchecked instead (with a warning), e.g. to avoid re-running a long finished cohort.

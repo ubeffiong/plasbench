@@ -456,6 +456,11 @@ class Project:
         cfg = self.root / "config"
         files = [cfg / "tool_capabilities.tsv", cfg / "tool_installers.tsv", cfg / "tool_database_releases.tsv", cfg / "config.sh", self.local_env_path()]
         static = loadcache.memo(("tools", str(self.root)), loadcache.sig(*files), self._tools_static)
+        try:
+            import source_install
+            source_entries = source_install.load(self.root / "config" / "source_tools.json")["profiles"]
+        except Exception:  # noqa: BLE001 - the Tools page still lists everything without it
+            source_entries = {}
         out = []
         for base in static:
             row = dict(base)
@@ -464,8 +469,30 @@ class Project:
                 found, ready = loadcache.which(exe, block)
                 row["installed"] = bool(found) if ready else None
                 row["checking"] = not ready
+            # ==INSTALL-INFO-BEGIN== how this tool is installed (python/source_install.py, config/source_tools.json) and which revision is installed
+            entry = source_entries.get(row.get("profile") or "")
+            if entry:
+                row["install"] = self._install_info(entry, exe, row.get("installed"))
+            # ==INSTALL-INFO-END==
             out.append(row)
         return out
+
+    def _install_info(self, entry: dict, exe: str, installed) -> dict:
+        """What the Tools page shows for a source-built or verified-manual tool: the pin, the size and licence, the installed revision (read from the wrapper PlasBench wrote,
+        never by running the tool) and whether it is the pinned one."""
+        info = {"kind": entry["mode"], "ref": entry["ref"], "pinned": entry["commit"], "repo": entry["repo"], "licence": entry["licence"], "download_mb": entry["download_mb"],
+                "disk_gb": entry["disk_gb"], "minutes": entry["minutes"], "inputs": entry.get("inputs", []), "revision": "", "current": None}
+        if entry["mode"] == "manual":
+            info["reason"] = entry["manual"]["reason"]
+        elif installed:
+            try:
+                import source_install
+                found = source_install.command_info(exe)
+            except Exception:  # noqa: BLE001
+                found = None
+            if found:
+                info.update(revision=found["commit"], installed_ref=found.get("ref", ""), installed_at=found.get("installed_at", ""), current=found["commit"] == entry["commit"])
+        return info
 
     def _tools_static(self) -> list[dict]:
         import csv
@@ -769,6 +796,7 @@ class Project:
 # --------------------------------------------------------------------------------------------- jobs
 SESSION_COMMANDS = ("run", "demo", "report", "report-pdf")   # the commands that make a benchmark run session (everything else stays on the Jobs page)
 RESUMABLE_STATES = ("failed", "interrupted", "cancelled")
+CONSENT_EXIT = 21         # install-tools: a source-built tool waits for --yes (plasbench/exitcodes.py); shown as "Consent needed", not Failed
 MANUAL_STEP_EXIT = 20   # install-tools: the profile is installed by hand (plasbench/exitcodes.py); shown as "Manual step needed", not Failed
 KEEP_JOBS = 500                       # finished (`done`) jobs kept; a failed, interrupted or cancelled job is kept until deleted or past the retention
 JOB_RETENTION_DAYS_DEFAULT = 180
@@ -1082,11 +1110,11 @@ class Jobs:
                 self._save()
         if code not in (0, None):
             # Never end silently: the console's last line says how and why the command stopped.
-            from .exitcodes import explain
+            from .exitcodes import explain, is_informational
             argv = job.get("argv") or []
-            if code == MANUAL_STEP_EXIT and argv[:1] == ["install-tools"]:
-                # Not an error: a profile PlasBench never installs for you. The notice above already lists the steps.
-                self._append_log(job_id, f"\n[PlasBench] Manual step needed (exit {code}): nothing failed. {explain(code)}.\n")
+            if is_informational(code):
+                # Not an error, whatever the command was: a manual step (20) or a consent wait (21). The notice above already lists what to do.
+                self._append_log(job_id, f"\n[PlasBench] {'Manual step needed' if code == MANUAL_STEP_EXIT else 'Consent needed'} (exit {code}): nothing failed. {explain(code)}.\n")
             else:
                 reason = "cancelled from the window" if state == "cancelled" else explain(code, argv[0] if argv else None)
                 self._append_log(job_id, f"\n[PlasBench] ERROR: the command stopped: {reason} (exit {code}).\n")
@@ -1110,8 +1138,10 @@ class Jobs:
             return "retrying"
         if state == "done" and job.get("warnings"):
             return "completed_with_warnings"
-        if state == "failed" and job.get("exit") == MANUAL_STEP_EXIT and (job.get("argv") or [])[:1] == ["install-tools"]:
-            return "manual_step"   # install-tools exit 20: a profile that is installed by hand; not a failure
+        if state == "failed" and job.get("exit") == MANUAL_STEP_EXIT:
+            return "manual_step"   # exit 20 (any command): a manual step, a verified limit; not a failure
+        if state == "failed" and job.get("exit") == CONSENT_EXIT:
+            return "consent_needed"   # exit 21: nothing was changed, the install waits for consent; not a failure
         return state
 
     RETRY_LINE = re.compile(r"failed \(exit \d+\); retry (\d+) of (\d+)")

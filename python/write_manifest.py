@@ -95,6 +95,19 @@ def user_tool_records(results_dir=None):
 
 
 def command_version(name):
+    """The tool's version, plus (for a tool PlasBench installed from a pinned source checkout) its install provenance: revision, source, time, environment."""
+    answer = _command_version(name)
+    try:
+        import source_install
+        info = source_install.command_info(name)
+    except Exception:  # noqa: BLE001 - provenance is extra detail, never a reason to lose the manifest
+        info = None
+    if info:
+        answer["install_provenance"] = {k: info[k] for k in ("profile", "commit", "ref", "installed_at", "repo", "env_prefix", "source_tree_sha256", "dependency_files_sha256")}
+    return answer
+
+
+def _command_version(name):
     executable = shutil.which(name)
     if not executable:
         return {"available": False}

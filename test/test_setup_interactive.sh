@@ -46,6 +46,9 @@ for dir in /usr/bin /bin; do
     done
 done
 
+# the installer scripts call python3; make sure the clean PATH has one (a machine whose python3 is not in /usr/bin, such as Git Bash)
+[[ -e "$CLEAN_BIN/python3" ]] || ln -s "$(command -v python3)" "$CLEAN_BIN/python3" 2>/dev/null || cp "$(command -v python3)" "$CLEAN_BIN/python3" 2>/dev/null || true
+
 mkdir -p "$TMP/bin_full" "$TMP/bin_partial" "$TMP/data/db/platon/db" "$TMP/results" "$TMP/logs" "$TMP/tmp"
 touch "$TMP/data/db/platon/db/marker"
 
@@ -99,7 +102,16 @@ if HOME="$TMP" PATH="$TMP/bin_partial:$CLEAN_BIN" DATA_DIR="$TMP/data" RESULTS_D
 fi
 [[ ! -s "$TMP/conda_calls.log" ]] || { echo "FAIL: declining must never invoke conda" >&2; cat "$TMP/conda_calls.log" >&2; exit 1; }
 grep -q "Skipped" "$TMP/run.log" || { echo "FAIL: expected a Skipped message" >&2; cat "$TMP/run.log" >&2; exit 1; }
-echo "declining consent never touches conda -> PASS"
+# A run with no terminal fails fast (before any sample work) with the exact command, naming what is missing.
+grep -q "plasbench install-tools reconstruction --yes" "$TMP/run.log" && grep -q "INSTALL_MISSING_TOOLS=1" "$TMP/run.log" || { echo "FAIL: the non-interactive stop must name the exact install command and INSTALL_MISSING_TOOLS" >&2; cat "$TMP/run.log" >&2; exit 1; }
+echo "declining consent never touches conda, and a run without a terminal stops naming the command -> PASS"
+
+# --- INSTALL_MISSING_TOOLS=1 is consent: a run with no terminal installs what is missing instead of stopping. ---
+: > "$TMP/conda_calls.log"
+HOME="$TMP" PATH="$TMP/bin_partial:$CLEAN_BIN" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" INSTALL_MISSING_TOOLS=1     bash "$ROOT/scripts/00_setup.sh" < /dev/null > "$TMP/run.log" 2>&1 || true
+grep -q "create .*mob_suite=3.1.9" "$TMP/conda_calls.log" || { echo "FAIL: INSTALL_MISSING_TOOLS=1 did not install the missing tools" >&2; cat "$TMP/run.log" >&2; exit 1; }
+grep -q "Checking again now that the installation has run" "$TMP/run.log" || { echo "FAIL: setup must re-check after installing (so a run can carry on)" >&2; exit 1; }
+echo "INSTALL_MISSING_TOOLS=1 installs without a terminal and then re-checks -> PASS"
 
 # --- missing gplas (needed only when a gplas2_* mode is enabled), conda
 # present, --yes: offers and actually invokes install-tools gplas, which
@@ -116,15 +128,19 @@ true
 EOF
 chmod +x "$TMP/bin_gplas/conda"
 
+mkdir -p "$TMP/conda/envs/plasbench"
 : > "$TMP/conda_calls.log"
 if PATH="$TMP/bin_gplas:$CLEAN_BIN" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
-    RUN_GPLAS2_MOB=1 bash "$ROOT/scripts/00_setup.sh" --yes > "$TMP/run.log" 2>&1; then
+    CONDA_PREFIX="$TMP/conda/envs/plasbench" PLASBENCH_SOURCE_TEST_OVERRIDES=1 PLASBENCH_SOURCE_URL_GPLAS2="$TMP/no-such-upstream.git" PLASBENCH_ASSUME_ONLINE=1     RUN_GPLAS2_MOB=1 bash "$ROOT/scripts/00_setup.sh" --yes > "$TMP/run.log" 2>&1; then
     echo "FAIL: this run should exit non-zero (a freshly-attempted install is never a passing check)" >&2
     cat "$TMP/run.log" >&2; exit 1
 fi
 grep -q "install-tools profile: gplas" "$TMP/run.log" || { echo "FAIL: gplas profile not offered" >&2; cat "$TMP/run.log" >&2; exit 1; }
-grep -q "gplas" "$TMP/conda_calls.log" || { echo "FAIL: install_tools.sh did not actually ask conda to install gplas" >&2; cat "$TMP/conda_calls.log" >&2; exit 1; }
-echo "missing gplas (RUN_GPLAS2_MOB=1) + --yes triggers install-tools -> conda end to end -> PASS"
+# gplas2 is a source-built tool (config/source_tools.json): the plan with the pinned commit is shown, and the installer starts by cloning that repository (here redirected
+# to a folder that does not exist so nothing is downloaded; the clone fails and leaves nothing behind).
+grep -q "9ec35cf6674c41ad91afc582dcbe9b2eee9161b0" "$TMP/run.log" && grep -q "cloning https://gitlab.com/mmb-umcu/gplas2.git" "$TMP/run.log" || { echo "FAIL: install_tools.sh did not show the gplas2 plan and start its pinned install" >&2; cat "$TMP/run.log" >&2; exit 1; }
+if grep -q "install .*[ ]gplas" "$TMP/conda_calls.log"; then echo "FAIL: the old gplas 0.6.1 conda package (no -P option) must not be installed" >&2; exit 1; fi
+echo "missing gplas (RUN_GPLAS2_MOB=1) + --yes triggers the pinned gplas2 install (not bioconda's gplas 0.6.1) -> PASS"
 
 # --- MOB-suite database: offered and actually invoked once mob_recon/mob_init exist. ---
 mkdir -p "$TMP/bin_mobdb"
