@@ -1,0 +1,186 @@
+{
+  "date": "2026-11-19",
+  "profiles": {
+    "annotation": {
+      "minutes": 0.5,
+      "problem": "",
+      "status": "pass",
+      "version": "bakta 1.12.2"
+    },
+    "annotation-prokka": {
+      "minutes": 0.9,
+      "problem": "",
+      "status": "pass",
+      "version": "prokka 1.15.6"
+    },
+    "assembly": {
+      "minutes": 0.2,
+      "problem": "",
+      "status": "pass",
+      "version": "SPAdes genome assembler v4.3.0"
+    },
+    "core": {
+      "minutes": 0.2,
+      "problem": "",
+      "status": "pass",
+      "version": "datasets version: 18.41.1"
+    },
+    "genomad": {
+      "minutes": 0.9,
+      "problem": "",
+      "status": "pass",
+      "version": "geNomad, version 1.13.0"
+    },
+    "gplas": {
+      "minutes": 0.3,
+      "problem": "",
+      "status": "pass",
+      "version": "Welcome to the user guide of gplas (version 0.5.0):"
+    },
+    "gplas2": {
+      "minutes": 1.5,
+      "problem": "",
+      "status": "pass",
+      "version": "usage: gplas -i INPUT -c {extract,predict} [-n NAME] [-P PREDICTION] [-k]"
+    },
+    "hybracter": {
+      "minutes": 0.2,
+      "problem": "",
+      "status": "pass",
+      "version": "\b"
+    },
+    "long-read": {
+      "minutes": 7.3,
+      "problem": "",
+      "status": "pass",
+      "version": "2.9.6-b1802"
+    },
+    "metagenomics": {
+      "minutes": 1.0,
+      "problem": "",
+      "status": "pass",
+      "version": "SPAdes genome assembler v4.3.0"
+    },
+    "mobilome-map": {
+      "minutes": 0.5,
+      "problem": "",
+      "status": "pass",
+      "version": "N E X T F L O W   ~  version 25.04.8"
+    },
+    "mobsuite": {
+      "minutes": 5.2,
+      "problem": "",
+      "status": "pass",
+      "version": "mob_recon 3.1.9"
+    },
+    "multiqc": {
+      "minutes": 0.6,
+      "problem": "",
+      "status": "pass",
+      "version": "multiqc, version 1.25.2"
+    },
+    "plasbin_flow": {
+      "minutes": 0.3,
+      "problem": "",
+      "status": "pass",
+      "version": "usage: plasbin_flow.py [-h] [-ag AG] [-gc GC] [-score SCORE] [-seeds SEEDS]"
+    },
+    "plascope": {
+      "minutes": 0.3,
+      "problem": "",
+      "status": "pass",
+      "version": "usage: plaScope.sh [OPTIONS] [ARGUMENTS]"
+    },
+    "plasgraph2": {
+      "minutes": 1.6,
+      "problem": "",
+      "status": "pass",
+      "version": "usage: plASgraph2_classify.py [-h] {set,gfa} ..."
+    },
+    "plasme": {
+      "minutes": 2.0,
+      "problem": "",
+      "status": "pass",
+      "version": "usage: PLASMe.py [-h] [-c COVERAGE] [-i IDENTITY] [-p PROBABILITY] [-t THREAD]"
+    },
+    "plasmer": {
+      "minutes": 0.4,
+      "problem": "",
+      "status": "pass",
+      "version": "Plasmer - an accurate and sensitive bacterial plasmid identification tool based on machine-learning of shared k-mers and genomic features"
+    },
+    "plasmidec": {
+      "minutes": 0.0,
+      "problem": "",
+      "status": "pass",
+      "version": "usage: bash plasmidEC.sh [-i INPUT] [-o OUTPUT] [options]"
+    },
+    "plasmidhunter": {
+      "minutes": 0.3,
+      "problem": "",
+      "status": "pass",
+      "version": "usage: plasmidhunter [-h] -i INP [-c CPU] [-o OUT]"
+    },
+    "plassembler": {
+      "minutes": 0.5,
+      "problem": "",
+      "status": "pass",
+      "version": "Usage: plassembler [OPTIONS] COMMAND [ARGS]..."
+    },
+    "plsmd": {
+      "minutes": 0.0,
+      "problem": "upstream ships only a Dockerfile with unpinned builds, no release and no licence file, and running it needs a Docker daemon: must exit 20 with the verified recipe",
+      "status": "expected-manual",
+      "version": ""
+    },
+    "ppr-meta": {
+      "minutes": 0.0,
+      "problem": "needs the MATLAB Runtime R2018a (click-through licence on mathworks.com) and an end-of-life Python 2.7 / TensorFlow 1.4 stack: must exit 20 with the verified recipe",
+      "status": "expected-manual",
+      "version": ""
+    },
+    "quast": {
+      "minutes": 0.4,
+      "problem": "",
+      "status": "pass",
+      "version": "QUAST v5.3.0"
+    },
+    "reconstruction": {
+      "minutes": 5.0,
+      "problem": "",
+      "status": "pass",
+      "version": "mob_recon 3.1.9"
+    },
+    "reference-annotation": {
+      "minutes": 6.4,
+      "problem": "",
+      "status": "pass",
+      "version": "abricate 1.4.0"
+    },
+    "rfplasmid": {
+      "minutes": 2.4,
+      "problem": "",
+      "status": "pass",
+      "version": "usage: rfplasmid.py [-h] [--species SPECIES] [--input INPUT] [--specieslist]"
+    },
+    "simulate": {
+      "minutes": 0.2,
+      "problem": "",
+      "status": "pass",
+      "version": "iss version 2.0.1"
+    },
+    "trycycler": {
+      "minutes": 4.3,
+      "problem": "",
+      "status": "pass",
+      "version": "Trycycler v0.5.6"
+    },
+    "utilities": {
+      "minutes": 0.2,
+      "problem": "",
+      "status": "pass",
+      "version": "2.3"
+    }
+  },
+  "run_url": "https://github.com/ubeffiong/plasbench/actions/runs/44542312999"
+}

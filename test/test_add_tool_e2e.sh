@@ -16,6 +16,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+NATIVE_ROOT="$(cygpath -m "$ROOT" 2>/dev/null || printf '%s' "$ROOT")"
 NATIVE_TMP="$(cygpath -m "$TMP" 2>/dev/null || printf '%s' "$TMP")"
 
 [[ -n "${E2E_SKIP_PY:-}" ]] || python3 "$HERE/test_add_tool_e2e.py"
@@ -37,7 +38,28 @@ printf '@r1\nACGT\n+\nIIII\n' | gzip > "$TMP/data/s1/SRR1_2.trim.fastq.gz"
 printf 'sample_id\tassembly_accession\tsra_run\ns1\tNA\tSRR1\n' > "$TMP/config/accessions.tsv"
 # Stage 5 aligns with minimap2: the real one when it is installed (CI), else a stand-in that reports the whole query on the plasmid.
 if ! command -v minimap2 >/dev/null 2>&1; then
-    printf '#!/usr/bin/env bash\nprintf "q1\\t100\\t0\\t100\\t+\\tP1\\t600\\t0\\t100\\t100\\t100\\t60\\n"\n' > "$TMP/bin/minimap2"
+    cat > "$TMP/bin/minimap2" <<'EOF'
+#!/usr/bin/env python3
+import sys
+args = sys.argv[1:]
+if "-d" in args:
+    open(args[args.index("-d") + 1], "w").write("index")
+    sys.exit(0)
+query = args[-1]
+name, length = None, 0
+records = []
+for line in open(query):
+    if line.startswith(">"):
+        if name:
+            records.append((name, length))
+        name, length = line[1:].split()[0], 0
+    else:
+        length += len(line.strip())
+if name:
+    records.append((name, length))
+for name, length in records:
+    print("\t".join(str(x) for x in (name, length, 0, length, "+", "P1", 600, 0, length, length, length, 60)))
+EOF
     chmod +x "$TMP/bin/minimap2"
 fi
 
@@ -78,7 +100,10 @@ EOF
 # A tool that fails, and one whose source was never installed ({src} comes from a local folder that has not been fetched).
 mkdir -p "$TMP/tools/ut_fail" "$TMP/tools/ut_noinst" "$TMP/noinst_src"
 printf '[tool]\nname = ut_fail\ntask = binning_reconstruction\nanalysis_track = short_read\n[run]\nmode = command\ncommand = echo "ut_fail is broken" >&2; exit 3\n[output]\nformat = contig_bins\npath = x.tsv\n' > "$TMP/tools/ut_fail/plasbench-tool.ini"
-printf 'print(1)\n' > "$TMP/noinst_src/run.py"
+cat > "$TMP/noinst_src/run.py" <<'EOF'
+import sys
+open(sys.argv[1] + "/x.csv", "w").write("contig\tcall\nc1\tplasmid\nc2\tchromosome\nc3\tchromosome\n")
+EOF
 cat > "$TMP/tools/ut_noinst/plasbench-tool.ini" <<EOF
 [tool]
 name = ut_noinst
@@ -171,7 +196,7 @@ stage 04_run_tools.sh USER_TOOLS=ut_multi || fail "re-run after a script edit"
 echo "an edited tool script re-runs the tool (fingerprint) -> PASS"
 PLASBENCH_TOOLS_PATH="$TMP/tools" python3 "$ROOT/python/user_tools.py" fetch ut_noinst >/dev/null 2>&1 || fail "fetching ut_noinst's local source"
 stage 04_run_tools.sh USER_TOOLS=ut_noinst || fail "stage 4 after the install"
-[[ "$(col ut_noinst 3)" != "skipped" ]] || fail "after the install the tool is no longer skipped as not installed: $(col ut_noinst 5)"
+[[ "$(col ut_noinst 3)" == "completed" ]] || fail "after the install the tool runs and completes (it was skipped as not installed before): $(col ut_noinst 3) $(col ut_noinst 5)"
 echo "after install-tools the tool runs (no longer 'not installed') -> PASS"
 
 # ---- selection by a per-task id ---------------------------------------------------------------------------------------------------
@@ -185,7 +210,7 @@ grep -q "unknown user tool" "$TMP/04_run_tools.sh.log" || fail "the reason must 
 echo "an unknown id is a named error, not an empty run -> PASS"
 
 # ---- the report labels -------------------------------------------------------------------------------------------------------------
-label_of() { PLASBENCH_TOOLS_PATH="$TMP/tools" python3 -c "import sys; sys.path.insert(0,'$ROOT/python'); from plasbench_common import display_tool_name as d; print(d('$1'))" | tr -d '\r'; }
+label_of() { PLASBENCH_TOOLS_PATH="$TMP/tools" python3 -c "import sys; sys.path.insert(0,'$NATIVE_ROOT/python'); from plasbench_common import display_tool_name as d; print(d('$1'))" | tr -d '\r'; }
 [[ "$(label_of ut_multi)" == "UT Multi (binning)" && "$(label_of ut_multi__classification)" == "UT Multi (classification)" ]] || fail "labels: $(label_of ut_multi) / $(label_of ut_multi__classification)"
 echo "the report labels carry the task: '$(label_of ut_multi)', '$(label_of ut_multi__classification)' -> PASS"
 
