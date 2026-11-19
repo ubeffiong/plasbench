@@ -380,7 +380,8 @@ def dist_svg(model, col):
         for key, name, colr, dash in (("warn", "warn", "#B07A00", "3 2"), ("reject", "reject", "#D55E00", "")):
             if t[key] is not None:
                 x = px(t[key] * col[3])
-                out.append(f"<line x1='{num(x)}' y1='{T - 2}' x2='{num(x)}' y2='{H - 24}' stroke='{colr}' stroke-width='1.6' {("stroke-dasharray='" + dash + "'") if dash else ''}/>"
+                dash_attr = f"stroke-dasharray='{dash}'" if dash else ""     # not inside the f-string below: nested quotes need Python 3.12
+                out.append(f"<line x1='{num(x)}' y1='{T - 2}' x2='{num(x)}' y2='{H - 24}' stroke='{colr}' stroke-width='1.6' {dash_attr}/>"
                            f"<text x='{num(x)}' y='{T - 6}' class='tk'>{name} {esc(tick_label(round(t[key] * col[3], 4)))}</text>")
     for i, (r, v) in enumerate(vals):
         out.append(point(px(v), T + 36 + (i % 4) * 11, r.get("qc_status"), r.get("sample"), f"{col[1]} {fmt(v, 1, col[4])}, {r.get('qc_status')}"))
