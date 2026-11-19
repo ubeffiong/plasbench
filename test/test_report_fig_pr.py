@@ -266,6 +266,11 @@ console.log(JSON.stringify({h:h,d:d,bad:PR.decodeHash('#fig-pr?prx=1,2,x,4&pru=w
 
 def main():
     check_maths(PY)
+    # compact layout: the plot is at most ~320 px tall at its widest (viewBox 640 x 330, max width 620 px), and Python and JavaScript agree on it
+    core = (ROOT / 'assets/report/fig_pr_core.html').read_text(encoding='utf-8')
+    assert 'PR.L = {W: %d, H: %d, ml: %d, mr: %d, mt: %d, mb: %d}' % tuple(fp.L[k] for k in ('W', 'H', 'ml', 'mr', 'mt', 'mb')) in core, 'python and javascript layouts differ'
+    assert fp.L['H'] * 620 / fp.L['W'] <= 330, 'the precision-recall plot is taller than the compact budget'
+    print('  compact layout ok')
     print("  python maths ok")
     with tempfile.TemporaryDirectory(prefix="pr_fig_") as tmp:
         model = check_python_data(tmp)

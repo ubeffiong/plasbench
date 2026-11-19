@@ -1,0 +1,37 @@
+<script>
+/* Tool fingerprint, pure core: the compare list, the grid arrow-key move, the per-isolate spread and the value format.
+   No DOM access. Mirrored in python/report_fig_fingerprint.py and parity-tested under node (test/test_report_fig_fingerprint.py).
+   Loaded by node (module.exports) and by the browser (window.PBFingerprint). */
+(function (root) {
+'use strict';
+var FP = {};
+/* the compare list after clicking id: removed when present, else appended; past the limit the oldest is dropped */
+FP.toggleCompare = function (cur, id, limit) {
+  var out = cur.slice(), i = out.indexOf(id);
+  if (i >= 0) { out.splice(i, 1); return out; }
+  out.push(id);
+  return out.length > limit ? out.slice(out.length - limit) : out;
+};
+/* the tile index after an arrow / Home / End key; stays put at an edge */
+FP.gridMove = function (index, key, columns, count) {
+  if (count <= 0) { return -1; }
+  columns = Math.max(1, columns);
+  var map = {ArrowRight: index + 1, ArrowLeft: index - 1, ArrowDown: index + columns, ArrowUp: index - columns, Home: 0, End: count - 1};
+  var t = Object.prototype.hasOwnProperty.call(map, key) ? map[key] : index;
+  if (key === 'ArrowRight' && index % columns === columns - 1) { t = index; }
+  if (key === 'ArrowLeft' && index % columns === 0) { t = index; }
+  return t >= 0 && t < count ? t : index;
+};
+/* n, min, median, max over the finite numbers (null ignored) */
+FP.spread = function (values) {
+  var xs = values.filter(function (v) { return v !== null && v !== undefined && isFinite(v); }).map(Number).sort(function (a, b) { return a - b; });
+  if (!xs.length) { return {n: 0, min: null, median: null, max: null}; }
+  var m = Math.floor(xs.length / 2), med = xs.length % 2 ? xs[m] : (xs[m - 1] + xs[m]) / 2;
+  return {n: xs.length, min: xs[0], median: med, max: xs[xs.length - 1]};
+};
+/* a value to a fixed number of digits; null / NaN is "not available", never 0 */
+FP.fmtValue = function (v, digits) { return (v === null || v === undefined || !isFinite(v)) ? 'not available' : Number(v).toFixed(digits); };
+if (typeof module !== 'undefined' && module.exports) { module.exports = FP; }
+root.PBFingerprint = FP;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
+</script>
