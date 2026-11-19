@@ -101,7 +101,7 @@ run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SD
     ASM_RETRY_NOTE=""
     while :; do
         rc=0
-        WATCH_LOG="$log" run_with_heartbeat "$sample / SPAdes assembly" spades.py -1 "$t1" -2 "$t2" -o "$asmdir" \
+        WATCH_LOG="$log" run_with_heartbeat "$SAMPLE / SPAdes assembly" spades.py -1 "$t1" -2 "$t2" -o "$asmdir" \
             --threads "$threads" --memory "$mem" > "$log" 2>&1 || rc=$?
         if [[ "$rc" -eq 0 ]]; then
             [[ -n "$note" ]] && ASM_RETRY_NOTE="retried once after $first: $note"
