@@ -6,6 +6,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 need python3
+preflight_resources 2 quiet
 
 # --- per-step timing: every sample's stage-2 steps are timed into data/<sample>/stage2_timing.tsv, and the log
 # names the slow ones, so a long stage 2 says where its time went.
@@ -145,7 +146,7 @@ truth_sample() {
         if [[ -s "$FEATURES" && "$FEATURES" -nt "$REF" ]]; then
             log "  reference annotation already present for $SAMPLE"
         else
-            python3 "$HERE/../python/annotate_reference.py" --reference "$REF" --out "$FEATURES"                 --provenance "$SDIR/annotation_provenance.json" --amr-database "$ANNOTATION_AMR_DB"                 --replicon-database "$ANNOTATION_REPLICON_DB" --isfinder-fasta "${ISFINDER_FASTA:-}" --threads "$THREADS"                 >> "$LOG_DIR/${SAMPLE}.annotation.log" 2>&1 ||                 warn "reference annotation failed for $SAMPLE; contextual features are unavailable"
+            WATCH_LOG="$LOG_DIR/${SAMPLE}.annotation.log" run_with_heartbeat "$SAMPLE / reference annotation" python3 "$HERE/../python/annotate_reference.py" --reference "$REF" --out "$FEATURES"                 --provenance "$SDIR/annotation_provenance.json" --amr-database "$ANNOTATION_AMR_DB"                 --replicon-database "$ANNOTATION_REPLICON_DB" --isfinder-fasta "${ISFINDER_FASTA:-}" --threads "$THREADS"                 >> "$LOG_DIR/${SAMPLE}.annotation.log" 2>&1 ||                 warn "reference annotation failed for $SAMPLE; contextual features are unavailable"
         fi
     fi
     step_mark annotation

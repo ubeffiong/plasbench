@@ -30,11 +30,13 @@ Standard library only; the callers themselves are external.
 
 import argparse
 import csv
+import hashlib
 import json
 import shutil
 import os
 import subprocess
-from concurrent.futures import ThreadPoolExecutor
+import time
+from concurrent.futures import ThreadPoolExecutor, wait
 import sys
 from pathlib import Path
 
@@ -248,6 +250,74 @@ def call_mob_typer(reference, timeout, sequences, threads=1):
                       "note": "MOB-typer types whole replicons; features span the sequence."}
 
 
+CACHE_SCHEMA = "1"
+
+
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def caller_fingerprint(amr_database, replicon_database, isfinder_fasta):
+    """What a cached annotation depends on besides the reference: each caller's version (or 'absent'), the database versions the callers can report
+    (AMRFinderPlus -V, the abricate database listing), the database names and the ISFinder FASTA's checksum. Any change gives a new cache key."""
+    def probe(name):
+        exe = shutil.which(name)
+        if not exe:
+            return name, "absent"
+        text = tool_version(exe)
+        if name == "amrfinder":
+            out, _ = run([exe, "-V"], 60)
+            text = (out or text).replace("\n", " | ")
+        if name == "abricate":
+            out, _ = run([exe, "--list"], 60)
+            text += " | " + hashlib.sha256((out or "").encode("utf-8")).hexdigest()[:16]
+        return name, text
+    names = ("mob_typer", "abricate", "amrfinder", "isescan.py", "isescan", "barrnap", "blastn")
+    with ThreadPoolExecutor(max_workers=len(names)) as pool:
+        versions = dict(pool.map(probe, names))
+    fasta = str(isfinder_fasta or "")
+    versions["isfinder_fasta"] = file_sha256(fasta) if fasta and Path(fasta).is_file() else "none"
+    versions["amr_database"] = amr_database
+    versions["replicon_database"] = " ".join(replicon_database.replace(",", " ").split())
+    return versions
+
+
+def cache_key(reference, fingerprint):
+    payload = json.dumps({"schema": CACHE_SCHEMA, "reference_sha256": file_sha256(reference), "callers": fingerprint}, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def cache_lookup(cache_dir, key):
+    """(features TSV path, saved metadata) for a cached annotation, or (None, None)."""
+    table, meta = Path(cache_dir) / f"{key}.tsv", Path(cache_dir) / f"{key}.json"
+    try:
+        if table.is_file() and meta.is_file():
+            return table, json.loads(meta.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        pass
+    return None, None
+
+
+def cache_store(cache_dir, key, table, record, fingerprint, reference):
+    """Keep this annotation for later runs. Never raises (a read-only or full cache folder just means no cache)."""
+    try:
+        cache_dir = Path(cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        tmp_table, tmp_meta = cache_dir / f"{key}.tsv.tmp{os.getpid()}", cache_dir / f"{key}.json.tmp{os.getpid()}"
+        shutil.copyfile(table, tmp_table)
+        meta = {"key": key, "created_epoch": int(time.time()), "reference_name": Path(reference).parent.name, "fingerprint": fingerprint, "record": record}
+        tmp_meta.write_text(json.dumps(meta, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        os.replace(tmp_table, cache_dir / f"{key}.tsv")
+        os.replace(tmp_meta, cache_dir / f"{key}.json")
+        return True
+    except OSError:
+        return False
+
+
 def reference_sequences(path):
     lengths, name, total = {}, None, 0
     with open(path, encoding="utf-8") as handle:
@@ -279,6 +349,9 @@ def main():
     parser.add_argument("--threads", type=int, default=int(os.environ.get("THREADS") or os.cpu_count() or 1),
                         help="CPU threads in total; the callers run at the same time and share them (default: THREADS)")
     parser.add_argument("--workdir", type=Path)
+    parser.add_argument("--cache-dir", default=os.environ.get("ANNOTATION_CACHE_DIR", ""),
+                        help="shared folder of finished annotations, keyed by the reference's checksum and the callers' versions "
+                             "(default: ANNOTATION_CACHE_DIR; empty turns the cache off)")
     args = parser.parse_args()
     if not args.reference.is_file():
         raise SystemExit(f"ERROR: reference not found: {args.reference}")
@@ -303,9 +376,46 @@ def main():
         ("isfinder", lambda: call_isfinder(args.reference, args.isfinder_fasta, args.timeout, sequences)),
         ("barrnap", lambda: call_barrnap(args.reference, args.timeout, sequences, small)),
     )
+    cache_id = fingerprint = None
+    if args.cache_dir:
+        try:
+            fingerprint = caller_fingerprint(args.amr_database, args.replicon_database, args.isfinder_fasta)
+            cache_id = cache_key(args.reference, fingerprint)
+        except OSError:
+            cache_id = None
+        hit, saved = cache_lookup(args.cache_dir, cache_id) if cache_id else (None, None)
+        if hit:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(hit, args.out)
+            record = dict(saved.get("record", {}))
+            record["annotation_cache"] = {"hit": True, "key": cache_id, "created_epoch": saved.get("created_epoch"),
+                                          "first_computed_for": saved.get("reference_name"), "fingerprint": saved.get("fingerprint")}
+            if args.provenance:
+                args.provenance.parent.mkdir(parents=True, exist_ok=True)
+                args.provenance.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            print(f"Annotated {args.reference.name}: reused the stored annotation (same reference checksum and caller versions, key {cache_id[:12]}, "
+                  f"first computed for {saved.get('reference_name', '?')}); nothing was run", flush=True)
+            return 0
+
+    # Each caller is timed, and a line says when it finishes and which are still running, so a long annotation is never silent.
+    started = {}
+
+    def timed(name, call):
+        started[name] = time.time()
+        found, status = call()
+        print(f"  annotation: {name} finished in {time.time() - started[name]:.0f} s ({status.get('status')}, {len(found)} feature(s))", flush=True)
+        return found, status
+
     features, provenance = [], {}
     with ThreadPoolExecutor(max_workers=len(calls)) as pool:
-        futures = [(name, pool.submit(call)) for name, call in calls]
+        futures = [(name, pool.submit(timed, name, call)) for name, call in calls]
+        pending = {future for _, future in futures}
+        t0 = time.time()
+        while pending:
+            _, pending = wait(pending, timeout=60)
+            if pending:
+                running = sorted(name for name, future in futures if future in pending)
+                print(f"  annotation: {int(time.time() - t0)} s in, still running: {', '.join(running)}", flush=True)
         for name, future in futures:                  # collected in the original order: output stays the same
             found, status = future.result()
             features.extend(found)
@@ -335,6 +445,11 @@ def main():
               "feature_classes_not_evaluated": missing,
               "meaning": ("Absent callers yield 'not evaluated' for their feature class. "
                           "A missing feature class is not evidence that the feature is absent.")}
+    stored = False
+    if cache_id and not any(status.get("status") == "failed" for status in provenance.values()):
+        stored = cache_store(args.cache_dir, cache_id, args.out, record, fingerprint, args.reference)
+    if cache_id:
+        record["annotation_cache"] = {"hit": False, "key": cache_id, "stored": stored}
     if args.provenance:
         args.provenance.parent.mkdir(parents=True, exist_ok=True)
         args.provenance.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")

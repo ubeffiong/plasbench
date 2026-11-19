@@ -192,6 +192,38 @@ def progress(results_dir):
     return out
 
 
+def assembly_failures(results_dir, log_dir=None):
+    """Why isolates failed to assemble: the cause and advice stage 3 wrote into assembly_status.tsv (columns `cause`, `advice`), or, for a status file from before
+    those columns existed, the classifier's reading of the isolate's own log. {} when nothing failed."""
+    rows = [r for r in read_tsv(os.path.join(results_dir, "assembly_status.tsv")) if (r.get("status") or "") == "failed"]
+    if not rows:
+        return {}
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        import assembler_diagnosis
+    except ImportError:
+        assembler_diagnosis = None
+    items = []
+    for r in rows:
+        item = {"sample": r.get("sample", ""), "cause": r.get("cause") or "", "advice": r.get("advice") or "", "reason": r.get("reason") or "", "title": "", "evidence": ""}
+        if (not item["cause"]) and assembler_diagnosis and log_dir:
+            newest = None
+            for tool in ("spades", "unicycler", "fastp"):
+                f = Path(log_dir) / f"{item['sample']}.{tool}.log"
+                try:
+                    m = f.stat().st_mtime
+                except OSError:
+                    continue
+                if newest is None or m > newest[0]:
+                    newest = (m, f)
+            if newest:
+                d = assembler_diagnosis.diagnose(assembler_diagnosis.read_tail(str(newest[1])), {"log": str(newest[1]), "sample": item["sample"]})
+                item.update(cause=d["cause"], advice=d["advice"], title=d["title"], evidence=d["evidence_lines"][-1] if d["evidence_lines"] else "", log=str(newest[1]))
+        items.append(item)
+    causes = sorted({i["cause"] for i in items if i["cause"]})
+    return {"failed": len(items), "items": items[:20], "same_cause": causes[0] if len(causes) == 1 and len(items) > 1 else ""}
+
+
 def reads_size(data_dir, sample):
     """Compressed bytes of the sample's paired read files in the data folder (0 when not there)."""
     total = 0
@@ -294,6 +326,7 @@ def summarize(results_dir, log_dir=None, data_dir=None, now=None, procs=None, ma
                 summary["newest_log"]["last_line"] = lines[-1][:200] if lines else ""
             except OSError:
                 pass
+    summary["assembly_failures"] = assembly_failures(results_dir, log_dir)
     summary["hints"] = hints(summary)
     return summary
 
@@ -328,6 +361,13 @@ def hints(s):
         out.append(f"Only {avail} MB of memory is available on this computer: a tool may be killed (exit 137) or crawl. Lower THREADS or ASSEMBLY_MEMORY_GB.")
     if m.get("swap_used_mb", 0) > 1000 and (avail is None or avail < 2000):
         out.append(f"{m['swap_used_mb']} MB of swap is in use while little memory is free: the machine is swapping, which makes everything very slow.")
+    asm = s.get("assembly_failures") or {}
+    if asm.get("same_cause"):
+        first = asm["items"][0]
+        out.append(f"All {asm['failed']} failed assemblies have the same cause ({asm['same_cause']}), so it is the computer or the settings, not the isolates: {first['advice']}")
+    for item in (asm.get("items") or [])[:3] if not asm.get("same_cause") else []:
+        if item.get("cause"):
+            out.append(f"Assembly of {item['sample']} failed ({item['cause']}): {item['advice']}")
     disk = m.get("disk_free_gb")
     if disk is not None and disk < 5:
         out.append(f"Only {disk} GB of disk is free where the results are: downloads and assemblies need several times the size of the reads.")
@@ -369,6 +409,11 @@ def render(s, diagnose=False):
     m = s.get("machine") or {}
     if m:
         lines.append("  machine: " + ", ".join(f"{k.replace('_', ' ')} {v}" for k, v in m.items()))
+    asm = s.get("assembly_failures") or {}
+    if asm:
+        lines.append(f"  assembly failures: {asm['failed']}" + (f", all for the same reason: {asm['same_cause']}" if asm.get("same_cause") else ""))
+        for item in asm["items"][:5]:
+            lines.append(f"    {item['sample']}: {item['cause'] or 'cause not recorded'}" + (f" ({item['evidence']})" if item.get("evidence") else ""))
     log = s.get("newest_log")
     if log:
         lines.append(f"  newest log for this isolate: {log['file']} (changed {human_seconds(log['idle_seconds'])} ago)" + (f": {log['last_line']}" if log.get("last_line") else ""))

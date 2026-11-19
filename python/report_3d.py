@@ -616,7 +616,7 @@ def rings_payload(data_dir):
     if not data_dir or not Path(data_dir).is_dir():
         return None
     samples, order, classes = {}, [], set()
-    for sample_dir in sorted(p for p in Path(data_dir).iterdir() if p.is_dir()):
+    for sample_dir in sorted(p for p in Path(data_dir).iterdir() if p.is_dir() and not p.name.startswith(".")):
         files = sorted(sample_dir.glob("*.amr_placement.tsv"))
         if not files:
             continue

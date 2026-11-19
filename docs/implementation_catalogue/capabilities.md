@@ -130,6 +130,11 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
 - **Limits.** The QC thresholds are not platform-specific (the pilot is Illumina paired reads from public runs). Running every tool on
   every alternative assembly is a separate run per condition (3.5).
 
+- **Assembly failure diagnosis and resource check** (`assembler_diagnosis.py`, `preflight_resources.py`, stage 3, `ASSEMBLER_AUTO_RETRY`, `CAP_THREADS_TO_CPUS`, `PLASBENCH_SKIP_DISK_CHECK`). When fastp, SPAdes or Unicycler fails, the log is classified (disk full, out of memory,
+  memory limit, threads, CPU feature, broken Python, truncated reads, mismatched mates, short or empty reads, read-only or missing files, stale output folder, missing tool, network, or "not recognised" with the last lines) and one block names the cause, the evidence line and the advice;
+  `assembly_status.tsv` gains `cause` and `advice`. A cause that belongs to the computer stops stage 3 at the first isolate (exit 5); out of memory and a stale folder get one retry. Before stages 0, 2 and 3 free disk (including the Windows drive holding the WSL virtual disk),
+  memory, usable CPUs and writable folders are checked against an estimate. Reference annotation is cached by reference checksum and tool versions (`ANNOTATION_CACHE_DIR`).
+  **Tests.** `test_assembler_diagnosis.py` (fixtures written from knowledge of the message formats, not captured logs), `test_preflight_resources.py`, `test_stage3_failure_diagnosis.sh`, `test_annotation_cache.py`, `test_run_status.py`.
 ### 3.10 Candidate multiplicity: when a tool reports several sequences for one plasmid
 
 - **What.** Every predicted record is kept and accounted for. Per true plasmid the report gives the candidate count, the best single candidate's coverage, the **combined

@@ -137,6 +137,32 @@ with tempfile.TemporaryDirectory() as tmp:
     check("a live run with no recent event says a long step writes to its own log", "No event for" in text5 and "own log" in text5, text5)
     check("a busy-less process is described as waiting on the network, not as an error", "4% CPU" in text5 and "network" in text5, text5)
 
+    # --- a run that stopped in stage 3 because SPAdes failed: the cause and advice stage 3 recorded, or the classifier on the log for an old status file -----------------
+    page_text = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
+    new_run = tmp / "asmfail" / "results"
+    write_run(new_run, [ev(-50, "stage_start", stage="3"), ev(-40, "assembly_failed", stage="3", sample="a", cause="disk_full")],
+              tables={"assembly_status.tsv": [("sample", "status", "contigs", "reason", "runtime_seconds", "cause", "advice"),
+                                               ("a", "failed", "", "spades: disk_full", "3", "disk_full", "Free disk space on C:, then run the same command again."),
+                                               ("b", "skipped", "", "not attempted", "", "disk_full", "fix it"),
+                                               ("c", "failed", "", "spades: disk_full", "2", "disk_full", "Free disk space on C:, then run the same command again.")]})
+    s6 = rs.summarize(new_run, log_dir=tmp / "nologs", now=NOW, procs=[], mach={})
+    af = s6["assembly_failures"]
+    check("the summary carries the assembly failures with their recorded cause and advice", af["failed"] == 2 and af["items"][0]["cause"] == "disk_full" and "Free disk space" in af["items"][0]["advice"], af)
+    check("failures with one cause are summarised as the same reason", af["same_cause"] == "disk_full", af)
+    check("a hint says the cause is the computer, not the isolates, with the advice", any("same cause (disk_full)" in h and "Free disk space on C:" in h for h in s6["hints"]), s6["hints"])
+    check("the text output lists the failures", "assembly failures: 2, all for the same reason: disk_full" in rs.render(s6), rs.render(s6))
+    check("the window reads these fields (assembly_failures, same_cause, items, advice)", all(k in page_text for k in ("d.assembly_failures", "af.same_cause", "af.items", "i.advice", "i.cause")))
+    check("and each exists in a real summary", set(af) >= {"failed", "items", "same_cause"} and set(af["items"][0]) >= {"sample", "cause", "advice"}, af)
+    logs_old = tmp / "asmfail_logs"
+    logs_old.mkdir()
+    (logs_old / "a.spades.log").write_text("some progress\n  0:00:03  ERROR  General  Failed to write: No space left on device\n", encoding="utf-8")
+    old_run = tmp / "asmfail_old" / "results"
+    write_run(old_run, [ev(-50, "stage_start", stage="3")],
+              tables={"assembly_status.tsv": [("sample", "status", "contigs", "reason", "runtime_seconds"), ("a", "failed", "", "spades: see log", "3")]})
+    s7 = rs.summarize(old_run, log_dir=logs_old, now=NOW, procs=[], mach={})
+    check("an old status file (no cause column) is still read: the classifier reads the isolate's log", s7["assembly_failures"]["items"][0]["cause"] == "disk_full" and s7["progress"]["assembly"]["failed"] == 1, s7["assembly_failures"])
+    check("a status file with nothing failed has no assembly_failures", rs.summarize(results, log_dir=logs, now=NOW, procs=[], mach={})["assembly_failures"] == {})
+
     # --- helpers ------------------------------------------------------------------------------------------------------------------------------
     check("events survive a cut-off last line", len(rs.read_events(results / "run_events.jsonl")) == len(events))
     check("human_seconds", rs.human_seconds(30) == "30 s" and rs.human_seconds(600) == "10 min" and rs.human_seconds(8100) == "2 h 15 min")
