@@ -26,6 +26,7 @@ ONE_OFF = {
     "build_implementation_catalogue",  # regenerates docs/IMPLEMENTATION_CATALOGUE.md; test_implementation_catalogue.py runs it
     "qc_pilot",                    # a maintainer tool that measures a short real-read pilot to freeze the QC thresholds; test_threshold_freeze.py runs it with the ENA stubbed
     "relabel_cohort_provenance",   # a maintainer tool that recomputes a cohort sheet's strategy and polish labels after classify_method changes; test_truth_provenance_tokens.py checks the shipped sheets against the same function
+    "tool_install_proof",          # run by .github/workflows/tool-install-proof.yml (outside the scanned folders); test_tool_install_proof.py covers it
     "refresh_sample_report",       # called at the end of test/run_demo.sh (the demo is not a pipeline stage); test_refresh_sample_report.py covers it
 }
 

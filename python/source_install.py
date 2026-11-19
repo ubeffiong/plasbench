@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parent.parent
 REGISTRY = ROOT / "config" / "source_tools.json"
 EXIT_FAILED, EXIT_USAGE, EXIT_MANUAL, EXIT_CONSENT = 1, 2, 20, 21
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
-STEP_TYPES = {"conda_create", "conda_file", "pip_requirements", "pip_install"}
+STEP_TYPES = {"conda_create", "conda_file", "pip_requirements", "pip_install", "clear_execstack"}
 WRAPPER_MARK = "# PlasBench source install:"
 PROVENANCE = "plasbench-install.json"
 SOURCE_DIR = "plasbench-src"
@@ -107,6 +107,8 @@ def validate(registry: dict, root: Path = ROOT) -> list[str]:
             for cmd, spec in entry.get("commands", {}).items():
                 if spec.get("kind") not in ("env_bin", "script") or not spec.get("path"):
                     bad(f"command {cmd} needs kind env_bin|script and a path")
+                if not isinstance(spec.get("set_env", {}), dict) or not isinstance(spec.get("unset_env", []), list):
+                    bad(f"command {cmd}: set_env must be an object and unset_env a list")
         else:
             manual = entry.get("manual") or {}
             if not manual.get("reason") or not manual.get("recipe"):
@@ -238,7 +240,8 @@ def plan_text(name: str, entry: dict, layout: Layout | None = None) -> str:
         lines.append("  Environment  : a dedicated, isolated environment" + (f" at {layout.install}" if layout else "") + ", built from:")
         for step in steps:
             what = {"conda_create": lambda s: "conda packages " + " ".join(s["packages"]), "conda_file": lambda s: "the conda environment file " + s["path"] + " of that revision",
-                    "pip_requirements": lambda s: "pip requirements " + s["path"].lstrip("@"), "pip_install": lambda s: "pip install of " + s["target"]}[step["type"]](step)
+                    "pip_requirements": lambda s: "pip requirements " + s["path"].lstrip("@"), "pip_install": lambda s: "pip install of " + s["target"],
+            "clear_execstack": lambda s: "clearing the executable-stack request of " + s["glob"] + " (recent glibc refuses to load such libraries)"}[step["type"]](step)
             lines.append(f"      - {what}")
     else:
         lines.append("  Environment  : none (the tool builds its own on first use; see below)")
@@ -272,9 +275,47 @@ def _confirm(prompt: str) -> bool:
 
 # ---- the installer --------------------------------------------------------------------------------------------------------------------------------------
 
+PT_GNU_STACK, PF_X = 0x6474E551, 1
+
+
+def clear_execstack(path: Path) -> bool:
+    """Clear the executable-stack request (PT_GNU_STACK's X flag) of one ELF64 little-endian shared object, in place; True when it changed.
+    Recent glibc refuses to load a library that asks for an executable stack (`cannot enable executable stack as shared object requires`), which is what
+    PyTorch 1.11's libtorch_cpu.so does; clearing the flag is what `execstack -c` / `patchelf --clear-execstack` do."""
+    with open(path, "r+b") as handle:
+        head = handle.read(64)
+        if head[:4] != b"\x7fELF" or head[4] != 2 or head[5] != 1:
+            return False
+        phoff, phentsize, phnum = int.from_bytes(head[32:40], "little"), int.from_bytes(head[54:56], "little"), int.from_bytes(head[56:58], "little")
+        for index in range(phnum):
+            at = phoff + index * phentsize
+            handle.seek(at)
+            entry = handle.read(8)
+            if int.from_bytes(entry[:4], "little") == PT_GNU_STACK:
+                flags = int.from_bytes(entry[4:8], "little")
+                if flags & PF_X:
+                    handle.seek(at + 4)
+                    handle.write((flags & ~PF_X).to_bytes(4, "little"))
+                    return True
+                return False
+    return False
+
+
+def wrapper_env_lines(spec: dict, layout: Layout) -> list[str]:
+    """Shell lines a wrapper starts with for a command's `set_env` (name -> value; {install} and {src} are the tool's own folders) and `unset_env` (names)."""
+    lines = []
+    for name in spec.get("unset_env", []):
+        lines.append(f"unset {name}")
+    for name, value in spec.get("set_env", {}).items():
+        shown = value.replace("{install}", str(layout.install)).replace("{src}", str(layout.src))
+        lines += [f'{name}="{shown}"', f"export {name}"]
+    return lines
+
+
 def wrapper_text(name: str, spec: dict, entry: dict, layout: Layout, profile: str) -> str:
     head = ["#!/bin/sh", f"{WRAPPER_MARK} {profile} {entry['commit']} {layout.provenance}",
             f"# Runs {name} from its own pinned, isolated installation (config/source_tools.json, python/source_install.py)."]
+    head += wrapper_env_lines(spec, layout)
     if spec["kind"] == "env_bin":
         head += [f'PATH="{layout.install}/bin:$PATH"', "export PATH", f'exec "{layout.install}/bin/{spec["path"]}" "$@"']
     else:
@@ -464,6 +505,10 @@ def _do_install(name: str, entry: dict, layout: Layout, solver: str, env_name: s
                 label, command = "pip install -r " + step["path"].lstrip("@"), [str(layout.install / "bin" / "pip"), "install", "-r", str(path)]
             elif step["type"] == "pip_install":
                 label, command = "pip install " + step["target"], [str(layout.install / "bin" / "pip"), "install"] + step.get("args", []) + [step["target"]]
+            elif step["type"] == "clear_execstack":
+                changed = [str(f) for f in sorted(layout.install.glob(step["glob"])) if f.is_file() and clear_execstack(f)]
+                print(f"[PlasBench] cleared the executable-stack request of {len(changed)} library file(s) ({step['glob']}): recent glibc refuses to load them otherwise")
+                continue
             else:
                 continue
             print(f"[PlasBench] {label}")

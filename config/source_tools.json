@@ -16,7 +16,7 @@
         {"type": "conda_file", "path": "envs/gplas.yaml"},
         {"type": "pip_install", "target": ".", "args": ["--no-deps"]}
       ]},
-      "commands": {"gplas": {"kind": "env_bin", "path": "gplas"}},
+      "commands": {"gplas": {"kind": "env_bin", "path": "gplas", "set_env": {"PYTHONPATH": "{src}"}}},
       "verify": {"argv": ["gplas", "--help"], "expect": "--prediction", "why": "proves the gplas2 -P/--prediction flag that PlasBench's gplas2 modes need (bioconda's gplas 0.6.1 lacks it)"},
       "inputs": ["gplas2_mob needs MOB-suite output (mob_recon profile); gplas2_external needs per-sample classifier tables you provide (--gplas2-external-predictions-dir)"],
       "note": "envs/gplas.yaml pins linux-64 builds and lists the Anaconda 'defaults' channel as upstream wrote it. Requires ASSEMBLER=unicycler (SPAdes contig ids never match gplas2's GFA segment ids).",
@@ -34,9 +34,10 @@
       "disk_gb": 6,
       "minutes": "10-30 (not measured; PyTorch 1.11 and CUDA 10.2 toolkit packages)",
       "env": {"python": null, "steps": [
-        {"type": "conda_file", "path": "plasme.yaml"}
+        {"type": "conda_file", "path": "plasme.yaml"},
+        {"type": "clear_execstack", "glob": "lib/python3*/site-packages/torch/lib/*.so*"}
       ]},
-      "commands": {"PLASMe.py": {"kind": "script", "path": "PLASMe.py", "interpreter": "python"}},
+      "commands": {"PLASMe.py": {"kind": "script", "path": "PLASMe.py", "interpreter": "python", "set_env": {"GLIBC_TUNABLES": "glibc.rtld.execstack=1"}}},
       "verify": {"argv": ["PLASMe.py", "--help"], "expect": "", "why": "the script starts and imports its PyTorch/Biopython dependencies"},
       "inputs": ["The PLASMe database (about 12.4 GB): installed by `plasbench check --yes` (env/download_plasme_db.sh)."],
       "note": "plasme.yaml pins linux-64 builds from the pytorch, bioconda, conda-forge and Anaconda 'defaults' channels as upstream wrote it.",
@@ -116,7 +117,7 @@
       "env": {"python": null, "steps": [
         {"type": "conda_create", "packages": ["nextflow=25.04.8"], "channels": ["conda-forge", "bioconda"]}
       ]},
-      "commands": {"nextflow": {"kind": "env_bin", "path": "nextflow"}},
+      "commands": {"nextflow": {"kind": "env_bin", "path": "nextflow", "unset_env": ["JAVA_CMD"], "set_env": {"JAVA_HOME": "{install}"}}},
       "verify": {"argv": ["nextflow", "-version"], "expect": "version", "why": "Nextflow starts (the pipeline needs >= 24.04.0); the pinned pipeline checkout is verified by git rev-parse"},
       "inputs": ["A container engine (Docker, Singularity or Apptainer) is needed when the pipeline runs: installing one needs administrator rights, which PlasBench never uses. The pipeline downloads its own container images and Nextflow plugins on its first run."],
       "note": "The benchmark does not run this pipeline; it imports its GFF3 output as non-scoring evidence. Run it with: nextflow run <install>/plasbench-src -profile docker ...",

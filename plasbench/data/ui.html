@@ -839,7 +839,8 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
    <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Add your own tool</h1>
     <p>Describe a plasmid reconstruction or classification tool once. PlasBench installs it into its own environment, runs it on every sample (or reads outputs you already have), converts its output, and scores, ranks and reports it beside the built-in tools. No code changes.</p></div>
     <div class="row"><button class="btn sec" id="ut_help" title="How Add your own tool works, step by step, with a worked example"><svg class="ico sm"><use href="#i-help"/></svg>How it works</button>
-     <select id="ut_load" aria-label="Edit an existing user tool" style="width:auto"><option value="">New tool…</option></select></div></div>
+     <select id="ut_load" aria-label="Edit an existing user tool" style="width:auto"><option value="">New tool…</option></select>
+     <button class="btn danger sm" id="ut_remove" disabled title="Delete the tool chosen on the left: its manifest, scripts and downloaded source">Remove</button></div></div>
    <div class="split">
     <div class="card" id="utform"><div class="hd"><h3>Manifest</h3><button class="btn ghost icon sm" data-uthelp title="How this form works, with an example" aria-label="Help: how this form works"><svg class="ico sm"><use href="#i-help"/></svg></button><span class="sub" id="ut_where"></span></div><div id="utsections"></div></div>
     <div class="stack" style="position:sticky;top:calc(var(--hdr) + 18px)">
@@ -3199,6 +3200,11 @@ async function utLoadList() {
 }
 $("#ut_load").onchange = async e => { if (!e.target.value) { utReset(); return; } utLast = null;
   const r = await api(`usertools/get?name=${encodeURIComponent(e.target.value)}`); $("#ut_text").value = r.text; $("#ut_where").textContent = r.path; utChanged(true); };
+$("#ut_load").addEventListener("change", e => { $("#ut_remove").disabled = !e.target.value; });
+$("#ut_remove").onclick = async () => { const name = $("#ut_load").value; if (!name) return;
+  if (!await askConfirm({title: `Remove ${name}?`, danger: true, confirmLabel: "Remove it", body: `This deletes the tool's folder (manifest, scripts and downloaded source) from ~/.plasbench/tools/${name}. Results already produced stay where they are.`})) return;
+  try { await api("usertools/remove", {name}); toast(`Removed ${name}`, "ok"); S.user = null; S.tools = null; S.toolsStale = true; utReset(); $("#ut_remove").disabled = true; await utLoadList(); }
+  catch (e) { toast(e.message, "bad"); } };
 function utReset() { UT = utBlank(); utLast = null;
   $("#ut_where").textContent = "saved to ~/.plasbench/tools/<name>/"; utRender(); utChanged(false); }
 window.editUserTool = async name => { go("addtool"); setTimeout(async () => { $("#ut_load").value = name; $("#ut_load").dispatchEvent(new Event("change")); }, 200); };

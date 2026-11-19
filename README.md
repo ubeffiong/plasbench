@@ -4042,6 +4042,7 @@ Send the tool's folder (manifest plus any scripts). The recipient adds it with
 instead keep shared tools in one folder and set `PLASBENCH_TOOLS_PATH` to it. In command mode PlasBench runs the
 command the manifest contains, as you, so read a manifest you receive before adding it, as you would any script.
 `PLASBENCH_USER_TOOLS=off` hides every user tool for a run.
+`plasbench tools remove my_binner` deletes a tool you added. The whole add-your-tool path is tested end to end with fake tools by `test/test_add_tool_e2e.sh`, and every tool install is proved on Linux by `.github/workflows/tool-install-proof.yml` (see `docs/TOOL_INSTALL_AUDIT.md`, *CI proof*).
 
 ---
 

@@ -19,6 +19,14 @@ plasbench run --tool my_tool ...         # 4. benchmark it with the built-in too
 
 `--tool` can be repeated (`--tool a --tool b`) or given `all`; in `config/config.sh` the same is `USER_TOOLS=a,b`.
 
+`plasbench tools list` shows what PlasBench sees; `plasbench tools add DIR` copies a finished tool folder onto the search path (adding the folder that already
+is the installed copy changes nothing); `plasbench tools remove my_tool` deletes the tool's folder (manifest, scripts, downloaded source and its provenance).
+It refuses a built-in tool and the examples that ship in `tools.d/`. The window's *Add your own tool* page has the same *Remove* button. Results already produced
+stay where they are.
+
+Every path above is exercised end to end against the real code with tiny fake tools by `test/test_add_tool_e2e.sh` (conversions for each task and format,
+every install source and its refusals, the command line, the window routes, and stage 4, 5 and 6 on a small cohort).
+
 ## How it fits together
 
 ```

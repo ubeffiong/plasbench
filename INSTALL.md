@@ -114,6 +114,10 @@ plasbench install-tools plan       # same machine-readable plan for records/auto
 plasbench install-tools validate   # confirms registry coverage; no downloads
 ```
 
+Every profile is installed on a clean Linux runner by `.github/workflows/tool-install-proof.yml` (weekly and on request, Actions tab, *Run workflow*; the
+`profiles` input takes `all` or a comma list). It uses the commands above, runs each tool's verification and writes one table of every profile (pass, or
+expected-manual with the reason) into the run summary; the latest result per tool is the *CI proof* column of `docs/TOOL_INSTALL_AUDIT.md`.
+
 `plasbench install-tools all` runs every **verified automatic** profile through
 its existing installer path. It deliberately does not fake an installation for
 the two runtimes that cannot be installed automatically (plsMD and PPR-Meta: see
