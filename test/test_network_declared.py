@@ -40,6 +40,7 @@ GUARDS = ("require_internet", "net_require", "net_explain", "netcheck", "PLASBEN
 ALLOWED = {
     "install.sh": "delegates every download to guarded scripts (env/bootstrap_conda.sh, env/setup_conda.sh, plasbench install-tools); its pip install is a local --no-deps install of this checkout",
     "plasbench/webui.py": "a loopback health check on 127.0.0.1 and tool-name lists; not the internet",
+    "plasbench/cli.py": "the upgrade repair runs a local `pip install --no-deps <this folder>` after update.sh (which is guarded and declared); the other matches are advice text",
     "plasbench/server_state.py": "a loopback health check of the replacement window server on 127.0.0.1; not the internet",
     "plasbench/platform_info.py": "builds advice text (a curl and docker pull command the user is told to run); makes no request",
     "plasbench/ui_help.py": "tooltip text that mentions prefetch and aria2c; no request",

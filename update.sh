@@ -129,6 +129,7 @@ say "latest version: $LATEST_VERSION"
 
 if [[ "$CURRENT_VERSION" == "$LATEST_VERSION" ]]; then
     say "already up to date -- nothing to do."
+    say "(plasbench upgrade also checks that the installed program matches this folder and repairs it; to see the evidence yourself: plasbench ui-state)"
     exit 0
 fi
 

@@ -13,6 +13,19 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed -- the "older version than the page" banner no longer cries wolf
+- **Stale means the loaded code really differs.** The window judged itself by the size and mtime of every `plasbench/*.py`; a touched file with the same content, a module it never imported, a cache or a copy made by a sync tool counted. It now records a SHA-256 of each module it has imported and compares content (cached by size and mtime), plus the version in the package it runs from. `ui.html` is no longer part of it; the page carries an api level (`meta plasbench-api-level`), and a server that leaves that placeholder unreplaced is certainly older than the page.
+- **Two installs are told apart from a stale window.** A copy in the plasbench environment (`pip install --no-deps .`) next to a different version in the PlasBench folder is reported as `two_installs` with the install command: Restart window cannot fix it, so it is not offered. `GET /api/server-state` gains `kind`, `running_version/path`, `project_root_version/path`, `changed_modules`, `fix_command`, `server {pid, port, started_at}`, `api_level`.
+- **A second `plasbench ui` (or the icon) replaces a window older than the command** instead of reusing it (which brought the same old window, and its banner, straight back); runs keep going. Restart now starts the package folder the old server ran from, not whatever `-m plasbench` finds in the current folder.
+- **Banner.** Shown only when the server says stale; Details carries versions, paths, pid and port and the changed modules with truncated hashes; "Dismiss for this server run" is keyed by start time, pid and kind.
+- **`plasbench upgrade` verifies the install** (the Python's `plasbench` against the folder's version), repairs an old installed copy with `pip install --no-deps`, and records the folder. Cause inferred from the code (not reproduced on the reporter's WSL machine): an older installed copy or window left running after an upgrade.
+
+### Added -- `plasbench ui-state`, finding the PlasBench folder from anywhere, a launcher
+- `plasbench ui-state [--json]` prints the evidence behind the banner (running version and folder, every copy of `plasbench` on `sys.path` and in the conda environments next to this Python, `pip` metadata, the PlasBench folder and how it was found, install record, the running window's state).
+- The PlasBench folder is found from `--project-root`, `PLASBENCH_HOME`, the current folder or a parent, `~/.plasbench/install.json`, the folder the program was imported from, then `~/PlasBench`; the one used is named when it is not the current folder, and a missing folder gives a short error with three fixes instead of the command list.
+- `install.sh` and `plasbench upgrade` write `~/.local/bin/plasbench` (marker comment, never over a foreign file, `PLASBENCH_NO_LAUNCHER=1` to skip) so `plasbench` works outside the conda environment.
+- New `plasbench/roots.py`; tests: `test/test_stale_false_positive.py`.
+
 ## [0.5.3] - 2026-11-19
 Summary. Nothing in this release changes a score, a ranking or a threshold.
 - **Window.** Every Browse button opens the computer's own folder window (Explorer on Windows and WSL, Finder, zenity/kdialog/yad) with the built-in browser as fallback; a window that is older than the files on disk shows a banner with Restart window and Reload page (clear cache).

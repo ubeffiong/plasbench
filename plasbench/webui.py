@@ -1698,7 +1698,7 @@ def make_handler(project: Project, jobs: Jobs):
         mtime = (PAGE_FILE.stat().st_mtime, disk)
         if mtime != page_cache["mtime"]:
             html = PAGE_FILE.read_text(encoding="utf-8")
-            page_cache.update(etag=f"{mtime[0]:.6f}-{mtime[1]}-{__version__}", mtime=mtime, body=html.replace("__PAGE_VERSION__", disk or __version__).replace("__VERSION__", __version__).encode("utf-8"))
+            page_cache.update(etag=f"{mtime[0]:.6f}-{mtime[1]}-{__version__}", mtime=mtime, body=html.replace("__PAGE_VERSION__", disk or __version__).replace("__API_LEVEL__", str(server_state.API_LEVEL)).replace("__VERSION__", __version__).encode("utf-8"))
         return page_cache["body"]
         # END server state
 
@@ -1906,7 +1906,7 @@ def make_handler(project: Project, jobs: Jobs):
             # -- END scan a folder for isolates --
             # BEGIN server state
             if route == "server-state":   # is this server older than the files on disk (an update while the window was open)? Stats a few files, spawns nothing
-                return self.jsend(200, loadcache.ttl("server-state", 3.0, server_state.state))
+                return self.jsend(200, loadcache.ttl("server-state", 3.0, lambda: server_state.state(project.root)))
             # END server state
             # BEGIN workflow steps
             if route == "workflow":
@@ -2687,6 +2687,49 @@ def _page_seen_of(port: int):
     return None, None, 0.0
 
 
+def _call_old_server(url: str, route: str, body=None, timeout: float = 4.0):
+    """GET (or POST with `body`) /api/<route> of a running PlasBench window given its address (with the key). The parsed JSON, or None when it does not answer or has no such route."""
+    import urllib.request
+    u = urlparse(url)
+    key = parse_qs(u.query).get("t", [""])[0]
+    headers = {"X-PlasBench-Token": key, "Host": f"127.0.0.1:{u.port}"}
+    data = None
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+        headers.update({"Content-Type": "application/json", "Origin": f"http://127.0.0.1:{u.port}"})
+    try:
+        with urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{u.port}/api/{route}", data=data, headers=headers), timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def replace_stale_instance(url: str, ask=None, say=print, wait: float = 10.0) -> bool:
+    """A second `plasbench ui` (or a click on the icon) finds a window already running for this folder. If that window runs OLDER code than this command (it was started before an
+    upgrade and kept running), reusing it would show the old program again however often the user 'restarts': ask it to exit (like Quit and keep running: runs are detached and keep going)
+    and let the caller start a fresh one. True when the old one is gone and a new server should be started; False to reuse it."""
+    ask = ask or _call_old_server
+    st = ask(url, "server-state")
+    old = (st or {}).get("running_version") or (st or {}).get("started_version") or ""
+    if st is not None and (st.get("kind") not in ("loaded_code",) and old == __version__):
+        return False   # the same version (or a two-installs problem a new process cannot fix): reuse it
+    who = f"pid {(st or {}).get('server', {}).get('pid', '?')}, port {urlparse(url).port}"
+    say(f"The PlasBench window that is already running ({who}) is older ({old or 'before 0.5.2'}) than this PlasBench ({__version__}); replacing it. Your runs keep going in the background.")
+    res = ask(url, "shutdown", {"keep": True})
+    if not (res or {}).get("ok"):
+        say("It did not agree to close; using it as it is. Close it with Quit in its window, then start PlasBench again.")
+        return False
+    port = urlparse(url).port
+    end = time.time() + wait
+    while time.time() < end and _page_seen_of(port)[0]:
+        time.sleep(0.2)
+    try:
+        _instance_file().unlink()
+    except OSError:
+        pass
+    return True
+
+
 def running_instance(root: Path):
     """The URL of a PlasBench window already serving this PlasBench folder, or None.
 
@@ -2770,6 +2813,8 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
     if lock:
         lock.__enter__()
     existing = None if new_instance else running_instance(root)
+    if existing and replace_stale_instance(existing):
+        existing = None
     if existing:
         if lock:
             lock.__exit__()
@@ -2802,6 +2847,7 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
             lock.__exit__()
         raise SystemExit(f"ERROR: no free port between {port} and {port + 19}")
     url = f"http://127.0.0.1:{server.server_address[1]}/?t={quote(TOKEN)}"
+    server_state.reset(root=root, port=server.server_address[1])   # the baseline of this server: the version and the content of the modules it has loaded now
     UI_HOME.mkdir(parents=True, exist_ok=True)
     record = _instance_file()
     record.write_text(json.dumps({"url": url, "port": server.server_address[1], "pid": os.getpid(), "started": int(SERVER_STARTED),
