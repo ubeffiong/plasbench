@@ -549,9 +549,10 @@ def build_parser():
     conda_parser.add_argument("--yes", action="store_true", help="Install without an interactive confirmation prompt.")
     conda_parser.add_argument("--prefix", type=Path, help="Install location (default: $HOME/miniforge3).")
     install_parser = sub.add_parser("install-tools", help="Install, inspect, or verify registered bioinformatics tool profiles.")
-    install_parser.add_argument("profile", nargs="?", default="core", help="list, plan, validate, locked, core, assembly, metagenomics, reconstruction, simulate, quast, multiqc, long-read, annotation, annotation-prokka, ppr-meta, plsmd, mobilome-map, gplas, gplas2, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, rfplasmid, plasmidhunter, plasmer, plascope, all, or a conda package name.")
+    install_parser.add_argument("profile", nargs="?", default="core", help="list, plan, validate, locked, core, assembly, metagenomics, reconstruction, simulate, quast, multiqc, long-read, annotation, annotation-prokka, ppr-meta, plsmd, mobilome-map, gplas, gplas2, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, plasbin_flow, plasmidec, baseline, rfplasmid, plasmidhunter, plasmer, plascope, all, or a conda package name. Exit codes: 0 installed or nothing to do, 20 a manual install is needed (nothing failed), 2 unknown name or wrong option, 1 the install failed.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     install_parser.add_argument("--yes", action="store_true", help="Use non-interactive mode for supported installer profiles; database setup remains explicit in 'plasbench check --yes'.")
+    install_parser.add_argument("--dry-run", action="store_true", help="Say what the profile is (automatic, built in, or a manual install) and stop: no conda, no network, nothing installed.")
     tools_parser = sub.add_parser(
         "tools", help="Add your own plasmid tool (one or several tasks; from conda, pip, an https URL or a folder on this computer): create, validate, list and install user tool manifests (docs/ADDING_TOOLS.md).")
     tools_sub = tools_parser.add_subparsers(dest="tools_command", required=True)
@@ -1219,7 +1220,7 @@ def main(argv=None):
         if args.yes:
             command.append("--yes")
         command.append(args.profile)
-        code = run(command, root)
+        code = run(command, root, {"PLASBENCH_INSTALL_DRY_RUN": "1"} if args.dry_run else None)
     elif args.command == "tools":
         if args.tools_command == "install":
             code = run([bash_command(), "env/install_tools.sh", "--env", args.env, args.name], root)

@@ -172,6 +172,7 @@ ARGS = {"run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONS
 
 # Wizard controls that are not command-line options. Keys are the control names used by the page.
 WIZARD = {
+    "git_page": {"summary": "Git without the command line, for your runs: one repository in the working directory, holding every study's record, sample sheets, settings, result tables, reports, figures and logs, with one history and one remote. The PlasBench program itself is not tracked here, because updates replace it. A managed .gitignore keeps raw sequence data (reads, assemblies, FASTA, alignments), tmp folders and credentials out. Every commit is checked for data, secrets and files too large for GitHub before it is made, and nothing is ever force-pushed."},
     "cohort": {"summary": "The bundled cohort to benchmark: its sample sheet in cohorts/. Locked cohorts are verified against their recorded accessions.", "flag": "--cohort",
                "when": "Only sample sheets of the benchmark kind are offered (the accession ledger is not one)."},
     "sample_sheet": {"summary": "A sample sheet you prepared, or one built on the Your own isolates page: columns sample_id, assembly_accession, sra_run.", "flag": "--samples", "setting": "SAMPLE_SHEET"},

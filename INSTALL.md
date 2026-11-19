@@ -120,6 +120,18 @@ source-only runtimes (currently gplas2, PLASMe and plASgraph2) or databases
 without a stable upstream checksum. Those rows remain explicit as `planned` or
 `manual` in the registry, and their own profile prints the safe next step.
 
+### Manual-install profiles (exit code 20)
+
+Some profiles are installed by hand because the upstream is a source checkout, a container or a workflow that PlasBench will not clone or pull unpinned: **gplas2**, **plasme**,
+**plasgraph2**, **plsmd**, **ppr-meta**, **mobilome-map**, **plasbin_flow** and **plasmidec**. `plasbench install-tools NAME` for one of them installs nothing, prints the reason, the
+commands to run yourself and the next steps, and exits **20**. That is not a failure: in the window the job reads *Manual step needed*, and `plasbench install-tools all` and
+`scripts/00_setup.sh` do not count it as one. The steps are: read the notice, run `plasbench install-tools plan` for the verification command of each tool, install the pinned
+revision yourself (sections 4 and 6 below give the gplas2, PLASMe and plASgraph2 commands), then run `plasbench check`.
+
+`plasbench install-tools` exit codes: **0** installed, or nothing to install (`baseline` is built in); **20** a manual installation step is needed (nothing failed); **2** an unknown
+profile name or a wrong option (a name close to a real one lists the nearest names); **1** the installation failed (the messages above it say which step); **137** killed for memory
+(the output says how to give WSL more). `plasbench install-tools NAME --dry-run` reports what a name is without starting conda or using the network.
+
 ### Platon database (required if `RUN_PLATON=1`)
 ```bash
 bash env/download_platon_db.sh

@@ -656,6 +656,35 @@ the independent-truth subset of public-v4 is still to be done.
 **Answer.** No. Use **Your own isolates > Scan a folder** in the window, or `plasbench scan-isolates FOLDER` (add `--write-sheet config/local.tsv` to place what it finds). It looks through the sub-folders, pairs the reads by their names (`_R1/_R2`, `_1/_2`, lanes, SRA style), picks the complete reference for each isolate and tells you why, and ignores BAMs, logs, PDFs, spreadsheets and assembler output such as `contigs.fasta`. It changes nothing in your folder; whatever it is unsure of is shown as an issue with the alternatives, never chosen silently. **Limit.** It matches by folder and file names and the start of each file, so a reference sitting in the right folder but from another strain looks right; check every isolate marked "check" and run the quick test. See the guide section "Add isolates from a folder".
 **Status.** New after v0.5.0.
 
+### Q63. `plasbench install-tools gplas2 --yes` printed a long note and then "ERROR ... wrong option or a missing file (exit 2)". Did something break?
+**Answer.** No. gplas2, PLASMe, plASgraph2, plsMD, PPR-Meta, the Mobilome Annotation Pipeline, PlasBin-flow and PlasmidEC are installed by hand (source checkouts, containers or workflows
+that PlasBench will not clone or pull unpinned). Before, that outcome ended with exit 2, which the window then explained with the usage-error text. Now the command prints what to do and exits
+**20**, which means "a manual installation step is needed; nothing failed". In the window the job shows **Manual step needed**, not Failed. The other exit codes of `install-tools` are 0
+(installed, or nothing to install: the built-in `baseline` profile), 2 (an unknown name or a wrong option; a misspelt name lists the nearest names) and 1 (the install really failed).
+`plasbench install-tools NAME --dry-run` says which of these a name is without starting conda or touching the network.
+**Evidence.** `env/install_tools.sh`, `python/tool_installer_registry.py resolve`, `plasbench/exitcodes.py`; `test/test_install_outcomes.py` (every name in `install-tools list`, `all`, unknown names).
+**Status.** Fixed after v0.5.0 (next release).
+
+### Q64. What do the numbers on the Scoring decisions page allow?
+**Answer.** Each numeric decision shows its type (whole number, decimal, fraction, seconds), its minimum and maximum, its unit and its default, in a small label and in the tooltip, and the
+edit box is a number input (with a slider when both bounds are enforced) that turns red outside the range. The ranges come from one table, `config/setting_ranges.tsv`, written from what the
+code refuses: the decision editor accepts whole numbers of 0 or more and decimals of 0 or more, and the scorers refuse an identity or coverage outside 0 to 1 and a recovery threshold
+outside above 0 up to 1. Where the code accepts anything, the label says **no maximum enforced** rather than inventing a bound. Saving a setting outside its range is refused with a plain sentence; a value that is
+already saved is never rejected on a later save, and clearing a setting to its default always works.
+**Evidence.** `python/setting_ranges.py`, `test/test_setting_ranges.py` (runs `score_bins.py` and the decision validator against the table).
+**Status.** New after v0.5.0.
+
+### Q65. The "This computer" card showed fewer CPUs and less memory than my machine has. Which numbers are right?
+**Answer.** Both, for different things. Inside WSL2 the card now shows the Linux virtual machine's CPUs, memory (total and **available now**) and swap, then the Windows host (read through
+PowerShell) and the `.wslconfig` limits, and says plainly that the VM's numbers are set by `C:\Users\<you>\.wslconfig` and change only after `wsl --shutdown`. It also reports a cgroup limit
+or a CPU affinity when one is in force, and what a benchmark will use (threads = usable CPUs; assembler memory = 80% of what is available, as `config/config.sh` computes it). Units are GB = 2^30 bytes.
+The **Drives** table lists every mounted drive with label, mount point (and the Windows letter under WSL), filesystem, used and free space, type (internal, removable, network, optical,
+cloud-synced; "guess" where it can only be inferred from the mount point), read-only flag, which drive holds the data folder, the workspace and the current study, and the slow-drive and
+cloud-sync warnings. **Refresh** looks again and marks drives plugged in since the last look as new and lists the ones removed. A Windows drive that is plugged in but not mounted in Ubuntu shows the
+`sudo mount -t drvfs` command the folder chooser shows; PlasBench never runs it. A probe that fails reads "unknown".
+**Evidence.** `plasbench/computer_info.py`; `test/test_computer_info.py` (sample /proc/meminfo, /proc/mounts, df, lsblk, PowerShell, wmic, sysctl, vm_stat and mount output for Linux, WSL, macOS and Windows).
+**Status.** Fixed after v0.5.0 (next release). Not yet checked on a real Mac.
+
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions

@@ -419,7 +419,10 @@ if [[ "$NEED_CONDA" -eq 1 ]]; then
 fi
 for profile in "${!NEEDED_PROFILES[@]}"; do
     log "Installing 'install-tools $profile' ..."
-    bash "$HERE/../env/install_tools.sh" "$profile" || warn "install-tools $profile failed; see output above"
+    profile_status=0
+    bash "$HERE/../env/install_tools.sh" "$profile" || profile_status=$?
+    if [[ "$profile_status" -eq 20 ]]; then warn "install-tools $profile needs a manual install (nothing failed); the steps are above"
+    elif [[ "$profile_status" -ne 0 ]]; then warn "install-tools $profile failed; see output above"; fi
 done
 if [[ "$NEED_PLATON_DB" -eq 1 ]]; then
     bash "$HERE/../env/download_platon_db.sh" || warn "Platon database step did not complete; see output above"

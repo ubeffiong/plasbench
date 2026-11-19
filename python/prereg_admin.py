@@ -136,6 +136,13 @@ def validate_value(row, value):
         if bad or not items:
             raise ValueError(f"{row['title']}: choose from {', '.join(choices)}" + (" (several allowed, separated by commas)" if kind == "text" else ""))
         value = ",".join(items)
+    if kind in ("int", "float", "yesno"):
+        # The range the code accepts (config/setting_ranges.tsv), on top of the type check above: one table, shared with the window and the settings save.
+        import setting_ranges
+        entry = setting_ranges.load(ROOT).get((row.get("config_variable") or "").strip())
+        problem = setting_ranges.check(entry, value) if entry else None
+        if problem:
+            raise ValueError(problem)
     if "\n" in value or "\r" in value or "\t" in value:
         raise ValueError("a value cannot contain a line break or a tab")
     return value

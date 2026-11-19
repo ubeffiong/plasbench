@@ -123,6 +123,13 @@ def main():
     check("the Runs & reports view has a delimited, collapsible QC note drawn from ui_help.REPORT_NOTES['qc'] (title + text) through the schema",
           "<details" in block and 'id="qcnote_title"' in block and 'id="qcnote_text"' in block and "renderQcNote" in html and ".report_notes" in html
           and ui_schema.schema()["report_notes"]["qc"]["title"] == ui_help.REPORT_NOTES["qc"]["title"] and ui_schema.schema()["report_notes"]["qc"]["text"] == ui_help.REPORT_NOTES["qc"]["text"] and ui_help.REPORT_NOTES["qc"]["text"])
+    git_text = ("Git without the command line, for your runs: one repository in the working directory, holding every study's record, sample sheets, settings, result tables, "
+                "reports, figures and logs, with one history and one remote. The PlasBench program itself is not tracked here, because updates replace it. A managed .gitignore keeps "
+                "raw sequence data (reads, assemblies, FASTA, alignments), tmp folders and credentials out. Every commit is checked for data, secrets and files too large for GitHub "
+                "before it is made, and nothing is ever force-pushed.")
+    check("the Version control page's description is the help tooltip text, word for word", ui_help.WIZARD["git_page"]["summary"] == git_text)
+    check("the Version control page has no visible description paragraph (it is in the tooltip)",
+          "Git without the command line, for your <b>runs</b>" not in html.split('id="v_git"', 1)[1].split("</section>", 1)[0] and 'id="g_tip"' in html and 'wizTip("git_page")' in html)
     node = shutil.which("node")
     if node:
         script = max(re.findall(r"<script[^>]*>(.*?)</script>", html, re.S), key=len)
