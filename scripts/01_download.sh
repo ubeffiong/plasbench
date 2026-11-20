@@ -477,8 +477,14 @@ require_downloads_online
 confirm_download
 
 declare -A PIDS
+DISK_STOP=""
+DISK_STOP_AT=""
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
+    if ! disk_guard 1 "$SAMPLE" "$SRA"; then      # the next isolate no longer fits (plus the reserve): stop cleanly BEFORE it starts downloading
+        DISK_STOP=1; DISK_STOP_AT="$SAMPLE"
+        break
+    fi
     if [[ "$MAX_PARALLEL_SAMPLES" -le 1 ]]; then
         # Not backgrounded: a die() inside download_sample aborts this whole
         # script immediately, exactly like before parallelism existed.
@@ -494,6 +500,12 @@ if [[ "$MAX_PARALLEL_SAMPLES" -gt 1 ]]; then
     for sample in "${!PIDS[@]}"; do
         wait "${PIDS[$sample]}" || true
     done
+fi
+
+if [[ -n "$DISK_STOP" ]]; then
+    run_event stage_stopped "cause=disk_space" "sample=$DISK_STOP_AT"
+    warn "Stage 1 stopped cleanly before $DISK_STOP_AT because the disk is nearly full. Nothing was lost: isolates already downloaded are kept. Free space (or use a bigger drive), then run the same plasbench run command again to continue with the isolates not downloaded yet."
+    exit 6
 fi
 
 # Assemble the status table in sample-sheet order, so its rows read the same

@@ -50,6 +50,26 @@ def _ps(exe: str, command: str, run, timeout: float = 30) -> tuple:
     return got.returncode, dec(got.stdout), dec(got.stderr)
 
 
+def _vdisk_step(steps, exe, run, env) -> None:
+    """Where this Ubuntu's virtual disk is and how much room its Windows drive has: the evidence behind the resource check's 'C: has only N GB free' (never a guess:
+    the distribution this process runs in, found by exact name; INFO with the reason when it cannot be measured)."""
+    from . import computer_info
+
+    def ps(argv, timeout=8):
+        rc, out, _err = _ps(argv[0], argv[-1], run, timeout=timeout)
+        return out if rc == 0 else None
+    try:
+        v = computer_info.wsl_vdisk(run=ps, which=lambda name: exe if name.startswith("powershell") else None, env=env)
+    except Exception as exc:  # noqa: BLE001 - a diagnostic must not break the checks
+        _step(steps, "Ubuntu's virtual disk and its Windows drive", INFO, f"could not be looked at ({exc.__class__.__name__})")
+        return
+    where = f"distribution '{v['distro'] or '?'}'" + (f", file {v['vhdx']}" if v["vhdx"] else "") + (f", Windows volume {v['letter']}:" if v["letter"] else "")
+    if v["free"] is None:
+        _step(steps, "Ubuntu's virtual disk and its Windows drive", INFO, f"free space unknown ({v['error']}); {where}")
+    else:
+        _step(steps, "Ubuntu's virtual disk and its Windows drive", PASS, f"{where}: {v['free'] / 1e9:.1f} GB free ({v['free']} bytes, {v['how']}). Check it yourself: {v['command']}")
+
+
 def _first_error(text: str) -> str:
     lines = [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.startswith("#< CLIXML")]
     return (lines[0] if lines else "")[:300]
@@ -187,6 +207,8 @@ def run_checks(interactive: bool = False, seconds: int = 2, *, platform: str | N
     if plat == "wsl":
         inter = caps.get("interop") or np.interop_state(env, read)
         _step(steps, "WSL interop (Linux can start Windows programs)", {True: PASS, False: FAIL, None: INFO}[inter["enabled"]], inter["detail"])
+    if plat == "wsl" and caps.get("available"):
+        _vdisk_step(steps, caps["exe"], run, env)
     if plat in ("windows", "wsl"):
         tried = caps.get("tried") or []
         if caps["available"]:

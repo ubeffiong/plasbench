@@ -398,6 +398,10 @@ declare -A PIDS
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     [[ -e "$STATUS_SHARDS/.stop" ]] && break      # a cause that belongs to the computer was found: do not try the rest
+    if ! disk_guard 3 "$SAMPLE" "$SRA"; then      # the next isolate no longer fits (plus the reserve): stop cleanly BEFORE SPAdes, not in the middle of it
+        printf '%s\t%s\t%s\n' "disk_space" "$SAMPLE" "not enough free disk space for the next isolate" > "$STATUS_SHARDS/.stop"
+        break
+    fi
     if [[ "$MAX_PARALLEL_SAMPLES" -le 1 ]]; then
         assemble_sample "$SAMPLE" "$ASM" "$SRA"
     else
@@ -460,6 +464,10 @@ fi
 if [[ -n "$STOP_INFO" ]]; then
     IFS=$'\t' read -r STOP_CAUSE STOP_SAMPLE STOP_TITLE <<< "$STOP_INFO"
     run_event stage_stopped "cause=$STOP_CAUSE" "sample=$STOP_SAMPLE" "not_attempted=$N_NOT_TRIED"
+    if [[ "$STOP_CAUSE" == "disk_space" ]]; then
+        warn "Stage 3 stopped cleanly before $STOP_SAMPLE because the disk is nearly full ($N_NOT_TRIED isolate(s) not attempted). Nothing was lost: finished isolates are kept. Free space (or use a bigger drive), then run the same plasbench run command again to continue. Status: $STATUS"
+        exit 6
+    fi
     warn "Stage 3 stopped early at $STOP_SAMPLE: $STOP_TITLE ($STOP_CAUSE). This belongs to the computer, not the isolate, so every other sample would fail the same way ($N_NOT_TRIED not attempted). Fix it, then run the same plasbench run command again: finished isolates, downloads and trimmed reads are reused (there is no separate --resume option). Status: $STATUS"
     exit 5
 fi
