@@ -1102,11 +1102,10 @@ class Jobs:
             job = self.jobs[job_id]
             code = int(code) if isinstance(code, (int, float)) else None
             state = "cancelled" if job["state"] == "cancelling" else ("done" if code == 0 else "failed")
+            warning = self._run_warnings(job) if state == "done" else ""
+            if warning:
+                job["warnings"] = warning      # before the state flips, so a reader that sees "done" never sees it without the note
             job.update(ended=ended or time.time(), exit=code, state=state)
-            if state == "done":
-                warning = self._run_warnings(job)
-                if warning:
-                    job["warnings"] = warning
             if save:
                 self._save()
         if code not in (0, None):
