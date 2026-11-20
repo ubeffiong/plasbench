@@ -243,6 +243,34 @@ def prereg_status(project_root):
     return record
 
 
+
+def runtime_record():
+    """{'runtime': conda|docker, and for docker: image, image_source (pulled|built-locally), docker_version, mounts, extras}: honest about where the tools ran."""
+    runtime = os.environ.get("PLASBENCH_RUNTIME") or "conda"
+    record = {"runtime": runtime}
+    if runtime != "docker":
+        return record
+    record.update(image=os.environ.get("CONTAINER_IMAGE"), image_id=os.environ.get("CONTAINER_IMAGE_DIGEST"),
+                  image_source=os.environ.get("PLASBENCH_IMAGE_SOURCE") or "unknown", docker_version=os.environ.get("PLASBENCH_DOCKER_VERSION") or "")
+    try:
+        record["mounts"] = json.loads(os.environ.get("PLASBENCH_RUNTIME_MOUNTS") or "[]")
+    except ValueError:
+        record["mounts"] = []
+    extra = os.environ.get("PLASBENCH_EXTRA_HOME")
+    tools, provenance = [], []
+    if extra and os.path.isdir(extra):
+        try:
+            tools = sorted(os.listdir(os.path.join(extra, "bin"))) if os.path.isdir(os.path.join(extra, "bin")) else []
+            for found in sorted(Path(extra).glob("*/plasbench-install.json"))[:50] + sorted(Path(extra).glob("envs/*/plasbench-install.json"))[:50]:
+                try:
+                    provenance.append(json.loads(found.read_text(encoding="utf-8")))
+                except (OSError, ValueError):
+                    pass
+        except OSError:
+            pass
+    record["extras"] = {"home": extra, "tools": tools, "provenance": provenance}
+    return record
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True)
@@ -333,6 +361,8 @@ def main():
         "platform": {"python": sys.version, "system": platform.platform()},
         "container": {"image": os.environ.get("CONTAINER_IMAGE"),
                       "image_digest": os.environ.get("CONTAINER_IMAGE_DIGEST")},
+        # Where the tools ran (plasbench/docker_runtime.py): conda on the host, or a Docker container with these mounts and these extras in its persistent storage.
+        "runtime": runtime_record(),
         "databases": {"platon": directory_identity(os.environ.get("PLATON_DB", "")),
                       "genomad": directory_identity(os.environ.get("GENOMAD_DB", "")),
                       "plasme": directory_identity(os.environ.get("PLASME_DB", ""))},

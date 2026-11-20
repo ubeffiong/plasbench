@@ -234,7 +234,8 @@ def prepare(root, name: str, samples=None, cohort=None, argv=None, location=None
         record["sample_sheet_sha256"] = _sha256(samples)
     if cohort:
         record["cohort"] = cohort
-    record.setdefault("runs", []).append({"started": now, "command": "plasbench " + " ".join(argv or []), "via": os.environ.get("PLASBENCH_STARTED_VIA") or "terminal"})
+    record.setdefault("runs", []).append({"started": now, "command": "plasbench " + " ".join(argv or []), "via": os.environ.get("PLASBENCH_STARTED_VIA") or "terminal",
+                                 "runtime": os.environ.get("PLASBENCH_RUNTIME_EFFECTIVE") or "conda"})
     record["runs"] = record["runs"][-200:]
     record_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     return folder

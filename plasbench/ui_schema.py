@@ -17,7 +17,7 @@ from .cli import build_parser
 # Where each command appears in the window. A command missing here still appears, under "More commands".
 CATEGORIES = [
     ("setup", "Set up", "Install, check and update PlasBench and its tools.",
-     ["ui", "ui-state", "desktop-icon", "picker-check", "check", "install-conda", "install-git", "install-tools", "tools", "upgrade", "test"]),
+     ["ui", "ui-state", "desktop-icon", "picker-check", "runtime", "check", "install-conda", "install-git", "install-tools", "tools", "upgrade", "test"]),
     ("benchmark", "Benchmark", "Run benchmarks on cohorts or your own isolates.",
      ["demo", "run", "init-local", "scan-isolates", "intake", "report", "reconstruct", "select-candidates", "select-unknown"]),
     ("sweeps", "Depth and quality sweeps", "How far sequencing can be cut before recovery degrades.",
@@ -140,6 +140,7 @@ def schema():
             "github_help": {k: ui_help.tooltip(v) for k, v in ui_help.GITHUB.items()},
             "usertool_help": {k: ui_help.tooltip(v) for k, v in ui_help.USERTOOL.items()},
             "native_picker_help": {k: ui_help.tooltip(v) for k, v in ui_help.NATIVE_PICKER.items()},
+            "environment_help": {k: ui_help.tooltip(v) for k, v in ui_help.ENVIRONMENT.items()},
             "report_notes": ui_help.REPORT_NOTES}
 
 

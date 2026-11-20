@@ -175,6 +175,16 @@ def kill_group(pgid, grace=KILL_GRACE_SECONDS):
     return not group_alive(pgid)
 
 
+def stop_job_container(job_dir, job_id):
+    """A job that runs its tools in Docker left JOB_ID.container (plasbench/docker_runtime.py): `docker stop` it, because stopping the docker client alone can leave the container going.
+    Starts nothing for a job without that file. Never raises."""
+    try:
+        from . import docker_runtime
+        return docker_runtime.stop_for_job(job_dir, job_id)
+    except Exception:   # noqa: BLE001 - cancelling must always go on
+        return False
+
+
 def run_state(job_dir, job_id):
     """What is left of a run: whether its runner and any member of its process group are alive (read from JOB_ID.pid)."""
     info = read_json(paths(job_dir, job_id)["pid"]) or {}
@@ -309,6 +319,7 @@ def run(job_dir, job_id, cwd, command):
     def stop_group(signum=None, frame=None):
         """SIGTERM/SIGINT/SIGHUP to the runner stops the command's whole group, then the run ends normally (its exit file says it was signalled)."""
         threading.Thread(target=kill_group, args=(proc.pid,), daemon=True).start()
+        threading.Thread(target=stop_job_container, args=(job_dir, job_id), daemon=True).start()
     if os.name != "nt" and threading.current_thread() is threading.main_thread():
         for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
             try:
