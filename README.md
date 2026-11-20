@@ -1390,6 +1390,90 @@ To install into another location, set `PLASBENCH_INSTALL_DIR=/path/to/location`
 before running the installer; PlasBench then lives in `/path/to/location/PlasBench`
 (use that as `PB`).
 
+#### I already downloaded the release file
+
+Use this when `plasbench-<version>.tar.gz` is already on your disk: you downloaded it in a browser, copied it from another computer, or this computer
+cannot reach GitHub. Nothing below needs the `curl` commands of the first option.
+
+**1. Get the two files.** Open <https://github.com/ubeffiong/plasbench/releases/latest> and, under **Assets**, download `plasbench-<version>.tar.gz` and
+`plasbench-<version>.tar.gz.sha256`. Use these two, not the "Source code" links. Keep the names exactly as downloaded: PlasBench refuses a file that is not
+named `plasbench-<version>.tar.gz`, and a browser that downloads the same file twice may rename the second one to `plasbench-<version> (1).tar.gz` (rename it back).
+
+**2. Put both files in one folder where Linux can see them.** On Ubuntu or macOS that is usually `~/Downloads`. On **Windows with WSL**, copy them from the
+Windows Downloads folder, which WSL shows under `/mnt/c/Users/<you>/Downloads/`:
+
+```bash
+cp /mnt/c/Users/<you>/Downloads/plasbench-<version>.tar.gz* ~/
+```
+
+(Or, in Windows Explorer, paste both files into `\\wsl.localhost\Ubuntu\home\<you>`; replace `Ubuntu` with your distribution's name.) Working from your Linux home folder is
+faster than working from `/mnt/c`.
+
+**3. Check the download.** In the folder that holds both files:
+
+```bash
+cd ~
+sha256sum -c plasbench-<version>.tar.gz.sha256
+```
+
+It must print `plasbench-<version>.tar.gz: OK`. On Windows, before copying, the same check in PowerShell is
+`Get-FileHash "$HOME\Downloads\plasbench-<version>.tar.gz" -Algorithm SHA256`: the hash it prints must equal the first word inside the `.sha256` file
+(`Get-Content "$HOME\Downloads\plasbench-<version>.tar.gz.sha256"`). The installer below repeats this check itself and stops before changing anything if it fails.
+
+**4. Install it.** Two ways; the first is recommended because it installs into the one folder `~/PlasBench`, which later updates reuse. The installer script is inside
+the archive (`scripts/install_latest.sh`), so you do not need to download it:
+
+```bash
+cd ~
+tar -xzOf plasbench-<version>.tar.gz plasbench-<version>/scripts/install_latest.sh > install_latest.sh
+bash install_latest.sh --archive "$PWD/plasbench-<version>.tar.gz" --tools
+```
+
+`--archive` installs the file you give it and downloads nothing (it checks `plasbench-<version>.tar.gz.sha256` beside it; with no `.sha256` it prints the file's SHA-256 so you
+can compare it with the release page yourself). Leave out `--tools` to install only PlasBench and install the benchmark tools later; add `--yes` to answer every question with yes.
+
+The other way unpacks the archive and runs the installer inside it, exactly as in the alternative route below; PlasBench then lives in that extracted folder, and the first
+`plasbench upgrade` later moves it into `~/PlasBench`:
+
+```bash
+cd ~
+tar -xzf plasbench-<version>.tar.gz
+cd plasbench-<version>
+./install.sh --tools
+```
+
+**What it needs.**
+
+- **conda** (Miniforge, mamba or micromamba). If none is installed, `install.sh` offers to install Miniforge (about 120 MB, needs the internet), or install it first with
+  [Step 2 — Install conda](#step-2--install-conda).
+- **Internet, only for what the file does not contain.** The release file holds PlasBench's code. A *first* install still downloads the conda packages of the `plasbench`
+  environment (and, with `--tools`, the tools and their databases). An *update* of an existing install from a newer file reuses the existing environment, tools and databases and needs
+  no internet. For a computer with no internet in its terminal, see [Q25 in the FAQ](FAQ.md#q25-the-installer-says-could-not-resolve-host-is-plasbench-broken); `PLASBENCH_OFFLINE=1` makes
+  the online-only steps stop at once with a plain message instead of waiting.
+
+**Where it installs.** `~/PlasBench`, or `$PLASBENCH_INSTALL_DIR/PlasBench` when you set `PLASBENCH_INSTALL_DIR=/path/to/location` first.
+
+**Upgrading later from a newer downloaded file.** Download the newer `plasbench-<version>.tar.gz` (and its `.sha256`) the same way and run the same command with the new
+file, or, from inside `~/PlasBench` with the environment active, `plasbench upgrade --archive /path/to/plasbench-<version>.tar.gz`, or use **Set up this computer, Updates, Install from a
+file** in the window. Your studies, settings, databases and tools are kept (see [Upgrade an existing installation](#upgrade-an-existing-installation)).
+
+**Check that it worked.**
+
+```bash
+conda activate plasbench
+plasbench --version        # prints the version you installed
+plasbench ui-state         # the evidence: which folder and version are installed and which one the window runs
+```
+
+**If it fails.**
+
+| Message | Meaning and fix |
+|---|---|
+| `ERROR: --archive must be named plasbench-<version>.tar.gz (got ...)` | The file was renamed (often `... (1).tar.gz`). Rename it back to exactly `plasbench-<version>.tar.gz`. |
+| `ERROR: --archive file not found` | The path is wrong. Give the full path of the Linux copy (`"$PWD/plasbench-<version>.tar.gz"`); in WSL a Windows path `C:\...` is `/mnt/c/...`. |
+| `plasbench-<version>.tar.gz: FAILED` or `computed checksum did NOT match` | The file is damaged or incomplete. Download it again. Nothing was changed. |
+| `ERROR: no conda-family package manager is available` | Install Miniforge ([Step 2](#step-2--install-conda)), open a new terminal and run the command again. |
+
 #### Alternative: choose or inspect a specific release version
 
 Use this route only when you need to install an older release, reproduce a
@@ -1429,6 +1513,8 @@ commands again:
 ```bash
 rm -f "plasbench-${VERSION}.tar.gz" "plasbench-${VERSION}.tar.gz.sha256"
 ```
+
+Already have the file? See [I already downloaded the release file](#i-already-downloaded-the-release-file) for the one-command route (`install_latest.sh --archive`).
 
 Now unpack it:
 
@@ -2037,12 +2123,12 @@ One command, run from inside your current install directory:
 plasbench upgrade
 ```
 
-**From the window:** `plasbench ui`, then **Setup, Maintenance, Check for updates**. It asks GitHub whether a newer
-release exists (only when you press it) and offers **Upgrade to <version>**; close and reopen PlasBench afterwards.
+**From the window:** `plasbench ui`, then **Set up this computer, Updates**. **Check for updates** asks GitHub whether a newer release exists and shows its date and what changed; **Download and install** verifies the
+download against the release's checksum, installs it into this folder and offers **Restart window** (see "Updating PlasBench from the window" in the user guide). **Install from a file** installs a release file you already
+downloaded, with no internet. From a terminal: `plasbench upgrade --check-only`, `plasbench upgrade --archive /path/to/plasbench-<version>.tar.gz`, `plasbench upgrade --rollback`.
 
-**No internet on this computer?** On another computer download `plasbench-<version>.tar.gz` and its `.sha256` from the
-Releases page, copy both here, then `tar -xzf plasbench-<version>.tar.gz` and run
-`bash plasbench-<version>/scripts/install_latest.sh --archive "$PWD/plasbench-<version>.tar.gz"`.
+**No internet on this computer?** See [I already downloaded the release file](#i-already-downloaded-the-release-file): on another computer download `plasbench-<version>.tar.gz` and its `.sha256` from the
+Releases page, copy both here and run `plasbench upgrade --archive "$PWD/plasbench-<version>.tar.gz"` (or `bash install_latest.sh --archive ...`).
 
 That's it — remember `./update.sh`, the same way you already remember `./install.sh`.
 It finds the latest release, downloads and verifies it, and **updates your `PlasBench`

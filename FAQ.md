@@ -715,6 +715,11 @@ writes the `docker run -v` command. From a window on your computer, **Run in Doc
 **Evidence.** `python/docker_setup.py`, `env/install_tools.sh`; `test/test_docker_setup.py` (recorded `docker version` / `docker info` outputs for every state, each platform's plan, the winget and Homebrew argument lists with fake programs), `test/test_docker_install.sh` (the exit codes 0 / 20 / 21 / 1 with fake `winget.exe`, `brew`, `docker` and a `sudo` that must never be called).
 **Status.** Implemented. Tested with fake programs only: no real Docker was installed or started by the tests. The Windows approval prompt and Docker Desktop's first launch are yours by design.
 
+### Q70. How do I update PlasBench from the window, or install a release file I already downloaded?
+**Answer.** Set up this computer, **Updates**. **Check for updates** shows the installed and latest versions, the release date and what changed; **Download and install** verifies the download against the release's checksum, replaces the program files, and offers **Restart window**; **Install from a file I already downloaded** does the same from `plasbench-<version>.tar.gz` with no internet; **Roll back** returns to the release saved by the last update. It is blocked while a run is going unless you choose **Update anyway**. If it fails the card names the reason (no internet, checksum mismatch, full disk, no conda, wrong file) and whether anything was changed. A first installation from a downloaded file is in the README, "I already downloaded the release file" (`bash install_latest.sh --archive plasbench-<version>.tar.gz`).
+**Evidence.** `plasbench/updatecheck.py`, `plasbench/updater.py`, `update.sh`, `POST /api/updates/install`; `test/test_updates.py`, `test/test_upgrade_e2e.sh` (a fake GitHub and fake release files: a bad checksum, a misnamed or foreign file and a second update are refused with nothing replaced).
+**Status.** Tested with fakes, not against a real release download from the window or a real WSL/conda upgrade; not checked in a real browser.
+
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions

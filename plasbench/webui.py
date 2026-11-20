@@ -1874,6 +1874,38 @@ def make_handler(project: Project, jobs: Jobs):
     terminal = Terminal(project.root, UI_HOME / "terminal_history.jsonl", lambda: studies.workspace(project.root),
                         on_record=lambda rec: session_log().event("terminal", **rec))
 
+    # ---- the Updates card (plasbench/updatecheck.py, plasbench/updater.py): cached answer, the update job, what is running now ----
+    def update_mode() -> str:
+        from . import updater
+        return updater.default_mode(project.local_env())
+
+    def outside_running() -> list:
+        from . import outside_runs
+        try:
+            return outside_runs.outside_runs(project.studies(), list(jobs.jobs.values()))
+        except Exception:  # noqa: BLE001 - a study folder that cannot be read must not hide the window's own jobs
+            return []
+
+    def updates_view() -> dict:
+        """Everything the card shows, from files and memory only (no network, no process): the cached check, the newest update job with its phases and result, what is running now."""
+        from . import roots, updatecheck, updater
+        mode = update_mode()
+        installed = roots.read_version(project.root) or __version__   # the version in the PlasBench folder: after an update it is the new one while this server still runs the old code
+        listing = jobs.list()
+        job = updater.newest_upgrade_job(listing)
+        summary = None
+        if job:
+            try:
+                text = _tail_bytes(jobs._paths(job["id"])["log"], 256 * 1024).decode("utf-8", "replace")
+            except OSError:
+                text = ""
+            summary = updater.job_summary(job, text)
+        if updatecheck.due(installed, mode):    # a daemon thread, at most once a day: the answer shows up on the next read
+            updatecheck.start_background(installed, update_mode)
+        return {"current": installed, "running": __version__, "needs_restart": installed != __version__, "mode": mode, "check": updatecheck.state(installed, mode), "job": summary,
+                "active": updater.active_work(listing, outside_running()), "rollback": updater.rollback_info(project.root),
+                "restart_supported": server_state.restart_support()[0], "folder": str(project.root)}
+
     def page() -> bytes:
         # BEGIN server state: __PAGE_VERSION__ is the version of the FILES on disk, __VERSION__ stays this server's; the page compares them (a stale server is shown at once)
         disk = server_state.disk_version()
@@ -2058,6 +2090,8 @@ def make_handler(project: Project, jobs: Jobs):
                 from . import updatecheck
                 netgate.require("github", "check for updates")
                 return self.jsend(200, updatecheck.check(__version__, updatecheck.fetch_latest))
+            if route == "updates":           # the Updates card: cached check + the update job + what is running (never contacts the network)
+                return self.jsend(200, updates_view())
             if route == "net/status":              # the Online / Offline indicator and the gating of every internet-dependent control
                 names = [n for n in (q.get("services") or "").split(",") if n in netgate.SERVICES] or None
                 # The connection check goes over the network (up to the 5 s timeout): it must never sit on the page-load path. A recent answer is served as it is, an old one at once
@@ -2519,6 +2553,32 @@ def make_handler(project: Project, jobs: Jobs):
                 session_log().event("quit", forced=bool(running) and not keep or None, kept_running=len(running) if keep else None)
                 threading.Timer(0.3, self.server.shutdown).start()
                 return self.jsend(200, {"ok": True})
+            if route == "updates/check":     # the Check for updates button: asks GitHub now (a gated, bounded request) and remembers the answer
+                from . import updatecheck
+                try:
+                    netgate.require("github", "check for updates")
+                except netgate.Offline as exc:
+                    updatecheck.save_cache({"error": exc.message, "error_kind": "offline", "checked_at": time.time()})
+                else:
+                    updatecheck.refresh(updates_view()["current"])
+                return self.jsend(200, updates_view())
+            if route == "updates/archive":   # what is known about a release file before the consent dialog: name, version, size, a .sha256 beside it
+                from . import updatecheck, updater
+                info = updater.inspect_archive(self.linux_path(str(data.get("path", ""))) if data.get("path") else "")
+                info["current"] = updates_view()["current"]
+                info["relation"] = updatecheck.relation(info["current"], info["version"]) if info["version"] else ""
+                return self.jsend(200, info)
+            if route == "updates/install":   # starts `plasbench upgrade ...` as a job; refused while anything runs unless force, never while another update runs
+                from . import updater
+                try:
+                    view = updates_view()
+                    plan = updater.plan(data, view["current"], view["check"], jobs.list(), outside_running(), resolve_path=lambda text: self.linux_path(text) if text else "", root=project.root)
+                except updater.Refused as exc:
+                    return self.jsend(409, exc.payload())
+                netgate.require_job(plan["argv"], {}, "update PlasBench")
+                job = jobs.start(plan["argv"], plan["label"], None)
+                session_log().event("update_started", update=plan["kind"], to=plan["to"], forced=plan["forced"] or None)
+                return self.jsend(200, {"job": job, "plan": plan})
             # BEGIN server state
             if route == "server/restart":   # start a replacement server, then this one exits like Quit and keep running (detached runs are not touched)
                 result = server_state.restart(project.root, self.server.server_address[1], _instance_file(), spawn=server_state.spawn_detached)
@@ -3046,6 +3106,8 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
     jobs = Jobs(project)
     handler = make_handler(project, jobs)
     warm(project, jobs)
+    from . import updatecheck, updater
+    updatecheck.start_background(__version__, lambda: updater.default_mode(project.local_env()))   # at most once a day, only with UPDATE_CHECK=auto; a thread, never on the load path
     server = None
     for candidate in range(port, port + 20):
         try:

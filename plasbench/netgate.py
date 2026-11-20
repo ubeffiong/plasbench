@@ -194,6 +194,8 @@ def command_services(argv) -> list:
     if not argv:
         return []
     command, rest = argv[0], list(argv[1:])
+    if command == "upgrade" and ("--archive" in rest or "--rollback" in rest):
+        return []                       # a release file already on this computer: nothing is fetched
     if command == "install-tools" and not _install_goes_online(rest):
         return []                       # inspection, --dry-run, a built-in or manual profile (exit 20), an unknown name: nothing is fetched
     sub = rest[0] if rest and (command, rest[0]) in {(c, s_) for c, d in SUBCOMMAND_NET.items() for s_ in d} | set(FLAG_NET) else ""
