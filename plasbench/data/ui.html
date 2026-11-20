@@ -477,7 +477,8 @@ dialog.dkdlg ul.dknotes{margin:6px 0 0 18px;padding:0}.dkerr{color:var(--bad);ma
 .modetag{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:2px;background:var(--primary-soft);color:var(--primary-ink);border:1px solid var(--line)}
 
 /* ---------- cleanup: one rhythm for page heads, touch targets, phone ---------- */
-.vhead .row{flex-wrap:wrap}.vhead .ttl p{max-width:70ch;margin-top:4px}
+#rt_body .mono,#rt_body .small{overflow-wrap:anywhere}#pc_body li,#pc_body code,#pc_body .cmdline code{overflow-wrap:anywhere;word-break:break-word;white-space:normal}.actrow{display:flex;gap:8px;align-items:center}.actrow .action{flex:1}.vhead .row{flex-wrap:wrap}.vhead .ttl p{max-width:70ch;margin-top:4px}
+@media (max-width:640px){#g_repo,#ut_load{max-width:100%!important;width:100%!important}.vhead .row{width:100%}}
 @media (pointer:coarse),(max-width:640px){.btn,.btn.sm,.tbtn,select,input[type=text],input[type=number],input[type=search],input[type=password]{min-height:40px}.chip{min-height:36px}}
 /* ---------- responsive ---------- */
 .grid>*,.split>*,.cmdgrid>*,.stats>*{min-width:0}
@@ -798,8 +799,8 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
 
   <!-- SETUP --------------------------------------------------------------------------------------- -->
   <section class="view" id="v_setup" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Set up this computer</h1>
-    <p>What PlasBench needs, what is already here, and a one-click fix for anything missing. Each fix runs the same <code>plasbench</code> command you would type; its output appears in the console below.</p></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Set up this computer<span data-tipid="p_setup"></span></h1>
+    <p>What PlasBench needs and a one-click fix for anything missing.</p></div>
     <div class="row"><button class="btn sec" id="envref"><svg class="ico sm"><use href="#i-refresh"/></svg>Re-check</button>
      <button class="btn" data-run='["check","--yes"]' data-label="Check and fix every dependency"><svg class="ico sm"><use href="#i-wrench"/></svg>Check &amp; fix all</button></div></div>
    <div class="card" id="env_card" style="margin-bottom:16px"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Environment <span id="rt_tip"></span></h3><span class="sub" id="rt_sub"></span></div>
@@ -809,37 +810,35 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
    <div class="split">
     <div class="card"><div class="hd"><h3>Checklist</h3><span class="sub" id="envsum"></span></div><div id="envlist"><div class="bd mut">Checking…</div></div></div>
     <div class="stack">
-     <div class="card" id="pc_card"><div class="hd"><svg class="ico"><use href="#i-monitor"/></svg><h3>This computer</h3><span class="sub" id="pc_mode"></span></div>
+     <div class="card" id="pc_card"><div class="hd"><svg class="ico"><use href="#i-monitor"/></svg><h3>This computer<span data-tipid="pc_help"></span></h3><span class="sub" id="pc_mode"></span></div>
       <div class="bd" id="pc_body"><span class="mut">Looking at this computer…</span></div>
       <div class="bd" id="pc_comp" style="border-top:1px solid var(--line)"></div>
       <div class="ft"><button class="btn sec sm" data-run='["desktop-icon","--remove"]' data-label="Remove the PlasBench desktop icon">Remove icon</button>
        <button class="btn sm" data-run='["desktop-icon"]' data-label="Add the PlasBench icon to the desktop and the applications menu"><svg class="ico sm"><use href="#i-plus"/></svg>Add desktop icon</button></div></div>
-     <div class="card"><div class="hd"><svg class="ico"><use href="#i-key"/></svg><h3>NCBI access</h3></div><div class="bd">
-      <p class="mut small" style="margin-top:0">Cohort downloads use NCBI. An email is courtesy; an API key raises the request allowance from 3 to 10 per second. Both are saved in <code id="ncbi_where">config/local.env</code> on this computer only.</p>
+     <div class="card"><div class="hd"><svg class="ico"><use href="#i-key"/></svg><h3>NCBI access<span data-tipid="ncbi"></span></h3></div><div class="bd">
+      <p class="mut small" style="margin-top:0">Saved in <code id="ncbi_where">config/local.env</code> on this computer only.</p>
       <label class="small" for="ncbi_email"><b>Contact email</b></label><input type="text" id="ncbi_email" placeholder="you@institute.org" autocomplete="email">
       <label class="small" for="ncbi_key" style="display:block;margin-top:10px"><b>API key</b> <a href="https://www.ncbi.nlm.nih.gov/account/settings/" target="_blank" rel="noopener">get one</a></label>
       <div class="row"><input type="password" id="ncbi_key" placeholder="36-character key" autocomplete="off"><button class="btn sec sm" id="ncbi_show" type="button">Show</button></div>
      </div><div class="ft"><button class="btn" id="ncbi_save"><svg class="ico sm"><use href="#i-save"/></svg>Save</button></div></div>
-     <div class="card"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Install a tool profile</h3></div><div class="bd">
-      <p class="mut small" style="margin-top:0">Profiles group related tools. <b>core</b> is needed for everything; the rest add assemblers, binning-reconstruction tools and optional analyses.</p>
+     <div class="card"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Install a tool profile<span data-tipid="profile"></span></h3></div><div class="bd">
       <div class="row"><select id="profile"></select><button class="btn" id="profgo">Install</button></div>
       <div class="row wrap" style="margin-top:12px"><button class="btn sec sm" data-run='["install-tools","plan"]' data-label="Show the install plan">Show install plan</button>
        <button class="btn sec sm" data-run='["install-tools","list"]' data-label="List install profiles">List profiles</button>
        <button class="btn sec sm" data-run='["install-tools","validate"]' data-label="Validate the install registry">Validate registry</button></div>
      </div></div>
-     <div class="card" id="dkcard"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Docker</h3><span class="sub">optional container engine</span></div><div class="bd">
+     <div class="card" id="dkcard"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Docker<span data-tipid="docker_card"></span></h3><span class="sub">optional container engine</span></div><div class="bd">
       <div class="row wrap" style="gap:8px"><span class="tag" id="dk_chip" title="Whether Docker works on this computer right now">Checking Docker</span><span class="small" id="dk_title"></span></div>
-      <p class="mut small" style="margin:8px 0 0">Docker is optional. It runs PlasBench in a container (<code>scripts/docker_run.sh</code>) and is the runtime tools such as mobilome-map and plsmd need when they run in a container. PlasBench never runs sudo and never accepts the Docker Desktop licence for you.</p>
       <div class="small" id="dk_wait" role="status" hidden style="margin-top:8px;padding:8px 10px;border:1px solid var(--warn);border-radius:6px"></div>
       <ul class="small dksteps" id="dk_steps" style="margin:8px 0 0;padding-left:18px"></ul>
       <div class="row wrap" style="margin-top:12px;gap:8px"><button class="btn" id="dk_install" data-dk="install" title="Install Docker">Install Docker</button><button class="btn sec" id="dk_recheck" data-dk="recheck" title="Check Docker again">Re-check</button><button class="btn ghost" id="dk_guide" data-dk="guide" title="Open the official Docker guide">Open the Docker guide</button></div>
      </div></div>
      <div class="card"><div class="hd"><svg class="ico"><use href="#i-refresh"/></svg><h3>Maintenance</h3></div><div class="bd grid" style="gap:10px">
-      <button class="action" data-run='["install-conda","--yes"]' data-label="Install conda (Miniforge)"><span class="aico"><svg class="ico"><use href="#i-down"/></svg></span><span><b>Install conda</b><span>Only if no conda, mamba or micromamba is present.</span></span></button>
-      <button class="action" id="updcheck" data-needs="github" title="Asks GitHub whether a newer release exists"><span class="aico"><svg class="ico"><use href="#i-search"/></svg></span><span><b>Check for updates</b><span>Asks GitHub whether a newer release exists. Nothing is installed.</span></span></button>
+      <div class="actrow"><button class="action" data-run='["install-conda","--yes"]' data-label="Install conda (Miniforge)"><span class="aico"><svg class="ico"><use href="#i-down"/></svg></span><span><b>Install conda</b></span></button><span data-tipid="m_conda"></span></div>
+      <div class="actrow"><button class="action" id="updcheck" data-needs="github" title="Asks GitHub whether a newer release exists"><span class="aico"><svg class="ico"><use href="#i-search"/></svg></span><span><b>Check for updates</b></span></button><span data-tipid="m_update"></span></div>
       <div id="updresult" class="small" aria-live="polite" style="display:none"></div>
-      <button class="action" data-run='["upgrade","--yes"]' data-label="Upgrade PlasBench"><span class="aico"><svg class="ico"><use href="#i-refresh"/></svg></span><span><b>Upgrade PlasBench</b><span>Latest release; keeps your reads, databases and studies. Close and reopen PlasBench afterwards to use the new version.</span></span></button>
-      <button class="action" data-run='["test"]' data-label="Run the offline test suite"><span class="aico"><svg class="ico"><use href="#i-check"/></svg></span><span><b>Run the test suite</b><span>Offline regression checks of this installation.</span></span></button>
+      <div class="actrow"><button class="action" data-run='["upgrade","--yes"]' data-label="Upgrade PlasBench"><span class="aico"><svg class="ico"><use href="#i-refresh"/></svg></span><span><b>Upgrade PlasBench</b></span></button><span data-tipid="m_upgrade"></span></div>
+      <div class="actrow"><button class="action" data-run='["test"]' data-label="Run the offline test suite"><span class="aico"><svg class="ico"><use href="#i-check"/></svg></span><span><b>Run the test suite</b></span></button><span data-tipid="m_test"></span></div>
      </div></div>
     </div>
    </div>
@@ -2213,8 +2212,7 @@ function renderPlatform({info, plan}) {
     ${plan.steps.length ? `<div class="small"><b>To do</b><ol style="margin:4px 0 0;padding-left:20px">${plan.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol></div>` : `<div class="note ok" style="margin-top:8px">${icon("check", "ico")}<div>Nothing to install for the way PlasBench runs here.</div></div>`}
     ${list(plan.warnings, "warn", "alert")}
     ${plan.alternatives.length ? `<p class="small" style="margin-bottom:4px"><b>Also possible</b>: ${plan.alternatives.map(esc).join(" ")}</p>
-      <div class="cmdline small"><span class="p">$</span><code>${esc(plan.docker_command)}</code></div>` : ""}
-    <p class="small mut" style="margin-bottom:0">The desktop icon starts PlasBench (or brings this window back). Quit, top right, stops it. Every page also works from the command line, and from the Terminal tab of the console below.</p>`;
+      <div class="cmdline small"><span class="p">$</span><code>${esc(plan.docker_command)}</code></div>` : ""}`;
 }
 /* ---- This computer: resources (environment, host, limits, what a benchmark will use) and drives (plasbench/computer_info.py; GET /api/computer) ---- */
 const cmpGB = n => n == null ? "unknown" : `${(n / 2 ** 30).toFixed(n < 10 * 2 ** 30 ? 1 : 0)} GB`;
@@ -2473,12 +2471,11 @@ function renderRuntime(r) {
     ? `<div class="small mut">image ${esc(img.name)} · ${esc(rtGB(img.size_bytes))} · ${img.source === "built-locally" ? "built on this computer" : "pulled"} · ${img.matches === false ? `<span class="warn-t">version ${esc(img.version || "?")} differs from ${esc(r.version)}</span>` : img.matches === true ? `matches PlasBench ${esc(r.version)}` : "version is checked when it is first used"}</div>`
     : `<div class="small mut">image ${esc(img.name || r.default_image)} is not on this computer yet: pull is ${esc(r.pull_size)}; if it cannot be pulled it can be built here</div>`;
   const extras = d.state === "ready" ? `<div class="small mut">extra tools and databases are kept in <span class="mono">${esc(r.extras.home)}</span>${r.extras.tools.length ? ` (${r.extras.tools.length} command${r.extras.tools.length > 1 ? "s" : ""})` : ""}${rtTip("extras")}</div>` : "";
-  const opt = (id, title, status, facts, text, tip) => `<div class="choice ${cur === id ? "on" : ""}" style="margin-bottom:10px" data-rt-opt="${id}"><span><b>${title}</b>${cur === id ? ` <span class="tag rec">in use</span>` : ""} ${status}${rtTip(tip)}${facts}<span class="small" style="display:block;margin-top:4px">${text}</span></span></div>`;
+  const opt = (id, title, status, facts, text, tip) => `<div class="choice ${cur === id ? "on" : ""}" style="margin-bottom:10px" data-rt-opt="${id}"><span><b>${title}</b>${cur === id ? ` <span class="tag rec">in use</span>` : ""} ${status}${rtTip(tip)}${facts}</span></div>`;
   const html = `${r.problem ? `<div class="note warn">${icon("alert", "ico")}<div>${esc(r.problem)}</div></div>` : ""}
     ${opt("conda", "Conda", condaStatus, condaFacts, "Tools run from the plasbench conda environment on this computer. Fastest file access, nothing to download but the tools themselves; each tool is installed with conda.", "conda")}
     ${opt("docker", "Docker", dState, `${d.version ? `<div class="small mut">Docker ${esc(d.version)}</div>` : ""}${imgLine}${extras}${d.hint && d.state !== "ready" && !d.pending ? `<div class="small warn-t">${esc(d.hint)}</div>` : ""}`,
-      "Every run, check and install starts a container of the PlasBench image with your study, data and database folders mounted at the same paths, so results stay on this computer. Every tool is at its pinned version without installing conda. Costs: an image download (" + esc(r.pull_size) + "), disk for Docker, and slower file access when the folders are on a Windows drive (/mnt). This window stays on this computer.", "docker")}
-    <p class="small mut" style="margin:0">Runs already going keep the runtime they started with. Conda stays installed whichever you choose.</p>`;
+      "Every run, check and install starts a container of the PlasBench image with your study, data and database folders mounted at the same paths, so results stay on this computer. Every tool is at its pinned version without installing conda. Costs: an image download (" + esc(r.pull_size) + "), disk for Docker, and slower file access when the folders are on a Windows drive (/mnt). This window stays on this computer.", "docker")}`;
   setIfChanged($("#rt_body"), html);
   setIfChanged($("#rt_tip"), rtTip("environment"));
   $("#rt_sub").textContent = `in use: ${cur === "docker" ? "Docker" : "Conda"}`;
@@ -2950,7 +2947,7 @@ function utFieldHTML(sec, f) {
   if (sec === "run" && k === "command") { const ph = Object.assign({}, S.user?.placeholders || {});
     extra = `<div class="chips" style="margin-top:6px">${Object.entries(ph).map(([p, d]) => `<button type="button" class="chip" title="${esc(d)}" data-ph="{${p}}">{${p}}</button>`).join("")}</div>`; }
   const lblFor = kind === "tasks" ? `ut_task_lbl` : "";
-  return `<div class="field"><label ${lblFor ? `id="${lblFor}" for="${id}_btn"` : `for="${id}"`}>${esc(label)}${req ? `<span class="req">*</span>` : ""} <code>${k}</code>${tip}</label><div><div class="ctl">${ctl}</div>${extra}</div>${help ? `<div class="help">${esc(help)}</div>` : ""}</div>`;
+  return `<div class="field"><label ${lblFor ? `id="${lblFor}" for="${id}_btn"` : `for="${id}"`}>${esc(label)}${req ? `<span class="req">*</span>` : ""} <code>${k}</code>${tip || (help ? tipBtn({title: label, summary: help, plain: true}, label) : "")}</label><div><div class="ctl">${ctl}</div>${extra}</div></div>`;   // the one-line hint is the (?) too
 }
 function utUploadBtn(id) {
   return `<button type="button" class="btn sec sm" data-upload="${id}" title="Read a small file (up to 5 MB) in this browser and store it in the tool's own folder">Upload from this computer…</button>` +
@@ -3918,7 +3915,7 @@ function renderWizard() {
          ["meta","Metagenomics track","Score normalized community outputs (separate track)."]].map(([k, t, d]) =>
          `<label class="choice ${W.source === k ? "on" : ""}"><input type="radio" name="wsrc" value="${k}" ${W.source === k ? "checked" : ""}><span><b>${t}</b><span>${d}</span></span></label>`).join("")}</div>
       <div class="card" style="margin-top:16px"><div class="bd" id="wsrcbody">${
-        W.source === "demo" ? `<div class="note info">${icon("info", "ico")}<div>The demo runs <code>plasbench demo</code>: synthetic data, scored and reported. Tools and resources do not apply; press Next to review.</div></div>` :
+        W.source === "demo" ? `<div class="note info">${icon("info", "ico")}<div>The demo runs <code>plasbench demo</code> on synthetic data; press Next to review.</div></div>` :
         W.source === "cohort" ? `<div class="field"><label>Cohort <span class="req">*</span>${wizTip("cohort")}</label><div class="ctl"><select id="wcoh">${chosenLedger ? `<option value="${esc(V.cohort)}" selected>${esc(V.cohort)} — not a cohort sheet</option>` : ""}${cohorts.map(c => `<option value="${esc(c.name)}" ${V.cohort === c.name ? "selected" : ""}>${esc(c.name)} — ${c.rows} isolates${c.locked ? " · locked" : ""}</option>`).join("")}</select></div>${chosenLedger ? `<div class="note bad" style="margin-top:8px">${icon("x", "ico")}<div><b>Not a cohort sheet.</b> ${esc(V.cohort)} is the accession ledger (accessions only, no organism or truth columns): a run on it fails stage 0. Choose a cohort from the list.</div></div>` : ""}</div>` :
         W.source === "sheet" ? `<div class="field"><label>Sample sheet <span class="req">*</span>${wizTip("sample_sheet")}</label><div class="ctl"><input type="text" id="wsheet" value="${esc(V.samples || "")}" placeholder="config/my_isolates.tsv"><button class="btn sec sm" data-browse="wsheet" data-dir="0">Browse</button></div></div>
           <div class="field"><label>Local inputs only${wizTip("local_inputs")}</label><div class="ctl"><label class="switch"><input type="checkbox" id="wlocal" ${V.local_inputs ? "checked" : ""}><span></span></label></div></div>` :
@@ -4426,7 +4423,7 @@ async function cohortInfo(name) {
     ${stats}
     ${publicationCard(d)}
     <div class="cohbars">${bars}</div>
-    ${L.present ? `<p class="mut small" style="margin:0">From the sheet and its verification lock (<code>${esc(L.path)}</code>): country, host, isolation source, collection date, how the reference was sequenced and assembled, and the Illumina run's size come from NCBI as recorded when the cohort was locked. The download estimate uses the same factors as <code>plasbench run</code>'s pre-download check.</p>` : ""}
+    ${L.present ? `<div class="small mut" style="margin:0">Sheet and verification lock: <code>${esc(L.path)}</code>${pageTip("coh_meta")}</div>` : ""}
     <div>
      <div class="row" style="margin-bottom:6px"><input type="search" id="coh_q" placeholder="Filter samples: organism, country, accession, study…" aria-label="Filter samples" style="max-width:360px">
       <label class="small row" style="gap:4px"><input type="checkbox" id="coh_all"> all columns</label><span class="grow"></span><span class="mut small" id="coh_n"></span>
@@ -4473,7 +4470,7 @@ function publicationCard(d) {
     <div class="cohbars" style="margin-top:8px">${studies}${funnel}${p.truth_match ? `<table class="data"><thead><tr><th>Truth plasmids vs the paper's</th><th class="num">Isolates</th></tr></thead><tbody>${rows(p.truth_match, "value", "n")}</tbody></table>` : ""}</div>${left}
     <p class="small" style="margin:8px 0 0">${has ? "The paper's own outcomes ship with PlasBench, so after a run you can put your results beside them:" : "No published outcome table ships for this cohort yet; the isolates can still be run."}
      ${has ? `<br><code>${esc((p.compare_command || "").replace("<results>", "results"))}</code> <button class="btn ghost sm" onclick="copyText(${jsq((p.compare_command || "").replace("<results>", "results"))}, 'Command copied')">Copy</button>` : ""}</p>
-    ${has ? `<p class="small mut" style="margin:4px 0 0">Stage 6 does this automatically (setting RUN_PUBLISHED_COMPARISON) and the report gets a "Comparison with published outcomes" section. It is a comparison for your judgement, not a ranking: assemblies, tool versions, databases and metric definitions differ from the paper's.</p>` : ""}</div>`;
+    ${has ? `<div class="small mut" style="margin:4px 0 0">Comparison with published outcomes${pageTip("coh_published")}</div>` : ""}</div>`;
 }
 async function selectionReport(name) {
   let d = S.cohInfo && S.cohInfo.name === name ? S.cohInfo : null;

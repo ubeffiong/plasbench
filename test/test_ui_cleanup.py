@@ -69,6 +69,16 @@ for v in VIEWS:
     n = explanation_words(v)
     check(f"{v}: {n} words of visible explanation (budget {BUDGET})", n <= BUDGET, f"{n} words")
 
+# The same rule for text the page's script writes (cards drawn from data): long descriptive paragraphs are counted over the whole file. The ceiling is what is left after the
+# cleanup (the guide dialog, consent facts, states, per-item facts); a new long note has to be a tooltip instead, or this number is raised on purpose, in review.
+LONG_WORDS, LONG_CEILING = 22, 18   # 18 left: the Add-your-own-tool guide dialog, consent and install dialogs, per-setting states, study Manage
+longs = []
+for m in re.finditer(r'<(p class="(?:mut|small mut|mut small)[^"]*"|div class="note info[^"]*"|div class="help")[^>]*>(.*?)</(?:p|div)>', html, re.S):
+    n = len(re.sub(r"<[^>]+>", " ", m.group(2)).split())
+    if n >= LONG_WORDS:
+        longs.append(n)
+check(f"long descriptive notes in the whole page: {len(longs)} (ceiling {LONG_CEILING})", len(longs) <= LONG_CEILING, longs)
+
 # ---- 2. help ids exist -----------------------------------------------------------------------------------------------------------------------------
 page_ids = set(re.findall(r'data-tipid="([\w]+)"', html)) | set(re.findall(r'pageTip\("([\w]+)"\)', html))
 wiz_ids = set(re.findall(r'wizTip\("([\w]+)"\)', html))
