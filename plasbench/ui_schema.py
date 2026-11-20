@@ -141,7 +141,8 @@ def schema():
             "usertool_help": {k: ui_help.tooltip(v) for k, v in ui_help.USERTOOL.items()},
             "native_picker_help": {k: ui_help.tooltip(v) for k, v in ui_help.NATIVE_PICKER.items()},
             "environment_help": {k: ui_help.tooltip(v) for k, v in ui_help.ENVIRONMENT.items()},
-            "report_notes": ui_help.REPORT_NOTES}
+            "report_notes": ui_help.REPORT_NOTES,
+            "page_help": {k: ui_help.page_tip(v) for k, v in ui_help.PAGE.items()}}
 
 
 def validate_argv(argv):

@@ -91,6 +91,9 @@ input[type=checkbox],input[type=radio]{accent-color:var(--primary)}
 .top .search .ico{position:absolute;left:8px;top:8px;color:var(--mut)}
 .top .search kbd{position:absolute;right:7px;top:6px;font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:2px;padding:0 4px;background:var(--surface)}
 .top .tbtn{background:var(--surface);border:1px solid var(--line);color:var(--fg-2);border-radius:var(--radius);padding:4px 9px;min-height:30px;display:inline-flex;gap:6px;align-items:center;cursor:pointer;font:inherit;font-size:12.5px}
+.menuwrap{position:relative}.menu{position:absolute;right:0;top:calc(100% + 6px);z-index:70;min-width:230px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:4px;display:flex;flex-direction:column}
+.menu[hidden]{display:none}.menu .mi{display:flex;gap:8px;align-items:center;background:transparent;border:0;border-radius:var(--radius);color:var(--fg);font:inherit;font-size:13px;padding:8px 10px;min-height:36px;cursor:pointer;text-align:left}
+.menu .mi:hover,.menu .mi:focus-visible{background:var(--surface-2)}
 .top .tbtn:hover{background:var(--surface-2);border-color:var(--faint)}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--fg-2)}
 .pulse{width:7px;height:7px;border-radius:50%;background:var(--primary);animation:blink 1.4s ease-in-out infinite}
@@ -222,7 +225,8 @@ table.data tbody tr:hover td{background:var(--surface-2)}
 .field:last-child{border-bottom:0}
 .field>label{font-weight:500;font-size:13px;padding-top:5px;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
 .field>label .req{color:var(--bad)}.field>label code{font-weight:400;font-size:11.5px;color:var(--mut);background:transparent;border:0;padding:0}
-.field .ctl{display:flex;gap:6px;align-items:center;min-width:0}.field .ctl>input,.field .ctl>select{flex:1;min-width:0}
+.field .ctl{display:flex;gap:6px;align-items:center;min-width:0;flex-wrap:wrap}.field .ctl>input,.field .ctl>select{flex:1;min-width:min(100%,140px)}
+.stack .field{grid-template-columns:minmax(0,1fr)}
 .field .help{grid-column:2;color:var(--mut);font-size:12px}
 .field.changed>label:after{content:"modified";font-size:11px;font-weight:400;color:var(--warn)}
 .field .reset{display:none}.field.changed .reset{display:inline-flex}
@@ -286,9 +290,12 @@ dialog.pbdlg .ghlist{width:100%;border-collapse:collapse;font-size:12.5px}dialog
 dialog.pbdlg.wide{width:min(900px,96vw)}dialog.pbdlg .frow{margin:0 0 10px}dialog.pbdlg .frow label{display:block;font-weight:500;margin-bottom:3px}dialog.pbdlg .frow .help{font-size:12px;color:var(--mut)}
 dialog.pbdlg .frow input[type=text],dialog.pbdlg .frow input[type=password],dialog.pbdlg .frow select,dialog.pbdlg .frow textarea{width:100%}
 .tipi{flex:none;display:inline-grid;place-items:center;width:18px;height:18px;padding:0;margin:0;border:1px solid var(--line);border-radius:50%;background:var(--surface-2);color:var(--mut);font:italic 700 11px/1 Georgia,serif;cursor:help;align-self:center}
+.tipi{position:relative}.tipi::after{content:"";position:absolute;inset:-4px}@media (pointer:coarse){.tipi::after{inset:-12px}}
+h1 .tipi,h3 .tipi,h4 .tipi,.hd .tipi{margin-left:8px;vertical-align:middle}[data-tipid]{display:inline-flex;vertical-align:middle}
 .tipi:hover,.tipi:focus-visible,.tipi[aria-expanded="true"]{background:var(--primary);color:#fff;border-color:var(--primary)}
 #tipbox{position:fixed;z-index:400;max-width:min(380px,calc(100vw - 24px));box-sizing:border-box;padding:10px 12px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 24px #0003;font-size:12.5px;line-height:1.45;overflow:auto;max-height:70vh}
 #tipbox[hidden]{display:none}#tipbox p{margin:0 0 6px}#tipbox dl{margin:0 0 6px;display:grid;grid-template-columns:auto 1fr;gap:3px 10px}#tipbox dt{font-weight:600}#tipbox dd{margin:0;color:var(--fg-2)}
+#tipbox .ttl{font-weight:600}#tipbox ul{margin:0 0 6px;padding-left:18px}#tipbox li{margin:2px 0}
 #tipbox .tmeta{color:var(--mut);font-size:12px;margin:2px 0 0}#tipbox .twhen{margin:6px 0 0;padding-top:6px;border-top:1px solid var(--line-2);color:var(--fg-2)}
 .rspanel{margin:8px 0 0;padding:8px 10px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface-2)}.rs-row{font-size:13px}.rs-hints{margin:2px 0 0;padding-left:18px}.rsbox{margin-top:6px;padding-top:6px;border-top:1px solid var(--term-line)}
 .stallnote{margin:8px 0 0;padding:8px 10px;border:1px solid var(--warn);border-left-width:3px;border-radius:4px;background:var(--surface-2);color:var(--fg);font-size:12.5px;line-height:1.45}
@@ -469,6 +476,10 @@ dialog.dkdlg ul.dknotes{margin:6px 0 0 18px;padding:0}.dkerr{color:var(--bad);ma
 .facts dt{color:var(--mut)}.facts dd{margin:0;overflow-wrap:anywhere}
 .modetag{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:2px;background:var(--primary-soft);color:var(--primary-ink);border:1px solid var(--line)}
 
+/* ---------- cleanup: one rhythm for page heads, touch targets, phone ---------- */
+#rt_body .mono,#rt_body .small{overflow-wrap:anywhere}#pc_body li,#pc_body code,#pc_body .cmdline code{overflow-wrap:anywhere;word-break:break-word;white-space:normal}.actrow{display:flex;gap:8px;align-items:center}.actrow .action{flex:1}.vhead .row{flex-wrap:wrap}.vhead .ttl p{max-width:70ch;margin-top:4px}
+@media (max-width:640px){#g_repo,#ut_load{max-width:100%!important;width:100%!important}.vhead .row{width:100%}}
+@media (pointer:coarse),(max-width:640px){.btn,.btn.sm,.tbtn,select,input[type=text],input[type=number],input[type=search],input[type=password]{min-height:40px}.chip{min-height:36px}}
 /* ---------- responsive ---------- */
 .grid>*,.split>*,.cmdgrid>*,.stats>*{min-width:0}
 #h_root,.run .meta span,.check .tx div{overflow-wrap:anywhere}
@@ -478,7 +489,7 @@ dialog.dkdlg ul.dknotes{margin:6px 0 0 18px;padding:0}.dkerr{color:var(--bad);ma
  .rail.open{transform:none}.shell{grid-template-columns:minmax(0,1fr)}#navtoggle{display:inline-flex!important}main{padding:14px 12px 28px}.g3,.g2{grid-template-columns:minmax(0,1fr)}
  .top .search{display:none}.field{grid-template-columns:minmax(0,1fr)}.field .help{grid-column:1}.wsteps small{display:none}.vhead{flex-direction:column;align-items:flex-start}}
 @media (max-width:640px){
- .g4{grid-template-columns:minmax(0,1fr)}.top{gap:8px;padding:0 8px}.brand{padding-right:8px}.brand small,#consbtn span,#jobpilltx{display:none}
+ .g4{grid-template-columns:minmax(0,1fr)}.top{gap:8px;padding:0 8px}.brand{padding-right:8px}.brand small,.brand .prod,#consbtn span,#jobpilltx,#gdbtn span:not(.badge),.netind .nl,.top .quit span{display:none}.top .tbtn{min-height:40px;min-width:40px;justify-content:center}.where{display:none}
  .card>.hd{flex-wrap:wrap}.run{grid-template-columns:minmax(0,1fr)}.run .row{justify-content:flex-start!important}
  #chead select{max-width:46vw}#ccopy,#cfollow,#ctoggle span,#chead>b{display:none}#chead{overflow:hidden}
  .wsteps{overflow-x:auto}.wsteps button{min-width:110px}.leaders{width:auto}
@@ -676,6 +687,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
   <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.6-4.5L3 9M4 13a8 8 0 0 0 14.6 4.5L21 15"/><path d="M3 4v5h5M21 20v-5h-5"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
@@ -719,9 +731,11 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
  <span class="pill" id="jobpill" hidden><span class="pulse"></span><span id="jobpilltx">1 job running</span></span>
  <button class="tbtn" id="gdbtn" aria-pressed="false" title="Side panel: Studies, Jobs and Git (Ctrl+Shift+G opens Git)"><svg class="ico sm"><use href="#i-sidebar"/></svg><span>Panel</span><span class="badge" id="gdbadge" hidden></span></button>
  <button class="tbtn netind" id="netind" title="Checking the internet connection…" aria-label="Internet status: checking"><span class="nd" aria-hidden="true"></span><span class="nl">Checking…</span></button>
- <button class="tbtn" id="helpbtn" title="Help for this page (F1)" aria-label="Help for this page"><svg class="ico sm"><use href="#i-help"/></svg></button>
- <button class="tbtn" id="reloadbtn" title="Reload page (clear cache)" aria-label="Reload page (clear cache)"><svg class="ico sm"><use href="#i-refresh"/></svg></button>
- <button class="tbtn" id="theme" title="Switch between light and dark"><svg class="ico sm"><use href="#i-moon"/></svg></button>
+ <div class="menuwrap" id="morewrap"><button class="tbtn" id="morebtn" aria-haspopup="true" aria-expanded="false" aria-controls="moremenu" title="More: help, reload the page, light or dark theme" aria-label="More"><svg class="ico sm"><use href="#i-more"/></svg></button>
+  <div class="menu" id="moremenu" hidden>
+   <button type="button" class="mi" id="helpbtn" title="Help for this page (F1)"><svg class="ico sm"><use href="#i-help"/></svg>Help for this page (F1)</button>
+   <button type="button" class="mi" id="reloadbtn" title="Reload page (clear cache)"><svg class="ico sm"><use href="#i-refresh"/></svg>Reload page (clear cache)</button>
+   <button type="button" class="mi" id="theme" title="Switch between light and dark"><svg class="ico sm"><use href="#i-moon"/></svg>Light / dark theme</button></div></div>
  <button class="tbtn" id="consbtn" title="Show or hide the console (job output and terminal)"><svg class="ico sm"><use href="#i-term"/></svg><span>Console</span></button>
  <button class="tbtn quit" id="quitbtn" title="Quit PlasBench: stop it and close this window"><svg class="ico sm"><use href="#i-power"/></svg><span>Quit</span></button>
 </header>
@@ -732,22 +746,23 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
   <button class="nav" data-view="home"><svg class="ico"><use href="#i-home"/></svg><span class="t"><b>Home</b><small id="s_home">Readiness and shortcuts</small></span></button>
   <h6>Set up</h6>
   <button class="nav" data-view="setup"><svg class="ico"><use href="#i-wrench"/></svg><span class="t"><b>Set up this computer</b><small id="s_setup">Checking…</small></span><span class="badge" id="b_setup" hidden></span></button>
-  <button class="nav" data-view="tools"><svg class="ico"><use href="#i-box"/></svg><span class="t"><b>Tools</b><small id="s_tools">Catalogue and installs</small></span></button>
-  <button class="nav" data-view="addtool"><svg class="ico"><use href="#i-plus"/></svg><span class="t"><b>Add your own tool</b><small id="s_addtool">Manifest builder</small></span></button>
-  <button class="nav" data-view="prereg"><svg class="ico"><use href="#i-check"/></svg><span class="t"><b>Scoring decisions</b><small id="s_prereg">The rules, fixed in advance</small></span><span class="badge warn" id="b_prereg" hidden title="Settings that differ from a confirmed decision">0</span></button>
-  <button class="nav" data-view="settings"><svg class="ico"><use href="#i-sliders"/></svg><span class="t"><b>Settings</b><small id="s_settings">Paths, threads, defaults</small></span></button>
   <h6>Benchmark</h6>
   <button class="nav" data-view="workspace"><svg class="ico"><use href="#i-folder"/></svg><span class="t"><b>Workspace &amp; studies</b><small id="s_workspace">Where runs are kept</small></span><span class="badge warn" id="b_workspace" hidden>!</span></button>
-  <button class="nav" data-view="wizard"><svg class="ico"><use href="#i-rocket"/></svg><span class="t"><b>New benchmark</b><small>Guided, step by step</small></span></button>
-  <button class="nav" data-view="isolates"><svg class="ico"><use href="#i-flask"/></svg><span class="t"><b>Your own isolates</b><small>Add FASTQ + reference</small></span></button>
   <button class="nav" data-view="cohorts"><svg class="ico"><use href="#i-users"/></svg><span class="t"><b>Cohorts</b><small id="s_cohorts">Bundled study sets</small></span></button>
+  <button class="nav" data-view="isolates"><svg class="ico"><use href="#i-flask"/></svg><span class="t"><b>Your own isolates</b><small>Add FASTQ + reference</small></span></button>
+  <button class="nav" data-view="wizard"><svg class="ico"><use href="#i-rocket"/></svg><span class="t"><b>New benchmark</b><small>Guided, step by step</small></span></button>
   <h6>Results</h6>
   <button class="nav" data-view="runs"><svg class="ico"><use href="#i-chart"/></svg><span class="t"><b>Runs &amp; reports</b><small id="s_runs">Finding results…</small></span><span class="badge bad" id="b_runs" hidden title="Runs that failed or were interrupted since you last looked">0</span></button>
   <button class="nav" data-view="jobs"><svg class="ico"><use href="#i-list"/></svg><span class="t"><b>Jobs</b><small id="s_jobs">Nothing running</small></span><span class="badge run" id="b_jobs" hidden></span></button>
+  <h6>Tools &amp; rules</h6>
+  <button class="nav" data-view="tools"><svg class="ico"><use href="#i-box"/></svg><span class="t"><b>Tools</b><small id="s_tools">Catalogue and installs</small></span></button>
+  <button class="nav" data-view="addtool"><svg class="ico"><use href="#i-plus"/></svg><span class="t"><b>Add your own tool</b><small id="s_addtool">Manifest builder</small></span></button>
+  <button class="nav" data-view="prereg"><svg class="ico"><use href="#i-check"/></svg><span class="t"><b>Scoring decisions</b><small id="s_prereg">The rules, fixed in advance</small></span><span class="badge warn" id="b_prereg" hidden title="Settings that differ from a confirmed decision">0</span></button>
   <h6>Advanced</h6>
   <button class="nav" data-view="git"><svg class="ico"><use href="#i-git"/></svg><span class="t"><b>Version control</b><small id="s_git">Git for your work</small></span><span class="badge" id="b_git" hidden></span></button>
   <button class="nav" data-view="commands"><svg class="ico"><use href="#i-cmd"/></svg><span class="t"><b>All commands</b><small id="s_commands">Every CLI command as a form</small></span></button>
-  <h6>Help</h6>
+  <h6>Settings &amp; help</h6>
+  <button class="nav" data-view="settings"><svg class="ico"><use href="#i-sliders"/></svg><span class="t"><b>Settings</b><small id="s_settings">Paths, threads, defaults</small></span></button>
   <button class="nav" data-view="help"><svg class="ico"><use href="#i-book"/></svg><span class="t"><b>Guides</b><small>README and docs</small></span></button>
  </nav>
 
@@ -771,11 +786,11 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
      <ol class="steps" id="gs" style="border-top:1px solid var(--line-2)"></ol></div>
     <div class="stack">
      <div class="card"><div class="hd"><h3>Common tasks</h3></div><div class="tasks">
-      <button class="task" data-act="demo"><svg class="ico"><use href="#i-play"/></svg><span class="tx"><b>Run the offline demo</b><span>Six synthetic isolates, scored and reported in about a minute; no downloads.</span></span><svg class="ico chev"><use href="#i-chev"/></svg></button>
-      <button class="task" data-go="wizard"><svg class="ico"><use href="#i-rocket"/></svg><span class="tx"><b>Start a benchmark</b><span>A bundled cohort or your own sample sheet, step by step.</span></span><svg class="ico chev"><use href="#i-chev"/></svg></button>
-      <button class="task" data-go="addtool"><svg class="ico"><use href="#i-plus"/></svg><span class="tx"><b>Add your own tool</b><span>Describe it once; it is installed, run, scored and ranked like a built-in tool.</span></span><svg class="ico chev"><use href="#i-chev"/></svg></button>
-      <button class="task" data-go="isolates"><svg class="ico"><use href="#i-flask"/></svg><span class="tx"><b>Add your own isolates</b><span>Paired FASTQ files and a complete reference assembly.</span></span><svg class="ico chev"><use href="#i-chev"/></svg></button>
-      <button class="task" data-go="commands"><svg class="ico"><use href="#i-cmd"/></svg><span class="tx"><b>Command reference</b><span>Every plasbench command and option, as forms.</span></span><svg class="ico chev"><use href="#i-chev"/></svg></button>
+      <button class="task" data-act="demo"><svg class="ico"><use href="#i-play"/></svg><span class="tx"><b>Run the offline demo</b><span>Six synthetic isolates in about a minute; no downloads.</span></span><svg class="ico chev"><use href="#i-chev"/></svg></button>
+      <button class="task" data-go="wizard"><svg class="ico"><use href="#i-rocket"/></svg><span class="tx"><b>Start a benchmark</b><span>A bundled cohort or your own sheet, step by step.</span></span><svg class="ico chev"><use href="#i-chev"/></svg></button>
+      <button class="task" data-go="addtool"><svg class="ico"><use href="#i-plus"/></svg><span class="tx"><b>Add your own tool</b><span>Describe it once; it runs like a built-in tool.</span></span><svg class="ico chev"><use href="#i-chev"/></svg></button>
+      <button class="task" data-go="isolates"><svg class="ico"><use href="#i-flask"/></svg><span class="tx"><b>Add your own isolates</b><span>Paired FASTQ files and a reference assembly.</span></span><svg class="ico chev"><use href="#i-chev"/></svg></button>
+      <button class="task" data-go="commands"><svg class="ico"><use href="#i-cmd"/></svg><span class="tx"><b>Command reference</b><span>Every command and option, as forms.</span></span><svg class="ico chev"><use href="#i-chev"/></svg></button>
      </div></div>
      <div class="card"><div class="hd"><h3>Recent runs</h3><button class="btn ghost sm" data-go="runs">View all</button></div><div id="h_runs"></div></div>
     </div>
@@ -784,8 +799,8 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
 
   <!-- SETUP --------------------------------------------------------------------------------------- -->
   <section class="view" id="v_setup" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Set up this computer</h1>
-    <p>What PlasBench needs, what is already here, and a one-click fix for anything missing. Each fix runs the same <code>plasbench</code> command you would type; its output appears in the console below.</p></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Set up this computer<span data-tipid="p_setup"></span></h1>
+    <p>What PlasBench needs and a one-click fix for anything missing.</p></div>
     <div class="row"><button class="btn sec" id="envref"><svg class="ico sm"><use href="#i-refresh"/></svg>Re-check</button>
      <button class="btn" data-run='["check","--yes"]' data-label="Check and fix every dependency"><svg class="ico sm"><use href="#i-wrench"/></svg>Check &amp; fix all</button></div></div>
    <div class="card" id="env_card" style="margin-bottom:16px"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Environment <span id="rt_tip"></span></h3><span class="sub" id="rt_sub"></span></div>
@@ -795,37 +810,35 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
    <div class="split">
     <div class="card"><div class="hd"><h3>Checklist</h3><span class="sub" id="envsum"></span></div><div id="envlist"><div class="bd mut">Checking…</div></div></div>
     <div class="stack">
-     <div class="card" id="pc_card"><div class="hd"><svg class="ico"><use href="#i-monitor"/></svg><h3>This computer</h3><span class="sub" id="pc_mode"></span></div>
+     <div class="card" id="pc_card"><div class="hd"><svg class="ico"><use href="#i-monitor"/></svg><h3>This computer<span data-tipid="pc_help"></span></h3><span class="sub" id="pc_mode"></span></div>
       <div class="bd" id="pc_body"><span class="mut">Looking at this computer…</span></div>
       <div class="bd" id="pc_comp" style="border-top:1px solid var(--line)"></div>
       <div class="ft"><button class="btn sec sm" data-run='["desktop-icon","--remove"]' data-label="Remove the PlasBench desktop icon">Remove icon</button>
        <button class="btn sm" data-run='["desktop-icon"]' data-label="Add the PlasBench icon to the desktop and the applications menu"><svg class="ico sm"><use href="#i-plus"/></svg>Add desktop icon</button></div></div>
-     <div class="card"><div class="hd"><svg class="ico"><use href="#i-key"/></svg><h3>NCBI access</h3></div><div class="bd">
-      <p class="mut small" style="margin-top:0">Cohort downloads use NCBI. An email is courtesy; an API key raises the request allowance from 3 to 10 per second. Both are saved in <code id="ncbi_where">config/local.env</code> on this computer only.</p>
+     <div class="card"><div class="hd"><svg class="ico"><use href="#i-key"/></svg><h3>NCBI access<span data-tipid="ncbi"></span></h3></div><div class="bd">
+      <p class="mut small" style="margin-top:0">Saved in <code id="ncbi_where">config/local.env</code> on this computer only.</p>
       <label class="small" for="ncbi_email"><b>Contact email</b></label><input type="text" id="ncbi_email" placeholder="you@institute.org" autocomplete="email">
       <label class="small" for="ncbi_key" style="display:block;margin-top:10px"><b>API key</b> <a href="https://www.ncbi.nlm.nih.gov/account/settings/" target="_blank" rel="noopener">get one</a></label>
       <div class="row"><input type="password" id="ncbi_key" placeholder="36-character key" autocomplete="off"><button class="btn sec sm" id="ncbi_show" type="button">Show</button></div>
      </div><div class="ft"><button class="btn" id="ncbi_save"><svg class="ico sm"><use href="#i-save"/></svg>Save</button></div></div>
-     <div class="card"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Install a tool profile</h3></div><div class="bd">
-      <p class="mut small" style="margin-top:0">Profiles group related tools. <b>core</b> is needed for everything; the rest add assemblers, binning-reconstruction tools and optional analyses.</p>
+     <div class="card"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Install a tool profile<span data-tipid="profile"></span></h3></div><div class="bd">
       <div class="row"><select id="profile"></select><button class="btn" id="profgo">Install</button></div>
       <div class="row wrap" style="margin-top:12px"><button class="btn sec sm" data-run='["install-tools","plan"]' data-label="Show the install plan">Show install plan</button>
        <button class="btn sec sm" data-run='["install-tools","list"]' data-label="List install profiles">List profiles</button>
        <button class="btn sec sm" data-run='["install-tools","validate"]' data-label="Validate the install registry">Validate registry</button></div>
      </div></div>
-     <div class="card" id="dkcard"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Docker</h3><span class="sub">optional container engine</span></div><div class="bd">
+     <div class="card" id="dkcard"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Docker<span data-tipid="docker_card"></span></h3><span class="sub">optional container engine</span></div><div class="bd">
       <div class="row wrap" style="gap:8px"><span class="tag" id="dk_chip" title="Whether Docker works on this computer right now">Checking Docker</span><span class="small" id="dk_title"></span></div>
-      <p class="mut small" style="margin:8px 0 0">Docker is optional. It runs PlasBench in a container (<code>scripts/docker_run.sh</code>) and is the runtime tools such as mobilome-map and plsmd need when they run in a container. PlasBench never runs sudo and never accepts the Docker Desktop licence for you.</p>
       <div class="small" id="dk_wait" role="status" hidden style="margin-top:8px;padding:8px 10px;border:1px solid var(--warn);border-radius:6px"></div>
       <ul class="small dksteps" id="dk_steps" style="margin:8px 0 0;padding-left:18px"></ul>
       <div class="row wrap" style="margin-top:12px;gap:8px"><button class="btn" id="dk_install" data-dk="install" title="Install Docker">Install Docker</button><button class="btn sec" id="dk_recheck" data-dk="recheck" title="Check Docker again">Re-check</button><button class="btn ghost" id="dk_guide" data-dk="guide" title="Open the official Docker guide">Open the Docker guide</button></div>
      </div></div>
      <div class="card"><div class="hd"><svg class="ico"><use href="#i-refresh"/></svg><h3>Maintenance</h3></div><div class="bd grid" style="gap:10px">
-      <button class="action" data-run='["install-conda","--yes"]' data-label="Install conda (Miniforge)"><span class="aico"><svg class="ico"><use href="#i-down"/></svg></span><span><b>Install conda</b><span>Only if no conda, mamba or micromamba is present.</span></span></button>
-      <button class="action" id="updcheck" data-needs="github" title="Asks GitHub whether a newer release exists"><span class="aico"><svg class="ico"><use href="#i-search"/></svg></span><span><b>Check for updates</b><span>Asks GitHub whether a newer release exists. Nothing is installed.</span></span></button>
+      <div class="actrow"><button class="action" data-run='["install-conda","--yes"]' data-label="Install conda (Miniforge)"><span class="aico"><svg class="ico"><use href="#i-down"/></svg></span><span><b>Install conda</b></span></button><span data-tipid="m_conda"></span></div>
+      <div class="actrow"><button class="action" id="updcheck" data-needs="github" title="Asks GitHub whether a newer release exists"><span class="aico"><svg class="ico"><use href="#i-search"/></svg></span><span><b>Check for updates</b></span></button><span data-tipid="m_update"></span></div>
       <div id="updresult" class="small" aria-live="polite" style="display:none"></div>
-      <button class="action" data-run='["upgrade","--yes"]' data-label="Upgrade PlasBench"><span class="aico"><svg class="ico"><use href="#i-refresh"/></svg></span><span><b>Upgrade PlasBench</b><span>Latest release; keeps your reads, databases and studies. Close and reopen PlasBench afterwards to use the new version.</span></span></button>
-      <button class="action" data-run='["test"]' data-label="Run the offline test suite"><span class="aico"><svg class="ico"><use href="#i-check"/></svg></span><span><b>Run the test suite</b><span>Offline regression checks of this installation.</span></span></button>
+      <div class="actrow"><button class="action" data-run='["upgrade","--yes"]' data-label="Upgrade PlasBench"><span class="aico"><svg class="ico"><use href="#i-refresh"/></svg></span><span><b>Upgrade PlasBench</b></span></button><span data-tipid="m_upgrade"></span></div>
+      <div class="actrow"><button class="action" data-run='["test"]' data-label="Run the offline test suite"><span class="aico"><svg class="ico"><use href="#i-check"/></svg></span><span><b>Run the test suite</b></span></button><span data-tipid="m_test"></span></div>
      </div></div>
     </div>
    </div>
@@ -833,18 +846,13 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
 
   <!-- TOOLS --------------------------------------------------------------------------------------- -->
   <section class="view" id="v_tools" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Tools</h1>
-    <p>Every tool PlasBench can benchmark, built-in and your own. The switch, and the <b>on</b> / <b>off</b> beside it, set whether a tool runs by default: <b>on</b> means it runs unless you turn it off for a run, <b>off</b> means it is skipped unless you turn it on (saved for this computer). The New benchmark page can still change it for one run.</p></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Tools &amp; rules</div><h1>Tools<span data-tipid="p_tools"></span></h1>
+    <p>Every tool PlasBench can benchmark; the switch sets whether it runs by default.</p></div>
     <div class="row"><button class="btn" id="installall" title="Installs exactly the tools that are switched on in Settings and not installed yet, after one confirmation">Install all enabled tools</button><button class="btn sec" id="toolsref"><svg class="ico sm"><use href="#i-refresh"/></svg>Refresh</button><button class="btn" data-go="addtool"><svg class="ico sm"><use href="#i-plus"/></svg>Add your own tool</button></div></div>
    <div class="note info small" id="instbar" role="status" aria-live="polite" hidden style="margin-bottom:12px"></div>
    <div class="stats" id="toolkpis" style="margin-bottom:12px"></div>
-   <div class="note info small" id="taskhelp" style="margin-bottom:12px"><svg class="ico"><use href="#i-info"/></svg><div><b>Three kinds of task, each ranked on its own.</b>
-    <b>Classification</b>: the tool labels every contig plasmid or chromosome (ranked by base-level F1).
-    <b>Binning reconstruction</b>: the tool groups contigs into separate plasmids (ranked by length-weighted binning F1).
-    <b>Sequence reassembly</b>: the tool produces the plasmid sequences themselves (ranked by CPRR, the share of true plasmids recovered correctly).
-    Tools are never ranked against tools of another task or another input track.</div></div>
-   <div class="card">
-    <div class="toolbar"><input type="search" id="toolq" placeholder="Filter tools…" aria-label="Filter tools">
+      <div class="card">
+    <div class="toolbar"><input type="search" id="toolq" placeholder="Filter tools…" aria-label="Filter tools"><span data-tipid="tool_tasks" id="taskhelp"></span>
      <div class="chips" id="toolchips"></div></div>
     <div class="tablewrap"><table class="data"><thead><tr><th>Tool</th><th>Task and track</th><th>Installed</th><th>Reference database</th><th title="Whether this tool runs when you do not choose tools yourself (its RUN_ setting). Saved for this computer.">Runs by default</th><th></th></tr></thead><tbody id="tooltb"></tbody></table></div>
    </div>
@@ -852,8 +860,8 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
 
   <!-- ADD TOOL ------------------------------------------------------------------------------------ -->
   <section class="view" id="v_addtool" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Add your own tool</h1>
-    <p>Describe a plasmid reconstruction or classification tool once. PlasBench installs it into its own environment, runs it on every sample (or reads outputs you already have), converts its output, and scores, ranks and reports it beside the built-in tools. No code changes.</p></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Tools &amp; rules</div><h1>Add your own tool<span data-tipid="p_addtool"></span></h1>
+    <p>Describe a tool once; PlasBench installs, runs, scores and ranks it like a built-in one.</p></div>
     <div class="row"><button class="btn sec" id="ut_help" title="How Add your own tool works, step by step, with a worked example"><svg class="ico sm"><use href="#i-help"/></svg>How it works</button>
      <select id="ut_load" aria-label="Edit an existing user tool" style="width:auto"><option value="">New tool…</option></select>
      <button class="btn danger sm" id="ut_remove" disabled title="Delete the tool chosen on the left: its manifest, scripts and downloaded source">Remove</button></div></div>
@@ -862,7 +870,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
     <div class="stack" style="position:sticky;top:calc(var(--hdr) + 18px)">
      <div class="card"><div class="hd"><h3>Check</h3><span class="sub">updates as you type</span></div><div class="bd" id="utcheck"><div class="mut">Fill in the form.</div></div></div>
      <div class="card"><div class="hd"><h3>plasbench-tool.ini</h3><button class="btn ghost sm" id="ut_copy"><svg class="ico sm"><use href="#i-copy"/></svg>Copy</button><button class="btn ghost sm" id="ut_dl"><svg class="ico sm"><use href="#i-down"/></svg>Download</button></div>
-      <div class="bd"><textarea id="ut_text" rows="16" spellcheck="false" aria-label="Manifest text"></textarea><p class="mut small" style="margin:6px 0 0">You can also edit the text directly; the form follows.</p></div>
+      <div class="bd"><textarea id="ut_text" rows="16" spellcheck="false" aria-label="Manifest text"></textarea><span data-tipid="ut_text" class="mut"></span></div>
       <div class="ft"><button class="btn sec" id="ut_save"><svg class="ico sm"><use href="#i-save"/></svg>Save</button><button class="btn" id="ut_saveinst"><svg class="ico sm"><use href="#i-down"/></svg>Save &amp; install</button></div></div>
     </div>
    </div>
@@ -870,8 +878,8 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
 
   <!-- SETTINGS ------------------------------------------------------------------------------------ -->
   <section class="view" id="v_prereg" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Scoring decisions</h1>
-    <p>Before any result is looked at, PlasBench fixes how tools are scored and ranked. These are those rules, each in plain words. They are confirmed and recorded so that nobody, including you, can quietly change a rule after seeing which tool wins. You can still change one: PlasBench asks why, records it, and warns that results from before and after the change cannot be compared.</p></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Tools &amp; rules</div><h1>Scoring decisions<span data-tipid="p_prereg"></span></h1>
+    <p>The scoring rules, confirmed and recorded before any result is seen.</p></div>
     <div class="row"><button class="btn sec" id="pr_hist">Decision record</button><button class="btn" id="pr_lock">Lock the decisions</button></div></div>
    <div class="card" id="pr_status" style="margin-bottom:12px"></div>
    <div class="card"><div class="toolbar"><input type="search" id="pr_q" placeholder="Search the decisions…" aria-label="Search the decisions"><label class="row small" style="gap:6px"><input type="checkbox" id="pr_only"> Only the ones I can change here</label><div class="chips" id="pr_topics" role="tablist" aria-label="Topics"></div></div>
@@ -879,18 +887,18 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
   </section>
 
   <section class="view" id="v_settings" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Settings</h1>
-    <p>Every setting PlasBench reads (from <code>config/config.sh</code>), its default, and your value for this computer. Changes are saved to <code id="set_where">config/local.env</code>, which upgrades keep; clear a value to return to the default.</p></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Settings &amp; help</div><h1>Settings<span data-tipid="p_settings"></span></h1>
+    <p>Your values for this computer, saved to <code id="set_where">config/local.env</code>.</p></div>
     <div class="row"><button class="btn sec" id="set_reset" disabled>Discard changes</button><button class="btn" id="set_save" disabled><svg class="ico sm"><use href="#i-save"/></svg>Save <span id="set_n"></span></button></div></div>
-   <div class="card" id="np_card"><div class="hd"><h3>Folder window</h3><span class="sub">what Browse opens</span></div><div class="bd"><p class="small mut" style="margin:0">Browse opens this computer's own folder window. If it does not, test it here: PlasBench opens a window, closes it again after two seconds and says which step fails.</p></div><div class="ft"><button class="btn sec" id="np_test" title="Open a test folder window that closes itself, and show a step-by-step report you can copy">Test the folder window</button><button class="btn sec" id="np_dk_switch" hidden title="Get the command that runs PlasBench in Docker">Run in Docker instead</button><button class="btn sec" id="np_dk_install" hidden title="Docker is not ready: see its state and install it">Install Docker first</button><button class="btn sec" id="np_dk_add" hidden title="This window runs in Docker: get the command that mounts another folder">Add another folder</button></div></div>
+   <div class="card" id="np_card"><div class="hd"><h3>Folder window</h3><span class="sub">what Browse opens</span></div><div class="bd small mut" style="padding-block:8px">Browse uses this computer's own folder window.<span data-tipid="folder_window"></span></div><div class="ft"><button class="btn sec" id="np_test" title="Open a test folder window that closes itself, and show a step-by-step report you can copy">Test the folder window</button><button class="btn sec" id="np_dk_switch" hidden title="Get the command that runs PlasBench in Docker">Run in Docker instead</button><button class="btn sec" id="np_dk_install" hidden title="Docker is not ready: see its state and install it">Install Docker first</button><button class="btn sec" id="np_dk_add" hidden title="This window runs in Docker: get the command that mounts another folder">Add another folder</button></div></div>
    <div class="card"><div class="toolbar"><input type="search" id="setq" placeholder="Search settings…" aria-label="Search settings"><label class="row small" style="gap:6px"><input type="checkbox" id="set_only"> Only my changes</label><span class="mut small grow" id="set_count" style="text-align:right"></span></div>
     <div id="setlist"></div></div>
   </section>
 
   <!-- WIZARD -------------------------------------------------------------------------------------- -->
   <section class="view" id="v_wizard" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Benchmark</div><h1>New benchmark</h1>
-    <p>Choose the isolates, the tools and the resources, review the exact command, and start. Every option of <code>plasbench run</code> is available; anything you leave alone keeps its default.</p></div></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Benchmark</div><h1>New benchmark<span data-tipid="p_wizard"></span></h1>
+    <p>Choose isolates, tools and resources, review the command, start.</p></div></div>
    <div class="wsteps" id="wsteps"></div>
    <div id="wbody"></div>
    <div class="row" style="margin-top:16px;justify-content:space-between"><button class="btn sec" id="wprev">Back</button><div class="row"><span class="mut small" id="wvalid"></span><button class="btn" id="wnext">Next</button></div></div>
@@ -898,10 +906,8 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
 
   <!-- WORKSPACE ----------------------------------------------------------------------------------- -->
   <section class="view" id="v_workspace" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Benchmark</div><h1>Workspace &amp; studies</h1>
-    <p>Every benchmark is a <b>study</b> with its own folder: its results, report, logs and a record of how it was run. The
-    <b>workspace</b> is the folder that holds all studies. Downloads, tool environments and databases are shared between
-    studies, so a new study never downloads the same reads again.</p></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Benchmark</div><h1>Workspace &amp; studies<span data-tipid="p_workspace"></span></h1>
+    <p>Every benchmark is a study with its own folder in the workspace.</p></div>
     <div class="row"><button class="btn sec" id="ws_ref"><svg class="ico sm"><use href="#i-refresh"/></svg>Refresh</button></div></div>
    <div class="split">
     <div class="stack">
@@ -916,24 +922,19 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
        <ul role="tree" id="wt_tree" aria-label="Workspace folders and files" tabindex="0"></ul><div class="small mut" id="wt_status" aria-live="polite" style="margin-top:6px"></div></div></div>
     </div>
     <div class="stack">
-     <div class="card"><div class="hd"><h3>Change the workspace</h3></div><div class="bd">
-      <p class="mut small" style="margin-top:0">Choose a folder with plenty of free space: a public cohort needs hundreds of GB.
-       A local disk is fastest; an external drive works if it stays connected. Existing studies stay where they are.</p>
+     <div class="card"><div class="hd"><h3>Change the workspace<span data-tipid="ws_change"></span></h3></div><div class="bd">
       <div class="row"><input type="text" id="ws_path" placeholder="D:\PlasBenchStudies" aria-label="Workspace folder"><button class="btn sec sm" data-browse="ws_path" data-dir="1">Browse</button></div>
       <div class="row" style="margin-top:8px"><button class="btn sec" id="ws_check">Check this folder</button><button class="btn" id="ws_use" disabled>Use this folder</button></div>
       <div id="ws_report" style="margin-top:10px"></div>
       <div id="ws_recent"></div>
      </div></div>
-     <div class="card"><div class="hd"><h3>New study</h3></div><div class="bd">
-      <p class="mut small" style="margin-top:0">Optional: a run creates its study automatically, named after the cohort or sample sheet.
-       Create one here to name it yourself, then choose it on New benchmark.</p>
-      <div class="field"><label for="st_name">Name</label><div class="ctl"><input type="text" id="st_name" placeholder="cohort1"></div><div class="help">Letters, digits, '.', '_' or '-'.</div></div>
+     <div class="card"><div class="hd"><h3>New study<span data-tipid="st_new"></span></h3></div><div class="bd">
+      <div class="field"><label for="st_name">Name</label><div class="ctl"><input type="text" id="st_name" placeholder="cohort1"><span data-tipid="st_name"></span></div></div>
       <div class="field"><label for="st_note">Note</label><div class="ctl"><input type="text" id="st_note" placeholder="What this study is for (optional)"></div></div>
-      <div class="field"><label for="st_loc">Location</label><div class="ctl"><input type="text" id="st_loc" placeholder="empty = the workspace" aria-label="Study location (empty means the workspace)" title="Empty: the workspace folder. Or choose another folder, on this computer or a connected drive."><button class="btn sec sm" data-browse="st_loc" data-dir="1">Choose a folder</button></div>
-       <div class="help" id="st_loccheck">The study folder is created as <i>location</i>/<i>name</i>. Leave empty to use the workspace.</div></div>
+      <div class="field"><label for="st_loc">Location<span data-tipid="st_loc"></span></label><div class="ctl"><input type="text" id="st_loc" placeholder="empty = the workspace" aria-label="Study location (empty means the workspace)" title="Empty: the workspace folder. Or choose another folder, on this computer or a connected drive."><button class="btn sec sm" data-browse="st_loc" data-dir="1">Choose a folder</button></div>
+       <div class="help" id="st_loccheck"></div></div>
      </div><div class="ft"><button class="btn sec" id="st_addex" title="Register a folder that already holds a study.json (for example a study on another drive)">Add an existing study folder…</button><button class="btn" id="st_create"><svg class="ico sm"><use href="#i-plus"/></svg>Create study</button></div></div>
-     <div class="card"><div class="hd"><h3>Import a study</h3></div><div class="bd">
-      <p class="mut small" style="margin-top:0">Bring in a study bundle (a <code>.zip</code> made by <b>Manage &rarr; Export</b>) from another computer or an earlier time. It becomes a new study; nothing is overwritten.</p>
+     <div class="card"><div class="hd"><h3>Import a study<span data-tipid="st_import"></span></h3></div><div class="bd">
       <div class="row"><input type="text" id="si_path" placeholder="D:\bundles\cohort1.zip" aria-label="Study bundle"><button class="btn sec sm" data-browse="si_path">Browse</button></div>
       <div class="field" style="margin-top:8px"><label for="si_name">Name (optional)</label><div class="ctl"><input type="text" id="si_name" placeholder="the name inside the bundle"></div></div>
      </div><div class="ft"><button class="btn" id="si_go"><svg class="ico sm"><use href="#i-plus"/></svg>Import study</button></div></div>
@@ -952,48 +953,38 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
 
   <!-- ISOLATES ------------------------------------------------------------------------------------ -->
   <section class="view" id="v_isolates" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Benchmark</div><h1>Your own isolates</h1>
-    <p>Tell PlasBench which folder(s) hold your reads and reference genomes. It finds each isolate, places the files where the run expects them, and tests that it can read and use them, before any run spends hours. Not sure what you need? <a href="#help/docs/INPUT_GUIDE.md">Read the guide</a>.</p></div></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Benchmark</div><h1>Your own isolates<span data-tipid="p_isolates"></span></h1>
+    <p>Point PlasBench at your reads and references; it places and tests them before any run.</p></div></div>
    <div class="stack">
     <div class="card" id="in_get">
-     <div class="hd"><h3>1. Get a sheet to fill in <span class="mut small">(optional)</span></h3></div>
+     <div class="hd"><h3>1. Get a sheet to fill in <span class="mut small">(optional)</span><span data-tipid="in_sheet"></span></h3></div>
      <div class="bd" style="padding:12px 14px">
-      <p class="mut" style="margin-top:0">You do not have to write a sheet: step 2 writes it for you from your folders. If you prefer to fill one in yourself, download a template. Each has the rules written at the top, and a worked example.</p>
-      <div class="row wrap" id="in_tpl"></div>
-      <div class="note info" style="margin-top:10px"><svg class="ico"><use href="#i-info"/></svg><div><b>What you need for each isolate:</b> its paired Illumina reads (two files); for a <em>scored</em> benchmark also the <em>complete</em> genome of the <em>same</em> isolate (chromosome and each plasmid as separate sequences). With reads only, PlasBench reconstructs the plasmids but cannot score them.</div></div>
+            <div class="row wrap" id="in_tpl"></div>
+      <div class="small mut" style="margin-top:8px">What you need for each isolate<span data-tipid="in_need"></span></div>
      </div></div>
     <div class="card" id="in_find">
-     <div class="hd"><h3>2. Find my files</h3><span class="sub">plasbench intake scan / stage</span></div>
+     <div class="hd"><h3>2. Find my files<span data-tipid="in_find"></span></h3><span class="sub">plasbench intake scan / stage</span></div>
      <div class="bd" style="padding:12px 14px">
-      <p class="mut" style="margin-top:0">Add the folder(s) where your files are. Sub-folders are searched. Nothing is changed until you press <b>Place the selected isolates</b>.</p>
-      <div class="row wrap"><button class="btn sec" id="in_addf"><svg class="ico sm"><use href="#i-folder"/></svg>Add a folder…</button>
+            <div class="row wrap"><button class="btn sec" id="in_addf"><svg class="ico sm"><use href="#i-folder"/></svg>Add a folder…</button>
        <input type="text" id="in_fpath" placeholder="or paste a folder path" aria-label="Folder path" style="flex:1;min-width:220px"><button class="btn sec" id="in_fadd">Add</button></div>
       <div id="in_folders" class="row wrap" style="margin:10px 0"></div>
       <div class="row wrap"><button class="btn" id="in_scan" disabled><svg class="ico sm"><use href="#i-play"/></svg>Find my files</button><span class="mut small" id="in_scan_msg"></span></div>
       <div id="in_found" style="margin-top:12px"></div>
      </div></div>
     <div class="card" id="in_test">
-     <div class="hd"><h3>3. Quick test: can PlasBench see and use them?</h3><span class="sub">plasbench intake check</span></div>
+     <div class="hd"><h3>3. Quick test: can PlasBench see and use them?<span data-tipid="in_test"></span></h3><span class="sub">plasbench intake check</span></div>
      <div class="bd" style="padding:12px 14px">
-      <p class="mut" style="margin-top:0">Opens each file the way a run will: are the reads real FASTQ and paired, is the reference a complete genome, do the labels match it, and do the reads actually come from that reference's isolate. Takes seconds per isolate and changes nothing unless you press Fix.</p>
-      <div class="field"><label>Sample sheet</label><div class="ctl"><input type="text" id="in_sheet" aria-label="Sample sheet path"><button class="btn sec sm" id="in_sheet_b">Browse</button></div></div>
-      <div class="field"><label>Data folder</label><div class="ctl"><input type="text" id="in_data" aria-label="Data folder"></div><div class="help">Where each isolate's own folder lives. The default is PlasBench's data folder.</div></div>
+            <div class="field"><label>Sample sheet</label><div class="ctl"><input type="text" id="in_sheet" aria-label="Sample sheet path"><button class="btn sec sm" id="in_sheet_b">Browse</button></div></div>
+      <div class="field"><label>Data folder<span data-tipid="in_data"></span></label><div class="ctl"><input type="text" id="in_data" aria-label="Data folder"></div></div>
       <div class="row wrap" style="margin-top:8px"><label class="row small"><input type="checkbox" id="in_deep" checked> Also compare the reads with the reference (a few seconds each)</label></div>
       <div class="row wrap" style="margin:10px 0"><button class="btn" id="in_run"><svg class="ico sm"><use href="#i-check"/></svg>Run the quick test</button><button class="btn sec" id="in_fix" hidden><svg class="ico sm"><use href="#i-refresh"/></svg>Fix what can be fixed</button><span class="mut small" id="in_run_msg"></span></div>
       <div id="in_result"></div>
      </div></div>
     <!-- BEGIN scan a folder (plasbench/isolate_scan.py) -->
     <div class="card" id="sc_card">
-     <div class="hd"><h3>Scan a folder</h3><span class="sub">plasbench scan-isolates</span></div>
+     <div class="hd"><h3>Scan a folder<span data-tipid="in_scan"></span></h3><span class="sub">plasbench scan-isolates</span></div>
      <div class="bd" style="padding:12px 14px">
-      <p class="mut" style="margin-top:0">Point at ONE folder, even a messy one with sub-folders and unrelated files. PlasBench looks for each isolate's paired reads and its complete reference, shows what it would use and why, and flags anything it is not sure of. <b>Scanning never changes your folder</b>, and nothing is added until you press <b>Add selected isolates</b>.</p>
-      <details class="small" style="margin-bottom:10px"><summary>What is recognised</summary>
-       <ul class="flow"><li><b>Reads:</b> FASTQ pairs named _R1/_R2, _1/_2, .1/.2 or _R1_001/_R2_001 (.fastq or .fq, gzipped). Illumina lanes (_L001, _L002) of one isolate are listed and flagged: you confirm before they are joined.</li>
-        <li><b>Reference:</b> a plain FASTA of the complete genome. Assembler output (contigs.fasta, scaffolds.fasta, assembly.fasta in SPAdes, Unicycler or Flye folders, NODE_ headers) is never taken as a reference.</li>
-        <li><b>Also used:</b> sequence_report.jsonl and truth tables (truth.tsv) that sit with an isolate.</li>
-        <li><b>Ignored and counted:</b> alignments (BAM), documents, spreadsheets, logs, hidden folders, .git, results and logs folders, long reads (not used here).</li>
-        <li><b>Limits:</b> matching uses folder and file names; check the reference of every isolate marked "check" before you rely on it.</li></ul></details>
-      <div class="row wrap"><button class="btn sec" id="sc_pick"><svg class="ico sm"><use href="#i-folder"/></svg>Choose a folder…</button>
+                  <div class="row wrap"><button class="btn sec" id="sc_pick"><svg class="ico sm"><use href="#i-folder"/></svg>Choose a folder…</button>
        <input type="text" id="sc_path" placeholder="or paste a folder path" aria-label="Folder to scan" style="flex:1;min-width:220px">
        <button class="btn" id="sc_go"><svg class="ico sm"><use href="#i-play"/></svg>Scan</button><button class="btn sec" id="sc_cancel" hidden>Cancel scan</button></div>
       <div class="mut small" id="sc_msg" role="status" aria-live="polite" style="margin-top:6px"></div>
@@ -1006,23 +997,21 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
 
   <!-- COHORTS ------------------------------------------------------------------------------------- -->
   <section class="view" id="v_cohorts" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Benchmark</div><h1>Cohorts</h1>
-    <p>Study sets that ship with PlasBench, each a sample sheet of NCBI-linked isolates. Validate one, or benchmark it directly. Building your own cohort (discover, curate, validate, lock) is under <a href="#commands/cohorts">All commands › Cohorts and truth</a>.</p></div></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Benchmark</div><h1>Cohorts<span data-tipid="p_cohorts"></span></h1>
+    <p>Study sets shipped with PlasBench: validate one, or benchmark it directly.</p></div></div>
    <div class="card"><div class="tablewrap"><table class="data"><thead><tr><th>Cohort</th><th>Isolates</th><th>Lock</th><th>Track</th><th></th></tr></thead><tbody id="cohtb"></tbody></table></div></div>
    <div class="card" id="cohdetail" style="margin-top:14px" hidden></div>
   </section>
 
   <!-- RUNS ---------------------------------------------------------------------------------------- -->
   <section class="view" id="v_runs" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Results</div><h1>Runs &amp; reports</h1>
-    <p>Your benchmark runs: the ones going now, the ones that failed or were interrupted (resume them: finished work is kept), and the completed ones with their reports. Below, every results folder found in this installation.</p></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Results</div><h1>Runs &amp; reports<span data-tipid="p_runs"></span></h1>
+    <p>Running, failed and completed benchmark runs, with their reports.</p></div>
     <div class="row"><button class="btn sec" id="runadd"><svg class="ico sm"><use href="#i-folder"/></svg>Add a results folder</button><button class="btn sec" id="runref"><svg class="ico sm"><use href="#i-refresh"/></svg>Refresh</button></div></div>
    <div class="card" id="sesscard" style="margin-bottom:14px"><div class="hd"><h3>Run sessions</h3><span class="mut small" id="sessnote"></span><div class="chips" id="sesstabs" role="tablist" aria-label="Run sessions"></div></div>
     <div class="bd" id="sesslist"><div class="mut">Looking for runs…</div></div></div>
-   <h3 style="margin:14px 0 8px">Results folders</h3>
-   <div class="note info small" id="rankhelp" style="margin-bottom:12px"><svg class="ico"><use href="#i-info"/></svg><div><b>How to read a rank.</b>
-    A rank is a tool's position within one task and one input track (short-read, long-read or hybrid), ordered by that task's headline metric (F1 for classification, length-weighted binning F1 for binning, CPRR for reassembly). Rank 1 is the best score, but a tied or overlapping confidence interval means two tools cannot be told apart, and a tool is only ranked on the isolates it ran on. "Leading" names the rank-1 tool of each task; the full table is in the report and the Leaderboard download. A run that says "Completed with warnings" finished normally but had failed tool runs.</div></div>
-   <!-- QCNOTE-BEGIN: the short-read QC panel and MultiQC (text: ui_help.REPORT_NOTES["qc"], the same sentence the report's QC panel shows) -->
+   <h3 style="margin:14px 0 8px">Results folders<span data-tipid="rank_help" id="rankhelp"></span></h3>
+      <!-- QCNOTE-BEGIN: the short-read QC panel and MultiQC (text: ui_help.REPORT_NOTES["qc"], the same sentence the report's QC panel shows) -->
    <details class="note info small" id="qcnote" style="margin-bottom:12px" hidden><summary id="qcnote_title"></summary><div id="qcnote_text" style="margin-top:6px"></div></details>
    <!-- QCNOTE-END -->
    <div class="card" id="runlist"><div class="bd mut">Looking for results…</div></div>
@@ -1030,16 +1019,15 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
 
   <!-- JOBS ---------------------------------------------------------------------------------------- -->
   <section class="view" id="v_jobs" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Results</div><h1>Jobs</h1>
-    <p>Every command started from this window, with its exact command line, how it ended, and its full log. Jobs keep running if you switch pages; Quit asks before stopping one that is still running.</p>
-    <p class="small mut" id="jobs_note">Everything you start from this window appears here; runs you start in the Terminal appear under Runs and reports, marked 'started outside the window'.</p></div></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Results</div><h1>Jobs<span data-tipid="p_jobs"></span></h1>
+    <p>Every command started from this window, with its command line and full log.</p></div></div>
    <div class="card"><div class="tablewrap"><table class="data"><thead><tr><th>State</th><th>Job</th><th>Started</th><th>Duration</th><th></th></tr></thead><tbody id="jobtb"></tbody></table></div></div>
   </section>
 
   <!-- COMMANDS ------------------------------------------------------------------------------------ -->
   <section class="view" id="v_commands" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Advanced</div><h1>All commands</h1>
-    <p>Every <code>plasbench</code> command and every option, generated from the command line itself, so nothing is missing or out of date. Fill in what you need, check the command line, and run it.</p></div></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Advanced</div><h1>All commands<span data-tipid="p_commands"></span></h1>
+    <p>Every command and option, generated from the command line itself.</p></div></div>
    <div class="cmdgrid"><div class="card cmdlist" id="cmdlist"><input type="search" id="cmdq" placeholder="Filter commands…" aria-label="Filter commands"><div id="cmdnav"></div></div>
     <div id="cmdpane"></div></div>
   </section>
@@ -1047,7 +1035,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
   <!-- HELP ---------------------------------------------------------------------------------------- -->
   <section id="v_doc" hidden aria-live="polite"></section>
   <section class="view" id="v_help" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Help</div><h1>Guides</h1><p>The README and every guide shipped with this installation.</p></div></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Settings &amp; help</div><h1>Guides</h1><p>The README and every guide shipped with this installation.</p></div></div>
    <div class="cmdgrid"><div class="card cmdlist" id="doclist"></div><div class="card"><div class="bd md" id="docbody"><p class="mut">Choose a guide.</p></div></div></div>
   </section>
  </main>
@@ -1622,8 +1610,16 @@ document.addEventListener("click", e => {
   const c = e.target.closest("[data-close]"); if (c) c.closest("dialog").close();
 });
 window.addEventListener("hashchange", route);
+getSchema().catch(() => {});   // the page notes (?) are filled from the schema as soon as it arrives
 $("#navtoggle").onclick = () => $("#rail").classList.toggle("open");
 
+/* the More menu in the top bar: Reload and the theme switch. Click or Enter opens it, Escape or a click elsewhere closes it, and a choice closes it. */
+{ const mb = $("#morebtn"), mm = $("#moremenu");
+  const close = back => { mm.hidden = true; mb.setAttribute("aria-expanded", "false"); if (back) mb.focus(); };
+  mb.onclick = () => { const open = mm.hidden; mm.hidden = !open; mb.setAttribute("aria-expanded", String(open)); if (open) mm.querySelector(".mi").focus(); };
+  mm.addEventListener("click", () => close(false));
+  mm.addEventListener("keydown", e => { if (e.key === "Escape") { e.stopPropagation(); close(true); } else if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const it = [...mm.querySelectorAll(".mi")], i = it.indexOf(document.activeElement); it[(i + (e.key === "ArrowDown" ? 1 : it.length - 1)) % it.length].focus(); } });
+  document.addEventListener("click", e => { if (!mm.hidden && !e.target.closest("#morewrap")) close(false); }); }
 /* theme */
 const savedTheme = localStorage.getItem("pb_theme");
 if (savedTheme) document.documentElement.dataset.theme = savedTheme;
@@ -2154,7 +2150,7 @@ async function getTools(force) {
   return S.tools;
 }
 async function getUser(force) { if (!S.user || force) S.user = await api("usertools"); return S.user; }
-async function getSchema() { if (!S.schema) S.schema = await api("schema"); return S.schema; }
+async function getSchema() { if (!S.schema) { S.schema = await api("schema"); hydrateTips(); } return S.schema; }
 async function getSettings(force) { if (!S.settings || force) S.settings = await api("settings"); return S.settings; }
 async function getRuns(force) { if (!S.runs || force) S.runs = (await api("runs")).runs; return S.runs; }
 async function getCohorts() { if (!S.cohorts) S.cohorts = (await api("cohorts")).cohorts; return S.cohorts; }
@@ -2216,8 +2212,7 @@ function renderPlatform({info, plan}) {
     ${plan.steps.length ? `<div class="small"><b>To do</b><ol style="margin:4px 0 0;padding-left:20px">${plan.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol></div>` : `<div class="note ok" style="margin-top:8px">${icon("check", "ico")}<div>Nothing to install for the way PlasBench runs here.</div></div>`}
     ${list(plan.warnings, "warn", "alert")}
     ${plan.alternatives.length ? `<p class="small" style="margin-bottom:4px"><b>Also possible</b>: ${plan.alternatives.map(esc).join(" ")}</p>
-      <div class="cmdline small"><span class="p">$</span><code>${esc(plan.docker_command)}</code></div>` : ""}
-    <p class="small mut" style="margin-bottom:0">The desktop icon starts PlasBench (or brings this window back). Quit, top right, stops it. Every page also works from the command line, and from the Terminal tab of the console below.</p>`;
+      <div class="cmdline small"><span class="p">$</span><code>${esc(plan.docker_command)}</code></div>` : ""}`;
 }
 /* ---- This computer: resources (environment, host, limits, what a benchmark will use) and drives (plasbench/computer_info.py; GET /api/computer) ---- */
 const cmpGB = n => n == null ? "unknown" : `${(n / 2 ** 30).toFixed(n < 10 * 2 ** 30 ? 1 : 0)} GB`;
@@ -2476,12 +2471,11 @@ function renderRuntime(r) {
     ? `<div class="small mut">image ${esc(img.name)} · ${esc(rtGB(img.size_bytes))} · ${img.source === "built-locally" ? "built on this computer" : "pulled"} · ${img.matches === false ? `<span class="warn-t">version ${esc(img.version || "?")} differs from ${esc(r.version)}</span>` : img.matches === true ? `matches PlasBench ${esc(r.version)}` : "version is checked when it is first used"}</div>`
     : `<div class="small mut">image ${esc(img.name || r.default_image)} is not on this computer yet: pull is ${esc(r.pull_size)}; if it cannot be pulled it can be built here</div>`;
   const extras = d.state === "ready" ? `<div class="small mut">extra tools and databases are kept in <span class="mono">${esc(r.extras.home)}</span>${r.extras.tools.length ? ` (${r.extras.tools.length} command${r.extras.tools.length > 1 ? "s" : ""})` : ""}${rtTip("extras")}</div>` : "";
-  const opt = (id, title, status, facts, text, tip) => `<div class="choice ${cur === id ? "on" : ""}" style="margin-bottom:10px" data-rt-opt="${id}"><span><b>${title}</b>${cur === id ? ` <span class="tag rec">in use</span>` : ""} ${status}${rtTip(tip)}${facts}<span class="small" style="display:block;margin-top:4px">${text}</span></span></div>`;
+  const opt = (id, title, status, facts, text, tip) => `<div class="choice ${cur === id ? "on" : ""}" style="margin-bottom:10px" data-rt-opt="${id}"><span><b>${title}</b>${cur === id ? ` <span class="tag rec">in use</span>` : ""} ${status}${rtTip(tip)}${facts}</span></div>`;
   const html = `${r.problem ? `<div class="note warn">${icon("alert", "ico")}<div>${esc(r.problem)}</div></div>` : ""}
     ${opt("conda", "Conda", condaStatus, condaFacts, "Tools run from the plasbench conda environment on this computer. Fastest file access, nothing to download but the tools themselves; each tool is installed with conda.", "conda")}
     ${opt("docker", "Docker", dState, `${d.version ? `<div class="small mut">Docker ${esc(d.version)}</div>` : ""}${imgLine}${extras}${d.hint && d.state !== "ready" && !d.pending ? `<div class="small warn-t">${esc(d.hint)}</div>` : ""}`,
-      "Every run, check and install starts a container of the PlasBench image with your study, data and database folders mounted at the same paths, so results stay on this computer. Every tool is at its pinned version without installing conda. Costs: an image download (" + esc(r.pull_size) + "), disk for Docker, and slower file access when the folders are on a Windows drive (/mnt). This window stays on this computer.", "docker")}
-    <p class="small mut" style="margin:0">Runs already going keep the runtime they started with. Conda stays installed whichever you choose.</p>`;
+      "Every run, check and install starts a container of the PlasBench image with your study, data and database folders mounted at the same paths, so results stay on this computer. Every tool is at its pinned version without installing conda. Costs: an image download (" + esc(r.pull_size) + "), disk for Docker, and slower file access when the folders are on a Windows drive (/mnt). This window stays on this computer.", "docker")}`;
   setIfChanged($("#rt_body"), html);
   setIfChanged($("#rt_tip"), rtTip("environment"));
   $("#rt_sub").textContent = `in use: ${cur === "docker" ? "Docker" : "Conda"}`;
@@ -2953,7 +2947,7 @@ function utFieldHTML(sec, f) {
   if (sec === "run" && k === "command") { const ph = Object.assign({}, S.user?.placeholders || {});
     extra = `<div class="chips" style="margin-top:6px">${Object.entries(ph).map(([p, d]) => `<button type="button" class="chip" title="${esc(d)}" data-ph="{${p}}">{${p}}</button>`).join("")}</div>`; }
   const lblFor = kind === "tasks" ? `ut_task_lbl` : "";
-  return `<div class="field"><label ${lblFor ? `id="${lblFor}" for="${id}_btn"` : `for="${id}"`}>${esc(label)}${req ? `<span class="req">*</span>` : ""} <code>${k}</code>${tip}</label><div><div class="ctl">${ctl}</div>${extra}</div>${help ? `<div class="help">${esc(help)}</div>` : ""}</div>`;
+  return `<div class="field"><label ${lblFor ? `id="${lblFor}" for="${id}_btn"` : `for="${id}"`}>${esc(label)}${req ? `<span class="req">*</span>` : ""} <code>${k}</code>${tip || (help ? tipBtn({title: label, summary: help, plain: true}, label) : "")}</label><div><div class="ctl">${ctl}</div>${extra}</div></div>`;   // the one-line hint is the (?) too
 }
 function utUploadBtn(id) {
   return `<button type="button" class="btn sec sm" data-upload="${id}" title="Read a small file (up to 5 MB) in this browser and store it in the tool's own folder">Upload from this computer…</button>` +
@@ -3572,7 +3566,7 @@ function renderSettings() {
       const where = r.resolved ? `<div class="help">${r.found === true ? `<span class="ok-t">${icon("check")} Installed</span> at` : r.found === false ? `<span class="warn-t">${icon("info")} Not installed yet</span> at` : "Default location:"} <code>${esc(r.resolved)}</code>${r.found === false ? ` — install from <a href="#setup">Set up this computer</a> if you use this tool` : ""}</div>` : "";
       return `<div class="field ${changed ? "changed" : ""}"><label>${esc(r.key)}${r.override != null && !changed ? ` <span class="tag rec">set here</span>` : ""}${tipBtn(r.tooltip, r.key)}</label><div class="ctl">${ctl}${r.override != null || changed ? `<button class="btn ghost sm" data-clear="${r.key}" title="Back to the default">Default</button>` : ""}</div>
         ${rangeLine(r.range, r.key)}${r.range ? `<div id="rng_${r.key}" class="bad-t small rngmsg" role="alert">${esc(rangeProblem(r.range, cur))}</div>` : ""}
-        <div class="help">${esc(r.comment || "")}${r.env ? ` <span class="tag warn">environment: ${esc(r.env.slice(0, 60))}</span>` : ""}</div>${r.override == null && !changed ? where : ""}</div>`; }).join("") + `</div></details>`; }).join("") || `<div class="bd mut">No setting matches.</div>`;
+        ${r.env ? `<div class="help"><span class="tag warn">environment: ${esc(r.env.slice(0, 60))}</span></div>` : ""}${r.override == null && !changed ? where : ""}</div>`; }).join("") + `</div></details>`; }).join("") || `<div class="bd mut">No setting matches.</div>`;
   const n = Object.keys(SET.edits).length; $("#set_save").disabled = $("#set_reset").disabled = !n; $("#set_n").textContent = n ? `(${n})` : "";
 }
 $("#setq").oninput = e => { SET.q = e.target.value; renderSettings(); };
@@ -3733,11 +3727,15 @@ async function askCancelRun(id) {
    so no card can clip it. The text comes from the server (ui_help.py through /api/schema and /api/settings), never from this page. ---- */
 function tipBtn(t, label) {
   if (!t || !(t.summary || (t.choices || []).length)) return "";
-  return `<button type="button" class="tipi" data-tip="${dattr(t)}" aria-label="Help: ${esc(label || "this field")}" aria-describedby="tipbox" aria-expanded="false">i</button>`;
+  return `<button type="button" class="tipi" data-tip="${dattr(t)}" aria-label="Help: ${esc(label || t.title || "this field")}" aria-describedby="tipbox" aria-expanded="false">i</button>`;
 }
 const wizTip = k => tipBtn((S.schema?.wizard_help || {})[k], k.replace(/_/g, " "));
+// Page-level notes (ui_help.PAGE): an empty span with a data-tipid attribute in the page is filled with the (?) once the schema is here; script-drawn text calls pageTip(id).
+const pageTip = k => tipBtn((S.schema?.page_help || {})[k]);
+function hydrateTips(root) { if (!S.schema) return; (root || document).querySelectorAll("[data-tipid]:empty").forEach(e => { e.innerHTML = pageTip(e.dataset.tipid); }); }
 const argTip = (cmd, dest) => { const a = command(cmd)?.args.find(x => x.dest === dest); return tipBtn(a?.tooltip, a ? argLabel(a) : dest); };
 function tipBody(t) {
+  if (t.plain) return `${t.title ? `<p class="ttl">${esc(t.title)}</p>` : ""}${t.summary ? `<p>${esc(t.summary)}</p>` : ""}${(t.bullets || []).length ? `<ul>${t.bullets.map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}${t.when ? `<div class="twhen">${esc(t.when)}</div>` : ""}`;
   const ch = (t.choices || []).map(([c, m]) => `<dt>${c === "" ? "(default)" : esc(c)}</dt><dd>${esc(m)}</dd>`).join("");
   return `<p>${esc(t.summary)}</p>${ch ? `<dl>${ch}</dl>` : ""}<div class="tmeta">Default: <b>${esc(t.default || "none")}</b>${t.flag ? ` · Option: <code>${esc(t.flag)}</code>` : ""}${t.setting ? ` · Setting: <code>${esc(t.setting)}</code>` : ""}</div>${t.when ? `<div class="twhen">${esc(t.when)}</div>` : ""}`;
 }
@@ -3793,7 +3791,7 @@ function fieldHTML(a, values, prefix) {
   else if (a.kind === "list") ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(Array.isArray(v) ? v.join(" ") : v ?? "")}" placeholder="space separated${a.choices ? ": " + esc(a.choices.join(" ")) : ""}">`;
   else ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${a.default != null && a.default !== "" ? "default " + esc(a.default) : ""}">`;
   return `<div class="field ${changed ? "changed" : ""}"><label for="${id}">${esc(argLabel(a))}${a.required ? `<span class="req">*</span>` : ""} <code>${esc(a.positional ? "<" + a.dest + ">" : flag)}</code>${tipBtn(a.tooltip, argLabel(a))}</label>
-    <div class="ctl">${ctl}<button type="button" class="btn ghost sm reset" data-reset="${a.dest}" title="Back to the default">Reset</button></div>${a.help ? `<div class="help">${esc(a.help)}</div>` : ""}${dbStatusHTML(a.dest)}</div>`;
+    <div class="ctl">${ctl}<button type="button" class="btn ghost sm reset" data-reset="${a.dest}" title="Back to the default">Reset</button></div>${a.help && !a.tooltip ? `<div class="help">${esc(a.help)}</div>` : ""}${dbStatusHTML(a.dest)}</div>`;
 }
 // Under a database field: whether a run will reuse an installed copy, and from where.
 function dbStatusHTML(dest) {
@@ -3917,22 +3915,22 @@ function renderWizard() {
          ["meta","Metagenomics track","Score normalized community outputs (separate track)."]].map(([k, t, d]) =>
          `<label class="choice ${W.source === k ? "on" : ""}"><input type="radio" name="wsrc" value="${k}" ${W.source === k ? "checked" : ""}><span><b>${t}</b><span>${d}</span></span></label>`).join("")}</div>
       <div class="card" style="margin-top:16px"><div class="bd" id="wsrcbody">${
-        W.source === "demo" ? `<div class="note info">${icon("info", "ico")}<div>The demo runs <code>plasbench demo</code>: synthetic data, scored and reported. Tools and resources do not apply; press Next to review.</div></div>` :
-        W.source === "cohort" ? `<div class="field"><label>Cohort <span class="req">*</span>${wizTip("cohort")}</label><div class="ctl"><select id="wcoh">${chosenLedger ? `<option value="${esc(V.cohort)}" selected>${esc(V.cohort)} — not a cohort sheet</option>` : ""}${cohorts.map(c => `<option value="${esc(c.name)}" ${V.cohort === c.name ? "selected" : ""}>${esc(c.name)} — ${c.rows} isolates${c.locked ? " · locked" : ""}</option>`).join("")}</select></div><div class="help">The cohort's sample sheet in cohorts/. Locked cohorts are verified against their recorded accessions.</div>${chosenLedger ? `<div class="note bad" style="margin-top:8px">${icon("x", "ico")}<div><b>Not a cohort sheet.</b> ${esc(V.cohort)} is the accession ledger (accessions only, no organism or truth columns): a run on it fails stage 0. Choose a cohort from the list.</div></div>` : ""}</div>` :
-        W.source === "sheet" ? `<div class="field"><label>Sample sheet <span class="req">*</span>${wizTip("sample_sheet")}</label><div class="ctl"><input type="text" id="wsheet" value="${esc(V.samples || "")}" placeholder="config/my_isolates.tsv"><button class="btn sec sm" data-browse="wsheet" data-dir="0">Browse</button></div><div class="help">Columns sample_id, assembly_accession, sra_run (see Your own isolates).</div></div>
-          <div class="field"><label>Local inputs only${wizTip("local_inputs")}</label><div class="ctl"><label class="switch"><input type="checkbox" id="wlocal" ${V.local_inputs ? "checked" : ""}><span></span></label></div><div class="help">Your reads and references are already on disk; never download.</div></div>` :
+        W.source === "demo" ? `<div class="note info">${icon("info", "ico")}<div>The demo runs <code>plasbench demo</code> on synthetic data; press Next to review.</div></div>` :
+        W.source === "cohort" ? `<div class="field"><label>Cohort <span class="req">*</span>${wizTip("cohort")}</label><div class="ctl"><select id="wcoh">${chosenLedger ? `<option value="${esc(V.cohort)}" selected>${esc(V.cohort)} — not a cohort sheet</option>` : ""}${cohorts.map(c => `<option value="${esc(c.name)}" ${V.cohort === c.name ? "selected" : ""}>${esc(c.name)} — ${c.rows} isolates${c.locked ? " · locked" : ""}</option>`).join("")}</select></div>${chosenLedger ? `<div class="note bad" style="margin-top:8px">${icon("x", "ico")}<div><b>Not a cohort sheet.</b> ${esc(V.cohort)} is the accession ledger (accessions only, no organism or truth columns): a run on it fails stage 0. Choose a cohort from the list.</div></div>` : ""}</div>` :
+        W.source === "sheet" ? `<div class="field"><label>Sample sheet <span class="req">*</span>${wizTip("sample_sheet")}</label><div class="ctl"><input type="text" id="wsheet" value="${esc(V.samples || "")}" placeholder="config/my_isolates.tsv"><button class="btn sec sm" data-browse="wsheet" data-dir="0">Browse</button></div></div>
+          <div class="field"><label>Local inputs only${wizTip("local_inputs")}</label><div class="ctl"><label class="switch"><input type="checkbox" id="wlocal" ${V.local_inputs ? "checked" : ""}><span></span></label></div></div>` :
         `<div class="field"><label>Community sheet</label><div class="ctl"><input type="text" id="wsheet" value="${esc(V.samples || "")}" placeholder="meta_samples.tsv"><button class="btn sec sm" data-browse="wsheet" data-dir="0">Browse</button></div></div>
-         <div class="field"><label>Predictions folder</label><div class="ctl"><input type="text" id="wpred" value="${esc(V.predictions_dir || "")}" placeholder="predictions_meta"><button class="btn sec sm" data-browse="wpred" data-dir="1">Browse</button></div><div class="help">&lt;tool&gt;/&lt;community&gt;.bins.tsv normalized outputs.</div></div>`}</div></div>
+         <div class="field"><label>Predictions folder${pageTip("w_predictions")}</label><div class="ctl"><input type="text" id="wpred" value="${esc(V.predictions_dir || "")}" placeholder="predictions_meta"><button class="btn sec sm" data-browse="wpred" data-dir="1">Browse</button></div></div>`}</div></div>
       ${W.source === "cohort" || W.source === "sheet" ? `<div class="card" style="margin-top:12px"><div class="hd"><h3>How many isolates</h3><span class="sub">optional</span></div><div class="bd">
         <div class="field"><label for="w_max_isolates">Run only${argTip("run", "max_isolates")}</label><div class="ctl"><input type="number" min="1" step="1" id="w_max_isolates" data-dest="max_isolates" value="${esc(V.max_isolates || "")}" placeholder="all" style="max-width:120px"><span class="mut small">isolates${W.source === "cohort" && cohorts.find(c => c.name === V.cohort) ? ` of ${cohorts.find(c => c.name === V.cohort).rows}` : ""}</span></div>
-        <div class="help">Any number you choose. The isolates are a balanced selection: spread across species and studies, and across recent and older genomes, so a small run is a fair miniature of the cohort. The cohort file is not changed. Leave empty to run all of them.</div></div>
+        </div>
         <div class="field"><label>Which isolates${argTip("run", "isolate_order")}</label><div class="ctl"><select id="w_isolate_order" data-dest="isolate_order"><option value="">balanced (recommended)</option><option value="file" ${V.isolate_order === "file" ? "selected" : ""}>the first rows in the sheet</option></select></div></div></div></div>` : ""}
       ${W.source !== "demo" ? `<div class="card" style="margin-top:12px"><div class="hd"><h3>Study folder</h3><span class="sub">everything this benchmark produces goes here</span></div><div class="bd">
         <div class="field"><label for="wstudy">Study name${wizTip("study")}</label><div class="ctl"><input type="text" id="wstudy" value="${esc(V.study || "")}" placeholder="${esc(wizDefaultStudy())}"></div>
         <div class="help" id="wstudyhelp">${esc(studyWhere())}</div></div>
         <div class="field"><label>Location${wizTip("study_location")}</label><div class="ctl" style="flex-wrap:wrap;gap:14px"><label><input type="radio" name="wloc" value="workspace" ${(S.wizStudy || {}).where !== "other" ? "checked" : ""}> Workspace <span class="mono small">${esc(S.ws?.path || "")}</span></label>
           <label><input type="radio" name="wloc" value="other" ${(S.wizStudy || {}).where === "other" ? "checked" : ""}> Another folder</label></div>
-          ${(S.wizStudy || {}).where === "other" ? `<div class="ctl" style="margin-top:6px"><input type="text" id="wloc_path" value="${esc((S.wizStudy || {}).location || "")}" placeholder="a folder on this computer or a connected drive" aria-label="Study location"><button class="btn sec sm" data-browse="wloc_path" data-dir="1">Choose a folder</button></div><div class="help" id="wloc_check" aria-live="polite"></div>` : `<div class="help">The study folder is created inside the workspace.</div>`}</div></div></div>` : ""}`;
+          ${(S.wizStudy || {}).where === "other" ? `<div class="ctl" style="margin-top:6px"><input type="text" id="wloc_path" value="${esc((S.wizStudy || {}).location || "")}" placeholder="a folder on this computer or a connected drive" aria-label="Study location"><button class="btn sec sm" data-browse="wloc_path" data-dir="1">Choose a folder</button></div><div class="help" id="wloc_check" aria-live="polite"></div>` : ``}</div></div></div>` : ""}`;
   } else if (W.step === 1) {
     if (W.source === "demo" || W.source === "meta") html = `<div class="note info">${icon("info", "ico")}<div>${W.source === "demo" ? "The demo uses its own five synthetic methods." : "The metagenomics track scores the tools present in the predictions folder."} Press Next.</div></div>`;
     else {
@@ -3962,16 +3960,14 @@ function renderWizard() {
     const dbName = {platon_db: "Platon", genomad_db: "geNomad", plasme_db: "PLASMe"};
     const dbSummary = Object.entries(dbName).map(([d, n]) => { const s = S.info?.databases?.[d];
       return s ? `${n} ${s.found ? "found" : "not installed"}` : n; }).join(" · ");
-    const dbBlock = dbArgs.length ? `<details class="fgroup" ${dbArgs.some(a => V[a.dest]) ? "open" : ""}><summary>Use a different database copy (optional) <span class="n">— ${esc(dbSummary)}</span></summary><div class="fb">
-        <p class="mut small" style="margin:0 0 10px">Leave these empty: each run uses the database where PlasBench installed it. Fill one in only to use another copy.</p>${dbArgs.map(a => fieldHTML(a, V, "w")).join("")}</div></details>` : "";
+    const dbBlock = dbArgs.length ? `<details class="fgroup" ${dbArgs.some(a => V[a.dest]) ? "open" : ""}><summary>Use a different database copy (optional) <span class="n">— ${esc(dbSummary)}</span>${pageTip("w_db")}</summary><div class="fb">${dbArgs.map(a => fieldHTML(a, V, "w")).join("")}</div></details>` : "";
     const E = S.wizEnv = S.wizEnv || {};
-    const ef = (id, label, tip, ctl, help) => `<div class="field"><label for="we_${id}">${label}${wizTip(tip)}</label><div class="ctl">${ctl}</div><div class="help">${help}</div></div>`;
+    const ef = (id, label, tip, ctl, help) => `<div class="field"><label for="we_${id}">${label}${wizTip(tip)}</label><div class="ctl">${ctl}</div></div>`;
     const num = (id, ph, step) => `<input type="number" min="0" step="${step || "any"}" id="we_${id}" data-wenv="${id}" value="${esc(E[id] ?? "")}" placeholder="${esc(ph)}" style="max-width:140px">`;
     const reportCard = W.source === "meta" ? `<div class="note info" style="margin-bottom:16px">${icon("info", "ico")}<div>The metagenomics track does not open a report by itself (the command opens reports of isolate runs only). The run still never stops to ask a question.</div></div>`
-      : `<div class="card" style="margin-bottom:16px"><div class="hd"><h3>When the run finishes</h3></div><div class="bd"><div class="field"><label for="wopen">Open the report in my browser when the run finishes${wizTip("open_report_run")}</label><div class="ctl"><label class="switch"><input type="checkbox" id="wopen" ${V.open_report ? "checked" : ""}><span></span></label></div>
-        <div class="help">Adds <code>--open-report</code>. The window always adds <code>--no-report-prompt</code> too${wizTip("no_report_prompt")}: the run never stops to ask a question.</div></div></div></div>`;
-    const dlCard = W.source === "cohort" || W.source === "sheet" ? `<details class="fgroup" style="margin-bottom:16px" ${Object.values(E).some(v => v !== "" && v != null && v !== false) ? "open" : ""}><summary>Downloads and reliability <span class="n">— optional; sent with this run only</span></summary><div class="fb">
-        <p class="mut small" style="margin:0 0 10px">These are environment settings for this run. Leave a box empty to keep the setting saved for this computer (Settings page, group Reliability and downloads).</p>
+      : `<div class="card" style="margin-bottom:16px"><div class="hd"><h3>When the run finishes</h3></div><div class="bd"><div class="field"><label for="wopen">Open the report in my browser when the run finishes${wizTip("open_report_run")}${wizTip("no_report_prompt")}</label><div class="ctl"><label class="switch"><input type="checkbox" id="wopen" ${V.open_report ? "checked" : ""}><span></span></label></div>
+        </div></div></div>`;
+    const dlCard = W.source === "cohort" || W.source === "sheet" ? `<details class="fgroup" style="margin-bottom:16px" ${Object.values(E).some(v => v !== "" && v != null && v !== false) ? "open" : ""}><summary>Downloads and reliability <span class="n">— optional; sent with this run only</span>${pageTip("w_env")}</summary><div class="fb">
         ${ef("read_source", "Read source", "read_source", `<select id="we_read_source" data-wenv="read_source"><option value="">default (auto)</option>${["auto", "sra", "ena"].map(c => `<option ${E.read_source === c ? "selected" : ""}>${c}</option>`).join("")}</select>`, "Where stage 1 gets short reads: auto, sra or ena.")}
         ${ef("max_gb", "Largest read download per isolate, GB", "max_run_download_gb", num("max_gb", "no limit"), "Empty = no limit.")}
         ${ef("warn_gb", "Warn above, GB", "warn_run_download_gb", num("warn_gb", "5"), "Empty = the default, 5.")}
@@ -3994,9 +3990,8 @@ function renderWizard() {
     html = W.source === "demo" ? `<div class="card"><div class="bd">${fieldHTML(command("demo").args.find(a => a.dest === "open_report"), V, "w")}</div></div>` :
       reportCard + dataCard + dlCard + `<div class="card"><div class="hd"><h3>Stages ${wizTip("stages")}</h3><span class="sub">leave all off to run the whole pipeline</span></div><div class="bd"><div class="chips" id="wstages">${
         [["0","Check"],["1","Download"],["2","Truth"],["3","Assemble"],["4","Run tools"],["5","Score"],["6","Aggregate & report"],["7","Long-read tools"]].map(([s, l]) =>
-        `<button type="button" class="chip ${(V.stages || []).includes(s) ? "on" : ""}" data-stage="${s}">${s} · ${l}</button>`).join("")}</div>
-        <p class="mut small" style="margin:10px 0 0">Choose stages to resume or re-run part of a benchmark, e.g. 5 and 6 to re-score and rebuild the report.</p></div></div>
-       <div class="note info" style="margin-top:16px">${icon("info", "ico")}<div><b>Nothing here needs filling in to reuse what you have.</b> Installed tools, tool databases and downloaded reads are shared by every benchmark on this computer: reads and assemblies in <code>${esc(S.info?.data_dir || "the data folder")}</code>, databases where PlasBench installed them. You do not need to know where that is: a run finds them itself.</div></div>
+        `<button type="button" class="chip ${(V.stages || []).includes(s) ? "on" : ""}" data-stage="${s}">${s} · ${l}</button>`).join("")}</div></div></div>
+       <div class="small mut" style="margin-top:16px">Nothing here needs filling in to reuse what you have.${pageTip("w_reuse")}</div>
        <div class="card" style="margin-top:16px" id="wform">${groupedFields(io, V, "w", true)}${dbBlock}${groupedFields(run.args.filter(a => a.group === "" && !["stages","mode","predictions_dir"].includes(a.dest)), V, "w", true)}</div>`;
   } else {
     const argv = wizArgv();
@@ -4428,7 +4423,7 @@ async function cohortInfo(name) {
     ${stats}
     ${publicationCard(d)}
     <div class="cohbars">${bars}</div>
-    ${L.present ? `<p class="mut small" style="margin:0">From the sheet and its verification lock (<code>${esc(L.path)}</code>): country, host, isolation source, collection date, how the reference was sequenced and assembled, and the Illumina run's size come from NCBI as recorded when the cohort was locked. The download estimate uses the same factors as <code>plasbench run</code>'s pre-download check.</p>` : ""}
+    ${L.present ? `<div class="small mut" style="margin:0">Sheet and verification lock: <code>${esc(L.path)}</code>${pageTip("coh_meta")}</div>` : ""}
     <div>
      <div class="row" style="margin-bottom:6px"><input type="search" id="coh_q" placeholder="Filter samples: organism, country, accession, study…" aria-label="Filter samples" style="max-width:360px">
       <label class="small row" style="gap:4px"><input type="checkbox" id="coh_all"> all columns</label><span class="grow"></span><span class="mut small" id="coh_n"></span>
@@ -4475,7 +4470,7 @@ function publicationCard(d) {
     <div class="cohbars" style="margin-top:8px">${studies}${funnel}${p.truth_match ? `<table class="data"><thead><tr><th>Truth plasmids vs the paper's</th><th class="num">Isolates</th></tr></thead><tbody>${rows(p.truth_match, "value", "n")}</tbody></table>` : ""}</div>${left}
     <p class="small" style="margin:8px 0 0">${has ? "The paper's own outcomes ship with PlasBench, so after a run you can put your results beside them:" : "No published outcome table ships for this cohort yet; the isolates can still be run."}
      ${has ? `<br><code>${esc((p.compare_command || "").replace("<results>", "results"))}</code> <button class="btn ghost sm" onclick="copyText(${jsq((p.compare_command || "").replace("<results>", "results"))}, 'Command copied')">Copy</button>` : ""}</p>
-    ${has ? `<p class="small mut" style="margin:4px 0 0">Stage 6 does this automatically (setting RUN_PUBLISHED_COMPARISON) and the report gets a "Comparison with published outcomes" section. It is a comparison for your judgement, not a ranking: assemblies, tool versions, databases and metric definitions differ from the paper's.</p>` : ""}</div>`;
+    ${has ? `<div class="small mut" style="margin:4px 0 0">Comparison with published outcomes${pageTip("coh_published")}</div>` : ""}</div>`;
 }
 async function selectionReport(name) {
   let d = S.cohInfo && S.cohInfo.name === name ? S.cohInfo : null;
@@ -5224,8 +5219,7 @@ function ghCardHTML(st) {
       <button class="btn sec sm" data-needs="github" id="gh_prs" ${remote ? "" : "disabled"} title="Open, closed and merged pull requests: view, check out, mark ready, close, reopen, merge">Pull requests…</button>
       <button class="btn sec sm" data-needs="github" id="gh_checks" ${remote ? "" : "disabled"} title="Workflow runs (CI) on this branch, and re-run the failed ones">Checks…</button>
       <button class="btn sec sm" data-needs="github" id="gh_issues" ${remote ? "" : "disabled"} title="List, create, comment on and close issues">Issues…</button>
-      <button class="btn sec sm" data-needs="github" id="gh_releases" ${remote ? "" : "disabled"} title="List releases, create a tag, create a release from a tag">Releases…</button></div>
-    <p class="mut small" style="margin:8px 0 0">Nothing is force-pushed. Deleting, closing and merging ask first, and say exactly what will happen.</p></div></div>`;
+      <button class="btn sec sm" data-needs="github" id="gh_releases" ${remote ? "" : "disabled"} title="List releases, create a tag, create a release from a tag">Releases…</button></div>${pageTip("git_safe")}</div></div>`;
 }
 function ghBindCard() {
   ghBindAccount("g_gh");
@@ -5560,7 +5554,7 @@ try { MT.tabs = JSON.parse(sessionStorage.getItem("pb_tabs") || "[]").filter(t =
 const mtSave = () => { try { sessionStorage.setItem("pb_tabs", JSON.stringify(MT.tabs)); } catch {} };
 const mtKey = t => t.kind === "page" ? "page|" + t.view : t.kind === "file" ? "file|" + t.path : t.kind === "report" ? ["report", t.path, t.file].join("|") : [t.kind, t.repo, t.path || "", t.rev || "", t.staged ? 1 : 0].join("|");
 const baseName = p => String(p || "").split("/").pop();
-const pageTitle = v => $(`#v_${v} h1`)?.textContent || v;
+const pageTitle = v => { const h = $(`#v_${v} h1`); if (!h) return v; const c = h.cloneNode(true); c.querySelectorAll("[data-tipid],#g_tip,.tipi").forEach(x => x.remove()); return c.textContent.trim() || v; };   // the title without its (?)
 function tabTitle(t, full) {
   if (t.kind === "page") return full ? `${pageTitle(t.view)}\n(page; middle-click or × closes it)` : pageTitle(t.view);
   if (t.kind === "file") return full ? t.path : t.name;
@@ -6527,7 +6521,7 @@ function wfRender(host) {
   const extras = rows.filter(r => (r.kind === "optional" || r.kind === "alternative") && r.default === "off" && wfCounts(states[r.item_id])), dropped = rows.filter(r => (r.kind === "optional" || r.kind === "alternative") && r.default === "on" && !wfCounts(states[r.item_id]));
   const ext = `<div class="wfext"><b>Enabled extras</b> ${extras.length ? extras.map(r => `<span class="onoff on">${icon("check")}${esc(r.label)}</span>`).join(" ") : `<span class="mut">none: only the default chain</span>`}
     ${dropped.length ? ` <b style="margin-left:8px">Turned off</b> ${dropped.map(r => `<span class="onoff off">${icon("x")}${esc(r.label)}</span>`).join(" ")}` : ""}</div>`;
-  const legend = `<div class="wflegend">${wizTip("workflow_colours")}<span>${wfPill("on")} runs</span><span>${wfPill("off")} skipped</span><span><span class="chgtag">changed</span> differs from its default</span><span class="mut">An item at its default shows its default colour.</span></div>`;
+  const legend = `<div class="wflegend">${wizTip("workflow_colours")}<span>${wfPill("on")} runs</span><span>${wfPill("off")} skipped</span><span><span class="chgtag">changed</span> differs from its default</span></div>`;
   const steps = WF.data.steps.slice().sort((a, b) => a.order - b.order);
   const strip = `<ol class="wfstrip" aria-label="The chain, in order">${steps.map(s => { const it = rows.filter(r => r.step_id === s.id && r.kind !== "demo" && r.kind !== "core" && r.kind !== "separate"), n = it.filter(r => wfCounts(states[r.item_id])).length;
     return `<li><a href="#wfs_${esc(s.id)}" data-wfjump="${esc(s.id)}">${esc(s.name)}<small>${it.length ? `${n} of ${it.length} on` : "always runs"}</small></a></li>`; }).join("")}</ol>`;

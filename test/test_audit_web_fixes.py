@@ -212,7 +212,10 @@ def main():
     check("no catch {} hides a failed git history/branch/session load", "catch {}\n}\nasync function gdFiles" not in html and 'Could not load the history' in html and 'could not be loaded' in html)
     check("one vocabulary: the chips, KPI and help name the three tasks alike",
           '"Binning reconstruction"' in html and '"Sequence reassembly"' in html and ">Binning<" not in html and '"Binning"]' not in html and '"Reassembly"]' not in html)
-    check("the Tools page explains the three tasks inline", 'id="taskhelp"' in html and all(x in html.split('id="taskhelp"')[1][:900] for x in ("Classification", "Binning reconstruction", "Sequence reassembly")))
+    # UI cleanup: the explanation moved from an inline note to the (?) next to the filter (ui_help.PAGE["tool_tasks"]); the page keeps the anchor id
+    from plasbench import ui_help
+    _tt = " ".join([ui_help.PAGE["tool_tasks"]["title"], ui_help.PAGE["tool_tasks"]["summary"]] + ui_help.PAGE["tool_tasks"]["bullets"])
+    check("the Tools page explains the three tasks in a (?) tooltip", 'data-tipid="tool_tasks" id="taskhelp"' in html and all(x in _tt for x in ("Classification", "Binning reconstruction", "Sequence reassembly")))
     check("the run list can export the leaderboard", "benchmark.leaderboard.tsv" in html and "download=" in html)
 
     shutil.rmtree(tmp, ignore_errors=True)

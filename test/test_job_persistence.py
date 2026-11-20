@@ -154,7 +154,7 @@ def main():
 
     print("page")
     html = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
-    check("the Jobs page explains where runs started in a terminal appear", "Everything you start from this window appears here; runs you start in the Terminal appear under Runs and reports, marked 'started outside the window'." in html)
+    check("the Jobs page explains where runs started in a terminal appear", "you start in the Terminal appear under Runs and reports, marked 'started outside the window'" in __import__("plasbench.ui_help", fromlist=["PAGE"]).PAGE["p_jobs"]["bullets"][2] and 'data-tipid="p_jobs"' in html)  # UI cleanup: the sentence is in the Jobs (?) tooltip
     print("FAILED: " + ", ".join(FAILED) if FAILED else "ALL PASS")
     return 1 if FAILED else 0
 

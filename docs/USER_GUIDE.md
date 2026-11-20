@@ -258,6 +258,24 @@ naming each one and the command. In the window, the Tools page has Install and U
 cards show the same state, and starting a run offers to install missing enabled tools first. Exit codes 20 (a manual step; plsMD and PPR-Meta) and 21 (consent needed) are information, not
 errors. The per-tool table is `docs/TOOL_INSTALL_AUDIT.md`.
 
+## The window at a glance
+
+`plasbench ui` opens the window in your browser. The left-hand list follows the order you work in:
+
+| Group | Pages | What you do there |
+|---|---|---|
+| Overview | Home | See whether this computer is ready; start the offline demo |
+| Set up | Set up this computer | Check and fix every dependency; Conda or Docker; NCBI access; tool profiles |
+| Benchmark | Workspace & studies, Cohorts, Your own isolates, New benchmark | Choose where studies live, pick or add the isolates, then start a run |
+| Results | Runs & reports, Jobs | Open reports, resume interrupted runs, read job logs |
+| Tools & rules | Tools, Add your own tool, Scoring decisions | Switch tools on or off, add your own, see the fixed scoring rules |
+| Advanced | Version control, All commands | Git for your work; every command as a form |
+| Settings & help | Settings, Guides | Every setting with its default; the README and the guides |
+
+The top bar keeps the few things you need all the time: the folder tree and job panel (**Panel**), the internet indicator, the **Console** and **Quit**. Help for the page (F1), reloading the page and the light or dark theme are in the **More** menu (the three dots).
+
+**Where did the explanation text go?** Pages show a title, one line saying what they are for, and the controls. What a control means, what an option does and how a page works is in the small green **?** next to the label: hover it, tab to it with the keyboard, or tap it on a phone; press **Escape** to close it. The same text is kept in one place, `plasbench/ui_help.py`. Anything you must act on or know before a costly step stays on the page: warnings, errors, offline or blocked reasons, disk-space notes, and the reminder that closing the window does not stop runs.
+
 ## Inputs
 
 The default sample sheet is `config/accessions.tsv`. It is a tab-separated file

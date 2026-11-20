@@ -65,6 +65,7 @@ _RUN = {
     "cohort": {"summary": "A bundled cohort by name: shorthand for --samples cohorts/<NAME>.tsv. With meta, --cohort bmock12 materializes the bundled physical truth control.",
                "when": "Leave empty when you give a sample sheet."},
     "max_isolates": {"summary": "Run only N isolates of the cohort or sheet (any number you choose). The sheet itself is not changed: a copy with those rows is written next to the results.",
+                     "choices": {"balanced": "The isolates are a balanced selection: spread across species and studies, and across recent and older genomes, so a small run is a fair miniature of the cohort."},
                      "when": "Leave empty to run all isolates."},
     "independent_truth_only": {"summary": "Run only isolates whose truth is independent of the benchmark's reads (long-read-only or long-read-first, polished with no reads or independent reads). The cohort file is not changed; a copy is written next to the results.",
                                "when": "Switch on to avoid truth that shares reads with the benchmark; combine with max isolates for a balanced N of them."},
@@ -347,6 +348,11 @@ def tooltip(entry, arg=None, flag="", default=None, setting=""):
     return out
 
 
+def page_tip(entry):
+    """What a page-level (?) shows: a title line, the summary, a short bullet list and a closing line. No default/flag footer: these explain a page, not an option."""
+    return {"title": entry.get("title", ""), "summary": entry.get("summary", ""), "bullets": list(entry.get("bullets", [])), "when": entry.get("when", ""), "plain": True}
+
+
 def setting_tooltip(row, carried=""):
     """Tooltip for one Settings-page row (a dict from Project.settings())."""
     entry = SETTINGS.get(row["key"], {})
@@ -453,4 +459,73 @@ NATIVE_PICKER = {
     "docker_recheck": {"summary": "Looks at Docker again right now: the same checks as the state label. Use it after you finished the steps PlasBench handed to you (starting Docker Desktop, turning on WSL integration, adding yourself to the docker group)."},
     "docker_guide": {"summary": "Opens Docker's own installation guide in your browser."},
     "docker_install_first": {"summary": "Run in Docker needs Docker to be installed and running. This opens the Docker setup: its state, what to do next and the install button."},
+}
+
+
+# ---- Front-facing page notes -------------------------------------------------------------------------------------------------------------------------
+# Every page shows one short line; what the page or a control MEANS lives here and opens from the green (?) next to it (hover, keyboard focus, or a tap).
+# Rule: text that explains what a control means or how it works is a tooltip (this dict); text that reports a state, a problem or a decision the person must
+# make stays visible. Entries: title (bold first line), summary, bullets (a short list), when (a closing line). test_ui_cleanup keeps the pages inside a word budget.
+PAGE = {
+    "p_setup": {"title": "Set up this computer", "summary": "What PlasBench needs, what is already here, and a one-click fix for anything missing.",
+                "bullets": ["Each fix runs the same plasbench command you would type.", "Its output appears in the console below."]},
+    "pc_help": {"title": "This computer", "summary": "The desktop icon starts PlasBench (or brings this window back). Quit, top right, stops it.", "when": "Every page also works from the command line, and from the Terminal tab of the console below."},
+    "ncbi": {"title": "NCBI access", "summary": "Cohort downloads use NCBI.", "bullets": ["An email is courtesy.", "An API key raises the request allowance from 3 to 10 per second.", "Both are saved in config/local.env on this computer only."]},
+    "profile": {"title": "Tool profiles", "summary": "Profiles group related tools.", "bullets": ["core is needed for everything.", "The rest add assemblers, binning-reconstruction tools and optional analyses."]},
+    "docker_card": {"title": "Docker (optional)", "summary": "Docker is optional. It runs PlasBench in a container (scripts/docker_run.sh) and is the runtime tools such as mobilome-map and plsmd need when they run in a container.",
+                    "bullets": ["PlasBench never runs sudo.", "PlasBench never accepts the Docker Desktop licence for you."]},
+    "m_conda": {"title": "Install conda", "summary": "Installs Miniforge. Only if no conda, mamba or micromamba is present."},
+    "m_update": {"title": "Check for updates", "summary": "Asks GitHub whether a newer release exists. Nothing is installed."},
+    "m_upgrade": {"title": "Upgrade PlasBench", "summary": "Installs the latest release; keeps your reads, databases and studies.", "when": "Close and reopen PlasBench afterwards to use the new version."},
+    "m_test": {"title": "Run the test suite", "summary": "Offline regression checks of this installation."},
+    "p_tools": {"title": "Tools", "summary": "Every tool PlasBench can benchmark, built-in and your own.",
+                "bullets": ["The switch, and the on / off beside it, set whether a tool runs by default (saved for this computer).", "on: it runs unless you turn it off for a run.", "off: it is skipped unless you turn it on.", "The New benchmark page can still change it for one run."]},
+    "tool_tasks": {"title": "Three kinds of task, each ranked on its own", "summary": "Tools are never ranked against tools of another task or another input track.",
+                   "bullets": ["Classification: the tool labels every contig plasmid or chromosome (ranked by base-level F1).", "Binning reconstruction: the tool groups contigs into separate plasmids (ranked by length-weighted binning F1).",
+                               "Sequence reassembly: the tool produces the plasmid sequences themselves (ranked by CPRR, the share of true plasmids recovered correctly)."]},
+    "p_addtool": {"title": "Add your own tool", "summary": "Describe a plasmid reconstruction or classification tool once.",
+                  "bullets": ["PlasBench installs it into its own environment.", "It runs it on every sample (or reads outputs you already have) and converts its output.", "It scores, ranks and reports it beside the built-in tools.", "No code changes."]},
+    "ut_text": {"title": "Manifest text", "summary": "You can also edit the text directly; the form follows."},
+    "p_prereg": {"title": "Scoring decisions", "summary": "Before any result is looked at, PlasBench fixes how tools are scored and ranked. These are those rules, each in plain words.",
+                 "bullets": ["They are confirmed and recorded so that nobody, including you, can quietly change a rule after seeing which tool wins.", "You can still change one: PlasBench asks why, records it, and warns that results from before and after the change cannot be compared."]},
+    "p_settings": {"title": "Settings", "summary": "Every setting PlasBench reads (from config/config.sh), its default, and your value for this computer.",
+                   "bullets": ["Changes are saved to config/local.env, which upgrades keep.", "Clear a value to return to the default."]},
+    "folder_window": {"title": "Folder window", "summary": "Browse opens this computer's own folder window. If it does not, test it here: PlasBench opens a window, closes it again after two seconds and says which step fails."},
+    "p_wizard": {"title": "New benchmark", "summary": "Choose the isolates, the tools and the resources, review the exact command, and start.", "bullets": ["Every option of plasbench run is available.", "Anything you leave alone keeps its default."]},
+    "p_workspace": {"title": "Workspace and studies", "summary": "Every benchmark is a study with its own folder: its results, report, logs and a record of how it was run. The workspace is the folder that holds all studies.",
+                    "when": "Downloads, tool environments and databases are shared between studies, so a new study never downloads the same reads again."},
+    "ws_change": {"title": "Change the workspace", "summary": "Choose a folder with plenty of free space: a public cohort needs hundreds of GB.", "bullets": ["A local disk is fastest; an external drive works if it stays connected.", "Existing studies stay where they are."]},
+    "st_new": {"title": "New study", "summary": "Optional: a run creates its study automatically, named after the cohort or sample sheet. Create one here to name it yourself, then choose it on New benchmark."},
+    "st_name": {"title": "Study name", "summary": "Letters, digits, '.', '_' or '-'."},
+    "st_loc": {"title": "Study location", "summary": "The study folder is created as location/name. Leave empty to use the workspace, or choose a folder on this computer or a connected drive."},
+    "st_import": {"title": "Import a study", "summary": "Bring in a study bundle (a .zip made by Manage > Export) from another computer or an earlier time. It becomes a new study; nothing is overwritten."},
+    "p_isolates": {"title": "Your own isolates", "summary": "Tell PlasBench which folder(s) hold your reads and reference genomes.",
+                   "bullets": ["It finds each isolate and places the files where the run expects them.", "It tests that it can read and use them, before any run spends hours."], "when": "Not sure what you need? Read the guide: Help > INPUT_GUIDE."},
+    "in_sheet": {"title": "A sheet to fill in (optional)", "summary": "You do not have to write a sheet: step 2 writes it for you from your folders. If you prefer to fill one in yourself, download a template.", "when": "Each has the rules written at the top, and a worked example."},
+    "in_need": {"title": "What you need for each isolate", "summary": "Its paired Illumina reads (two files); for a scored benchmark also the complete genome of the same isolate (chromosome and each plasmid as separate sequences).", "when": "With reads only, PlasBench reconstructs the plasmids but cannot score them."},
+    "in_find": {"title": "Find my files", "summary": "Add the folder(s) where your files are. Sub-folders are searched.", "when": "Nothing is changed until you press Place the selected isolates."},
+    "in_test": {"title": "Quick test", "summary": "Opens each file the way a run will: are the reads real FASTQ and paired, is the reference a complete genome, do the labels match it, and do the reads actually come from that reference's isolate.", "when": "Takes seconds per isolate and changes nothing unless you press Fix."},
+    "in_data": {"title": "Data folder", "summary": "Where each isolate's own folder lives. The default is PlasBench's data folder."},
+    "in_scan": {"title": "Scan a folder", "summary": "Point at ONE folder, even a messy one with sub-folders and unrelated files. PlasBench looks for each isolate's paired reads and its complete reference, shows what it would use and why, and flags anything it is not sure of.",
+                "bullets": ["Scanning never changes your folder.", "Nothing is added until you press Add selected isolates.",
+                            "Reads: FASTQ pairs named _R1/_R2, _1/_2, .1/.2 or _R1_001/_R2_001 (.fastq or .fq, gzipped). Illumina lanes (_L001, _L002) of one isolate are listed and flagged: you confirm before they are joined.",
+                            "Reference: a plain FASTA of the complete genome. Assembler output (contigs.fasta, scaffolds.fasta, assembly.fasta in SPAdes, Unicycler or Flye folders, NODE_ headers) is never taken as a reference.",
+                            "Also used: sequence_report.jsonl and truth tables (truth.tsv) that sit with an isolate.",
+                            "Ignored and counted: alignments (BAM), documents, spreadsheets, logs, hidden folders, .git, results and logs folders, long reads (not used here).",
+                            "Limits: matching uses folder and file names; check the reference of every isolate marked 'check' before you rely on it."]},
+    "p_cohorts": {"title": "Cohorts", "summary": "Study sets that ship with PlasBench, each a sample sheet of NCBI-linked isolates. Validate one, or benchmark it directly.", "when": "Building your own cohort (discover, curate, validate, lock) is under All commands > Cohorts and truth."},
+    "coh_meta": {"title": "Where the details come from", "summary": "From the sheet and its verification lock: country, host, isolation source, collection date, how the reference was sequenced and assembled, and the Illumina run's size come from NCBI as recorded when the cohort was locked.", "when": "The download estimate uses the same factors as plasbench run's pre-download check."},
+    "coh_published": {"title": "Comparison with published outcomes", "summary": "Stage 6 does this automatically (setting RUN_PUBLISHED_COMPARISON) and the report gets a 'Comparison with published outcomes' section.", "when": "It is a comparison for your judgement, not a ranking: assemblies, tool versions, databases and metric definitions differ from the paper's."},
+    "p_runs": {"title": "Runs and reports", "summary": "Your benchmark runs: the ones going now, the ones that failed or were interrupted (resume them: finished work is kept), and the completed ones with their reports.", "when": "Below, every results folder found in this installation."},
+    "rank_help": {"title": "How to read a rank", "summary": "A rank is a tool's position within one task and one input track (short-read, long-read or hybrid), ordered by that task's headline metric (F1 for classification, length-weighted binning F1 for binning, CPRR for reassembly).",
+                  "bullets": ["Rank 1 is the best score, but a tied or overlapping confidence interval means two tools cannot be told apart.", "A tool is only ranked on the isolates it ran on.", "\"Leading\" names the rank-1 tool of each task; the full table is in the report and the Leaderboard download.", "\"Completed with warnings\" means the run finished normally but had failed tool runs."]},
+    "p_jobs": {"title": "Jobs", "summary": "Every command started from this window, with its exact command line, how it ended, and its full log.",
+               "bullets": ["Jobs keep running if you switch pages.", "Quit asks before stopping one that is still running.", "Runs you start in the Terminal appear under Runs and reports, marked 'started outside the window'."]},
+    "p_commands": {"title": "All commands", "summary": "Every plasbench command and every option, generated from the command line itself, so nothing is missing or out of date.", "when": "Fill in what you need, check the command line, and run it."},
+    "w_predictions": {"title": "Predictions folder", "summary": "<tool>/<community>.bins.tsv normalized outputs."},
+    "w_db": {"title": "Use a different database copy", "summary": "Leave these empty: each run uses the database where PlasBench installed it. Fill one in only to use another copy."},
+    "w_env": {"title": "Downloads and reliability", "summary": "These are environment settings for this run. Leave a box empty to keep the setting saved for this computer (Settings page, group Reliability and downloads)."},
+    "w_reuse": {"title": "Reusing what you have", "summary": "Installed tools, tool databases and downloaded reads are shared by every benchmark on this computer.",
+                "bullets": ["Reads and assemblies live in the shared data folder; databases where PlasBench installed them.", "You do not need to know where that is: a run finds them itself."]},
+    "git_safe": {"title": "Safety", "summary": "Nothing is force-pushed. Deleting, closing and merging ask first, and say exactly what will happen."},
 }
