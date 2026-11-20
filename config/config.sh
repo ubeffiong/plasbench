@@ -86,6 +86,10 @@ export TRUTH_LABEL_SCHEME="${TRUTH_LABEL_SCHEME:-ncbi}"
 # Where stage 1 gets short reads: auto (SRA Toolkit, then ENA if prefetch fails),
 # sra (SRA Toolkit only), ena (ENA only; python/fetch_ena_reads.py, MD5-verified).
 export READ_SOURCE="${READ_SOURCE:-auto}"
+# Does the window look for a newer PlasBench release by itself? auto (default): when it starts and then at most once a day, one public
+# request to GitHub's release list (nothing about you or this computer is sent); off: only when you press Check for updates.
+# PLASBENCH_OFFLINE=1 switches every online check off. Installing an update is always your decision (Set up this computer > Updates).
+export UPDATE_CHECK="${UPDATE_CHECK:-auto}"
 # Keep downloads for future runs: SHA-256 manifest per sample (downloads.sha256),
 # read files made read-only, verified instead of re-downloaded next time.
 export PRESERVE_DOWNLOADS="${PRESERVE_DOWNLOADS:-1}"

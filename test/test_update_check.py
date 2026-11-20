@@ -89,9 +89,10 @@ check("the route returns the comparison", code == 200 and body.get("newer") is T
 server.shutdown()
 
 page = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
-check("the window has a Check for updates control and a one-click upgrade", 'id="updcheck"' in page and 'id="updgo"' in page
-      and 'api("update-check")' in page)
-check("the window never checks by itself", page.count('api("update-check")') == 1)
+check("the window has a Check for updates control and a Download and install button", 'id="updcheck"' in page and 'id="updgo"' in page
+      and 'api("updates/check", {})' in page and 'api("updates/install", body)' in page)
+check("the page asks GitHub only when the button is pressed (the page itself reads the cached GET /api/updates)", page.count('api("updates/check"') == 1
+      and 'api("update-check")' not in page)
 
 print("ALL UPDATE CHECK TESTS PASSED" if ok else "UPDATE CHECK TESTS FAILED")
 sys.exit(0 if ok else 1)

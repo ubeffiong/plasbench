@@ -423,6 +423,8 @@ test_ui_markdown.py	0.7
 test_ui_patch.py	0.3
 test_update_check.py	0.3
 test_update_script.sh	0.7
+test_updates.py	3.0
+test_upgrade_e2e.sh	8.0
 test_user_tool_adapter.py	0.3
 test_user_tool_detect.py	0.3
 test_user_tool_multitask.py	0.3
