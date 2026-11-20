@@ -114,7 +114,8 @@ def main():
     print("static page")
     html = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
     block = html[html.index("BEGIN scan a folder (plasbench/isolate_scan.py) -->"):html.index("<!-- END scan a folder -->")]
-    check("the section exists with its controls", all(i in block for i in ('id="sc_pick"', 'id="sc_go"', 'id="sc_cancel"', 'id="sc_out"', "What is recognised", "never changes your folder")))
+    from plasbench import ui_help
+    check("the section exists with its controls", all(i in block for i in ('id="sc_pick"', 'id="sc_go"', 'id="sc_cancel"', 'id="sc_out"', "in_scan")) and "What is recognised" not in block and "never changes your folder" in " ".join(ui_help.PAGE["in_scan"]["bullets"]) and "FASTQ pairs named" in " ".join(ui_help.PAGE["in_scan"]["bullets"]))
     js = html[html.index("BEGIN scan a folder (plasbench/isolate_scan.py) ----"):html.index("END scan a folder ----")]
     check("no browser confirm/prompt/alert in the new code", not re.search(r"(?<![.\w])(confirm|prompt|alert)\(", js.replace("askConfirm(", "")), re.findall(r"(?<![.\w])(?:confirm|prompt|alert)\(", js))
     check("the picker, status polling, cancel and add routes are wired", all(x in js for x in ("pickPath(", "isolates/scan/status", "isolates/scan/cancel", "isolates/add", "askConfirm(")))

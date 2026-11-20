@@ -36,7 +36,10 @@ check("the Copy patch button copies through the one clipboard helper", "await co
 unused = [r for r in routes if r not in used and r not in ("info", "scan", "heavy", "gitignore", "checkignore", "file", "files", "branches")]
 check("no served git GET route is left without a control", not unused, str(unused))
 
-check("the Runs page explains a rank", 'id="rankhelp"' in html and all(x in html.split('id="rankhelp"')[1][:1600] for x in ("task", "track", "tied", "CPRR", "Leaderboard")))
+sys.path.insert(0, ROOT)
+from plasbench import ui_help  # noqa: E402  (UI cleanup: the rank explanation is the (?) beside "Results folders", text in ui_help.PAGE["rank_help"])
+_rk = " ".join([ui_help.PAGE["rank_help"]["summary"]] + ui_help.PAGE["rank_help"]["bullets"])
+check("the Runs page explains a rank in a (?) tooltip", 'data-tipid="rank_help" id="rankhelp"' in html and all(x in _rk for x in ("task", "track", "tied", "CPRR", "Leaderboard")))
 check("the leaders carry a rank tooltip", 'class="leader" title="Rank 1' in html)
 check("exit 0 with failed tool runs is worded, not 'done'", "WARN_EXPLAIN" in html and "exited normally, exit 0" in html and "finished, but some tool runs failed" in html)
 check("the toast uses the derived state", "const shown = j.display_state || j.state" in html)
