@@ -34,6 +34,7 @@ from concurrent.futures import ThreadPoolExecutor
 from plasbench_common import net_explain, net_require, subprocess_timeout  # noqa: E402
 
 CONNECTIONS = max(1, int(os.environ.get("ENA_DOWNLOAD_CONNECTIONS", "4") or 4))
+RETRY_DELAY_SECONDS = float(os.environ.get("ENA_RETRY_DELAY_SECONDS", "15") or 15)   # wait before retry n is n times this (15 s, 30 s, ...); tests set 0
 SEGMENT_MIN_BYTES = int(os.environ.get("ENA_SEGMENT_MIN_BYTES", str(16 << 20)) or (16 << 20))
 
 # ENA_PORTAL_URL points the file-report lookup at a mirror (or, in the tests, at a local fake server). The default is ENA itself.
@@ -157,7 +158,7 @@ def download(url, path, expected_md5, expected_bytes=None, retries=5, timeout=12
                     os.remove(tmp)
                 raise
             sys.stderr.write(f"[fetch_ena_reads] {exc}; retry {attempt}/{retries - 1}\n")
-            time.sleep(15 * attempt)
+            time.sleep(RETRY_DELAY_SECONDS * attempt)
 
 
 def main():
