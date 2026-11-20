@@ -18,6 +18,18 @@ if [[ -f "$LOCAL_SETTINGS" ]]; then
     source "$LOCAL_SETTINGS"
 fi
 
+# --- Where the tools run (conda or Docker) -----------------------------------
+# conda (the default) runs the benchmark tools from the plasbench conda environment on this computer. docker runs every command that needs them (a run, check,
+# install-tools) inside a container of the PlasBench image, with your study, data and database folders mounted at the same paths; conda stays installed and you can switch back at any time (Set up this computer, Environment, or plasbench runtime use conda|docker).
+export PLASBENCH_RUNTIME="${PLASBENCH_RUNTIME:-conda}"
+# The image used when the runtime is docker. Empty means the published image of this PlasBench version (ghcr.io/ubeffiong/plasbench:v<version>), else the image built here from the Dockerfile (plasbench:<version>-local). Never latest by default; give a name to use another image.
+export PLASBENCH_DOCKER_IMAGE="${PLASBENCH_DOCKER_IMAGE:-}"
+# When to pull the image from the registry: missing (only when it is not on this computer; the default), always (refresh it every time), or never (use only what is here, or build it).
+export PLASBENCH_DOCKER_PULL="${PLASBENCH_DOCKER_PULL:-missing}"
+# Where tools and databases added in Docker mode are kept between containers (empty: ~/.plasbench/docker/<version>/extras). The image itself is never changed.
+export PLASBENCH_DOCKER_EXTRA="${PLASBENCH_DOCKER_EXTRA:-}"
+
+# --- Where data goes ---------------------------------------------------------
 export DATA_DIR="${DATA_DIR:-${PLASBENCH_DATA_DIR:-$PROJECT_ROOT/data}}" # refs + reads
 # Tool databases are kept once per machine, not per project or per DATA_DIR, so
 # a new checkout, a new cohort folder or a rebuilt conda environment reuses them

@@ -1250,7 +1250,8 @@ class Jobs:
     def _launch(self, command, shown, label, env, argv, kind, cwd, resumes: str | None = None) -> dict:
         job_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
         p = self._paths(job_id)
-        child_env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8", PLASBENCH_STARTED_VIA="window")
+        child_env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8", PLASBENCH_STARTED_VIA="window",
+                         PLASBENCH_JOB_ID=job_id, PLASBENCH_JOB_DIR=str(self.dir))
         for key, value in (env or {}).items():
             if not re.fullmatch(r"[A-Z][A-Z0-9_]*", key):
                 raise ValueError(f"not a setting name: {key}")
@@ -1316,6 +1317,7 @@ class Jobs:
     def _kill(self, job_id: str, job: dict):
         info = jobrunner.read_json(self._paths(job_id)["pid"]) or {}
         pid = int(info.get("runner") or job.get("pid") or 0)
+        threading.Thread(target=jobrunner.stop_job_container, args=(str(self.dir), job_id), daemon=True).start()   # a Docker run: stop its container too
         if not pid:
             return
         if info.get("pgid") and os.name != "nt":
@@ -1620,6 +1622,77 @@ def docker_offer_state(root) -> dict:
         return {"pending": True, "offered": False, "reason": "checking whether Docker is available"}
     offer = docker_helper.switch_offer(state, (Path(root) / "scripts" / "docker_run.sh").is_file())
     return dict(offer, pending=False, in_docker=False, docker=state)
+# ---- where the tools run: conda or Docker (plasbench/docker_runtime.py; GET /api/runtime, POST /api/runtime/use|test|pull|ready) ----
+RUNTIME_TTL = 20.0
+_runtime_test_lock = threading.Lock()
+
+
+def _docker_probe(root) -> dict:
+    from . import docker_runtime
+    return docker_runtime.probe(root)
+
+
+def runtime_state(project) -> dict:
+    """The Environment card's data. The Docker probe (`docker version`, `docker image inspect`) runs in the background through loadcache and is never on the page-load path:
+    until it has answered the state says pending. Conda's side is the cached platform probe."""
+    from . import docker_helper, docker_runtime as dr
+    root = project.root
+    try:
+        chosen = dr.runtime_setting(root)
+        problem = ""
+    except ValueError as exc:
+        chosen, problem = "conda", str(exc)
+    inside = docker_helper.in_docker()
+    plat, plat_ready = loadcache.swr("platform", PLATFORM_TTL, _platform_probe, block=False)
+    info = (plat or {}).get("info") or {}
+    conda = {"pending": not plat_ready, "env_found": bool(info.get("env_ready")), "env_prefix": info.get("env_prefix"), "solver": info.get("conda_solver")}
+    if inside:
+        docker = {"pending": False, "state": "inside_docker", "installed": False, "running": False, "version": "", "image": {},
+                  "hint": "This window runs inside a container: choose where tools run from a window on the computer itself."}
+    else:
+        found, ready = loadcache.swr(("runtime-docker", str(root)), RUNTIME_TTL, lambda: _docker_probe(root), block=False)
+        docker = dict(found, pending=False) if ready else {"pending": True, "state": "pending", "installed": False, "running": False, "version": "", "image": {}, "hint": "Checking Docker..."}
+    reason = ""
+    if inside:
+        reason = docker["hint"]
+    elif not docker["pending"] and docker["state"] != "ready":
+        reason = docker["hint"] or "Docker is not ready"
+    return {"runtime": chosen, "problem": problem, "version": __version__, "conda": conda, "docker": docker, "docker_usable": not reason and not docker["pending"], "docker_reason": reason,
+            "default_image": dr.published_image(), "local_image": dr.local_tag(), "pull_policy": setting_value(project, "PLASBENCH_DOCKER_PULL", "missing"),
+            "extras": dr.extras_listing(root), "pull_size": "not measured", "build_note": dr.build_plan(root, dr.local_tag())["lines"]}
+
+
+def setting_value(project, key, default=""):
+    return os.environ.get(key) or project.local_env().get(key) or default
+
+
+def runtime_use(project, choice: str) -> dict:
+    from . import docker_runtime as dr
+    if choice not in dr.RUNTIMES:
+        raise ValueError("the runtime is conda or docker")
+    if choice == "docker":
+        state = runtime_state(project)
+        if state["docker"]["pending"]:
+            raise ValueError("Docker is still being checked: try again in a moment")
+        if state["docker_reason"]:
+            raise ValueError("Docker cannot be used yet: " + state["docker_reason"])
+    project.save_local_env({"PLASBENCH_RUNTIME": choice})
+    loadcache.forget(("runtime-docker", str(project.root)))
+    session_log().event("runtime_use", runtime=choice)
+    return runtime_state(project)
+
+
+def runtime_test(project) -> dict:
+    """`plasbench runtime check` for the Test Docker setup button: the same steps, PASS or FAIL each. One at a time."""
+    from . import docker_runtime as dr
+    if not _runtime_test_lock.acquire(blocking=False):
+        return {"error": "a Docker test is already running", "steps": [], "ok": False}
+    try:
+        rows = dr.check_steps(project.root)
+        loadcache.forget(("runtime-docker", str(project.root)))
+        return {"steps": rows, "ok": all(r["ok"] for r in rows), "text": dr.format_steps(rows)}
+    finally:
+        _runtime_test_lock.release()
 # ---- end folder window extras ----
 
 
@@ -1909,6 +1982,8 @@ def make_handler(project: Project, jobs: Jobs):
                     return self.jsend(200, native_picker.status(q.get("id", "")))
                 caps = loadcache.ttl(("native-picker-caps",), 60.0, native_picker.capabilities)     # only looks for programs; starts nothing
                 return self.jsend(200, dict(caps, exe=None, **native_picker_extras(caps)))
+            if route == "runtime":           # where the tools run; the Docker probe is a background loadcache probe, never on the page-load path
+                return self.jsend(200, runtime_state(project))
             if route == "docker/offer":      # "run in Docker instead": the docker probe runs in the background (loadcache.swr), never on the page-load path
                 return self.jsend(200, docker_offer_state(project.root))
             # ---- end native folder window ----
@@ -2424,6 +2499,19 @@ def make_handler(project: Project, jobs: Jobs):
                 session_log().event("study_added", path=str(folder))
                 return self.jsend(200, {"path": str(folder), "name": folder.name})
             # ---- native folder window (plasbench/native_picker.py): additive block, POST side ----
+            if route == "runtime/use":
+                return self.jsend(200, runtime_use(project, str(data.get("runtime") or "")))
+            if route == "runtime/test":
+                return self.jsend(200, runtime_test(project))
+            if route in ("runtime/pull", "runtime/ready"):
+                if route == "runtime/ready":
+                    argv, label = ["check", "--yes"], "Make everything ready in Docker (tools and databases)"
+                elif data.get("build"):
+                    argv, label = ["runtime", "build", "--yes"] + (["--rebuild"] if data.get("rebuild") else []), "Build the PlasBench image on this computer"
+                else:
+                    argv, label = ["runtime", "pull", "--yes"], "Pull the PlasBench image"
+                netgate.require_job(argv, {}, "start this command")
+                return self.jsend(200, jobs.start(argv, label, None))
             if route == "docker/plan":       # the docker run command for chosen folders: built here, shown and copied, never run
                 from . import docker_helper
                 shell = data.get("shell") if data.get("shell") in ("posix", "powershell") else ("powershell" if os.name == "nt" else "posix")

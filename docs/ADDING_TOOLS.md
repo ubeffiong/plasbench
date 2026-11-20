@@ -304,3 +304,11 @@ someone sends you before adding it, as you would any script. A `url` or `local` 
 
 A user tool that proves useful can become built-in: open a pull request adding its manifest under `tools.d/` (or a
 dedicated adapter under `adapters/`), with a small test like `test/test_user_tool_stage.sh`.
+
+## Your tools in Docker mode
+
+When the runtime is Docker (`plasbench runtime use docker`) a tool installed with conda on this computer is NOT visible inside the container. A user tool is run in the container with its manifest folder
+(`~/.plasbench/tools`) mounted read-only at the same path; its `install` method (conda, pip, script, url, local, git) runs inside a container when you use `plasbench tools install NAME` and the result is kept in
+the persistent folder (`~/.plasbench/docker/<version>/extras`, or `PLASBENCH_DOCKER_EXTRA`), which is mounted into every container and put on PATH. A `local` source folder must be mounted: it is mounted at the same
+path only when it lies inside a folder PlasBench already shares; otherwise copy it into the tool folder. A script that needs host-only software (a program installed only on this computer) cannot work in the container: use
+Conda for that tool, or build a derived image (`FROM` the PlasBench image) that contains it and set `PLASBENCH_DOCKER_IMAGE`.

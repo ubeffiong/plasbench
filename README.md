@@ -975,6 +975,8 @@ plasbench ui --tab           # open it in a normal browser tab instead of an app
 plasbench ui --no-browser    # only print the address (a server, or another browser)
 plasbench desktop-icon       # (re)make the icon; --remove takes it away, --no-desktop keeps it to the menu
 plasbench picker-check       # Browse does not open the folder window? PASS or FAIL per step (--interactive lets you pick a folder)
+plasbench runtime status      # where the tools run (conda or Docker) and what Docker looks like; use conda|docker, check, pull, build
+plasbench runtime use docker  # run the tools in a container of the PlasBench image (PLASBENCH_RUNTIME); `plasbench run --runtime docker` for one run
 ```
 
 The window is a page served only to this computer (127.0.0.1). Each start gets its own session key, so other programs
@@ -1089,6 +1091,9 @@ locally: `ssh -L 8770:127.0.0.1:8770 you@server`, then `plasbench ui --no-browse
 ---
 
 ### Container
+
+**Docker from the window.** On **Set up this computer**, the **Environment** card switches where the tools run, Conda or Docker (`plasbench runtime use docker`); runs started by the window or `plasbench run` then execute inside this image with your folders mounted at the same paths, and an image that cannot be pulled is built from this Dockerfile after you agree (`plasbench runtime build`). Settings: `PLASBENCH_RUNTIME`, `PLASBENCH_DOCKER_IMAGE`, `PLASBENCH_DOCKER_PULL`, `PLASBENCH_DOCKER_EXTRA`. See the User Guide, "Choosing where tools run".
+
 
 The image carries every tool and the MOB-suite database already built in.
 

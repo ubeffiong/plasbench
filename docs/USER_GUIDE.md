@@ -834,6 +834,46 @@ The same card covers the everyday GitHub work: **Create repository on GitHub** (
 
 The top bar shows **Online**, **Limited**, **DNS problem** or **Offline** (and "Offline (forced)" when `PLASBENCH_OFFLINE=1`). Hover for each service's state and the advice, click to check again; it re-checks every 30 s while the window is visible. A control that needs the internet (sign in, push, pull, clone, check for updates, installs, discovery, downloading runs) looks disabled with the reason when its service is unreachable, and clicking it checks again at that moment before it says no. The server refuses such a job with a clear message instead of starting it. A run whose reads and references are already on disk (or `--local-inputs`, or the metagenomics track) still starts offline. Scoring, reports, studies, the folder tree, settings and documents never need the internet.
 
+### Choosing where tools run: Conda or Docker
+
+PlasBench's tools (the assemblers, MOB-suite, Platon and the rest) can run from the `plasbench` conda environment on this computer (**Conda**, the default) or inside a container
+of the PlasBench image (**Docker**). Choose on **Set up this computer**, in the **Environment** card at the top, or from a terminal with `plasbench runtime use conda|docker`.
+The setting is `PLASBENCH_RUNTIME` in `config/local.env`; one run can differ with `plasbench run --runtime docker` (the run wizard has the same choice). The window itself always
+runs on this computer: the window listens on 127.0.0.1 only, so a container cannot host it. In Docker mode every command that needs the tools (`run`, `report`, `check`,
+`install-tools`, `tools install`) is started by the host-side `plasbench` as `docker run --rm`, from the detached job runner, so closing the window does not stop a run and Cancel
+stops the container (it is named `plasbench-<job id>`).
+
+**What is shared.** Your study folder, the data folder, the logs, the temporary folder, the database folder (`~/.plasbench/databases`), the sample sheet and `config/local.env`
+are mounted into the container at the same absolute paths (WSL `/mnt/d/x` stays `/mnt/d/x`), so every path in `run_events.jsonl`, the manifest and the report is valid on this
+computer too. Files are written as you (`--user`), not as root. Nothing else on the computer is visible to the container. On native Windows a container has no `D:\`, so `D:\x`
+is mounted at `/mnt/d/x` and the container's own messages use that spelling; a network share (`\\server\share`) is refused with the reason (map it to a drive letter).
+
+**When to prefer which.** Conda: fastest file access and no image to download. Docker: every tool at its pinned version without installing conda, and the same environment on every
+computer; it costs an image download (not measured), Docker's own disk space, and slower file access when the folders are on a Windows drive (`/mnt/c`, `/mnt/d`): keep the
+workspace on WSL's own disk (under `/home`) for speed. Apple Silicon runs the amd64 image emulated (slow).
+
+**The image.** Default `ghcr.io/ubeffiong/plasbench:v<this version>` (never `latest`); `PLASBENCH_DOCKER_IMAGE` names another, `PLASBENCH_DOCKER_PULL` is `missing` (default),
+`always` or `never`. The image's PlasBench version must equal this one, otherwise the run is refused and the matching image is named. If the image is not on the computer and cannot be
+pulled (not published for this version, no access, offline, wrong architecture) PlasBench offers to **build it here** from the Dockerfile (`plasbench runtime build`, the
+**Build the image** button): it needs the internet, several GB of disk and a long time (not measured; from half an hour to hours), asks first (`--yes` agrees), shows the build log
+with a "still working" line, and on failure says which step failed and why (disk full, name lookup, registry refusal, platform mismatch). The build is recorded as `built-locally`.
+
+**Tools and databases that are not in the image.** The image is never changed. `plasbench check --yes`, `plasbench install-tools ...` and `tools install` run inside a container
+with a persistent folder mounted (`~/.plasbench/docker/<version>/extras`, or `PLASBENCH_DOCKER_EXTRA`): extra conda environments and tool wrappers land there and are put on PATH
+in every later container; databases land in the shared database folder. **Make everything ready** in the Environment card runs `plasbench check --yes` this way. A tool that needs a
+licence or a manual step stays exit 20, exactly as with conda. The extras (tool names and install provenance) are recorded in `run_manifest.json` under `runtime`, with the image, its
+source (`pulled` or `built-locally`), the Docker version and the mounts, and the report's Run metadata says where the tools ran. Installing tools into a container is exercised in the tests with a
+small fake tool and database; real bioconda installs inside the container have not been validated on every tool: if one fails, the log says why, and the supported fallbacks are a derived
+image (`FROM` the PlasBench image, install the tool, set `PLASBENCH_DOCKER_IMAGE`) or Conda for that tool.
+
+**Switching back.** `plasbench runtime use conda`, or **Use Conda**. Conda stays installed; runs already going keep the runtime they started with. The study record (`study.json`) says which
+runtime each run used.
+
+**Troubleshooting.** `plasbench runtime check` (the **Test Docker setup** button) tests Docker step by step, PASS or FAIL each: Docker answers, the image is here, `plasbench --version` inside
+it equals this version, a container writes a file in a mounted folder and this computer reads it, a path survives the mapping. Docker states the card shows: not installed (Tools page, **Install Docker**),
+daemon stopped (start Docker Desktop or the service), permission needed (add yourself to the `docker` group), WSL integration off (Docker Desktop, Settings, Resources, WSL integration).
+On Windows with WSL2: install Docker Desktop with the WSL backend and switch your Ubuntu distribution on, open PlasBench from Ubuntu, run `plasbench runtime check`, then **Use Docker**.
+
 ### Where your data and studies live
 
 Two different things are stored on disk, and each can be placed where you want.

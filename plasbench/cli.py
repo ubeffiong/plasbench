@@ -202,6 +202,93 @@ def bash_command():
     return shutil.which("bash") or "bash"
 
 
+def chosen_runtime(args, root):
+    """conda or docker for this command: --runtime, else PLASBENCH_RUNTIME (environment, config/local.env), else conda. A wrong value stops the command."""
+    from . import docker_helper, docker_runtime
+    if docker_helper.in_docker():
+        return "conda"      # already inside the container: its own tools are the ones that run
+    try:
+        return docker_runtime.runtime_setting(root, getattr(args, "runtime", None))
+    except ValueError as exc:
+        print(f"[plasbench] ERROR: {exc}", file=sys.stderr)
+        raise SystemExit(2)
+
+
+def run_in_runtime(runtime, host_command, container_command, root, env=None, yes=False, action="a container run"):
+    """conda: exactly the host command, as before. docker: the same work as `container_command`, started in a container of the PlasBench image (plasbench/docker_runtime.py);
+    the exit code is the container's."""
+    if runtime != "docker":
+        return run(host_command, root, env)
+    from . import docker_runtime, netcheck
+
+    def need(services):
+        netcheck.require(list(services), action=action)
+    code = docker_runtime.execute(root, container_command, env, assume_yes=yes, out=lambda text: print(text, flush=True), net_require=need)
+    if code < 0 or code in (137, 139, 134):
+        from .exitcodes import explain
+        sys.stderr.write(f"\nERROR: PlasBench stopped: {explain(code)} (exit {code}). Finished work is kept; run the same command again to continue.\n")
+    return code
+
+
+def runtime_command(args, root):
+    """`plasbench runtime ...`: status, use, check, pull, build."""
+    from . import docker_runtime as dr, netcheck
+    action = args.action
+    if action == "use":
+        if not args.choice:
+            print("[plasbench] ERROR: say which: plasbench runtime use conda   or   plasbench runtime use docker", file=sys.stderr)
+            return 2
+        dr.save_local_setting(root, "PLASBENCH_RUNTIME", args.choice)
+        print(f"[plasbench] The tools now run in: {args.choice} (saved as PLASBENCH_RUNTIME in config/local.env). Runs already in progress keep the runtime they started with.")
+        if args.choice == "docker":
+            st = dr.probe(root)
+            print(f"[plasbench] Docker: {st['state'].replace('_', ' ')}" + (f". {st['hint']}" if st["hint"] else ""))
+            if st["state"] == "ready" and not (st["image"] or {}).get("present"):
+                print("[plasbench] The image is not on this computer yet: `plasbench runtime pull` (or `plasbench runtime build --yes` to build it here).")
+        return 0
+    if action == "status":
+        chosen = dr.runtime_setting(root)
+        st = dr.probe(root)
+        out = {"runtime": chosen, "docker": st, "default_image": dr.published_image(), "local_image": dr.local_tag(), "extras": dr.extras_listing(root)}
+        if args.json:
+            print(json.dumps(out, indent=2))
+            return 0
+        img = st.get("image") or {}
+        print(f"Runtime: {chosen}  (change with: plasbench runtime use conda|docker)")
+        print(f"Docker : {st['state'].replace('_', ' ')}" + (f" (version {st['version']})" if st["version"] else "") + (f"\n         {st['hint']}" if st["hint"] else ""))
+        if img:
+            where = ("on this computer" + (f", {img['size_bytes'] / 2**30:.1f} GB" if img.get("size_bytes") else "")) if img.get("present") else "not on this computer (plasbench runtime pull, or build)"
+            print(f"Image  : {img['name']}  {where}")
+        print(f"Extras : {out['extras']['home']}  ({len(out['extras']['tools'])} extra tool command(s))")
+        return 0
+    if action == "check":
+        rows = dr.check_steps(root)
+        if args.json:
+            print(json.dumps(rows, indent=2))
+        else:
+            print("Docker setup check:")
+            print(dr.format_steps(rows))
+            print("All steps passed." if all(r["ok"] for r in rows) else "Some steps FAILED: fix the first one above and run the check again.")
+        return 0 if all(r["ok"] for r in rows) else 1
+
+    def need(services):
+        netcheck.require(list(services), action=f"plasbench runtime {action}")
+
+    def ask(question):
+        return input(f"[plasbench] {question} [y/N] ").strip().lower() in ("y", "yes")
+    ensure = dr.ensure_image(root, assume_yes=args.yes, ask=ask if (sys.stdin and sys.stdin.isatty()) else None, out=lambda t: print(t, flush=True),
+                             rebuild=(action == "build" and args.rebuild), net_require=need,
+                             policy="always" if action == "pull" else ("never" if action == "build" else None))
+    if not ensure["ok"]:
+        print("[plasbench] " + ensure["message"])
+        return ensure["code"]
+    if action == "build" and ensure["source"] == "present" and not args.rebuild:
+        print(f"[plasbench] {ensure['image']} is already here (use --rebuild to build it again).")
+    check = dr.verify_image(ensure["image"], dr.docker_exe())
+    print(f"[plasbench] {ensure['message']} " + (f"Verified: it holds PlasBench {check['version']}." if check["ok"] else "WARNING: " + check["message"]))
+    return 0 if check["ok"] else 1
+
+
 def open_report_in_browser(report):
     """Open a local report with the host's browser, including WSL hosts."""
     report = Path(report).resolve()
@@ -363,6 +450,7 @@ def build_parser():
                "  plasbench desktop-icon            (put the PlasBench icon on the desktop; --remove undoes it)\n"
                "  plasbench picker-check            (why does Browse not open the folder window? PASS or FAIL per step)\n"
                "  bash install_latest.sh --archive plasbench-<version>.tar.gz   (install a downloaded release with no network)\n"
+               "  plasbench runtime use docker      (run the tools in a container instead of conda; `plasbench runtime check` tests it)\n"
                "  plasbench check --yes\n"
                "  plasbench install-tools core\n"
                "  plasbench install-tools all\n"
@@ -421,6 +509,17 @@ def build_parser():
                                help="Leave the folder window open so you can choose a folder; prints the path that comes back.")
     picker_parser.add_argument("--seconds", type=int, default=2, help="How long the self-test leaves its window open before closing it (default 2).")
     picker_parser.add_argument("--json", action="store_true", help="Print the report as JSON.")
+    runtime_parser = sub.add_parser(
+        "runtime",
+        help="Choose where PlasBench's tools run, conda or Docker: status, use, check, pull, build.",
+        description="status: the current choice and what Docker looks like.  use conda|docker: save the choice (PLASBENCH_RUNTIME in config/local.env).  "
+                    "check: step-by-step self-test of Docker (PASS or FAIL per step).  pull: get the published image.  build: build the image from this folder's Dockerfile "
+                    "(when it cannot be pulled).  Guide: docs/USER_GUIDE.md, 'Choosing where tools run'.")
+    runtime_parser.add_argument("action", nargs="?", choices=("status", "use", "check", "pull", "build"), default="status", help="What to do (default: status).")
+    runtime_parser.add_argument("choice", nargs="?", choices=("conda", "docker"), help="With `use`: conda or docker.")
+    runtime_parser.add_argument("--yes", action="store_true", help="Agree to a pull or build without asking.")
+    runtime_parser.add_argument("--rebuild", action="store_true", help="With `build`: build again even if an image of this version exists.")
+    runtime_parser.add_argument("--json", action="store_true", help="Print status or check as JSON.")
     demo_parser = sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
     demo_parser.add_argument("--open-report", action="store_true",
                              help="Open the completed demo report in your browser without asking.")
@@ -937,6 +1036,9 @@ def build_parser():
                                     "(default: config value, normally 4). Higher is more robust but "
                                     "multiplies stage-7 runtime for trycycler_mob_recon proportionally.")
         tools = command_parser.add_argument_group("tools")
+        tools.add_argument("--runtime", choices=("conda", "docker"),
+                           help="Where the tools run: conda (the plasbench environment on this computer) or docker (a container of the PlasBench image; see `plasbench runtime`). "
+                                "Default: the PLASBENCH_RUNTIME setting, else conda.")
         for option, destination, label in (
             ("--mob-recon", "mob_recon", "Enable or disable MOB-suite reconstruction."),
             ("--platon", "platon", "Enable or disable Platon classification."),
@@ -1119,6 +1221,8 @@ def main(argv=None):
         from .webui import serve
         serve(root, port=args.port, open_browser=not args.no_browser, tab=args.tab, new_instance=args.new_instance)
         return 0
+    if args.command == "runtime":
+        raise SystemExit(runtime_command(args, root))
     if args.command == "picker-check":
         from . import picker_check
         return picker_check.main((["--interactive"] if args.interactive else []) + ["--seconds", str(args.seconds)] + (["--json"] if args.json else []))
@@ -1206,7 +1310,7 @@ def main(argv=None):
         command = [bash_command(), "scripts/00_setup.sh"]
         if args.yes:
             command.append("--yes")
-        code = run(command, root)
+        code = run_in_runtime(chosen_runtime(args, root), command, ["bash"] + command[1:], root, None, args.yes, "plasbench check")
     elif args.command == "init-local":
         data_dir = args.data_dir or configured_data_dir(root)
         command = [sys.executable, "python/init_local_sample.py",
@@ -1391,10 +1495,14 @@ def main(argv=None):
         if args.yes:
             command.append("--yes")
         command.append(args.profile)
-        code = run(command, root, {"PLASBENCH_INSTALL_DRY_RUN": "1"} if args.dry_run else None)
+        # `install-tools docker` installs Docker itself on this computer and the inspection actions touch no environment: those never go into a container.
+        host_only = args.profile in ("docker", "list", "plan", "validate", "locked") or args.dry_run
+        runtime = "conda" if host_only else chosen_runtime(args, root)
+        code = run_in_runtime(runtime, command, ["bash"] + command[1:], root, {"PLASBENCH_INSTALL_DRY_RUN": "1"} if args.dry_run else None, args.yes, "plasbench install-tools")
     elif args.command == "tools":
         if args.tools_command == "install":
-            code = run([bash_command(), "env/install_tools.sh", "--env", args.env, args.name], root)
+            command = [bash_command(), "env/install_tools.sh", "--env", args.env, args.name]
+            code = run_in_runtime(chosen_runtime(args, root), command, ["bash"] + command[1:], root, None, False, "plasbench tools install")
         else:
             command = [sys.executable, "python/user_tools.py", args.tools_command]
             if args.tools_command in ("validate", "show", "new", "remove") and getattr(args, "name", None):
@@ -1567,6 +1675,10 @@ def main(argv=None):
         if code == 0 and not args.write_script:
             announce_report(meta_results / "metagenomics.report.html", args.open_report, not args.no_report_prompt)
     else:
+        # Where the tools run is decided first: the study record and the run manifest say it (an explicit --runtime wins over PLASBENCH_RUNTIME).
+        os.environ["PLASBENCH_RUNTIME_EFFECTIVE"] = chosen_runtime(args, root)
+        if os.environ["PLASBENCH_RUNTIME_EFFECTIVE"] == "docker" and args.write_script:
+            parser.error("--write-script writes a script for the conda environment on this computer; use it with --runtime conda (a Docker run is started by plasbench itself)")
         if args.cohort:
             from . import sheetcheck
             cohort_path = root / "cohorts" / f"{args.cohort}.tsv"
@@ -1717,7 +1829,8 @@ def main(argv=None):
             write_run_script(args.write_script, root, ["bash", "scripts/run_all.sh", *stages], env)
             code = 0
         else:
-            code = run([bash_command(), "scripts/run_all.sh", *stages], root, env)
+            runtime = chosen_runtime(args, root)
+            code = run_in_runtime(runtime, [bash_command(), "scripts/run_all.sh", *stages], ["bash", "scripts/run_all.sh", *stages], root, env, False, f"plasbench {args.command}")
     # A report is an end product, not an unadvertised file. Keep this handoff
     # in the Python CLI so demo, local-isolate, and cohort benchmark workflows
     # behave identically even though they use different Bash entry points.

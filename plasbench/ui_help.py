@@ -171,7 +171,38 @@ _DEMO = {
 
 _UI_STATE = {"json": {"summary": "Print the evidence as JSON instead of a short report.", "when": "Only when you want to process it with a script; to ask for help, paste the plain report."}}
 
-ARGS = {"ui-state": _UI_STATE, "run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONSTRUCT, "intake": _INTAKE, "scan-isolates": _SCAN}
+_RUNTIME = {
+    "action": {"summary": "What to do: status shows the choice and Docker's state, use saves the choice, check tests Docker step by step, pull gets the published image, build makes the image on this computer from the Dockerfile.",
+               "choices": {"status": "Show where the tools run and what Docker looks like.", "use": "Save conda or docker as the place the tools run (PLASBENCH_RUNTIME).",
+                           "check": "Test Docker: the image, the version inside it, a file written in a mounted folder and read here, and the path mapping. PASS or FAIL per step.",
+                           "pull": "Download the published image of this version.", "build": "Build the image from this folder's Dockerfile (long, needs the internet, asks first)."}},
+    "choice": {"summary": "With use: conda (the plasbench environment on this computer) or docker (a container of the PlasBench image)."},
+    "yes": {"summary": "Agree to the download or build without asking.", "when": "Only after reading what it will do; a build takes a long time and several GB."},
+    "rebuild": {"summary": "With build: build the image again even if one for this version exists on this computer."},
+    "json": {"summary": "Print status or check as JSON instead of text."},
+}
+
+ENVIRONMENT = {
+    "environment": {"summary": "Where PlasBench's tools run. Conda: the plasbench environment on this computer. Docker: a container of the PlasBench image, started for each run, with your study, data and database folders mounted at the same paths. The window itself always stays on this computer."},
+    "conda": {"summary": "Tools run from the plasbench conda environment on this computer: fastest file access, no image to download, each tool installed with conda."},
+    "docker": {"summary": "Tools run inside a container of the PlasBench image: every tool at the pinned version without installing conda; needs Docker, an image download (size not measured) and slower file access on /mnt drives."},
+    "use_docker": {"summary": "Switch runs to Docker. Conda stays installed and you can switch back at any time; runs already going keep the runtime they started with."},
+    "use_conda": {"summary": "Switch runs back to the conda environment on this computer."},
+    "pull_image": {"summary": "Download the published image of this PlasBench version, or update it. Needs the internet."},
+    "build_image": {"summary": "Build the image on this computer from the Dockerfile in the PlasBench folder, used when the image cannot be pulled. Slow (not measured; from half an hour to hours), several GB, needs the internet; asks first."},
+    "test_docker": {"summary": "A small real test of Docker: the image runs plasbench --version, a container writes a file in a mounted folder and this computer reads it, and a path survives the round trip. PASS or FAIL per step with the exact error."},
+    "install_docker": {"summary": "Docker is not ready: open the Tools page to install it (needs your OK)."},
+    "run_in": {"summary": "Where this study's tools run: Conda or Docker. The default is the setting above; the choice is recorded in the study and in the run manifest."},
+    "make_ready": {"summary": "Install every enabled tool and its database into the persistent storage of Docker mode (the image is never changed). Asks first and says what will be downloaded."},
+    "extras": {"summary": "Tools and databases added in Docker mode live in this folder on your computer and are mounted into every container, so they stay between runs."},
+}
+
+ARGS = {"ui-state": _UI_STATE, "run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONSTRUCT, "intake": _INTAKE, "scan-isolates": _SCAN, "runtime": _RUNTIME}
+_RUNTIME_ARG = {"summary": "Where this run's tools run: conda (the plasbench environment on this computer) or docker (a container of the PlasBench image, started for this run with your folders mounted). Empty uses the setting from Set up this computer. The choice is recorded in the study and the run manifest.",
+                "choices": {"conda": "Tools from the plasbench conda environment on this computer.", "docker": "Tools from a container of the PlasBench image; needs Docker (Set up this computer, Environment)."},
+                "when": "Leave empty unless this study should differ from the setting."}
+ARGS["run"]["runtime"] = _RUNTIME_ARG
+ARGS["report"]["runtime"] = _RUNTIME_ARG
 
 # Wizard controls that are not command-line options. Keys are the control names used by the page.
 WIZARD = {

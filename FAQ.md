@@ -999,3 +999,12 @@ Still open, and why:
    (count-based and length-weighted precision, recall, F1 and MCC) is done; ambiguous contigs are excluded, not multi-assigned.
 8. **A literature comparison establishing novelty** (Part 2 section 2).
 9. **Stale per-tool result files** when the tool set changes between runs (Q21): clear `results/` between such runs.
+
+### Can I run PlasBench's tools in Docker instead of conda, and switch between them?
+
+Yes. Set up this computer, **Environment**, or `plasbench runtime use docker` / `plasbench runtime use conda`. The window stays on your computer; runs, checks and tool installs execute in a container
+of the PlasBench image with your study, data and database folders mounted at the same paths, so every recorded path is valid on both sides. If the image is not on the computer and cannot be pulled,
+PlasBench builds it from the Dockerfile after you agree (needs the internet, several GB, a long time, not measured). Tools and databases not in the image are installed into persistent storage
+mounted into every container (the image is never changed); a tool that needs a licence is still a manual step. `plasbench runtime check` tests Docker step by step. **Evidence.** `plasbench/docker_runtime.py`,
+`test/test_docker_runtime.py` (a recording fake Docker), `test/test_docker_runtime_e2e.py` (a real build and real containers in CI). **Status.** Verified with real Docker only in CI (Linux);
+the Windows and WSL2 paths are tested with fakes, so run `plasbench runtime check` on your computer.

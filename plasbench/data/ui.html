@@ -788,6 +788,10 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
     <p>What PlasBench needs, what is already here, and a one-click fix for anything missing. Each fix runs the same <code>plasbench</code> command you would type; its output appears in the console below.</p></div>
     <div class="row"><button class="btn sec" id="envref"><svg class="ico sm"><use href="#i-refresh"/></svg>Re-check</button>
      <button class="btn" data-run='["check","--yes"]' data-label="Check and fix every dependency"><svg class="ico sm"><use href="#i-wrench"/></svg>Check &amp; fix all</button></div></div>
+   <div class="card" id="env_card" style="margin-bottom:16px"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Environment <span id="rt_tip"></span></h3><span class="sub" id="rt_sub"></span></div>
+    <div class="bd" id="rt_body"><span class="mut">Looking at conda and Docker…</span></div>
+    <div class="bd" id="rt_test" style="border-top:1px solid var(--line)" hidden></div>
+    <div class="ft" id="rt_ft"></div></div>
    <div class="split">
     <div class="card"><div class="hd"><h3>Checklist</h3><span class="sub" id="envsum"></span></div><div id="envlist"><div class="bd mut">Checking…</div></div></div>
     <div class="stack">
@@ -2239,6 +2243,7 @@ async function loadSetup(force) {
   $("#ncbi_where").textContent = S.info?.local_env || "config/local.env";
   loadPlatform(force);
   loadComputer();
+  loadRuntime();
   try {
     const env = await getEnv(force);
     renderEnv(env);
@@ -2436,6 +2441,94 @@ async function instPreRun() {
   return x.id === "ok" ? "install" : "cancel";
 }
 /* ==INSTALL-UI-END== */
+
+/* ==RUNTIME-UI-BEGIN== Environment card: where the tools run, Conda or Docker (plasbench/docker_runtime.py; GET /api/runtime, POST /api/runtime/use|test|pull|ready).
+   The Docker state comes from a background probe (never on the page-load path); the card says "checking" until it answers. Docker is never hidden: when it cannot be used it is
+   disabled with the reason. Every confirmation is a designed dialog (modalDialog), never a browser dialog. */
+const rtTip = k => tipBtn((S.schema?.environment_help || {})[k], k.replace(/_/g, " "));
+const rtStateWord = {ready: "ready", daemon_stopped: "Docker is not running", not_installed: "Docker is not installed", permission_needed: "permission needed", wsl_integration_off: "WSL integration is off", inside_docker: "this window runs inside Docker", pending: "checking"};
+const rtGB = n => n == null ? "size unknown" : `${(n / 2 ** 30).toFixed(1)} GB`;
+async function loadRuntime() {
+  const el = $("#rt_body"); if (!el) return;
+  try { await getSchema(); S.rt = await api("runtime"); } catch (e) { el.innerHTML = `<span class="mut">Where tools run: unknown (${esc(e.message)})</span>`; return; }
+  renderRuntime(S.rt);
+  clearTimeout(S.rtPoll);
+  if (S.rt.docker.pending || S.rt.conda.pending) S.rtPoll = setTimeout(() => { if (!$("#v_setup").hidden) loadRuntime(); }, 800);
+}
+function renderRuntime(r) {
+  const d = r.docker, img = d.image || {}, cur = r.runtime, tools = S.tools || [];
+  const enabled = tools.filter(t => t.enabled), missing = enabled.filter(t => t.installed === false).length, okc = enabled.filter(t => t.installed === true).length;
+  const condaStatus = r.conda.pending ? `<span class="tag">checking</span>` : r.conda.env_found ? `<span class="tag ok">environment found</span>` : `<span class="tag warn">environment not created</span>`;
+  const condaFacts = r.conda.pending ? "" : `<div class="small mut">${r.conda.solver ? esc(r.conda.solver) : "no conda found"}${r.conda.env_prefix ? " · " + esc(r.conda.env_prefix) : ""}${tools.length ? ` · tools: ${okc} ready, ${missing} missing` : ""}</div>`;
+  const dState = d.pending ? `<span class="tag">checking</span>` : d.state === "ready" ? `<span class="tag ok">ready</span>` : `<span class="tag warn">${esc(rtStateWord[d.state] || d.state)}</span>`;
+  const imgLine = d.state !== "ready" ? "" : img.present
+    ? `<div class="small mut">image ${esc(img.name)} · ${esc(rtGB(img.size_bytes))} · ${img.source === "built-locally" ? "built on this computer" : "pulled"} · ${img.matches === false ? `<span class="warn-t">version ${esc(img.version || "?")} differs from ${esc(r.version)}</span>` : img.matches === true ? `matches PlasBench ${esc(r.version)}` : "version is checked when it is first used"}</div>`
+    : `<div class="small mut">image ${esc(img.name || r.default_image)} is not on this computer yet: pull is ${esc(r.pull_size)}; if it cannot be pulled it can be built here</div>`;
+  const extras = d.state === "ready" ? `<div class="small mut">extra tools and databases are kept in <span class="mono">${esc(r.extras.home)}</span>${r.extras.tools.length ? ` (${r.extras.tools.length} command${r.extras.tools.length > 1 ? "s" : ""})` : ""}${rtTip("extras")}</div>` : "";
+  const opt = (id, title, status, facts, text, tip) => `<div class="choice ${cur === id ? "on" : ""}" style="margin-bottom:10px" data-rt-opt="${id}"><span><b>${title}</b>${cur === id ? ` <span class="tag rec">in use</span>` : ""} ${status}${rtTip(tip)}${facts}<span class="small" style="display:block;margin-top:4px">${text}</span></span></div>`;
+  const html = `${r.problem ? `<div class="note warn">${icon("alert", "ico")}<div>${esc(r.problem)}</div></div>` : ""}
+    ${opt("conda", "Conda", condaStatus, condaFacts, "Tools run from the plasbench conda environment on this computer. Fastest file access, nothing to download but the tools themselves; each tool is installed with conda.", "conda")}
+    ${opt("docker", "Docker", dState, `${d.version ? `<div class="small mut">Docker ${esc(d.version)}</div>` : ""}${imgLine}${extras}${d.hint && d.state !== "ready" && !d.pending ? `<div class="small warn-t">${esc(d.hint)}</div>` : ""}`,
+      "Every run, check and install starts a container of the PlasBench image with your study, data and database folders mounted at the same paths, so results stay on this computer. Every tool is at its pinned version without installing conda. Costs: an image download (" + esc(r.pull_size) + "), disk for Docker, and slower file access when the folders are on a Windows drive (/mnt). This window stays on this computer.", "docker")}
+    <p class="small mut" style="margin:0">Runs already going keep the runtime they started with. Conda stays installed whichever you choose.</p>`;
+  setIfChanged($("#rt_body"), html);
+  setIfChanged($("#rt_tip"), rtTip("environment"));
+  $("#rt_sub").textContent = `in use: ${cur === "docker" ? "Docker" : "Conda"}`;
+  const dis = d.pending || !r.docker_usable;
+  const ft = `${cur === "docker" ? `<button class="btn sec sm" id="rt_conda">Use Conda${rtTip("use_conda")}</button>` : `<button class="btn sm" id="rt_docker" ${dis ? `disabled title="${esc(r.docker_reason || "Checking Docker")}"` : ""}>Use Docker${rtTip("use_docker")}</button>`}
+    <button class="btn sec sm" id="rt_pull" data-needs="ghcr" ${d.state !== "ready" ? "disabled" : ""}>Pull / update the image${rtTip("pull_image")}</button>
+    <button class="btn sec sm" id="rt_build" data-needs="docker" ${d.state !== "ready" ? "disabled" : ""}>Build the image${rtTip("build_image")}</button>
+    <button class="btn sec sm" id="rt_test_btn" ${d.state !== "ready" ? "disabled" : ""}>Test Docker setup${rtTip("test_docker")}</button>
+    ${cur === "docker" && d.state === "ready" ? `<button class="btn sm" id="rt_ready" data-needs="conda">Make everything ready${rtTip("make_ready")}</button>` : ""}
+    ${d.state === "not_installed" || d.state === "wsl_integration_off" ? `<button class="btn sec sm" data-run='["install-tools","docker"]' data-label="Install Docker" title="Installs Docker on this computer (asks first)">Install Docker first${rtTip("install_docker")}</button>` : ""}`;
+  setIfChanged($("#rt_ft"), ft);
+  if (typeof applyNetGating === "function") applyNetGating();
+}
+async function rtUseDocker() {
+  const r = S.rt, img = (r.docker.image || {});
+  const x = await modalDialog({title: "Run the tools in Docker?", wide: true, buttons: [{id: "cancel", label: "Cancel"}, {id: "ok", label: "Use Docker", primary: true}],
+    bodyHTML: `<p>From now on runs, checks and tool installs start in a container instead of using conda. Exactly what will happen:</p>
+      <ul class="small"><li><b>Image:</b> <span class="mono">${esc(img.name || r.default_image)}</span> ${img.present ? "(already on this computer)" : `(not here yet: it is pulled when needed, ${esc(r.pull_size)}; if it cannot be pulled you are offered a local build)`}.</li>
+      <li><b>Mounts:</b> your study, data, database and sample-sheet folders are mounted at the same paths; results are written to the same folders as before. Nothing else on this computer is visible to the container.</li>
+      <li><b>Extra tools and databases</b> you add are kept in <span class="mono">${esc(r.extras.home)}</span>; the image itself is never changed.</li>
+      <li><b>Conda stays installed.</b> Switch back at any time. Runs already in progress keep using the runtime they started with.</li></ul>`});
+  if (x.id !== "ok") return;
+  try { S.rt = await api("runtime/use", {runtime: "docker"}); toast("Tools now run in Docker", "ok"); renderRuntime(S.rt); } catch (e) { toast(e.message, "bad"); }
+}
+async function rtUseConda() { try { S.rt = await api("runtime/use", {runtime: "conda"}); toast("Tools now run from conda", "ok"); renderRuntime(S.rt); } catch (e) { toast(e.message, "bad"); } }
+async function rtBuild() {
+  const r = S.rt;
+  const x = await modalDialog({title: "Build the PlasBench image here?", wide: true, buttons: [{id: "cancel", label: "Cancel"}, {id: "ok", label: "Build the image", primary: true}],
+    bodyHTML: `<p>Use this when the published image cannot be pulled (not published for this version, no access, or the registry is unreachable).</p>
+      <ul class="small">${r.build_note.map(l => `<li>${esc(l)}</li>`).join("")}</ul>
+      <p class="small mut">The build runs as a job with a live log; if it fails the reason and the last lines are shown. Needs the internet.</p>`});
+  if (x.id !== "ok") return;
+  try { const job = await api("runtime/pull", {build: true}); toast("Started: build the image", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (e) { toast(e.message, "bad"); }
+}
+async function rtTest() {
+  const box = $("#rt_test"); box.hidden = false; box.innerHTML = `<span class="mut">Testing Docker (a few small containers)...</span>`;
+  try {
+    const t = await api("runtime/test", {});
+    box.innerHTML = t.error ? `<span class="warn-t">${esc(t.error)}</span>` : `<p style="margin:0 0 6px"><b>${t.ok ? "All steps passed" : "Some steps failed"}</b></p>` + t.steps.map(s => `<div class="note ${s.ok ? "ok" : "warn"}" style="margin-top:6px">${icon(s.ok ? "check" : "alert", "ico")}<div><b>${s.ok ? "PASS" : "FAIL"}</b> ${esc(s.step)}<div class="small mono" style="overflow-wrap:anywhere">${esc(s.detail)}</div></div></div>`).join("");
+  } catch (e) { box.innerHTML = `<span class="warn-t">${esc(e.message)}</span>`; }
+}
+async function rtReady() {
+  const tools = (S.tools || []).filter(t => t.enabled && typeof instCanInstall === "function" && instCanInstall(t));
+  const x = await modalDialog({title: "Make everything ready in Docker?", wide: true, buttons: [{id: "cancel", label: "Cancel"}, {id: "ok", label: "Install and download", primary: true}],
+    bodyHTML: `<p>This runs <code>plasbench check --yes</code> inside a container of the image: it installs every enabled tool that is missing and downloads the databases the enabled tools need. Each item is reported separately; one failure does not stop the others.</p>
+      <ul class="small"><li><b>Tools to install:</b> ${tools.length ? tools.map(t => esc(t.display)).join(", ") : "none missing that can be installed automatically"}. A tool that needs a licence or a manual step stays a manual step, exactly as with conda.</li>
+      <li><b>Databases:</b> Platon, MOB-suite and the others the enabled tools use, into <span class="mono">${esc(S.rt.extras.home)}</span> (tools) and your database folder (databases). Total size: not measured; some databases are several GB, so check the free space first.</li>
+      <li><b>Needs the internet.</b> Times are not measured. The image is not changed; everything is kept between runs.</li></ul>`});
+  if (x.id !== "ok") return;
+  try { const job = await api("runtime/ready", {}); toast("Started: make everything ready", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (e) { toast(e.message, "bad"); }
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest && e.target.closest("#env_card button"); if (!b || b.disabled || b.getAttribute("aria-disabled") === "true") return;
+  if (b.id === "rt_docker") rtUseDocker(); else if (b.id === "rt_conda") rtUseConda(); else if (b.id === "rt_build") rtBuild(); else if (b.id === "rt_test_btn") rtTest(); else if (b.id === "rt_ready") rtReady();
+  else if (b.id === "rt_pull") { try { const job = await api("runtime/pull", {}); toast("Started: pull the image", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (err) { toast(err.message, "bad"); } }
+});
+/* ==RUNTIME-UI-END== */
+
 
 /* ===================================================================================================
    ADD YOUR OWN TOOL (manifest builder)

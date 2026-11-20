@@ -1040,6 +1040,13 @@ def run_manifest_html(manifest_path, tool_versions):
     item("PlasBench version", f"{manifest.get('tool') or 'PlasBench'} {version}" if version else "not recorded")
     container = manifest.get("container") if isinstance(manifest.get("container"), dict) else {}
     item("Container", " ".join(str(v) for v in (container.get("image"), container.get("image_digest")) if v) or "no container image recorded (run on the host)")
+    rt = manifest.get("runtime") if isinstance(manifest.get("runtime"), dict) else {}
+    if rt.get("runtime") == "docker":
+        extras = rt.get("extras") if isinstance(rt.get("extras"), dict) else {}
+        item("Tools ran in", f"a Docker container ({rt.get('image') or 'image not recorded'}, {rt.get('image_source') or 'source unknown'}; Docker {rt.get('docker_version') or 'version not recorded'})"
+             + (f"; extra tools in persistent storage: {', '.join(extras.get('tools') or [])}" if extras.get("tools") else ""))
+    else:
+        item("Tools ran in", "the conda environment on this computer")
     databases = manifest.get("databases") if isinstance(manifest.get("databases"), dict) else {}
     parts = []
     for name, info in sorted(databases.items()):
