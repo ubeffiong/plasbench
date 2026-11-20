@@ -651,8 +651,9 @@ def build_run_argv(root, command, env=None, *, image, name, kind=None, uid=None,
 
 
 # ---------------------------------------------------------------- running a command in the container
-def _marker(name):
-    job_dir, job = os.environ.get("PLASBENCH_JOB_DIR"), os.environ.get("PLASBENCH_JOB_ID")
+def _marker(name, environ=None):
+    environ = os.environ if environ is None else environ
+    job_dir, job = environ.get("PLASBENCH_JOB_DIR"), environ.get("PLASBENCH_JOB_ID")
     if job_dir and job:
         return Path(job_dir) / (job + ".container")
     return None
@@ -728,7 +729,7 @@ def execute(root, command, env=None, *, assume_yes=False, interactive_ok=True, o
     out(f"[plasbench] Runtime: docker  image {image} ({source})  container {name}")
     for note in plan["notes"]:
         out("[plasbench] note: " + note)
-    marker = _marker(name)
+    marker = _marker(name, environ)
     if marker:
         try:
             marker.write_text(name, encoding="utf-8")
