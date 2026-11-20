@@ -70,13 +70,15 @@ TABLE = {
     "iss": ("insilicoseq", {"profile"}),
     "badread": ("badread", {"profile"}),
 }
+# Container engines: not conda packages, so not in TABLE. `plasbench install-tools docker` (python/docker_setup.py) is their route: a guided, consent-based installer that starts
+# winget / Homebrew only with --yes and hands the sudo / licence steps to the user. The routes below must all exist (checked in main()).
+RUNTIME = {"docker": "optional container engine: install-tools profile `docker`, registry runtime row, an optional (never required) check line in 00_setup.sh, INSTALL.md section"}
 # Used by code but deliberately not installed through PlasBench. Each says why.
 MANUAL = {
     "pigz": "optional: measure_depth.py decompresses reads with it when installed (faster), else with gzip",
     # the PlasBench window, its desktop icon and its terminal: each is looked up first and optional
     "conda": "the window's platform check and the desktop launcher look for it; plasbench install-conda installs it",
     "micromamba": "an alternative to conda, looked up by the platform check and the desktop launcher",
-    "docker": "optional: the platform check reports it; scripts/docker_run.sh is the documented Docker mode",
     "gh": "optional: Version control publishes to GitHub with it when present",
     "gio": "GNOME only: marks the desktop icon trusted when present",
     "update-desktop-database": "freedesktop only: refreshes the applications menu when present",
@@ -99,6 +101,11 @@ KNOWN_GAPS = {
     ("barrnap", "lock"): "barrnap is in env/environment.yml but not env/environment.lock.yml; regenerate the "
                          "lock with env/lock_environment.sh on a machine with conda",
 }
+
+
+def json_load(*parts):
+    import json
+    return json.loads(read(*parts))
 
 
 def environment_packages():
@@ -182,7 +189,7 @@ def main():
     install_doc = read("INSTALL.md")
 
     # 1. no external tool in the code is left undeclared
-    accounted = set(TABLE) | SYSTEM | set(MANUAL)
+    accounted = set(TABLE) | SYSTEM | set(MANUAL) | set(RUNTIME)
     undeclared = sorted(code_tools() - accounted)
     check("every external binary the code calls is accounted for in this table", not undeclared,
           f"-> undeclared: {undeclared}. Decide how each is installed (env/install_tools.sh profile, "
@@ -222,6 +229,16 @@ def main():
           "mash" in checks and checks["mash"] == "utilities")
     check("the false 'samtools is checked elsewhere' comment is gone",
           "minimap2/samtools are unconditionally required elsewhere" not in read("scripts", "00_setup.sh"))
+
+    # 3b. every runtime (Docker) is reachable by the same routes as a tool: profile, registry row, optional check line, docs
+    sh = read("env", "install_tools.sh")
+    registry_py = read("python", "tool_installer_registry.py")
+    for name in sorted(RUNTIME):
+        check(f"{name}: env/install_tools.sh has an install route for the profile", f'"$PROFILE" == "{name}"' in sh and f"python/{name}_setup.py" in sh.replace("$HERE/../", ""))
+        check(f"{name}: the registry lists it (install-tools list / plan) and treats it as an automatic, self-gated profile", f'"profile": "{name}"' in registry_py and f'"{name}"' in registry_py.split("SCRIPT_PROFILES")[1].split(")")[0] and "SELF_GATED" in registry_py)
+        check(f"{name}: plasbench check reports it as optional and never queues it for installation", f"{name}_setup.py" in read("scripts", "00_setup.sh") and f"check_tool {name} " not in read("scripts", "00_setup.sh"))
+        check(f"{name}: the proof table has an entry", name in json_load("config", "install_proof.json")["profiles"])
+        check(f"{name}: INSTALL.md has an 'Installing Docker' section", "Installing Docker" in install_doc and "plasbench install-tools docker" in install_doc)
 
     # 4. the docs say how to install them
     for needle in ("plasbench install-tools utilities", "plasbench install-tools reference-annotation", "amrfinder -u",

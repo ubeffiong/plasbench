@@ -83,6 +83,9 @@ python3 "$HERE/test_install_wiring.py"
 bash "$HERE/test_install_all_optional.sh"
 # Tools install automatically, pinned and isolated, with consent (python/source_install.py): hermetic installs with fake conda/pip and a local upstream repository.
 bash "$HERE/test_source_install.sh"
+# Docker in the tools setup: state detection, per-platform plans, winget / Homebrew argument lists, exit codes 0/20/21/1 with fake programs (no real Docker is installed or started).
+python3 "$HERE/test_docker_setup.py"
+bash "$HERE/test_docker_install.sh"
 python3 "$HERE/test_tool_install_registry.py"
 python3 "$HERE/test_exit20_wrappers.py"
 python3 "$HERE/test_materialize_bmock12_truth.py"
