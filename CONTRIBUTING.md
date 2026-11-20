@@ -8,6 +8,23 @@ a pull request. `.github/CODEOWNERS` requires the maintainer's review on
 every PR regardless of who else approves it, so don't expect a fast merge —
 explain your reasoning in the PR description to make review quick.
 
+### Running one shard of the test suite
+
+CI runs the suite as four parallel shards per Python version. The same split works locally,
+for example to reproduce a failure from the CI job `shard (3.11, 2/4)`:
+
+```bash
+PB_SHARD=2 PB_SHARDS=4 bash test/run_tests.sh      # shard 2 of 4 (builds the demo results first if the shard needs them)
+PB_LIST=1 bash test/run_tests.sh                   # only print the registered tests
+```
+
+With `PB_SHARDS` unset every test runs, in the usual order. Shards are balanced by
+`test/shard_weights.tsv` (test, seconds; read the `PB_TIME <test> <seconds>` lines of a CI log).
+A new test needs a line there (`test/test_shard_selection.py` says so); the sharding itself
+never drops a test that has no weight. Register every test in `test/run_tests.sh` through `pb_run`.
+The CI checks `test (3.9)`, `test (3.11)`, `test (3.13)` and `container` are the names to
+require; `test (3.x)` is an aggregate of that version's shards.
+
 ## Contributing a new isolate to a public cohort
 
 PlasBench's public cohorts (`cohorts/public-v1.tsv`, `cohorts/public-v2.tsv`)
