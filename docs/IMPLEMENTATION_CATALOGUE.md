@@ -9,7 +9,7 @@ a methods file, a changelog and the code. This catalogue is the index to all of 
 explains the method in depth.
 
 **Size at the time of writing:** 210 analysis modules, 28 registered tools and baselines (20 real tools), 219 registered
-outputs, 54 run switches, 446 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+outputs, 54 run switches, 447 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -197,9 +197,8 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
 
 - **Assembly failure diagnosis and resource check** (`assembler_diagnosis.py`, `preflight_resources.py`, stage 3, `ASSEMBLER_AUTO_RETRY`, `CAP_THREADS_TO_CPUS`, `PLASBENCH_SKIP_DISK_CHECK`). When fastp, SPAdes or Unicycler fails, the log is classified (disk full, out of memory,
   memory limit, threads, CPU feature, broken Python, truncated reads, mismatched mates, short or empty reads, read-only or missing files, stale output folder, missing tool, network, or "not recognised" with the last lines) and one block names the cause, the evidence line and the advice;
-  `assembly_status.tsv` gains `cause` and `advice`. A cause that belongs to the computer stops stage 3 at the first isolate (exit 5); out of memory and a stale folder get one retry. Before stages 0, 2 and 3 free disk (including the Windows drive holding the WSL virtual disk),
-  memory, usable CPUs and writable folders are checked against an estimate. Reference annotation is cached by reference checksum and tool versions (`ANNOTATION_CACHE_DIR`).
-  **Tests.** `test_assembler_diagnosis.py` (fixtures written from knowledge of the message formats, not captured logs), `test_preflight_resources.py`, `test_stage3_failure_diagnosis.sh`, `test_annotation_cache.py`, `test_run_status.py`.
+  `assembly_status.tsv` gains `cause` and `advice`. A cause that belongs to the computer stops stage 3 at the first isolate (exit 5); out of memory and a stale folder get one retry. Before stages 0, 2 and 3 free disk, memory, usable CPUs and writable folders are checked against an estimate: only the working set of the first isolates can block a run (exit 6), a whole cohort that will not fit is a warning with a `--max-isolates` suggestion, and a rolling guard (`disk_guard`, `PLASBENCH_DISK_RESERVE_GB`) stops stages 1 and 3 cleanly before an isolate that no longer fits. Under WSL the Windows drive holding Ubuntu's virtual disk is measured for the distribution this process runs in, with the evidence printed (`PLASBENCH_VDISK_MIN_GB`). Reference annotation is cached by reference checksum and tool versions (`ANNOTATION_CACHE_DIR`).
+  **Tests.** `test_assembler_diagnosis.py` (fixtures written from knowledge of the message formats, not captured logs), `test_preflight_resources.py`, `test_disk_guard.sh`, `test_stage3_failure_diagnosis.sh`, `test_annotation_cache.py`, `test_run_status.py`.
 ### 3.10 Candidate multiplicity: when a tool reports several sequences for one plasmid
 
 - **What.** Every predicted record is kept and accounted for. Per true plasmid the report gives the candidate count, the best single candidate's coverage, the **combined

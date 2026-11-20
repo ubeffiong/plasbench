@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import posixpath
 import re
 import shutil
 import subprocess
@@ -247,6 +248,84 @@ def windows_disks(run=_run, which=shutil.which) -> list:
                       "total": _int(r.get("Size")), "free": _int(r.get("FreeSpace")), "provider": r.get("ProviderName", ""), "bus": None,
                       "read_only": {1: True, 2: False, 3: False}.get(_int(r.get("Access"))), "media": _int(r.get("Size")) is not None} for r in rows if r.get("DeviceID")]
     return disks
+
+
+LXSS_PS = r"@(Get-ChildItem HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss | Get-ItemProperty | Select-Object DistributionName,BasePath) | ConvertTo-Json -Compress"
+
+
+def parse_lxss(text) -> list:
+    """The LXSS_PS output (one object, or a list) -> [{'name', 'base'}] for every WSL distribution Windows knows (Ubuntu, docker-desktop, ...)."""
+    d = _json(text)
+    if isinstance(d, dict):
+        d = [d]
+    return [{"name": str(r.get("DistributionName") or "").strip(), "base": str(r.get("BasePath") or "").strip()}
+            for r in d if isinstance(r, dict) and r.get("DistributionName")] if isinstance(d, list) else []
+
+
+def wsl_vdisk(run=_run, which=shutil.which, env=None, disks=None) -> dict:
+    """Where THIS Ubuntu's virtual disk lives and how much room that Windows drive has, with the evidence. It never guesses:
+      distro  the name of the distribution this process runs in (WSL_DISTRO_NAME only; another distribution such as docker-desktop is never substituted);
+      base    that distribution's BasePath in the Windows registry (registry key HKCU Lxss, matched on the exact name), vhdx = base + ext4.vhdx;
+      letter  the drive letter of base; free/total  that drive's FreeSpace and Size in BYTES from Win32_LogicalDisk (windows_disks), or None.
+    Any lookup or parse problem leaves free as None and explains in 'error'. 'command' is what the user can run to check it themselves."""
+    env = os.environ if env is None else env
+    info = {"distro": (env.get("WSL_DISTRO_NAME") or "").strip(), "base": "", "vhdx": "", "letter": "", "free": None, "total": None, "how": "", "error": "",
+            "command": "", "others": []}
+    if not info["distro"]:
+        info["error"] = "WSL_DISTRO_NAME is not set, so this Ubuntu cannot be told apart from other distributions (docker-desktop, ...)"
+        return info
+    exe = which("powershell.exe") or which("powershell")
+    if not exe:
+        info["error"] = "powershell.exe is not reachable from Ubuntu (WSL interop is off?)"
+        return info
+    entries = parse_lxss(run([exe, "-NoProfile", "-NonInteractive", "-Command", LXSS_PS]))
+    if not entries:
+        info["error"] = "the WSL registry list (HKCU Lxss) could not be read"
+        return info
+    mine = [e for e in entries if e["name"].casefold() == info["distro"].casefold()]
+    info["others"] = [e["name"] for e in entries if e not in mine]
+    if len(mine) != 1:
+        info["error"] = f"{'no' if not mine else 'more than one'} registry entry is named '{info['distro']}' (found: {', '.join(e['name'] for e in entries)})"
+        return info
+    base = re.sub(r"^\\\\[?.]\\", "", mine[0]["base"])
+    m = re.match(r"^([A-Za-z]):[\\/]", base)
+    if not m:
+        info["error"] = f"the disk folder '{mine[0]['base']}' is not on a Windows drive letter (a network or unusual location)"
+        info["base"] = mine[0]["base"]
+        return info
+    info["base"] = base
+    info["vhdx"] = base.rstrip("\\/") + "\\ext4.vhdx"
+    info["letter"] = m.group(1).upper()
+    info["command"] = f'powershell.exe -NoProfile -Command "(Get-PSDrive {info["letter"]}).Free/1GB"'
+    if disks is None:
+        disks = windows_disks(run=run, which=which)
+    row = next((d for d in disks or [] if str(d.get("letter", "")).upper()[:1] == info["letter"]), None)
+    free, total = (row or {}).get("free"), (row or {}).get("total")
+    if row is None or not isinstance(free, int) or free < 0 or (isinstance(total, int) and free > total):
+        info["error"] = f"the free space of {info['letter']}: could not be read reliably" + ("" if row is not None else f" (Windows listed no drive {info['letter']}:)")
+        return info
+    info.update(free=free, total=total if isinstance(total, int) else None, how="Win32_LogicalDisk FreeSpace in bytes (or Get-Volume SizeRemaining)")
+    return info
+
+
+def classify_path(path, wsl: bool, mounts_text=None) -> tuple:
+    """Where a folder really lives, as (kind, letter): 'native' (not WSL), 'windows' (a drvfs/9p/virtiofs mount of a Windows drive), 'unmounted' (a plain folder
+    /mnt/<x>/... that is NOT a mount: it lives on Ubuntu's virtual disk) or 'vdisk' (anywhere else under WSL: Ubuntu's own disk)."""
+    if not wsl:
+        return "native", ""
+    if mounts_text is None:
+        mounts_text = _read("/proc/mounts") or ""
+    p = posixpath.normpath(str(path)) if str(path).startswith("/") else str(path)
+    mounts = parse_mounts(mounts_text)
+    holder = _holder(p, [m["mount"] for m in mounts])
+    entry = next((m for m in mounts if m["mount"] == holder), None)
+    mm = re.match(r"^/mnt/([A-Za-z])(?:/|$)", p)
+    if entry and entry["fs"] in WSL_FS and holder != "/":
+        lm = re.match(r"^/mnt/([A-Za-z])$", holder)
+        return "windows", (lm.group(1).upper() if lm else "")
+    if mm:
+        return "unmounted", mm.group(1).upper()
+    return "vdisk", ""
 
 
 def host_info(run=_run, in_wsl=False) -> dict | None:

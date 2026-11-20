@@ -246,7 +246,7 @@ WIZARD = {
                            "setting": "TOOL_TIMEOUT_SECONDS", "when": "Leave empty for no limit, the default: a limit scores a slow tool zero. Set one only to stop a truly stuck run, and make it generous."},
     "allow_all_tools_failed": {"summary": "Stage 4 normally exits with code 4 when every tool run failed (nothing to score). Switched on, the run continues with a warning.",
                                "setting": "ALLOW_ALL_TOOLS_FAILED", "when": "Leave off unless you want the run to go on after every tool failed."},
-    "skip_disk_check": {"default": "off", "summary": "Before stages 0, 2 and 3 PlasBench estimates the disk space the isolates still to do need and stops (exit 6) when the drive has less. Switched on, the disk figures are skipped.",
+    "skip_disk_check": {"default": "off", "summary": "PlasBench estimates the disk space the isolates still to do need. It stops (exit 6) only when the first isolates cannot fit at once; a whole cohort that will not fit is a warning, and a guard before each isolate stops the run cleanly when space runs out. Switched on, the disk figures and the guard are skipped.",
                         "setting": "PLASBENCH_SKIP_DISK_CHECK", "when": "Leave off. Use it only when the estimate is wrong for your data and you know the space is there."},
     "cap_threads_to_cpus": {"default": "on", "summary": "Lower THREADS to the CPUs this process can really use (affinity, container quota, WSL processors=) and print the decision.",
                             "setting": "CAP_THREADS_TO_CPUS", "when": "Leave on. Off keeps exactly the number you set, even above your CPUs."},
@@ -323,7 +323,7 @@ SETTINGS["MULTIQC_TIMEOUT_SECONDS"] = {"summary": "The limit, in seconds, for th
 REPORT_NOTES = {"qc": {"title": _MQ_TITLE, "text": _MQ_TEXT, "setting": "MULTIQC_REPORT"}}
 # Settings shown together in the "Reliability and downloads" group (only those config.sh defines).
 RELIABILITY_KEYS = ["READ_SOURCE", "MAX_RUN_DOWNLOAD_GB", "WARN_RUN_DOWNLOAD_GB", "PREFETCH_FAIL_LIMIT", "NETWORK_RETRIES", "NETWORK_RETRY_DELAY_SECONDS",
-                    "ENA_DOWNLOAD_CONNECTIONS", "PLASBENCH_OFFLINE", "PLASBENCH_ONLINE_TIMEOUT", "PRESERVE_DOWNLOADS", "TOOL_RETRIES", "TOOL_TIMEOUT_SECONDS", "ALLOW_ALL_TOOLS_FAILED", "RUN_CONSOLE_LOG", "LOG_RETENTION_RUNS"]
+                    "ENA_DOWNLOAD_CONNECTIONS", "PLASBENCH_OFFLINE", "PLASBENCH_ONLINE_TIMEOUT", "PRESERVE_DOWNLOADS", "TOOL_RETRIES", "TOOL_TIMEOUT_SECONDS", "ALLOW_ALL_TOOLS_FAILED", "PLASBENCH_DISK_RESERVE_GB", "PLASBENCH_VDISK_MIN_GB", "RUN_CONSOLE_LOG", "LOG_RETENTION_RUNS"]
 
 
 def _default_text(default, kind=None):

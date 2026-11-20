@@ -206,7 +206,15 @@ export MIN_FREE_DISK_GB="${MIN_FREE_DISK_GB:-20}"
 # Before stages 0, 2 and 3 PlasBench checks free disk (study, data and temporary folders, and under WSL the Windows drive holding Ubuntu's virtual disk), memory,
 # usable CPUs and writable folders (python/preflight_resources.py). Too little disk for the isolates still to do stops the stage (exit 6) with the figures.
 # 1 skips the disk figures only (the writable-folder and memory checks still run). Default 0.
+# Only what cannot even START is a block: the first isolates' working set (peak per isolate x MAX_PARALLEL_SAMPLES) must fit. A whole cohort that will not fit is a WARNING with the
+# number of isolates that will, and the run stops cleanly when space runs out (the rolling guard below), keeping every finished isolate.
 export PLASBENCH_SKIP_DISK_CHECK="${PLASBENCH_SKIP_DISK_CHECK:-0}"
+# The rolling guard checks, before each isolate's download (stage 1) and assembly (stage 3), that the drives it writes to have room for that isolate plus this many GB of reserve;
+# if not, the stage stops cleanly with exit 6 (finished isolates are kept; run the same command again after freeing space). 0 keeps no reserve. Default 5.
+export PLASBENCH_DISK_RESERVE_GB="${PLASBENCH_DISK_RESERVE_GB:-5}"
+# Under WSL, Ubuntu's own disk is a file on a Windows drive. When the study, data and temporary folders are on a mounted Windows drive (/mnt/e) only small things go to Ubuntu's
+# disk (conda environments, logs), so only this hard floor (GB free on the Windows drive holding Ubuntu's disk) stops the run; under 10 GB is a warning. Default 2.
+export PLASBENCH_VDISK_MIN_GB="${PLASBENCH_VDISK_MIN_GB:-2}"
 # 1 skips the whole resource check. Default 0.
 export PLASBENCH_SKIP_RESOURCE_CHECK="${PLASBENCH_SKIP_RESOURCE_CHECK:-0}"
 # 1 (default) lowers THREADS to the CPUs this process can really use (CPU count, affinity, container quota, WSL processors=) when you ask for more; 0 keeps your number.
