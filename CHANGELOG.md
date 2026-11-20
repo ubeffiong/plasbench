@@ -13,7 +13,11 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
-<<<<<<< HEAD
+## [0.5.4] - 2026-11-20
+Summary. Nothing in this release changes a score, a ranking or a threshold.
+- **Window.** The folder window now opens under WSL: `powershell.exe` is found by absolute path when PATH does not have it, the dialog script travels as a short unpacker or a file instead of a very long command line, there are fallbacks when Windows PowerShell is restricted, the window is brought to the front, and the page is told when it opened. When it cannot open, the page says why and offers the built-in browser. `plasbench picker-check` and Settings > Test the folder window show each step. In Docker, Browse uses the built-in browser rooted at the mounted folders and *Add another folder* writes the `docker run -v` command; *Run in Docker instead* shows a copyable command only (it does not start anything).
+- **Install and update.** The older-version banner appears only when the loaded code really differs (content hashes of the loaded modules); two installs of PlasBench are named, with the fix command; Details shows the evidence and the banner can be dismissed for a server run. `plasbench ui` replaces an older running window. `plasbench upgrade` verifies the installed copy, repairs it, and exits 4 with the command if it cannot. New `plasbench ui-state`. The PlasBench folder is found from outside it (`~/.plasbench/install.json` and others), and an optional `~/.local/bin/plasbench` launcher is written.
+
 ### Fixed -- Browse did not open the folder window under WSL, and nothing said why (project lead report, 19 November 2026)
 - **Why it failed.** The dialog script was about 11,000 characters and went through `powershell.exe` as a 29,000-character `-EncodedCommand`, within a few percent of the Windows command-line limit (32,767) and
   far above the 8,191 that some launchers stop at; `powershell.exe` was found only on PATH (WSL with `appendWindowsPath=false`, a conda environment or `interop` switched off found nothing and gave a bare "not found");
@@ -37,7 +41,6 @@ history is lost, only the numbering is cleaner. See
   starts nothing (the window listens on 127.0.0.1 only and the image's command is the command line). `scripts/docker_run.sh` takes `PLASBENCH_DATA_DIR`.
 - **Tests.** `test/test_picker_diagnostics.py` (about 180 checks; WSL and Docker with fakes; on Windows the real PowerShell route, the temp-file and stdin routes, and a real folder window found with UI Automation,
   closed with WM_CLOSE and reported as cancelled) and `test/test_picker_ui_browser.py` (opt-in, real browser: unavailable, Docker, and on Windows the real window).
-=======
 ### Fixed -- the "older version than the page" banner no longer cries wolf
 - **Stale means the loaded code really differs.** The window judged itself by the size and mtime of every `plasbench/*.py`; a touched file with the same content, a module it never imported, a cache or a copy made by a sync tool counted. It now records a SHA-256 of each module it has imported and compares content (cached by size and mtime), plus the version in the package it runs from. `ui.html` is no longer part of it; the page carries an api level (`meta plasbench-api-level`), and a server that leaves that placeholder unreplaced is certainly older than the page.
 - **Two installs are told apart from a stale window.** A copy in the plasbench environment (`pip install --no-deps .`) next to a different version in the PlasBench folder is reported as `two_installs` with the install command: Restart window cannot fix it, so it is not offered. `GET /api/server-state` gains `kind`, `running_version/path`, `project_root_version/path`, `changed_modules`, `fix_command`, `server {pid, port, started_at}`, `api_level`.
@@ -50,7 +53,6 @@ history is lost, only the numbering is cleaner. See
 - The PlasBench folder is found from `--project-root`, `PLASBENCH_HOME`, the current folder or a parent, `~/.plasbench/install.json`, the folder the program was imported from, then `~/PlasBench`; the one used is named when it is not the current folder, and a missing folder gives a short error with three fixes instead of the command list.
 - `install.sh` and `plasbench upgrade` write `~/.local/bin/plasbench` (marker comment, never over a foreign file, `PLASBENCH_NO_LAUNCHER=1` to skip) so `plasbench` works outside the conda environment.
 - New `plasbench/roots.py`; tests: `test/test_stale_false_positive.py`.
->>>>>>> origin/main
 
 ## [0.5.3] - 2026-11-19
 Summary. Nothing in this release changes a score, a ranking or a threshold.
