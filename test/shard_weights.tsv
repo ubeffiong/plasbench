@@ -131,6 +131,8 @@ test_input_validation.py	1.7
 test_install_all_optional.sh	7.3
 test_install_latest.sh	0.3
 test_install_outcomes.py	3.0
+test_install_toast.py	3.0
+test_install_toast_browser.py	0.3
 test_install_wiring.py	0.3
 test_intake.py	1.3
 test_intake_ui_browser.py	0.3
