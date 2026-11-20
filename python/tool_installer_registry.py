@@ -72,7 +72,16 @@ EXIT_NOTHING_TO_DO = 10   # internal to `resolve`: a built-in profile; env/insta
 
 # Profiles env/install_tools.sh installs through its own case branch although no registry row names them.
 SCRIPT_PROFILES = ("core", "assembly", "mobsuite", "locked", "metagenomics", "simulate", "quast", "long-read", "utilities",
-                   "reference-annotation", "annotation", "annotation-prokka", "gplas", "all")
+                   "reference-annotation", "annotation", "annotation-prokka", "gplas", "docker", "all")
+# Profiles that check the internet themselves, and only for the route that needs it (Docker: winget or Homebrew; a hand-off or an already-working Docker fetches nothing), so
+# neither the command line's pre-flight nor the window's gating asks for conda / PyPI / GitHub on their behalf.
+SELF_GATED = ("docker",)
+# Runtimes that are not adapters (no capability row) but are part of the tools setup: shown by `install-tools list` and `plan` after the adapters. Docker is a container engine:
+# it runs PlasBench in a container (scripts/docker_run.sh) and is what Nextflow-based tools such as mobilome-map need. python/docker_setup.py installs it where a user-level
+# process may (winget, Homebrew) and hands off the rest (a sudo script you run yourself); it never runs sudo and never accepts the Docker Desktop licence for you.
+RUNTIME_ROWS = [{"tool": "docker", "profile": "docker", "install_mode": "guided_consent", "automated": "guided", "runtime": "container_engine", "database_mode": "none",
+                 "verify_command": "docker info",
+                 "notes": "Optional container engine (run PlasBench in a container; the runtime for mobilome-map's Nextflow route and plsmd's Dockerfile). winget/Homebrew with consent, else exact steps (exit 20)."}]
 ACTIONS = ("list", "plan", "validate")
 INSTALL_POINTER = "INSTALL.md, section 3, 'Tools that cannot be installed automatically (exit code 20)'"
 
@@ -141,7 +150,7 @@ def needs_network(name: str, rows: list[dict[str, str]]) -> bool:
     """Will `install-tools NAME` go online? Only when an installer would run (resolve says 0) and NAME is not an inspection action: a built-in profile (nothing to
     install), a manual one (exit 20: the notice is printed and nothing is fetched) and a near-miss name (exit 2) must not be refused for lack of internet.
     The command-line pre-flight (plasbench/cli.py) and the window's gating (plasbench/netgate.py) both ask this."""
-    return name not in ACTIONS and resolve(name, rows)[0] == 0
+    return name not in ACTIONS and name not in SELF_GATED and resolve(name, rows)[0] == 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -189,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     writer.writerow(("tool", "profile", "install_mode", "automated", "runtime", "database_mode", "verify_command", "notes"))
     for row in rows:
         writer.writerow(tuple(row[column] for column in ("tool", "profile", "install_mode", "automated", "runtime", "database_mode", "verify_command", "notes")))
-    for row in meta_rows:
+    for row in meta_rows + RUNTIME_ROWS:
         writer.writerow(tuple(row[column] for column in ("tool", "profile", "install_mode", "automated", "runtime", "database_mode", "verify_command", "notes")))
     return 0
 

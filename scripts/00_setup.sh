@@ -101,6 +101,11 @@ check_tool minimap2 core
 check_tool unzip "" 1
 check_tool python3 "" 1
 
+# Docker is optional (run PlasBench in a container; the runtime for container-based tools). Its state is reported with the same diagnosis `plasbench install-tools docker` gives; it is never
+# required and never added to the profiles that get installed (installing it starts an installer the operating system asks you to approve, so it only runs when you ask for it).
+docker_line="$(python3 "$HERE/../python/docker_setup.py" check-line 2>/dev/null || true)"
+[[ -n "$docker_line" ]] && log "$docker_line"
+
 if [[ "${RUN_PLASMIDSPADES:-0}" -eq 1 ]]; then
     check_tool plasmidspades.py assembly
 fi

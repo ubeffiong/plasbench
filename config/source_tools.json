@@ -119,7 +119,7 @@
       ]},
       "commands": {"nextflow": {"kind": "env_bin", "path": "nextflow", "unset_env": ["JAVA_CMD"], "set_env": {"JAVA_HOME": "{install}"}}},
       "verify": {"argv": ["nextflow", "-version"], "expect": "version", "why": "Nextflow starts (the pipeline needs >= 24.04.0); the pinned pipeline checkout is verified by git rev-parse"},
-      "inputs": ["A container engine (Docker, Singularity or Apptainer) is needed when the pipeline runs: installing one needs administrator rights, which PlasBench never uses. The pipeline downloads its own container images and Nextflow plugins on its first run."],
+      "inputs": ["A container engine (Docker, Singularity or Apptainer) is needed when the pipeline runs: installing one needs administrator rights, which PlasBench never uses; `plasbench install-tools docker` shows your computer's Docker state and installs Docker Desktop where it can (winget, Homebrew) or prints the exact steps. The pipeline downloads its own container images and Nextflow plugins on its first run."],
       "note": "The benchmark does not run this pipeline; it imports its GFF3 output as non-scoring evidence. Run it with: nextflow run <install>/plasbench-src -profile docker ...",
       "sources": ["https://api.github.com/repos/EBI-Metagenomics/mobilome-annotation-pipeline/tags", "https://api.anaconda.org/package/bioconda/nextflow"],
       "researched": "2026-11-19"
@@ -141,7 +141,7 @@
         "reason": "Upstream distributes only a Dockerfile, not a release. The Dockerfile downloads 'Miniconda3-latest' and unpinned conda packages when it builds, so two builds of the same commit are not the same image; the repository's only tag (v1.0) predates the Dockerfile (labelled v1.2); there is no licence file; and running it needs a Docker daemon, whose installation needs administrator rights that PlasBench never uses.",
         "evidence": ["https://github.com/Genomics-and-Metagenomics-Unit-57357/plsMD/blob/9cbff566cdad115b8dd5801ea53ff75092aaeaf7/Dockerfile", "https://api.github.com/repos/Genomics-and-Metagenomics-Unit-57357/plsMD/tags", "https://github.com/Genomics-and-Metagenomics-Unit-57357/plsMD/blob/9cbff566cdad115b8dd5801ea53ff75092aaeaf7/README.md"],
         "recipe": [
-          "Install Docker yourself (needs administrator rights) and make sure `docker info` works.",
+          "Install Docker (needs administrator rights, which PlasBench never uses; `plasbench install-tools docker` detects your computer, installs Docker Desktop through winget or Homebrew with your consent, or prints the exact steps) and make sure `docker info` works.",
           "git clone https://github.com/Genomics-and-Metagenomics-Unit-57357/plsMD.git && cd plsMD && git checkout 9cbff566cdad115b8dd5801ea53ff75092aaeaf7 && git rev-parse HEAD   (must print that 40-character revision)",
           "docker build -t plsmd .   (add --build-arg DOWNLOAD_DB=true to fetch PLSDB during the build)",
           "Record the image digest in your study notes: docker image inspect --format '{{.Id}}' plsmd",

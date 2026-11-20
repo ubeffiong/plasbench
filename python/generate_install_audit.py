@@ -60,6 +60,7 @@ def build() -> str:
         "| `plasbench run` / `check` with an enabled tool missing | Stage 0 lists every missing tool. At a terminal it asks; with `--yes`, `INSTALL_MISSING_TOOLS=1` or `plasbench run --install-missing-tools` it installs first and checks again in the same process (it no longer asks you to open a new shell); with no terminal and no consent it stops before any sample work, naming every missing tool and the exact command. |",
         "| Stage 4 reached with a tool still missing | One notice names every missing enabled tool; each is recorded as `skipped` with the reason `command unavailable (not installed; run: plasbench install-tools PROFILE --yes)`, never silently dropped. |",
         "| The window | *Install* / *Update* per tool on the Tools page and Workflow cards, *Install all enabled tools* (one consent dialog), a progress strip, and an offer to install missing enabled tools before a run starts. Tools are marked stale after an install so the next probe re-checks. |",
+        "| `plasbench install-tools docker [--yes] [--dry-run] [--hello-world]` | Detects the computer (Windows, WSL2, macOS, Linux, inside a container) and the Docker state (not installed, daemon stopped, permission needed, WSL integration off, ready) and gives the exact next step. Starts an installer only where a user-level process may (winget, Homebrew) and only with `--yes`; Windows or macOS then show their own approval prompt. Otherwise it prints the steps and a script you run yourself. Exit 0 verified working, 20 handed to you (the window shows *Waiting for you to finish in ...* and a *Re-check* button), 21 consent needed, 1 failed. |",
         "| Isolation and safety | Each source-built tool gets its own environment next to the main one; the clone is staged and moved; a failure removes everything it created and restores a previous working install; https only; no sudo; no piped shell installers. |",
         "",
         "## Per tool",
@@ -105,6 +106,11 @@ def build() -> str:
             internet = "none" if row["install_mode"] == "builtin" else "yes (conda, pypi)"
             status = "automated (already)" if row["automated"] == "yes" else "see notes"
         lines.append(f"| {tool} | {profile} | {how} | {pin} | {source} | {size} | {internet} | {minutes} | {verify} | {proof_cell(profile, row['install_mode'])} | {status} |")
+    # Docker is a runtime, not an adapter: it has no capability row, so it is described here (python/docker_setup.py, python/tool_installer_registry.py RUNTIME_ROWS).
+    lines.append("| docker (container engine) | docker | guided, with consent: `winget install -e --id Docker.DockerDesktop` (Windows, WSL2 through the Windows side), `brew install --cask docker-desktop` (macOS); "
+                 "a copyable sudo script from docs.docker.com for Linux and Docker Engine in WSL (never run by PlasBench) | the winget / Homebrew package (not pinned by PlasBench) | https://docs.docker.com/get-started/get-docker/ | "
+                 "about 600 MB (not measured) | yes (winget or brew, docker) | not measured | `docker --version` and `docker info` must succeed | " + proof_cell("docker", "guided") +
+                 " | exit 0 when Docker is verified working, 20 when steps are handed to you (Docker Desktop's licence is accepted by you, sudo is yours), 21 without consent |")
     manual = {n: e for n, e in registry.items() if e["mode"] == "manual"}
     lines += ["", "## Tools that cannot be installed automatically, with the evidence", ""]
     for name, entry in manual.items():

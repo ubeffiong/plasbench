@@ -163,6 +163,13 @@
       "expect": "manual",
       "reason": "upstream ships only a Dockerfile with unpinned builds, no release and no licence file, and running it needs a Docker daemon: must exit 20 with the verified recipe"
     },
+    "docker": {
+      "verify": [
+        "docker --version",
+        "docker info"
+      ],
+      "note": "a container engine, not a conda package: CI cannot meaningfully install Docker Engine on a runner and the ubuntu runners ship with Docker, so the proof is that `plasbench install-tools docker --yes` detects it working (exit 0, installs nothing, runs no sudo) and docker --version / docker info succeed; the winget, Homebrew and sudo-script routes are exercised with fake programs in test/test_docker_setup.py"
+    },
     "ppr-meta": {
       "expect": "manual",
       "reason": "needs the MATLAB Runtime R2018a (click-through licence on mathworks.com) and an end-of-life Python 2.7 / TensorFlow 1.4 stack: must exit 20 with the verified recipe"

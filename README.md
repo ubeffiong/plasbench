@@ -1000,6 +1000,8 @@ requirement. The release image `ghcr.io/ubeffiong/plasbench` carries every tool.
 study folders. **Set up this computer → This computer** shows what this computer is, the way PlasBench should run
 there, what is still missing, and the Docker command when Docker is available.
 
+**No Docker yet?** `plasbench install-tools docker` (or **Install Docker** on the Tools page) detects your computer and Docker's state and installs Docker Desktop where it can: `winget` on Windows and WSL 2 (Windows asks you to approve the installer; you accept Docker's licence yourself) or Homebrew on macOS. On Linux, and for Docker Engine inside WSL, it prints the exact sudo commands for you to run: PlasBench never runs sudo. Exit code 20 means steps were handed to you (the window shows *Waiting for you to finish in ...* and a **Re-check** button). See INSTALL.md, "Installing Docker".
+
 | Page | What you do there |
 |---|---|
 | **Home** | See how ready this computer is, the next setup step, and your latest results. Run the offline demo in one click. |
@@ -2430,7 +2432,7 @@ ones you'll actually reach for most often; every command has more than shown her
 | `ui-state` | Say which PlasBench the window runs and whether the installed program matches your PlasBench folder: running version and folder, every copy of `plasbench` visible to this Python and the conda environments next to it, the PlasBench folder and how it was found, and the running window's own state. Paste it when the window says it is older than the page. | `--json` |
 | `install-conda` | Detect (or install) a conda-family manager. | `--yes`, `--prefix` |
 | `net` | Which online services this computer can reach (NCBI, ENA, GitHub, conda, ...), and what to do when one is not; exit 0 online, 3 otherwise. `PLASBENCH_OFFLINE=1` switches every online-only action off. | `--service`, `--json` |
-| `install-tools` | Install one dependency profile (`core`, `reconstruction`, `long-read`, `all`, ...). | *`profile`* (positional) |
+| `install-tools` | Install one dependency profile (`core`, `reconstruction`, `long-read`, `docker`, `all`, ...). `docker` installs Docker Desktop through winget or Homebrew with `--yes`, else prints the exact steps (exit 20); never sudo. | *`profile`* (positional) |
 | `tools` | Add your own tool: `new NAME` (a commented manifest; `--task a,b` for several tasks, `--source installed\|conda\|pip\|url\|local\|script`, `--url`, `--sha256`, `--local-path`, `--output-format a,b\|auto`), `validate [NAME]` (per task: native, derived or not possible, with the fix; and the source), `list`, `show NAME`, `add PATH`, `install NAME`. `install-tools NAME` also installs a user tool, downloading an `https` source or copying a local folder. | *`--task`*, *`--source`*, *`--url`*, *`--sha256`*, *`--local-path`*, *`--output-format`* |
 | `init-local` | Register one of your own isolates: stages its files and appends a sample-sheet row. | *`--sample`*, *`--reads-1`/`--reads-2`*, `--reference`, `--samples` |
 | `intake` | Your own isolates in bulk: `template` (a sheet to fill in), `scan FOLDER...` (find isolates, change nothing), `stage FOLDER...` (place them, write the sheet), `check [--fix]` (the quick test). For one mixed folder, `scan-isolates` finds the pairs by itself. Guide: [docs/INPUT_GUIDE.md](docs/INPUT_GUIDE.md). | *`template\|scan\|stage\|check`*, `--data-dir`, `--samples`, `--fix` |

@@ -136,6 +136,15 @@ def sample_rows(path):
     return rows
 
 
+def container_engine_record():
+    """What python/docker_setup.py last recorded about Docker ({} when it was never checked): state, client and server version, context, when."""
+    try:
+        import docker_setup
+        return docker_setup.recorded() or {}
+    except Exception:  # noqa: BLE001 - a manifest never fails because of an optional engine
+        return {}
+
+
 def status_rows(results_dir):
     path = Path(results_dir) / "tool_status.tsv"
     if not path.is_file():
@@ -352,6 +361,8 @@ def main():
         # User-added tools (python/user_tools.py): their manifests, and versions the report reads by tool name.
         "user_tools": user_records, "method_versions": user_versions,
         "execution_profiles": status_rows(args.results_dir),
+        # The container engine as last verified by `plasbench install-tools docker` / `plasbench check` (version and context; empty when never checked). Read, never probed here.
+        "container_engine": container_engine_record(),
         "outputs": outputs, "selected_candidates": selected_candidates,
         "warnings": manifest_warnings,
     }
