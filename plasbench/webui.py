@@ -1674,12 +1674,13 @@ def runtime_state(project) -> dict:
         if ds.get("pending"):
             docker = {"pending": True, "state": "pending", "installed": False, "running": False, "version": "", "image": {}, "hint": "Checking Docker..."}
         else:
-            state = {"permission_denied": "permission_needed", "desktop_not_running": "daemon_stopped", "in_container": "inside_docker", "unknown": "daemon_stopped"}.get(ds["state"], ds["state"])
+            state = {"permission_denied": "permission_needed", "desktop_not_running": "daemon_stopped", "in_container": "inside_docker", "unknown": "daemon_stopped",
+                     "installed_windows_not_running": "daemon_stopped", "desktop_running_engine_down": "daemon_stopped", "engine_up_wsl_integration_off": "wsl_integration_off"}.get(ds["state"], ds["state"])
             image = {}
             if state == "ready":
                 found, ready = loadcache.swr(("runtime-image", str(root)), RUNTIME_TTL, lambda: _docker_probe(root), block=False)
                 image = (found or {}).get("image") or {}
-            docker = {"pending": False, "state": state, "chip": ds.get("chip", ""), "installed": state != "not_installed", "running": state == "ready", "version": ds.get("server_version") or ds.get("version", ""),
+            docker = {"pending": False, "state": state, "setup_state": ds["state"], "action": ds.get("action", ""), "chip": ds.get("chip", ""), "installed": state != "not_installed", "running": state == "ready", "version": ds.get("server_version") or ds.get("version", ""),
                       "image": image, "hint": "" if state == "ready" else (ds.get("title") or ds.get("detail") or "Docker is not ready")}
     reason = ""
     if inside:
@@ -1735,7 +1736,9 @@ def _docker_setup_probe(root) -> dict:
     diag = docker_setup.diagnose(st, environment)
     if st["state"] == "ready":
         docker_setup.record(st)
+    ev = st.get("evidence") or {}
     return {"state": st["state"], "chip": diag["chip"], "tone": diag["tone"], "title": diag["title"], "detail": st.get("detail", ""), "steps": diag["steps"], "place": diag["place"],
+            "action": diag["action"], "stages": st.get("stages") or [], "installed_note": plan.get("installed", ""), "desktop_version": ev.get("desktop_version", ""),
             "version": st.get("version", ""), "server_version": st.get("server_version", ""), "context": st.get("context", ""),
             "environment": {k: environment.get(k) for k in ("kind", "distro", "wsl_distro", "package_manager", "interop", "container")} | {"winget": bool(environment.get("winget")), "brew": bool(environment.get("brew"))},
             "plan": {"route": plan["route"], "place": plan["place"], "runs": plan["runs"], "who_elevates": plan["who_elevates"], "licence": plan["licence"], "internet": plan["internet"],

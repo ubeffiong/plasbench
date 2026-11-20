@@ -13,6 +13,16 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed
+
+- `plasbench install-tools docker` no longer reports *Docker state: Not installed* right after winget installed Docker Desktop, and no longer waits 90 seconds for an engine that cannot answer until Docker Desktop is started. New states told apart from the Windows side (also from WSL 2): `installed_windows_not_running`, `desktop_running_engine_down`, `engine_up_wsl_integration_off`; *Not installed* is left for when nothing is found. Right after the install it says *Docker Desktop was installed on Windows (version X). It is not running yet.* and exits 20 at once; it polls the engine (default 90 s, `--wait SECONDS`) only where Docker Desktop is running, with a progress line every 10 s.
+
+### Added
+
+- `plasbench install-tools docker --start` starts Docker Desktop (`powershell.exe -NoProfile -Command Start-Process -FilePath '<Docker Desktop.exe>'`, an argument list) and polls the engine; `--open-integration` opens Docker Desktop's WSL integration settings and checks every 5 s for up to 3 min. PlasBench never accepts the licence, never edits Docker Desktop's settings and never clicks in its window.
+- Read-only Windows-side evidence: `Docker Desktop.exe` / `docker.exe` files, `tasklist.exe`, `winget list`, `docker.exe info` and `settings-store.json` (`IntegratedWslDistros`, licence record). `plasbench runtime check`, `plasbench check` and the window use the same detector.
+- The Tools page Docker card shows the four stages as a checklist (hover for the evidence) and one primary button for the next action (Install Docker, Start Docker Desktop, Open WSL integration settings, I enabled it, Re-check); the Environment card offers the same Start and Open actions.
+
 ### CI
 - **CI: layer cache, sharded tests, cancelled superseded runs.** The container job caches its Docker layers in the GitHub Actions cache (scope `ci-container`, `mode=max`), so the conda layers are rebuilt only when the lock files change. The test suite runs as four parallel shards per Python version (`PB_SHARD=i PB_SHARDS=4 bash test/run_tests.sh`; weights in `test/shard_weights.tsv`, proved to cover every test exactly once by `test/test_shard_selection.py`); shellcheck runs once, and install, demo, compileall, build and twine run in a `checks (3.x)` job. The check names `test (3.9)`, `test (3.11)`, `test (3.13)` and `container` are kept: each `test (3.x)` is an aggregate that passes only if all four shards and the checks job of that version passed. A new push to a pull request cancels that PR's older CI run; runs on main are never cancelled. `release.yml` is unchanged (its image build stays uncached so a release is built from scratch).
 

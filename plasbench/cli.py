@@ -780,6 +780,9 @@ def build_parser():
     install_parser.add_argument("--yes", action="store_true", help="Use non-interactive mode for supported installer profiles; database setup remains explicit in 'plasbench check --yes'.")
     install_parser.add_argument("--dry-run", action="store_true", help="Say what the profile is (automatic, built in, or a manual install) and stop: no conda, no network, nothing installed.")
     install_parser.add_argument("--hello-world", action="store_true", help="docker profile only: after Docker answers, also run `docker run --rm hello-world` (pulls a small image; needs the internet; off by default).")
+    install_parser.add_argument("--start", action="store_true", help="docker profile only: start Docker Desktop when it is installed but not running (Windows, WSL 2, macOS), then poll the engine. It never accepts the licence for you.")
+    install_parser.add_argument("--wait", type=float, default=None, metavar="SECONDS", help="docker profile only: seconds to poll the engine afterwards (default 90 where Docker Desktop is running or was just started, 0 where you have to act first).")
+    install_parser.add_argument("--open-integration", action="store_true", help="docker profile, WSL 2 only: open Docker Desktop's WSL integration settings and check every 5 seconds (up to 3 minutes) for you to switch it on.")
     tools_parser = sub.add_parser(
         "tools", help="Add your own plasmid tool (one or several tasks; from conda, pip, an https URL or a folder on this computer): create, validate, list and install user tool manifests (docs/ADDING_TOOLS.md).")
     tools_sub = tools_parser.add_subparsers(dest="tools_command", required=True)
@@ -1502,6 +1505,12 @@ def main(argv=None):
         extra = {"PLASBENCH_INSTALL_DRY_RUN": "1"} if args.dry_run else {}
         if getattr(args, "hello_world", False):
             extra["PLASBENCH_DOCKER_HELLO"] = "1"
+        if getattr(args, "start", False):
+            extra["PLASBENCH_DOCKER_START"] = "1"
+        if getattr(args, "open_integration", False):
+            extra["PLASBENCH_DOCKER_OPEN_INTEGRATION"] = "1"
+        if getattr(args, "wait", None) is not None:
+            extra["PLASBENCH_DOCKER_WAIT"] = str(args.wait)
         code = run_in_runtime(runtime, command, ["bash"] + command[1:], root, extra or None, args.yes, "plasbench install-tools")
 
     elif args.command == "tools":

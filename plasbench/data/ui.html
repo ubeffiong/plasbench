@@ -379,6 +379,8 @@ dialog.npdlg{width:min(460px,94vw)}
 dialog.dkdlg{width:min(660px,96vw)}dialog.dkdlg .bd label{display:block;font-weight:500;margin:8px 0 3px}dialog.dkdlg .bd input[type=text]{width:100%}
 dialog.dkdlg pre.dkcmd{white-space:pre-wrap;word-break:break-all;background:var(--surface-2);padding:8px;border-radius:6px;font-size:12px;margin:8px 0}
 dialog.dkdlg ul.dknotes{margin:6px 0 0 18px;padding:0}.dkerr{color:var(--bad);margin-top:6px}
+.dkstages{list-style:none;display:flex;gap:6px;flex-wrap:wrap;padding:0;margin:8px 0 0}.dkstages li{padding:2px 9px;border:1px solid var(--line);border-radius:10px;font-size:12px;color:var(--mut)}
+.dkstages li.ok{border-color:var(--ok);color:var(--ok)}.dkstages li.pending{border-color:var(--warn);color:var(--warn);font-weight:600}.dkstages li:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 .fs-list .sz{margin-left:auto;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
 .fs-list button .ico{color:var(--mut)}
 #toasts{position:fixed;right:16px;bottom:calc(var(--cons) + 16px);display:flex;flex-direction:column;gap:6px;z-index:90}
@@ -829,9 +831,10 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
      </div></div>
      <div class="card" id="dkcard"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Docker<span data-tipid="docker_card"></span></h3><span class="sub">optional container engine</span></div><div class="bd">
       <div class="row wrap" style="gap:8px"><span class="tag" id="dk_chip" title="Whether Docker works on this computer right now">Checking Docker</span><span class="small" id="dk_title"></span></div>
+      <ul class="dkstages" id="dk_stages" aria-label="Docker setup stages" hidden></ul>
       <div class="small" id="dk_wait" role="status" hidden style="margin-top:8px;padding:8px 10px;border:1px solid var(--warn);border-radius:6px"></div>
       <ul class="small dksteps" id="dk_steps" style="margin:8px 0 0;padding-left:18px"></ul>
-      <div class="row wrap" style="margin-top:12px;gap:8px"><button class="btn" id="dk_install" data-dk="install" title="Install Docker">Install Docker</button><button class="btn sec" id="dk_recheck" data-dk="recheck" title="Check Docker again">Re-check</button><button class="btn ghost" id="dk_guide" data-dk="guide" title="Open the official Docker guide">Open the Docker guide</button></div>
+      <div class="row wrap" style="margin-top:12px;gap:8px"><button class="btn" id="dk_install" data-dk="install" title="Install Docker">Install Docker</button><button class="btn sec" id="dk_enabled" data-dk="enabled" hidden title="I enabled WSL integration">I enabled it</button><button class="btn sec" id="dk_recheck" data-dk="recheck" title="Check Docker again">Re-check</button><button class="btn ghost" id="dk_guide" data-dk="guide" title="Open the official Docker guide">Open the Docker guide</button></div>
      </div></div>
      <div class="card"><div class="hd"><svg class="ico"><use href="#i-refresh"/></svg><h3>Maintenance</h3></div><div class="bd grid" style="gap:10px">
       <div class="actrow"><button class="action" data-run='["install-conda","--yes"]' data-label="Install conda (Miniforge)"><span class="aico"><svg class="ico"><use href="#i-down"/></svg></span><span><b>Install conda</b></span></button><span data-tipid="m_conda"></span></div>
@@ -2485,7 +2488,7 @@ function renderRuntime(r) {
     <button class="btn sec sm" id="rt_build" data-needs="docker" ${d.state !== "ready" ? "disabled" : ""}>Build the image${rtTip("build_image")}</button>
     <button class="btn sec sm" id="rt_test_btn" ${d.state !== "ready" ? "disabled" : ""}>Test Docker setup${rtTip("test_docker")}</button>
     ${cur === "docker" && d.state === "ready" ? `<button class="btn sm" id="rt_ready" data-needs="conda">Make everything ready${rtTip("make_ready")}</button>` : ""}
-    ${d.state === "not_installed" || d.state === "wsl_integration_off" ? `<button class="btn sec sm" data-run='["install-tools","docker"]' data-label="Install Docker" title="Installs Docker on this computer (asks first)">Install Docker first${rtTip("install_docker")}</button>` : ""}`;
+    ${d.action === "start" ? `<button class="btn sec sm" data-dk="start">Start Docker Desktop${rtTip("start_docker")}</button>` : d.action === "integration" ? `<button class="btn sec sm" data-dk="integration">Open WSL integration settings${rtTip("open_integration")}</button>` : d.state === "not_installed" || d.state === "wsl_integration_off" ? `<button class="btn sec sm" data-run='["install-tools","docker"]' data-label="Install Docker" title="Installs Docker on this computer (asks first)">Install Docker first${rtTip("install_docker")}</button>` : ""}`;
   setIfChanged($("#rt_ft"), ft);
   if (typeof applyNetGating === "function") applyNetGating();
 }
@@ -2569,18 +2572,53 @@ function dockerRender() {
   if (wait) w.innerHTML = `<b>Waiting for you to finish in ${esc(wait.waiting_place || "Docker")}.</b> Nothing failed. When you have done the steps, press Re-check.`;
   const steps = st.pending ? [] : ((st.plan && st.plan.steps && st.plan.steps.length ? st.plan.steps : st.steps) || []);
   applyKeyed($("#dk_steps"), steps.map((t, i) => ({key: "s" + i, sig: t})), it => `<li>${esc(it.sig)}</li>`);
-  $("#dk_install").hidden = st.state === "ready" || !!st.pending;
-  $("#dk_install").textContent = st.plan && st.plan.runs ? "Install Docker" : "Show how to install Docker";
+  const act = dockerAction(st), main = $("#dk_install");        // the one next action is the primary button: Install Docker / Start Docker Desktop / Open WSL integration settings / Re-check
+  main.hidden = st.state === "ready" || !!st.pending || act.id === "recheck";
+  main.textContent = act.label; main.dataset.dk = act.id; main.title = npHelp(act.tip) || act.label;
+  $("#dk_enabled").hidden = st.state === "ready" || !!st.pending || act.id !== "integration";
+  const shown = !st.pending && (st.stages || []).filter(x => x.status !== "na");
+  $("#dk_stages").hidden = !shown || !shown.length;
+  applyKeyed($("#dk_stages"), (shown || []).map(x => ({key: x.id, sig: x.status + "|" + x.evidence, x})), it => `<li class="${esc(it.x.status)}" tabindex="0" title="${esc(it.x.evidence)}" aria-label="${esc(it.x.label + ": " + ({ok: "done", pending: "to do now", blocked: "waiting for an earlier step"}[it.x.status] || it.x.status) + ". " + it.x.evidence)}">${{ok: "&#10003;", pending: "&#9679;", blocked: "&ndash;"}[it.x.status] || ""} ${esc(it.x.label)}</li>`);
   $("#dk_recheck").disabled = !!DK.loading && !!st.pending;
-  for (const [id, k] of [["dk_chip", "docker_state"], ["dk_install", "docker_install"], ["dk_recheck", "docker_recheck"], ["dk_guide", "docker_guide"], ["np_dk_install", "docker_install_first"], ["fs_dkinstall", "docker_install_first"]]) { const t = npHelp(k), el = $("#" + id); if (t && el) el.title = t; }
+  $("#dk_recheck").className = "btn " + (act.id === "recheck" ? "" : "sec");
+  for (const [id, k] of [["dk_chip", "docker_state"], ["dk_install", "docker_install"], ["dk_recheck", "docker_recheck"], ["dk_enabled", "docker_integration_done"], ["dk_stages", "docker_stages"], ["dk_guide", "docker_guide"], ["np_dk_install", "docker_install_first"], ["fs_dkinstall", "docker_install_first"]]) { const t = npHelp(k), el = $("#" + id); if (t && el) el.title = t; }
   if (typeof wfRenderAll === "function" && $$("[data-ctx].wfroot").length) wfRenderAll();
+}
+function dockerAction(st) {        // the single next action of the detected state (python/docker_setup.py next_action)
+  const a = st.action || (st.state === "not_installed" ? "install" : "recheck");
+  if (a === "install") return {id: "install", label: st.plan && st.plan.runs ? "Install Docker" : "Show how to install Docker", tip: "docker_install"};
+  if (a === "start") return {id: "start", label: "Start Docker Desktop", tip: "docker_start"};
+  if (a === "integration") return {id: "integration", label: "Open WSL integration settings", tip: "docker_integration"};
+  return {id: "recheck", label: "Re-check", tip: "docker_recheck"};
+}
+function dockerActionHTML(st) { const a = dockerAction(st); return a.id === "recheck" ? "" : `<button class="btn sec sm" data-dk="${a.id}" title="${esc(npHelp(a.tip) || a.label)}">${esc(a.label)}</button>`; }
+async function dockerStart() {        // consent first (an in-page dialog), then a job: PlasBench starts the program only; the licence and Docker's settings stay yours
+  const mac = DK.state && DK.state.environment && DK.state.environment.kind === "macos";
+  const x = await modalDialog({title: "Start Docker Desktop?", buttons: [{id: "cancel", label: "Cancel"}, {id: "ok", label: "Start Docker Desktop", primary: true}],
+    facts: [["What will run", mac ? "open -a Docker" : "powershell.exe -NoProfile -Command Start-Process -FilePath '<path of Docker Desktop.exe>'"], ["Who elevates", "Nobody: it starts as you"], ["Internet", "Not needed"]],
+    bodyHTML: `<p>PlasBench starts Docker Desktop, then checks the engine every 5 seconds for up to 90 seconds and shows the progress. If Docker Desktop asks you to accept its licence, switch to its window and accept it yourself: PlasBench never accepts it, never changes Docker Desktop's settings and never clicks in its window.</p>`});
+  if (x.id !== "ok") return null;
+  return startJob(["install-tools", "docker", "--start"], "Start Docker Desktop");
+}
+function dockerIntegration() { return startJob(["install-tools", "docker", "--open-integration"], "Open WSL integration settings"); }
+async function dockerEnabled() {      // "I enabled it": look again every 5 s for up to 3 minutes (reads Docker Desktop's settings and tests docker in this distro), stop at ready
+  if (DK.enabling) return;
+  DK.enabling = true; toast("Checking every 5 seconds for up to 3 minutes…", "");
+  try {
+    for (const end = Date.now() + 180000; Date.now() < end;) {
+      const st = await dockerLoad(true);
+      if (st && !st.pending && st.state === "ready") { toast(st.title || "Docker is working", "ok"); return; }
+      await sleep(5000);
+    }
+    toast("WSL integration is still not on. Check the switch for your distro in Docker Desktop, then press Re-check.", "");
+  } finally { DK.enabling = false; }
 }
 function dockerWorkflowHTML() {       // the optional "run in a container" item of the Workflow view: state chip and the same three actions
   const st = DK.state;
   if (!st) return `<div class="inst small" style="margin-top:4px"><span class="tag">Checking Docker</span></div>`;
   const wait = dockerWaitingJob();
   return `<div class="inst small" style="margin-top:4px"><span class="tag ${dkTone(st.tone)}">${esc(st.chip || "")}</span>${wait ? ` <span class="tag warn">Waiting for you in ${esc(wait.waiting_place || "Docker")}</span>` : ""}
-    <span class="mut"> Optional: runs PlasBench in a container and is the container engine for tools such as mobilome-map.</span><div class="row wrap" style="gap:6px;margin-top:4px">${st.state === "ready" || st.pending ? "" : `<button class="btn sec sm" data-dk="install" title="Install Docker">Install Docker</button>`}<button class="btn ghost sm" data-dk="recheck" title="Check Docker again">Re-check</button><button class="btn ghost sm" data-dk="guide" title="Open the official Docker guide">Open the Docker guide</button></div></div>`;
+    <span class="mut"> Optional: runs PlasBench in a container and is the container engine for tools such as mobilome-map.</span><div class="row wrap" style="gap:6px;margin-top:4px">${st.state === "ready" || st.pending ? "" : dockerActionHTML(st)}<button class="btn ghost sm" data-dk="recheck" title="Check Docker again">Re-check</button><button class="btn ghost sm" data-dk="guide" title="Open the official Docker guide">Open the Docker guide</button></div></div>`;
 }
 function dockerGuide() { window.open((DK.state && DK.state.guide_url) || "https://docs.docker.com/get-started/get-docker/", "_blank", "noopener"); }
 async function dockerRecheck() { toast("Checking Docker again…", ""); const st = await dockerLoad(true); if (st && !st.pending) toast(st.title || st.chip, st.state === "ready" ? "ok" : ""); }
@@ -2610,7 +2648,7 @@ async function dockerInstall() {
   else if (x.id === "recheck") dockerRecheck();
   return null;
 }
-document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-dk]"); if (!b) return; const a = b.dataset.dk; if (a === "install") dockerInstall(); else if (a === "recheck") dockerRecheck(); else if (a === "guide") dockerGuide(); });
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-dk]"); if (!b) return; const a = b.dataset.dk; if (a === "install") dockerInstall(); else if (a === "start") dockerStart(); else if (a === "integration") dockerIntegration(); else if (a === "enabled") dockerEnabled(); else if (a === "recheck") dockerRecheck(); else if (a === "guide") dockerGuide(); });
 /* ==DOCKER-UI-END== */
 
 /* ===================================================================================================
