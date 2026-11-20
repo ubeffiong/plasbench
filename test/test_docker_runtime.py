@@ -214,7 +214,7 @@ def main():
     for code in (0, 1, 6, 20, 21):
         fk = Fake(images={dr.published_image()})
         seen = []
-        rc = dr.execute(root, ["bash", "scripts/run_all.sh"], {"DATA_DIR": str(data), "RESULTS_DIR": str(res), "LOG_DIR": str(logs), "TMP_DIR": str(tmpd)}, run=fk.run, streamer=fk.stream,
+        rc = dr.execute(root, ["bash", "scripts/run_all.sh"], {"DATA_DIR": str(tmp / "d"), "RESULTS_DIR": str(tmp / "r"), "LOG_DIR": str(tmp / "l"), "TMP_DIR": str(tmp / "t"), "PLASBENCH_DB_DIR": str(tmp / "db")}, run=fk.run, streamer=fk.stream,
                         exe="docker", environ=dict(env0, PLASBENCH_JOB_ID="J9", PLASBENCH_JOB_DIR=str(tmp / "jobs")), out=lambda t: None, runner=lambda a, e, c=code: (seen.append(a), c)[1])
         check(f"exit code {code} passes through", rc == code and seen and seen[0][3:5] == ["--name", "plasbench-J9"], (rc, seen[:1]))
     (tmp / "jobs").mkdir(exist_ok=True)
