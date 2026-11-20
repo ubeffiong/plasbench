@@ -114,7 +114,7 @@ bash "$HERE/test_stage3_failure_diagnosis.sh"
 bash "$HERE/test_download_gate_and_prefetch.sh"
 bash "$HERE/test_require_internet.sh"
 bash "$HERE/test_run_events_and_heartbeat.sh"
-for t in test_run_isolation_lock.sh test_stage4_outcomes.sh test_adapter_no_output.sh test_stage8_fresh_prediction.sh test_score_failure_reason.sh test_stage4_preflight_and_fasta.sh test_run_lock_race.sh test_run_lock_heartbeat.sh test_tool_timeout_preset.sh; do bash "$HERE/$t"; done
+for t in test_run_isolation_lock.sh test_stage4_outcomes.sh test_adapter_no_output.sh test_stage8_fresh_prediction.sh test_score_failure_reason.sh test_stage4_preflight_and_fasta.sh test_run_lock_race.sh test_run_lock_heartbeat.sh test_tool_timeout_preset.sh test_disk_guard.sh; do bash "$HERE/$t"; done
 sleep 1
 # Count lines that START with a skip notice ("SKIP:", "SKIPPED:", "  skip  "), not every line that contains the word: passing checks such as "PASS: SKIP set: ..." mention it too.
 SKIPPED="$(grep -c -E '^[[:space:]]*(SKIP|SKIPPED|skip)([: ]|$)' "$RUN_LOG" || true)"

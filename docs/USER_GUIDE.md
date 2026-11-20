@@ -761,7 +761,9 @@ All are optional; the defaults are safe. Set them in the environment or in `conf
 | `PLASBENCH_STALL_SECONDS` | `600` | The window shows a running job as `stalled` after this many seconds without output (`0` turns it off). |
 | `PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS` | `21600` (6 h) | Time limit for every helper subprocess in `python/` (`0` or `off` removes it). |
 | `MIN_FREE_DISK_GB` | `20` | A warning (never a stop) before stage 1 when the drive has less free space (`0` turns it off). |
-| `PLASBENCH_SKIP_DISK_CHECK` | `0` | `1` skips the disk figures of the resource check made before stages 0, 2 and 3 (which otherwise stops with exit 6 when the estimated need does not fit). |
+| `PLASBENCH_SKIP_DISK_CHECK` | `0` | `1` skips the disk figures of the resource check made before stages 0, 2 and 3 and the rolling guard before each isolate (the check otherwise stops with exit 6 only when the first isolates cannot fit at once; a whole cohort that will not fit is a warning). |
+| `PLASBENCH_DISK_RESERVE_GB` | `5` | The rolling guard stops stage 1 or 3 cleanly (exit 6) before an isolate when the free space where it writes is below that isolate's estimate plus this many GB. |
+| `PLASBENCH_VDISK_MIN_GB` | `2` | WSL: when the study, data and temporary folders are on a mounted Windows drive, the Windows drive holding Ubuntu's virtual disk stops the run only below this many GB free (under 10 GB warns). |
 | `PLASBENCH_SKIP_RESOURCE_CHECK` | `0` | `1` skips the whole resource check (disk, memory, CPUs, writable folders). |
 | `CAP_THREADS_TO_CPUS` | `1` | `THREADS` above the CPUs this process can use (affinity, container quota, WSL `processors=`) is lowered to them and the decision is printed; `0` keeps your number. |
 | `ASSEMBLER_AUTO_RETRY` | `1` | A SPAdes failure from lack of memory (or a stale output folder) is retried once, with fewer threads and a budget that fits the free memory; `0` never retries. |
@@ -1329,6 +1331,27 @@ Empty sample sheet
 Missing executable
     Activate the plasbench Conda environment, then run plasbench check.
 
+"Resources check stopped my run" (exit code 6) or "I have enough disk space but it says there is not"
+    Read the block top to bottom. The headline says whether the run CANNOT START or only has warnings, and names the cause (disk space, an unwritable folder);
+    memory and CPUs are reported on the same line with the rule that was applied ("memory: 5 GB assembler budget <= 7.0 GB available: ok").
+      Measured:  each folder, the drive it is really on, the free bytes and how they were read. Under WSL it also prints the evidence for Ubuntu's virtual disk:
+                 the distribution (the one you are in, found by its exact name; docker-desktop is never used), the ext4.vhdx file, the Windows volume and its free bytes.
+                 "unknown" means the lookup failed: no number is shown then. To check it yourself, in Windows or from Ubuntu:
+                     powershell.exe -NoProfile -Command "(Get-PSDrive C).Free/1GB"          (use your drive letter)
+      Needed:    the "working set" (what the first isolates need AT ONCE) and the whole run (what every isolate leaves on disk: reads, trimmed reads and the assembler
+                 folder are kept), whether it was measured (reads on disk, the cohort's lock) or sampled (ENA sizes of up to 20 isolates) or only a typical isolate, and
+                 the assumptions. All of it is an estimate and says so.
+      Only the working set can BLOCK a run (the first isolates cannot fit, or the Windows drive under Ubuntu's disk is under 2 GB free). A whole cohort that will not
+      fit is a WARNING: "this run will fill the drive after about N isolates". Add `--max-isolates N` (the message suggests a number), free space or use a bigger
+      drive, or just start: a guard before each isolate's download and assembly stops the run cleanly (exit 6) when the next isolate no longer fits plus a reserve
+      (`PLASBENCH_DISK_RESERVE_GB`, default 5). Finished isolates are kept; free space and run the same `plasbench run ...` command again to continue.
+    Under WSL, where the folders are decides what matters. On a mounted Windows drive (/mnt/e) only small things go to Ubuntu's own disk (conda environments, logs), so only a
+    floor (`PLASBENCH_VDISK_MIN_GB`, default 2) blocks and under 10 GB warns. On Ubuntu's own disk, the Windows drive holding ext4.vhdx is the limit even when `df` shows more.
+    "E: is not mounted: /mnt/e is just a folder on Ubuntu's disk" means /mnt/e is not the E: drive: files would go to Ubuntu's disk. Mount it (PlasBench never runs this):
+        sudo mkdir -p /mnt/e && sudo mount -t drvfs E: /mnt/e
+    `PLASBENCH_SKIP_DISK_CHECK=1` turns the disk figures and the guard off when you know the estimate is wrong for your data. `python3 python/preflight_resources.py vdisk`
+    and `plasbench picker-check` print the Ubuntu-disk evidence on their own.
+
 The run stopped in stage 3: SPAdes failed
     Stage 3 now reads the assembler's log, names the cause and says what to do, in one block:
       "SPAdes failed for <isolate>: <cause> (<the log line>). What to do: ... Log: <path>"
@@ -1374,7 +1397,8 @@ The run stopped in stage 3: SPAdes failed
     Before stages 0, 2 and 3 a resource check (python/preflight_resources.py) looks at free disk
     (study, data and temporary folders; under WSL also the Windows drive holding Ubuntu's disk),
     memory, usable CPUs and writable folders, and prints "Resources check: ok" or the warnings.
-    A shortage stops with exit code 6. Set PLASBENCH_SKIP_DISK_CHECK=1 to try anyway.
+    Only a shortage that stops the FIRST isolates stops the run (exit code 6); a whole cohort that will not fit is a warning, and a guard before each isolate stops the run
+    cleanly when space runs out (see "Resources check stopped my run"). Set PLASBENCH_SKIP_DISK_CHECK=1 to try anyway.
     WSL limits (memory, processors, swap) are set in C:\Users\<you>\.wslconfig and change only
     after `wsl --shutdown`.
 

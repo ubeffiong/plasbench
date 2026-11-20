@@ -493,7 +493,7 @@ preflight_resources() {
     [[ -n "$quiet" ]] && extra+=(--quiet-ok)
     out="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" check --stage "$stage" --results-dir "${RESULTS_DIR:-.}" \
         --data-dir "${DATA_DIR:-.}" --tmp-dir "${TMPDIR:-/tmp}" --sheet "${SAMPLE_SHEET:-/nonexistent}" --threads "${THREADS:-1}" \
-        --memory-gb "${ASSEMBLY_MEMORY_GB:-${MEMORY_GB:-0}}" ${extra[@]+"${extra[@]}"} 2>/dev/null)" || rc=$?
+        --memory-gb "${ASSEMBLY_MEMORY_GB:-${MEMORY_GB:-0}}" --parallel "${MAX_PARALLEL_SAMPLES:-1}" ${extra[@]+"${extra[@]}"} 2>/dev/null)" || rc=$?
     while IFS= read -r line; do
         case "$line" in
             "@threads="*) capped="${line#@threads=}" ;;
@@ -509,6 +509,25 @@ preflight_resources() {
     if [[ "$rc" -eq 3 ]]; then
         run_event resource_check "action=stopped" "stage=$stage"
         exit 6
+    fi
+    return 0
+}
+
+# disk_guard STAGE SAMPLE SRA: the rolling disk check, called before each isolate's download (stage 1) and assembly (stage 3). Returns 6 when the free space where the
+# isolate writes is below what it needs (estimate) plus PLASBENCH_DISK_RESERVE_GB, after printing why and how to resume; the caller stops cleanly (finished isolates are kept,
+# the same command resumes). Returns 0 otherwise, and whenever the information is unavailable. PLASBENCH_SKIP_DISK_CHECK=1 and PLASBENCH_SKIP_RESOURCE_CHECK=1 turn it off.
+disk_guard() {
+    local stage="$1" sample="$2" sra="${3:-}" out rc=0 line
+    [[ "${PLASBENCH_SKIP_RESOURCE_CHECK:-0}" == "1" || "${PLASBENCH_SKIP_DISK_CHECK:-0}" == "1" ]] && return 0
+    have python3 || return 0
+    out="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" guard --stage "$stage" --sample "$sample" --sra "$sra" --results-dir "${RESULTS_DIR:-.}" \
+        --data-dir "${DATA_DIR:-.}" --tmp-dir "${TMPDIR:-/tmp}" --in-flight "${MAX_PARALLEL_SAMPLES:-1}" 2>/dev/null)" || rc=$?
+    if [[ "$rc" -eq 3 ]]; then
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && warn "$line"
+        done <<< "$out"
+        run_event resource_check "action=disk_guard_stop" "stage=$stage" "sample=$sample"
+        return 6
     fi
     return 0
 }
