@@ -49,6 +49,7 @@ def installable_profiles():
     """Every profile name env/install_tools.sh can install by name: the `case` branches, the `all` list and the registry's profiles."""
     text = INSTALL_SH.read_text(encoding="utf-8")
     names = set(re.findall(r"^ ([a-z0-9][a-z0-9_-]*)\)", text, re.M))
+    names |= set(re.findall(r'\[\[ "\$PROFILE" == "([a-z0-9_-]+)" \]\]', text)) - {"all", "locked", "list", "plan", "validate", "core"}   # profiles handled by an `if` before the case (docker)
     names -= {"all", "locked", "list", "plan", "validate"}
     match = re.search(r'ALL_PROFILES="([^"]+)"', text)
     if match:

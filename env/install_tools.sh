@@ -46,6 +46,26 @@ if [[ "$PROFILE" == *,* ]]; then
     exit 0
 fi
 
+# Docker is a container engine, not a conda package: python/docker_setup.py detects the computer (Windows, WSL2, macOS, Linux, inside a container) and the Docker state,
+# then installs only where a user-level process may (winget / Homebrew: the operating system shows its own approval prompt) and prints the exact steps and scripts for the rest
+# (a copyable sudo script is never run for you). It needs --yes before it starts an installer. Exit 0 = Docker verified working, 20 = steps handed to you (information),
+# 21 = consent needed, 1 = failed. PLASBENCH_INSTALL_DRY_RUN=1 prints the plan; PLASBENCH_DOCKER_HELLO=1 also runs `docker run --rm hello-world` (needs the internet).
+if [[ "$PROFILE" == "docker" ]]; then
+    DOCKER_ARGS=(install)
+    [[ "$ASSUME_YES" -eq 1 ]] && DOCKER_ARGS+=(--yes)
+    [[ "${PLASBENCH_INSTALL_DRY_RUN:-0}" == "1" ]] && DOCKER_ARGS+=(--dry-run)
+    [[ "${PLASBENCH_DOCKER_HELLO:-0}" == "1" ]] && DOCKER_ARGS+=(--hello-world)
+    if [[ "$ASSUME_YES" -eq 1 && "${PLASBENCH_INSTALL_DRY_RUN:-0}" != "1" ]]; then
+        # Only the winget / Homebrew routes go online; the services are the ones the plan says (config/network_services.tsv: winget, brew, docker).
+        read -r -a DOCKER_SERVICES <<< "$(python3 "$HERE/../python/docker_setup.py" services 2>/dev/null || true)"
+        [[ "${PLASBENCH_DOCKER_HELLO:-0}" == "1" ]] && DOCKER_SERVICES+=(docker)
+        if [[ ${#DOCKER_SERVICES[@]} -gt 0 ]]; then
+            require_internet --action "Installing Docker" --hint "Docker is installed through winget (Windows) or Homebrew (macOS), which download from the internet. Nothing was changed." "${DOCKER_SERVICES[@]}"
+        fi
+    fi
+    exec python3 "$HERE/../python/docker_setup.py" "${DOCKER_ARGS[@]}"
+fi
+
 # What kind of profile is this? A built-in one has nothing to install (exit 0); a manual one (source checkout, container, workflow) is never
 # installed for the user and is not a failure: it prints the exact steps and exits 20; an unknown name close to a real one is a usage error (exit 2)
 # with the nearest names. PLASBENCH_INSTALL_DRY_RUN=1 stops here, before any solver or network, for tests and for `plasbench install-tools --dry-run`.

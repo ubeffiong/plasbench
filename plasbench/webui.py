@@ -799,6 +799,14 @@ SESSION_COMMANDS = ("run", "demo", "report", "report-pdf")   # the commands that
 RESUMABLE_STATES = ("failed", "interrupted", "cancelled")
 CONSENT_EXIT = 21         # install-tools: a source-built tool waits for --yes (plasbench/exitcodes.py); shown as "Consent needed", not Failed
 MANUAL_STEP_EXIT = 20   # install-tools: the profile is installed by hand (plasbench/exitcodes.py); shown as "Manual step needed", not Failed
+
+
+def is_docker_setup(argv) -> bool:
+    """True for `plasbench install-tools docker ...`: the one install whose exit 20 means "steps handed to you" rather than "this tool cannot be installed automatically"."""
+    argv = list(argv or [])
+    return len(argv) >= 2 and argv[0] == "install-tools" and argv[1] == "docker"
+
+
 KEEP_JOBS = 500                       # finished (`done`) jobs kept; a failed, interrupted or cancelled job is kept until deleted or past the retention
 JOB_RETENTION_DAYS_DEFAULT = 180
 LOCK_STALE_SECONDS = 15
@@ -1112,7 +1120,17 @@ class Jobs:
             # Never end silently: the console's last line says how and why the command stopped.
             from .exitcodes import explain, is_informational
             argv = job.get("argv") or []
-            if is_informational(code):
+            if is_informational(code) and is_docker_setup(argv) and code == MANUAL_STEP_EXIT:
+                # Docker's installer handed steps to the user: "Waiting for you to finish in <place>", with a Re-check button. The place is read from the line the installer printed.
+                try:
+                    tail = _tail_bytes(self._paths(job_id)["log"], 6000).decode("utf-8", "replace")
+                except Exception:  # noqa: BLE001
+                    tail = ""
+                found = re.findall(r"Waiting for you to finish in (.+?) \(exit 20", tail)
+                with self.lock:
+                    job["waiting_place"] = found[-1] if found else "Docker"
+                self._append_log(job_id, f"\n[PlasBench] Waiting for you to finish in {job['waiting_place']} (exit 20): nothing failed. The steps are listed above; press Re-check when you are done.\n")
+            elif is_informational(code):
                 # Not an error, whatever the command was: a manual step (20) or a consent wait (21). The notice above already lists what to do.
                 self._append_log(job_id, f"\n[PlasBench] {'Manual step needed' if code == MANUAL_STEP_EXIT else 'Consent needed'} (exit {code}): nothing failed. {explain(code)}.\n")
             else:
@@ -1138,6 +1156,8 @@ class Jobs:
             return "retrying"
         if state == "done" and job.get("warnings"):
             return "completed_with_warnings"
+        if state == "failed" and job.get("exit") == MANUAL_STEP_EXIT and is_docker_setup(job.get("argv")):
+            return "waiting_for_you"   # Docker's installer handed steps to the user (exit 20): information, shown as "Waiting for you to finish in <place>"
         if state == "failed" and job.get("exit") == MANUAL_STEP_EXIT:
             return "manual_step"   # exit 20 (any command): a manual step, a verified limit; not a failure
         if state == "failed" and job.get("exit") == CONSENT_EXIT:
@@ -1649,8 +1669,18 @@ def runtime_state(project) -> dict:
         docker = {"pending": False, "state": "inside_docker", "installed": False, "running": False, "version": "", "image": {},
                   "hint": "This window runs inside a container: choose where tools run from a window on the computer itself."}
     else:
-        found, ready = loadcache.swr(("runtime-docker", str(root)), RUNTIME_TTL, lambda: _docker_probe(root), block=False)
-        docker = dict(found, pending=False) if ready else {"pending": True, "state": "pending", "installed": False, "running": False, "version": "", "image": {}, "hint": "Checking Docker..."}
+        # The Docker state is the tools setup's own (python/docker_setup.py, one cached background probe: docker_setup_state); only the image facts are added here.
+        ds = docker_setup_state(root)
+        if ds.get("pending"):
+            docker = {"pending": True, "state": "pending", "installed": False, "running": False, "version": "", "image": {}, "hint": "Checking Docker..."}
+        else:
+            state = {"permission_denied": "permission_needed", "desktop_not_running": "daemon_stopped", "in_container": "inside_docker", "unknown": "daemon_stopped"}.get(ds["state"], ds["state"])
+            image = {}
+            if state == "ready":
+                found, ready = loadcache.swr(("runtime-image", str(root)), RUNTIME_TTL, lambda: _docker_probe(root), block=False)
+                image = (found or {}).get("image") or {}
+            docker = {"pending": False, "state": state, "chip": ds.get("chip", ""), "installed": state != "not_installed", "running": state == "ready", "version": ds.get("server_version") or ds.get("version", ""),
+                      "image": image, "hint": "" if state == "ready" else (ds.get("title") or ds.get("detail") or "Docker is not ready")}
     reason = ""
     if inside:
         reason = docker["hint"]
@@ -1676,7 +1706,7 @@ def runtime_use(project, choice: str) -> dict:
         if state["docker_reason"]:
             raise ValueError("Docker cannot be used yet: " + state["docker_reason"])
     project.save_local_env({"PLASBENCH_RUNTIME": choice})
-    loadcache.forget(("runtime-docker", str(project.root)))
+    loadcache.forget(("runtime-image", str(project.root)))
     session_log().event("runtime_use", runtime=choice)
     return runtime_state(project)
 
@@ -1688,10 +1718,40 @@ def runtime_test(project) -> dict:
         return {"error": "a Docker test is already running", "steps": [], "ok": False}
     try:
         rows = dr.check_steps(project.root)
-        loadcache.forget(("runtime-docker", str(project.root)))
+        loadcache.forget(("runtime-image", str(project.root)))
         return {"steps": rows, "ok": all(r["ok"] for r in rows), "text": dr.format_steps(rows)}
     finally:
         _runtime_test_lock.release()
+def _docker_setup_probe(root) -> dict:
+    """One answer for the Docker item of the tools setup: the state chip, the diagnosis and the plan (python/docker_setup.py). Runs `docker --version`, `docker info` and
+    `docker context show` only, in the background thread loadcache starts; nothing is installed or started."""
+    dpy = str(Path(root) / "python")
+    if dpy not in sys.path:
+        sys.path.insert(0, dpy)
+    import docker_setup
+    environment = docker_setup.detect_environment()
+    st = docker_setup.probe(environment)
+    plan = docker_setup.make_plan(environment, st)
+    diag = docker_setup.diagnose(st, environment)
+    if st["state"] == "ready":
+        docker_setup.record(st)
+    return {"state": st["state"], "chip": diag["chip"], "tone": diag["tone"], "title": diag["title"], "detail": st.get("detail", ""), "steps": diag["steps"], "place": diag["place"],
+            "version": st.get("version", ""), "server_version": st.get("server_version", ""), "context": st.get("context", ""),
+            "environment": {k: environment.get(k) for k in ("kind", "distro", "wsl_distro", "package_manager", "interop", "container")} | {"winget": bool(environment.get("winget")), "brew": bool(environment.get("brew"))},
+            "plan": {"route": plan["route"], "place": plan["place"], "runs": plan["runs"], "who_elevates": plan["who_elevates"], "licence": plan["licence"], "internet": plan["internet"],
+                     "size": plan["size"], "summary": plan["summary"], "steps": plan["steps"], "links": [list(x) for x in plan["links"]], "scripts": plan["scripts"]},
+            "guide_url": docker_setup.GUIDE_URL, "licence_url": docker_setup.LICENCE_URL}
+
+
+def docker_setup_state(root, refresh: bool = False) -> dict:
+    """The Docker item's state for the Tools page, the Workflow view and the folder chooser's "Run in Docker instead": a cached background probe (loadcache.swr), never on the
+    page-load path. `refresh` (the Re-check button) drops the cached answer and probes again."""
+    if refresh:
+        loadcache.forget(("docker-setup",))
+    value, ready = loadcache.swr(("docker-setup",), 30.0, lambda: _docker_setup_probe(root), block=False)
+    if not ready:
+        return {"pending": True, "state": "checking", "chip": "Checking Docker", "tone": "mut"}
+    return dict(value, pending=False)
 # ---- end folder window extras ----
 
 
@@ -1983,6 +2043,8 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, dict(caps, exe=None, **native_picker_extras(caps)))
             if route == "runtime":           # where the tools run; the Docker probe is a background loadcache probe, never on the page-load path
                 return self.jsend(200, runtime_state(project))
+            if route == "docker/setup":      # the Docker item of the tools setup: chip, diagnosis, plan; Re-check = ?refresh=1 (a cached background probe, never on the page-load path)
+                return self.jsend(200, docker_setup_state(project.root, q.get("refresh") == "1"))
             if route == "docker/offer":      # "run in Docker instead": the docker probe runs in the background (loadcache.swr), never on the page-load path
                 return self.jsend(200, docker_offer_state(project.root))
             # ---- end native folder window ----

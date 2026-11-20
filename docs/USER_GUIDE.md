@@ -245,6 +245,10 @@ The exact copy-paste command is in the README.
 The window (`plasbench ui`) is for your own computer: it listens on 127.0.0.1 only and opens that computer's folder window. Inside a container it has no desktop, so Browse uses the built-in
 browser at the mounted folders; see "The folder window does not open" above for **Add another folder** and **Run in Docker instead**.
 
+### Installing Docker from the tools setup
+
+Docker is optional. The **Tools** page has a *Docker* card (and the Workflow view an optional *Docker (container engine)* item under *Check and install*) with a live state label (not installed, installed with the daemon stopped, permission needed, WSL integration off, Docker Desktop not running, ready), **Install Docker**, **Re-check** and **Open the Docker guide**. **Install Docker** lists exactly what will run, who approves it and the Docker Desktop licence note before anything starts; on Windows (and WSL 2) it runs `winget install -e --id Docker.DockerDesktop` on the Windows side and Windows asks you to approve the installer, on macOS `brew install --cask docker-desktop`. Where only you can act (sudo, the licence, WSL integration) it shows the steps and a copyable script, and the job ends as *Waiting for you to finish in ...* (exit 20, not an error) until you press **Re-check**. The same thing from a terminal: `plasbench install-tools docker [--yes] [--dry-run]`. The *Run in Docker instead* button of the folder chooser and Settings shows *Install Docker first* when Docker is not ready. `scripts/docker_run.sh` prints the same diagnosis when Docker is missing. Details per platform: INSTALL.md, "Installing Docker".
+
 ### Installing the tools
 
 Tools install with your consent, each in its own isolated environment, from a pinned release or an exact commit: `plasbench install-tools NAME --yes` (a first install of a source-built tool

@@ -64,7 +64,7 @@ bash env/download_mobsuite_db.sh      # its database, into the new environment
 **Docker mode (switchable).** Set up this computer, **Environment**, chooses where the tools run: Conda or Docker (`plasbench runtime use docker`, `plasbench runtime check`). In Docker mode the window stays on your computer and each run, check and install executes in a container of `ghcr.io/ubeffiong/plasbench:v<version>` with your folders mounted at the same paths; if that image cannot be pulled, `plasbench runtime build --yes` builds it from the Dockerfile (internet, several GB, long). Tools and databases you add live in `~/.plasbench/docker/<version>/extras` and the database folder, not in the image.
 
 **Docker and the folder window.** The window (`plasbench ui`) opens this computer's own folder window for Browse, so run it on your computer; Docker runs the pipeline
-(`scripts/docker_run.sh plasbench run ...`, see the README's Container section). Inside a container there is no desktop: Browse uses the built-in browser at the folders you mounted, and
+(`scripts/docker_run.sh plasbench run ...`, see the README's Container section; no Docker yet? `plasbench install-tools docker`, see "Installing Docker"). Inside a container there is no desktop: Browse uses the built-in browser at the folders you mounted, and
 the window shows the `docker run -v` command for mounting another one. If Browse does not open the folder window on your computer, run `plasbench picker-check`.
 
 **Databases are kept once per machine.** Every tool database lives in
@@ -159,7 +159,7 @@ A run that needs a missing enabled tool never silently skips it: `plasbench run`
 After installing it checks again in the same process, so the run carries on without a new shell.
 
 What the runtime does not include is said per tool and reported by `plasbench check` as "runtime installed, input X missing": the PLASMe database (`plasbench check --yes` installs it),
-a Gurobi licence for PlasBin-flow (free for academics; PlasBench cannot obtain it), a container engine for the Mobilome Annotation Pipeline (installing one needs administrator rights),
+a Gurobi licence for PlasBin-flow (free for academics; PlasBench cannot obtain it), a container engine for the Mobilome Annotation Pipeline (installing one needs administrator rights; see "Installing Docker" below and `plasbench install-tools docker`),
 and the databases PlasmidEC downloads itself the first time it runs (about 20 minutes). `docs/TOOL_INSTALL_AUDIT.md` lists, per tool, how it is installed, the pinned revision, the source,
 the size, the time estimate and the verification command.
 
@@ -167,7 +167,7 @@ the size, the time estimate and the verification command.
 
 Two profiles stay manual, each with a verified reason (checked against the upstream on 2026-11-19) and a step-by-step recipe that `plasbench install-tools NAME` prints:
 
-- **plsmd**: upstream ships only a Dockerfile that downloads `Miniconda3-latest` and unpinned packages (two builds of one commit differ), its only tag predates the Dockerfile, it has no licence file, and Docker needs administrator rights.
+- **plsmd**: upstream ships only a Dockerfile that downloads `Miniconda3-latest` and unpinned packages (two builds of one commit differ), its only tag predates the Dockerfile, it has no licence file, and Docker needs administrator rights (`plasbench install-tools docker` helps, see "Installing Docker" below).
 - **ppr-meta**: its executable needs the MATLAB Runtime R2018a, which MathWorks gives out only after a click-through licence, plus Python 2.7, TensorFlow 1.4.1 and Keras 2.0.8 (all end of life).
 
 `plasbench install-tools NAME` for these prints the reason, the evidence URLs and the steps, and exits **20**. That is information, not a failure: no `ERROR`, not red, in the window's console,
@@ -177,6 +177,40 @@ the terminal page, the job state (*Manual step needed*) and the scripts.
 **21** consent is needed (nothing was changed: read the plan, then add `--yes`); **2** an unknown profile name or a wrong option (a name close to a real one lists the nearest names); **1** the
 installation failed (the messages say which step, and nothing is left half installed); **137** killed for memory (the output says how to give WSL more). `plasbench install-tools NAME --dry-run`
 reports what a name is without starting conda or using the network.
+
+### Installing Docker (optional)
+
+Docker is optional. It runs PlasBench in a container (`scripts/docker_run.sh`, the README's Container section) and is the container engine that tools such as mobilome-map (Nextflow) and plsmd (a Dockerfile) need. It appears in `plasbench install-tools list`, in the window's **Tools** page (a *Docker* card with a live state label and **Install Docker**, **Re-check** and **Open the Docker guide**), in the Workflow view under *Check and install*, and as an optional line of `plasbench check`.
+
+```bash
+plasbench install-tools docker --dry-run   # the plan for this computer; nothing is started
+plasbench install-tools docker             # diagnose, and say what to do next (exit 20 when it hands steps to you)
+plasbench install-tools docker --yes       # also start the installer where a user-level process may (Windows, WSL2, macOS)
+plasbench install-tools docker --hello-world   # after Docker answers, also run `docker run --rm hello-world` (needs the internet; off by default)
+```
+
+PlasBench never runs `sudo`, never asks for or stores an administrator password and never pipes a downloaded script to a shell. So it does the real install only where the operating system itself asks you to approve it, and hands you the exact steps everywhere else. It first detects the computer (native Windows, WSL 2, macOS, Linux with its package manager, or inside a container) and the Docker state, and tells you which of these applies:
+
+| State | What it means | Next step |
+| --- | --- | --- |
+| Not installed | no `docker` program | the install route for your computer (below) |
+| Installed, daemon stopped | `Cannot connect to the Docker daemon` | start the service (`sudo systemctl start docker`) or Docker Desktop |
+| Permission needed | `permission denied ... /var/run/docker.sock` | `sudo usermod -aG docker "$USER"`, then log out and in (or `newgrp docker`) |
+| WSL integration off | Docker Desktop is on Windows but this Ubuntu cannot use it | Docker Desktop > Settings > Resources > WSL integration > turn on your distro |
+| Docker Desktop not running | Windows or macOS, engine unreachable | start Docker Desktop and wait until it says it is running |
+| Ready | `docker --version` and `docker info` answer | nothing; the version and context are recorded for `plasbench check` and the run manifest |
+
+**Windows, and WSL 2 (Windows 11 with Ubuntu): Docker Desktop with the WSL 2 backend.** `install-tools docker --yes` (or **Install Docker** in the window, after its consent dialog) runs `winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements` through the Windows side (`winget.exe` is reached from WSL by its absolute path; WSL interop must be on). **Windows asks you to approve the installer** (its own UAC prompt); PlasBench never sees the password. What only you can do afterwards: start Docker Desktop once; accept Docker's subscription terms (<https://www.docker.com/legal/docker-subscription-service-agreement/>; Docker Desktop is free for personal use, education and small businesses, and paid for larger companies, and PlasBench cannot accept it for you); keep *Use the WSL 2 based engine* on; Settings > Resources > WSL integration > turn on your Ubuntu distro; and, if Docker Desktop asks, run `wsl --shutdown` in PowerShell and reopen Ubuntu. The job then shows *Waiting for you to finish in Docker Desktop* (exit 20, information, not an error) and polls `docker info` for a short time; press **Re-check** when you are done. If `winget` is missing, PlasBench prints the official download page (<https://docs.docker.com/desktop/setup/install/windows-install/>) and `wsl --install` instead; it does not download and run an installer by itself.
+
+**Docker Engine inside WSL, without Docker Desktop (advanced).** This needs `sudo`, so PlasBench shows the exact commands from docs.docker.com (the apt repository with its signing key, whose fingerprint the script checks, then `docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin`, `usermod -aG docker $USER`, and `[boot] systemd=true` in `/etc/wsl.conf`) as a script you copy and run in your own Ubuntu window. The window's **Open Terminal with this command prefilled** puts the text in the Terminal tab without running it; that terminal cannot type a sudo password, so run it in a real terminal. Print the same script with `python python/docker_setup.py script apt --wsl`.
+
+**macOS.** With Homebrew, `install-tools docker --yes` runs `brew install --cask docker-desktop` (an older Homebrew that only knows the cask `docker` is handled); the installer asks for your macOS password itself. Without Homebrew, use <https://docs.docker.com/desktop/setup/install/mac-install/>. Then `open -a Docker`, accept the terms, wait for it to run, and press Re-check.
+
+**Linux.** PlasBench prints a script for your package manager family (apt: Ubuntu, Debian; dnf: Fedora, RHEL family; pacman: Arch; zypper: openSUSE), using Docker's own repository (<https://docs.docker.com/engine/install/>) with the signing-key check, or the distribution's own `docker.io` / `moby-engine` package as the simpler alternative. You run it with your own sudo, then `sudo systemctl enable --now docker`, join the `docker` group, and log out and in (or `newgrp docker`). Rootless Docker, which needs no root daemon, is an alternative: <https://docs.docker.com/engine/security/rootless/>. The `get.docker.com` convenience script is a download-and-run-as-root installer and is deliberately not used.
+
+**Inside a container.** Docker-in-Docker is out of scope: install Docker on the computer that hosts the container and run PlasBench there.
+
+Exit codes of `plasbench install-tools docker`: **0** Docker is verified working, **20** steps were handed to you (nothing failed), **21** consent needed (add `--yes`; nothing was changed), **1** a real failure (for example the Windows approval prompt was declined: *"The Windows approval prompt (UAC) was declined or closed, so nothing was installed"*). Needs the internet only for the winget and Homebrew routes (and `--hello-world`). `scripts/docker_run.sh` checks the same state first and prints the same diagnosis when Docker is missing or not ready.
 
 ### Platon database (required if `RUN_PLATON=1`)
 ```bash

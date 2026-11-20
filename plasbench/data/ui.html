@@ -427,7 +427,7 @@ dialog.dkdlg ul.dknotes{margin:6px 0 0 18px;padding:0}.dkerr{color:var(--bad);ma
 @media (max-width:640px){#chead{overflow-x:auto;scrollbar-width:thin}#chead .grow{flex:0 0 4px}}
 #cstate{font-size:11.5px;padding:0 6px;line-height:18px;border-radius:2px;border:1px solid var(--term-line);color:#aab3bd}
 #cstate:empty{display:none}
-#cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled,#cstate.stalled,#cstate.retrying,#cstate.completed_with_warnings,#cstate.manual_step,#cstate.consent_needed{color:#e3c27a;border-color:#6b5520}
+#cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled,#cstate.stalled,#cstate.retrying,#cstate.completed_with_warnings,#cstate.manual_step,#cstate.consent_needed,#cstate.waiting_for_you{color:#e3c27a;border-color:#6b5520}
 #clog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
 /* console colour code, all three tabs: errors red, warnings yellow */
 .c-err,#clog .c-err,#tlog .t-err,#slog .s-bad{color:#ff6b6b;font-weight:600}
@@ -517,7 +517,7 @@ body.gd-open #gdrawer{transform:none}
 .tree li.study>.tn{font-weight:600;padding-top:5px;padding-bottom:5px;border-top:1px solid var(--line-2)}
 .tree li:not(.open)>ul{display:none}
 .sdot{width:8px;height:8px;border-radius:50%;flex:none;margin-top:5px;background:var(--faint)}
-.sdot.running,.sdot.cancelling{background:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}.sdot.done{background:var(--ok)}.sdot.failed,.sdot.interrupted{background:var(--bad)}.sdot.cancelled,.sdot.stalled,.sdot.retrying,.sdot.completed_with_warnings,.sdot.manual_step,.sdot.consent_needed{background:var(--warn)}
+.sdot.running,.sdot.cancelling{background:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}.sdot.done{background:var(--ok)}.sdot.failed,.sdot.interrupted{background:var(--bad)}.sdot.cancelled,.sdot.stalled,.sdot.retrying,.sdot.completed_with_warnings,.sdot.manual_step,.sdot.consent_needed,.sdot.waiting_for_you{background:var(--warn)}
 /* git history colour code: you are here / pushed / not yet pushed / merge */
 .hdot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block;background:var(--faint)}
 .hdot.head{background:var(--primary);box-shadow:0 0 0 2px var(--primary-soft)}.hdot.pushed{background:var(--ok)}.hdot.local{background:var(--warn)}
@@ -813,6 +813,13 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
        <button class="btn sec sm" data-run='["install-tools","list"]' data-label="List install profiles">List profiles</button>
        <button class="btn sec sm" data-run='["install-tools","validate"]' data-label="Validate the install registry">Validate registry</button></div>
      </div></div>
+     <div class="card" id="dkcard"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Docker</h3><span class="sub">optional container engine</span></div><div class="bd">
+      <div class="row wrap" style="gap:8px"><span class="tag" id="dk_chip" title="Whether Docker works on this computer right now">Checking Docker</span><span class="small" id="dk_title"></span></div>
+      <p class="mut small" style="margin:8px 0 0">Docker is optional. It runs PlasBench in a container (<code>scripts/docker_run.sh</code>) and is the runtime tools such as mobilome-map and plsmd need when they run in a container. PlasBench never runs sudo and never accepts the Docker Desktop licence for you.</p>
+      <div class="small" id="dk_wait" role="status" hidden style="margin-top:8px;padding:8px 10px;border:1px solid var(--warn);border-radius:6px"></div>
+      <ul class="small dksteps" id="dk_steps" style="margin:8px 0 0;padding-left:18px"></ul>
+      <div class="row wrap" style="margin-top:12px;gap:8px"><button class="btn" id="dk_install" data-dk="install" title="Install Docker">Install Docker</button><button class="btn sec" id="dk_recheck" data-dk="recheck" title="Check Docker again">Re-check</button><button class="btn ghost" id="dk_guide" data-dk="guide" title="Open the official Docker guide">Open the Docker guide</button></div>
+     </div></div>
      <div class="card"><div class="hd"><svg class="ico"><use href="#i-refresh"/></svg><h3>Maintenance</h3></div><div class="bd grid" style="gap:10px">
       <button class="action" data-run='["install-conda","--yes"]' data-label="Install conda (Miniforge)"><span class="aico"><svg class="ico"><use href="#i-down"/></svg></span><span><b>Install conda</b><span>Only if no conda, mamba or micromamba is present.</span></span></button>
       <button class="action" id="updcheck" data-needs="github" title="Asks GitHub whether a newer release exists"><span class="aico"><svg class="ico"><use href="#i-search"/></svg></span><span><b>Check for updates</b><span>Asks GitHub whether a newer release exists. Nothing is installed.</span></span></button>
@@ -875,7 +882,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
    <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Settings</h1>
     <p>Every setting PlasBench reads (from <code>config/config.sh</code>), its default, and your value for this computer. Changes are saved to <code id="set_where">config/local.env</code>, which upgrades keep; clear a value to return to the default.</p></div>
     <div class="row"><button class="btn sec" id="set_reset" disabled>Discard changes</button><button class="btn" id="set_save" disabled><svg class="ico sm"><use href="#i-save"/></svg>Save <span id="set_n"></span></button></div></div>
-   <div class="card" id="np_card"><div class="hd"><h3>Folder window</h3><span class="sub">what Browse opens</span></div><div class="bd"><p class="small mut" style="margin:0">Browse opens this computer's own folder window. If it does not, test it here: PlasBench opens a window, closes it again after two seconds and says which step fails.</p></div><div class="ft"><button class="btn sec" id="np_test" title="Open a test folder window that closes itself, and show a step-by-step report you can copy">Test the folder window</button><button class="btn sec" id="np_dk_switch" hidden title="Get the command that runs PlasBench in Docker">Run in Docker instead</button><button class="btn sec" id="np_dk_add" hidden title="This window runs in Docker: get the command that mounts another folder">Add another folder</button></div></div>
+   <div class="card" id="np_card"><div class="hd"><h3>Folder window</h3><span class="sub">what Browse opens</span></div><div class="bd"><p class="small mut" style="margin:0">Browse opens this computer's own folder window. If it does not, test it here: PlasBench opens a window, closes it again after two seconds and says which step fails.</p></div><div class="ft"><button class="btn sec" id="np_test" title="Open a test folder window that closes itself, and show a step-by-step report you can copy">Test the folder window</button><button class="btn sec" id="np_dk_switch" hidden title="Get the command that runs PlasBench in Docker">Run in Docker instead</button><button class="btn sec" id="np_dk_install" hidden title="Docker is not ready: see its state and install it">Install Docker first</button><button class="btn sec" id="np_dk_add" hidden title="This window runs in Docker: get the command that mounts another folder">Add another folder</button></div></div>
    <div class="card"><div class="toolbar"><input type="search" id="setq" placeholder="Search settings…" aria-label="Search settings"><label class="row small" style="gap:6px"><input type="checkbox" id="set_only"> Only my changes</label><span class="mut small grow" id="set_count" style="text-align:right"></span></div>
     <div id="setlist"></div></div>
   </section>
@@ -1122,7 +1129,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
  <div class="bd fsbody"><nav class="fsside" aria-label="Places" id="fs_side"></nav>
   <div class="fsmain"><nav class="crumbbar" id="fs_crumbs" aria-label="Folder path"></nav>
    <div class="row fsbar"><button class="btn sec sm" id="fs_back" title="Back (Alt+Left)" aria-label="Back" disabled>Back</button><button class="btn sec sm" id="fs_fwd" title="Forward (Alt+Right)" aria-label="Forward" disabled>Forward</button><button class="btn sec sm" id="fs_up" title="Up one folder (Backspace)">Up</button><input type="text" id="fs_path" aria-label="Path (a Windows path such as C:\Users\me\data also works)" title="Type or paste a path and press Enter: a Linux path, ~, a Windows path, a path copied in Explorer (Copy as path, the address bar) or a file:/// link."><button class="btn sec sm" id="fs_go" title="Show this folder">Go</button><button class="btn sec sm" id="fs_refresh" title="Look again (finds a drive you just plugged in)">Refresh</button><button class="btn sec sm" id="fs_new" title="Create a new folder inside the folder shown">New folder</button></div>
-   <div class="row fsbar"><input type="search" id="fs_filter" placeholder="Filter this folder (press /)" aria-label="Filter this folder"><select id="fs_sort" aria-label="Sort by"><option value="name">Sort: name</option><option value="size">Sort: size</option><option value="mtime">Sort: modified</option></select><label class="small"><input type="checkbox" id="fs_hidden"> Hidden files</label><button class="btn sec sm" id="fs_open" title="Show this folder in Explorer, the file manager of this computer">Open in Explorer</button><button class="btn sm" id="fs_native" title="Choose with the computer's own folder window" hidden>Use the Explorer window</button><button class="btn sec sm" id="fs_docker" title="Get the command that runs PlasBench in Docker with these folders" hidden>Run in Docker instead</button></div>
+   <div class="row fsbar"><input type="search" id="fs_filter" placeholder="Filter this folder (press /)" aria-label="Filter this folder"><select id="fs_sort" aria-label="Sort by"><option value="name">Sort: name</option><option value="size">Sort: size</option><option value="mtime">Sort: modified</option></select><label class="small"><input type="checkbox" id="fs_hidden"> Hidden files</label><button class="btn sec sm" id="fs_open" title="Show this folder in Explorer, the file manager of this computer">Open in Explorer</button><button class="btn sm" id="fs_native" title="Choose with the computer's own folder window" hidden>Use the Explorer window</button><button class="btn sec sm" id="fs_docker" title="Get the command that runs PlasBench in Docker with these folders" hidden>Run in Docker instead</button><button class="btn sec sm" id="fs_dkinstall" title="Docker is not ready: see its state and install it" hidden>Install Docker first</button></div>
    <div class="small mut" id="fs_note" aria-live="polite"></div>
    <div class="small mut" id="fs_win" aria-live="polite"></div>
    <div class="row small" id="fs_why_row" hidden style="gap:6px"><button class="btn ghost sm" id="fs_why" title="Why Browse is not using the computer's own folder window">Why?</button><button class="btn ghost sm" id="fs_diag" title="Copy what PlasBench found out, to paste into a bug report">Copy diagnostics</button><button class="btn sec sm" id="fs_adddk" hidden title="Folders outside the container's mounts are not visible: get the docker command that mounts another folder">Add another folder</button></div>
@@ -1903,7 +1910,7 @@ document.addEventListener("click", e => {
   if (b.dataset.stAct === "activity") checkActivity(S.consJob);
   else $("#ccancel").click();
 });
-const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted", stalled:"No new output (may still be working)", working_quiet:"Working (quiet log)", retrying:"Retrying a failed tool", completed_with_warnings:"Completed with warnings", manual_step:"Manual step needed", consent_needed:"Consent needed"})[s] || s;
+const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted", stalled:"No new output (may still be working)", working_quiet:"Working (quiet log)", retrying:"Retrying a failed tool", completed_with_warnings:"Completed with warnings", manual_step:"Manual step needed", consent_needed:"Consent needed", waiting_for_you:"Waiting for you to finish"})[s] || s;
 function showConsole(id, expand) {
   if (id && id !== S.consJob) { S.consJob = id; S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; }
   $("#cjob").value = S.consJob || "";
@@ -1958,6 +1965,7 @@ async function pollConsole(force) {
     if (wasRunning && j.state !== "running") {
       if (shown === "completed_with_warnings") toast(`${j.label}: finished, but some tool runs failed. ${WARN_EXPLAIN}`, "bad");
       else if (shown === "consent_needed") toast(`${j.label}: consent needed. Nothing was changed; confirm the install to go ahead.`, "");
+      else if (shown === "waiting_for_you") toast(`${j.label}: waiting for you to finish in ${j.waiting_place || "Docker"}. Nothing failed; the console lists the steps. Press Re-check afterwards.`, "");
       else if (shown === "manual_step") toast(`${j.label}: manual step needed. Nothing failed; the console lists the steps.`, "");
       else toast(`${j.label}: ${stateWord(shown).toLowerCase()}`, j.state === "done" ? "ok" : "bad");
       refreshJobs(); afterJob(j);
@@ -1967,6 +1975,7 @@ async function pollConsole(force) {
 function afterJob(j) {
   const n = j.argv[0];
   if (j.kind === "git") refreshGit();   // fetch, pull, push: the drawer and the page show the new state
+  if (n === "install-tools" && j.argv[1] === "docker") dockerLoad(true);      // the engine may be working now: look again (Re-check does the same by hand)
   if (["check","install-tools","install-conda","tools"].includes(n)) { S.env = null; S.tools = null; S.toolsStale = true; S.user = null; if (!$("#v_setup").hidden) loadSetup(true); }
   if (["run","demo","report","report-pdf"].includes(n)) { S.runs = null; if (!$("#v_runs").hidden) loadRuns(); if (!$("#v_home").hidden) loadHome(); }
 }
@@ -2244,6 +2253,7 @@ async function loadSetup(force) {
   loadPlatform(force);
   loadComputer();
   loadRuntime();
+  dockerLoad(!!force);
   try {
     const env = await getEnv(force);
     renderEnv(env);
@@ -2296,7 +2306,7 @@ $("#updcheck").onclick = async () => {
     }
   } catch (e) { box.innerHTML = `<div class="note warn">${icon("alert", "ico")}<div>${esc(e.message)}</div></div>`; }
 };
-$("#profgo").onclick = () => { const p = $("#profile").value; confirmRun(["install-tools", p, "--yes"], `Install the ${p} profile`); };
+$("#profgo").onclick = () => { const p = $("#profile").value; if (p === "docker") return dockerInstall(); confirmRun(["install-tools", p, "--yes"], `Install the ${p} profile`); };
 $("#ncbi_show").onclick = () => { const k = $("#ncbi_key"); k.type = k.type === "password" ? "text" : "password"; $("#ncbi_show").textContent = k.type === "password" ? "Show" : "Hide"; };
 $("#ncbi_save").onclick = async () => {
   const changes = {NCBI_EMAIL: $("#ncbi_email").value.trim() || null};
@@ -2388,6 +2398,7 @@ function instButtons(t) {
   return "";
 }
 function instWorkflow(it) {
+  if (it.item_id === "docker") return dockerWorkflowHTML();
   const t = (S.tools || []).find(x => x.tool === it.item_id);
   if (!t || !t.profile) return "";
   const k = instKind(t);
@@ -2529,6 +2540,84 @@ document.addEventListener("click", async e => {
 });
 /* ==RUNTIME-UI-END== */
 
+/* ==DOCKER-UI-BEGIN== Docker in the tools setup (python/docker_setup.py): a live state chip from a cached background probe (api docker/setup, never on the page-load path),
+   Install Docker (a consent dialog listing exactly what runs, who elevates and the licence note), Re-check, the Docker guide. Where PlasBench may not act (sudo, the Docker
+   Desktop licence) the dialog shows the exact steps and a copyable script; the Terminal can be opened with it prefilled but never runs it. */
+const DK = {state: null, loading: null};
+async function dockerLoad(refresh) {
+  if (DK.loading && !refresh) return DK.loading;
+  DK.loading = (async () => {
+    try {
+      for (let i = 0; i < 14; i++) {
+        const r = await api("docker/setup" + (refresh && i === 0 ? "?refresh=1" : ""));
+        DK.state = r; dockerRender();
+        if (!r.pending) break;
+        await sleep(1500);
+      }
+    } catch (e) { DK.state = {state: "unknown", chip: "Could not check", tone: "warn", title: e.message, steps: [], plan: null, pending: false}; dockerRender(); }
+    finally { DK.loading = null; }
+    return DK.state;
+  })();
+  return DK.loading;
+}
+function dockerWaitingJob() {      // the latest Docker install job that handed steps to the user (exit 20), while Docker still is not ready
+  const mine = (S.jobs || []).filter(j => j.argv && j.argv[0] === "install-tools" && j.argv[1] === "docker").sort((a, b) => (b.started || 0) - (a.started || 0))[0];
+  return mine && mine.display_state === "waiting_for_you" && !(DK.state && DK.state.state === "ready") ? mine : null;
+}
+const dkTone = t => ({ok: "ok", bad: "bad", warn: "warn"})[t] || "";
+function dockerRender() {
+  const st = DK.state; if (!st) return;
+  const chip = $("#dk_chip"); if (!chip) return;
+  const wait = dockerWaitingJob();
+  chip.className = "tag " + dkTone(st.tone); chip.textContent = st.chip || "";
+  $("#dk_title").textContent = st.pending ? "Looking at Docker in the background…" : (st.title || "");
+  const w = $("#dk_wait"); w.hidden = !wait;
+  if (wait) w.innerHTML = `<b>Waiting for you to finish in ${esc(wait.waiting_place || "Docker")}.</b> Nothing failed. When you have done the steps, press Re-check.`;
+  const steps = st.pending ? [] : ((st.plan && st.plan.steps && st.plan.steps.length ? st.plan.steps : st.steps) || []);
+  applyKeyed($("#dk_steps"), steps.map((t, i) => ({key: "s" + i, sig: t})), it => `<li>${esc(it.sig)}</li>`);
+  $("#dk_install").hidden = st.state === "ready" || !!st.pending;
+  $("#dk_install").textContent = st.plan && st.plan.runs ? "Install Docker" : "Show how to install Docker";
+  $("#dk_recheck").disabled = !!DK.loading && !!st.pending;
+  for (const [id, k] of [["dk_chip", "docker_state"], ["dk_install", "docker_install"], ["dk_recheck", "docker_recheck"], ["dk_guide", "docker_guide"], ["np_dk_install", "docker_install_first"], ["fs_dkinstall", "docker_install_first"]]) { const t = npHelp(k), el = $("#" + id); if (t && el) el.title = t; }
+  if (typeof wfRenderAll === "function" && $$("[data-ctx].wfroot").length) wfRenderAll();
+}
+function dockerWorkflowHTML() {       // the optional "run in a container" item of the Workflow view: state chip and the same three actions
+  const st = DK.state;
+  if (!st) return `<div class="inst small" style="margin-top:4px"><span class="tag">Checking Docker</span></div>`;
+  const wait = dockerWaitingJob();
+  return `<div class="inst small" style="margin-top:4px"><span class="tag ${dkTone(st.tone)}">${esc(st.chip || "")}</span>${wait ? ` <span class="tag warn">Waiting for you in ${esc(wait.waiting_place || "Docker")}</span>` : ""}
+    <span class="mut"> Optional: runs PlasBench in a container and is the container engine for tools such as mobilome-map.</span><div class="row wrap" style="gap:6px;margin-top:4px">${st.state === "ready" || st.pending ? "" : `<button class="btn sec sm" data-dk="install" title="Install Docker">Install Docker</button>`}<button class="btn ghost sm" data-dk="recheck" title="Check Docker again">Re-check</button><button class="btn ghost sm" data-dk="guide" title="Open the official Docker guide">Open the Docker guide</button></div></div>`;
+}
+function dockerGuide() { window.open((DK.state && DK.state.guide_url) || "https://docs.docker.com/get-started/get-docker/", "_blank", "noopener"); }
+async function dockerRecheck() { toast("Checking Docker again…", ""); const st = await dockerLoad(true); if (st && !st.pending) toast(st.title || st.chip, st.state === "ready" ? "ok" : ""); }
+function dockerTerminal(script) {       // opens the Terminal tab with the text in the input box; it is NOT run (press Enter yourself). The window's terminal has no keyboard input for sudo.
+  setCTab("term"); const el = $("#tcmd"); el.value = script; if (typeof tFit === "function") tFit(); el.focus();
+}
+async function dockerInstall() {
+  let st = DK.state && !DK.state.pending ? DK.state : await dockerLoad(false);
+  if (!st || st.pending) return toast("PlasBench is still looking at Docker; try again in a moment.", "");
+  if (st.state === "ready") return toast(`${st.title} Nothing to install.`, "ok");
+  const p = st.plan || {}, links = (p.links || []).map(l => `<li><a href="${esc(l[1])}" target="_blank" rel="noopener">${esc(l[0])}</a></li>`).join("");
+  const licence = p.licence ? `<p class="small"><b>Licence.</b> ${esc(p.licence.replace(/ https?:\/\/\S+$/, ""))} <a href="${esc(st.licence_url)}" target="_blank" rel="noopener">Docker subscription terms</a>. PlasBench cannot accept them for you.</p>` : "";
+  if (p.runs) {         // winget / Homebrew: consent to start the installer; the operating system asks for its own approval
+    const x = await modalDialog({title: "Install Docker?", wide: true, buttons: [{id: "cancel", label: "Cancel"}, {id: "ok", label: "Install Docker", primary: true}],
+      facts: [["What will run", p.runs.join(" ")], ["Who elevates", p.who_elevates], ["Internet", (p.internet || []).length ? "Needed (" + p.internet.join(", ") + ")" : "Not needed"], ["Size", p.size || "not measured"], ["Time", "not measured"]],
+      bodyHTML: `<p>${esc(p.summary)}</p>${licence}<p class="small mut">After the installer finishes, Docker Desktop must be started once and its licence accepted by you; PlasBench then waits and shows what is left. Nothing is run with sudo or administrator rights by PlasBench.</p>`});
+    if (x.id !== "ok") return null;
+    return startJob(["install-tools", "docker", "--yes"], "Install Docker");
+  }
+  const script = Object.values(p.scripts || {})[0] || "", tabs = Object.keys(p.scripts || {});
+  const buttons = [{id: "close", label: "Close"}, {id: "guide", label: "Open the Docker guide"}].concat(script ? [{id: "terminal", label: "Open Terminal with this command prefilled"}] : []).concat([{id: "recheck", label: "Re-check", primary: true}]);
+  const x = await modalDialog({title: st.state === "not_installed" ? "Install Docker: what you need to do" : "Docker: what to do next", wide: true, cancelId: "close", buttons, copy: script || undefined, detail: script || undefined,
+    bodyHTML: `<p><b>${esc(st.title)}</b></p>${p.summary && p.summary !== st.title ? `<p>${esc(p.summary)}</p>` : ""}<p class="small">${esc(p.who_elevates || "PlasBench cannot do these steps for you: they need your own approval.")}</p>
+      <ol class="small">${(p.steps && p.steps.length ? p.steps : st.steps || []).map(t => `<li>${esc(t)}</li>`).join("")}</ol>${licence}${script ? `<p class="small">${tabs.length > 1 ? "The first script is Docker's own repository; " : ""}Copy the script and run it in your own terminal (for Ubuntu on Windows, the Ubuntu window): sudo asks for your password there. <b>PlasBench never runs it.</b> The window's Terminal tab cannot type a sudo password, so use it only to look at the text.</p>` : ""}<ul class="small">${links}</ul>`});
+  if (x.id === "guide") dockerGuide();
+  else if (x.id === "terminal") dockerTerminal(script);
+  else if (x.id === "recheck") dockerRecheck();
+  return null;
+}
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-dk]"); if (!b) return; const a = b.dataset.dk; if (a === "install") dockerInstall(); else if (a === "recheck") dockerRecheck(); else if (a === "guide") dockerGuide(); });
+/* ==DOCKER-UI-END== */
 
 /* ===================================================================================================
    ADD YOUR OWN TOOL (manifest builder)
@@ -5962,6 +6051,9 @@ async function npLoadOffer(settings) {         // in the background, and only wh
   const on = !!(NPX.offer && NPX.offer.offered);
   $("#np_dk_switch").hidden = !on;
   if ($("#fsdlg").open) $("#fs_docker").hidden = !on;
+  const needDocker = !on && !!NPX.offer && !NPX.offer.pending && !NPX.offer.in_docker && /Docker is not installed|installed but not running/.test(NPX.offer.reason || "");     // not ready: the same state as the Tools page
+  $("#np_dk_install").hidden = !needDocker;
+  if ($("#fsdlg").open) $("#fs_dkinstall").hidden = !needDocker;
 }
 $("#fs_why").onclick = () => showMessage({title: "Why the built-in browser?", body: (NP.caps && NP.caps.reason) || (NP.lastView && NP.lastView.error) || "No reason was reported.", detail: npDiag(), copy: npDiag()});
 $("#fs_diag").onclick = () => copyText(npDiag(), "Diagnostics copied");
@@ -5998,6 +6090,8 @@ $("#dk_bws").onclick = () => pickPath(true, p => { $("#dk_ws").value = p; }, "Ch
 $("#fs_adddk").onclick = () => dkOpen("add");
 $("#np_dk_add").onclick = () => dkOpen("add");
 $("#np_dk_switch").onclick = () => dkOpen("switch");
+$("#np_dk_install").onclick = () => dockerInstall();
+$("#fs_dkinstall").onclick = () => { if ($("#fsdlg").open) $("#fsdlg").close(); dockerInstall(); };
 $("#fs_docker").onclick = () => dkOpen("switch", FS.dir ? (FS.path || "") : "");
 async function npValidate(dir, p) {
   if (!dir || !p) return;
@@ -6397,7 +6491,7 @@ function wfItemHTML(it, states, ctx, idx, per) {
   const s = states[it.item_id], value = wfValue(it, ctx), changed = wfIsChanged(it, value), id = "wfc_" + it.item_id.replace(/[^A-Za-z0-9_]/g, "_");
   let sw;
   if (it.kind === "core") sw = `<span class="sw">${wfPill("on", "Always on")}</span>`;
-  else if (it.kind === "separate" || it.kind === "demo") sw = `<span class="sw">${wfPill("fixed", it.kind === "demo" ? "Demo only" : "Own command")}</span>`;
+  else if (it.kind === "separate" || it.kind === "demo") sw = `<span class="sw">${wfPill("fixed", it.kind === "demo" ? "Demo only" : it.item_id === "docker" ? "Optional runtime" : "Own command")}</span>`;
   else sw = `<button type="button" class="sw" role="switch" aria-checked="${wfCounts(s)}" id="${id}" data-wftoggle="${esc(it.item_id)}" aria-label="${esc(it.label)}: ${s === "auto" ? "auto, runs when its inputs exist" : wfCounts(s) ? "on" : "off"}. Press to turn ${wfCounts(s) ? "off" : "on"}">${wfPill(s)}</button>`;
   const rst = (changed || wfOverridden(it, ctx)) && it.kind !== "core" ? `<button type="button" class="rst" data-wfreset="${esc(it.item_id)}" title="${ctx === "wizard" ? "Use the saved setting for this run" : "Back to the default"}">${ctx === "wizard" ? "use saved" : "default"}</button>` : "";
   return `<li class="wfi ${s}" id="wfi_${esc(id)}">${sw}<div class="tx"><b>${esc(it.label)}</b> ${it.user ? `<span class="tag user">your tool</span> ` : ""}${changed ? `<span class="chgtag" title="Different from its default (${wfDefaultState(it)})">changed</span> ` : ""}${rst}${tipBtn(wfTip(it, per), it.label)}
@@ -6449,6 +6543,7 @@ async function wfLoad(force) {
   if (WF.data && !force) return WF.data;
   if (WF.loading) return WF.loading;
   WF.loading = (async () => {
+    dockerLoad(false);
     try { const d = await api("workflow"); WF.data = d; WF.loadError = ""; WF.vals = {}; for (const s of d.steps) for (const it of s.items) if (it.setting_key) WF.vals[it.setting_key] = it.value ?? ""; }
     catch (e) { WF.loadError = "The workflow could not be loaded: " + e.message; }
     finally { WF.loading = null; }

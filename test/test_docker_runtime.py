@@ -272,6 +272,8 @@ def main():
     calls = []
     orig_probe = webui._docker_probe
     webui._docker_probe = lambda r: calls.append(1) or {"state": "ready", "installed": True, "running": True, "version": "1", "hint": "", "image": {}}
+    orig_setup = webui.docker_setup_state
+    webui.docker_setup_state = lambda root, refresh=False: {"pending": False, "state": "ready", "chip": "Docker is ready", "version": "1", "server_version": "1"}   # the tools setup's state (one shared probe)
     try:
         class P:
             root = ROOT
@@ -287,6 +289,7 @@ def main():
         check("a second call reuses it", len(calls) == 1)
     finally:
         webui._docker_probe = orig_probe
+        webui.docker_setup_state = orig_setup
     src = (ROOT / "plasbench" / "webui.py").read_text(encoding="utf-8")
     check("routes exist", all(f'route == "{r}"' in src or f'"{r}"' in src for r in ("runtime", "runtime/use", "runtime/test", "runtime/pull")))
     check("job env carries the job id for container names", "PLASBENCH_JOB_ID=job_id" in src)

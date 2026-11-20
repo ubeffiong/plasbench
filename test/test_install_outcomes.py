@@ -74,6 +74,7 @@ check("lib.sh's shell translator agrees on 20 and 21", 'a manual installation st
 
 script = open(os.path.join(ROOT, "env", "install_tools.sh"), encoding="utf-8").read()
 flat = {p for item in re.findall(r"^ ([a-z0-9_|-]+)\)", script, re.M) for p in item.split("|")}
+flat |= set(re.findall(r'\[\[ "\$PROFILE" == "([a-z0-9_-]+)" \]\]', script))     # docker is handled by an `if` before the case (python/docker_setup.py)
 check("every script-only profile has a case branch", set(reg.SCRIPT_PROFILES) <= flat, set(reg.SCRIPT_PROFILES) - flat)
 
 from plasbench import webui  # noqa: E402
