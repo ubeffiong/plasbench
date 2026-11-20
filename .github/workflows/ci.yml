@@ -5,24 +5,22 @@ on:
   push:
     branches: [main]
 
+# A new push to a pull request cancels that PR's older run (its result is thrown away anyway). Runs on main are never cancelled: release
+# verification reads the check runs of main's merge commits, so every push to main must run to the end.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # Least privilege: the test and image-build jobs only read the repository (audit AU-050).
 permissions:
   contents: read
 
 jobs:
-  test:
-    # Pinned: ubuntu-latest is now 26.04, which has no Python 3.9 build for setup-python.
+  # Once for the whole run: the shell scripts do not depend on the Python version.
+  lint:
     runs-on: ubuntu-24.04
-    # requires-python is >=3.9, so the oldest and the newest supported interpreters are tested as well as the middle one.
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.9', '3.11', '3.13']
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
-        with:
-          python-version: ${{ matrix.python-version }}
       # shellcheck from the runner's package manager: ludeeus/action-shellcheck's
       # release download returns a non-archive on the current runner image, so
       # the job failed before any check ran.
@@ -33,18 +31,85 @@ jobs:
           shellcheck --version
           # Gate on warnings and errors; info/style notes are reported, not fatal.
           find scripts adapters env test -type f -name '*.sh' -print0 | xargs -0 shellcheck -S warning
+  # The Python-version-specific checks that are not the test suite: install, bytecode compile, demo, build and twine on every supported interpreter.
+  checks:
+    name: checks (${{ matrix.python-version }})
+    # Pinned: ubuntu-latest is now 26.04, which has no Python 3.9 build for setup-python.
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # requires-python is >=3.9, so the oldest and the newest supported interpreters are tested as well as the middle one.
+        python-version: ['3.9', '3.11', '3.13']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install --no-deps .
+      - run: plasbench demo
+      - run: python -m compileall -q python plasbench
+      - run: python -m pip install build twine
+      - run: python -m build
+      # Only distributions: a stray release-archive .sha256 in dist/ is rejected by twine as an unknown distribution format.
+      - run: python -m twine check dist/*.whl dist/*.tar.gz
+  # The test suite, split into parallel shards per Python version (test/run_tests.sh, PB_SHARD/PB_SHARDS; weights in test/shard_weights.tsv).
+  # The shards together run exactly the tests an unsharded `plasbench test` runs (test/test_shard_selection.py proves the partition).
+  shard:
+    name: shard (${{ matrix.python-version }}, ${{ matrix.shard }}/4)
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.11', '3.13']
+        shard: [1, 2, 3, 4]
+    env:
+      PB_SHARDS: 4
+      PB_SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: ${{ matrix.python-version }}
       # minimap2 on PATH so test_scoring_real_minimap2.py runs the real aligner
       # instead of skipping (the --no-deps install provides no aligner).
       - run: sudo apt-get install -y -qq minimap2
       - run: python -m pip install --no-deps .
       - run: plasbench test
-      - run: plasbench demo
-      - run: python -m compileall -q python plasbench
-      - run: python -m pip install build twine
-      - run: python -m build
-      # Only distributions: `plasbench test` leaves a release-archive .sha256
-      # in dist/, which twine rejects as an unknown distribution format.
-      - run: python -m twine check dist/*.whl dist/*.tar.gz
+  # One check per Python version under the names `test (3.9)`, `test (3.11)` and `test (3.13)`, as before the suite was sharded, so anything that
+  # waits for those names keeps working. It passes only if every shard and the checks job of that version passed, and the shell lint passed.
+  test:
+    name: test (${{ matrix.python-version }})
+    needs: [lint, checks, shard]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.11', '3.13']
+    steps:
+      - name: Require every job of this Python version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ matrix.python-version }}
+          LINT: ${{ needs.lint.result }}
+          CHECKS: ${{ needs.checks.result }}
+          SHARD: ${{ needs.shard.result }}
+        run: |
+          echo "lint=$LINT checks=$CHECKS shard=$SHARD (all Python versions)"
+          [ "$LINT" = "success" ] || { echo "lint did not succeed"; exit 1; }
+          # needs.<matrix job>.result covers every Python version; the jobs API says which version failed.
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" --jq '.jobs[] | [.name, .conclusion // .status] | @tsv' > jobs.tsv
+          cat jobs.tsv
+          expected_shards=4
+          good_shards="$(grep -F -e "shard ($VERSION, " jobs.tsv | awk -F'	' '$2 == "success"' | wc -l)"
+          good_checks="$(awk -F'	' -v n="checks ($VERSION)" '$1 == n && $2 == "success"' jobs.tsv | wc -l)"
+          echo "Python $VERSION: $good_shards/$expected_shards shards succeeded, checks succeeded: $good_checks"
+          [ "$good_shards" = "$expected_shards" ] || { echo "not every shard succeeded"; exit 1; }
+          [ "$good_checks" = "1" ] || { echo "the checks job did not succeed"; exit 1; }
   container:
     runs-on: ubuntu-latest
     steps:
@@ -56,4 +121,8 @@ jobs:
           push: false
           load: true
           tags: plasbench:ci
+          # The conda layers take ~20 minutes to solve and download; the GitHub Actions cache keeps them between runs (needs no extra permission on the runner).
+          # A pull request reads its own and main's cache, never another PR's; mode=max also keeps the intermediate layers.
+          cache-from: type=gha,scope=ci-container
+          cache-to: type=gha,scope=ci-container,mode=max
       - run: docker run --rm plasbench:ci plasbench demo
