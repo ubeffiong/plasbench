@@ -5,6 +5,24 @@ the standard library, so they run even without the conda env — but the bio-too
 
 ---
 
+## 0. I already downloaded the release file
+
+If `plasbench-<version>.tar.gz` (and `plasbench-<version>.tar.gz.sha256`) are already on this computer, for example copied from another computer because this one has no internet,
+put both in one folder (in WSL, copy them from `/mnt/c/Users/<you>/Downloads/` into `~`), keep the names exactly as downloaded, and run:
+
+```bash
+cd ~
+sha256sum -c plasbench-<version>.tar.gz.sha256        # must print: plasbench-<version>.tar.gz: OK
+tar -xzOf plasbench-<version>.tar.gz plasbench-<version>/scripts/install_latest.sh > install_latest.sh
+bash install_latest.sh --archive "$PWD/plasbench-<version>.tar.gz" --tools
+```
+
+This installs into `~/PlasBench` (or `$PLASBENCH_INSTALL_DIR/PlasBench`) without downloading PlasBench. It still needs conda (section 1) and, on a first install, the internet for the conda
+packages and tools. Installing a newer file later is the same command (or `plasbench upgrade --archive FILE`); studies, settings, databases and tools are kept. The full guide, with
+the Windows checksum check and the error messages, is in the README under "I already downloaded the release file".
+
+---
+
 ## 1. Install Miniforge (conda/mamba)
 
 If you don't already have conda, let PlasBench check and offer to install it for you:

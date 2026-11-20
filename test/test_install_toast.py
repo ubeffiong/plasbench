@@ -55,6 +55,10 @@ TABLE = [
     (["check", "--yes"], True, "Installing missing tools and databases…", []),                                            # Make everything ready; Install tool databases; Check & fix all
     (["check"], False, "", []),
     (["upgrade", "--yes"], True, "Updating PlasBench…", ["plasbench"]),
+    (["upgrade", "--yes", "--version", "0.5.6"], True, "Updating PlasBench…", ["plasbench"]),
+    (["upgrade", "--yes", "--archive", "C:/dl/plasbench-0.5.6.tar.gz"], True, "Updating PlasBench…", ["plasbench"]),
+    (["upgrade", "--rollback", "--yes"], True, "Rolling back PlasBench…", ["plasbench"]),
+    (["upgrade", "--check-only"], False, "", []),
     (["run", "--study", "s1"], False, "", []), (["demo", "--no-report-prompt"], False, "", []), (["test"], False, "", []), (["report", "--results-dir", "results"], False, "", []),
 ]
 

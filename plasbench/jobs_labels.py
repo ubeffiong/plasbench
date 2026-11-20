@@ -8,7 +8,7 @@ or the terminal is labelled the same way:
   install-conda                           Miniforge
   runtime pull | build                    the PlasBench image
   check --yes                             "Make everything ready" and the database downloads (without --yes it only checks)
-  upgrade                                 PlasBench itself
+  upgrade                                 PlasBench itself (--check-only only asks; --rollback goes back a release; --version / --archive install one)
 
 `describe` returns {is_install, label, install_tools, install_kind}; the fields are additive in the jobs payload. `last_line` and `installed_version` read a job's log tail.
 """
@@ -21,7 +21,7 @@ GROUP_PROFILES = {"core": "the core tools", "all": "all tools", "assembly": "the
                   "reconstruction": "the reconstruction tools", "simulate": "the simulation tools", "long-read": "the long-read tools", "annotation": "the annotation tools",
                   "baseline": "the baseline tools"}
 DISPLAY = {"docker": "Docker", "conda": "conda", "plasbench": "PlasBench"}
-JOB_KINDS_INSTALL = ("install-tools", "tools-install", "install-conda", "runtime-pull", "runtime-build", "check-yes", "upgrade")   # the install_kind values below
+JOB_KINDS_INSTALL = ("install-tools", "tools-install", "install-conda", "runtime-pull", "runtime-build", "check-yes", "upgrade", "rollback")   # the install_kind values below
 NOT_INSTALL = {"is_install": False, "label": "", "install_tools": [], "install_kind": ""}
 
 
@@ -79,6 +79,10 @@ def describe(argv, kind: str = "plasbench") -> dict:
     if cmd == "check" and "--yes" in rest:
         return _result("check-yes", "Installing missing tools and databases…", [])
     if cmd == "upgrade":
+        if "--check-only" in rest:
+            return dict(NOT_INSTALL)   # only asks whether a newer release exists
+        if "--rollback" in rest:
+            return _result("rollback", "Rolling back PlasBench…", ["plasbench"])
         return _result("upgrade", "Updating PlasBench…", ["plasbench"])
     return dict(NOT_INSTALL)
 
