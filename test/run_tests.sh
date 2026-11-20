@@ -26,7 +26,20 @@ pb_run() {
         bash "$HERE/run_demo.sh" > /dev/null
     fi
     started=$SECONDS
-    "$interpreter" "$HERE/$name"
+    if [ -n "$PB_SHARDS" ]; then
+        # A shard runs each test in its own session (a test that signals a process group can only reach its own) under a time limit (PB_TEST_TIMEOUT seconds, default 900),
+        # so a hung test fails the job quickly and by name instead of holding the runner for hours.
+        local runner=() code=0
+        command -v setsid > /dev/null 2>&1 && runner+=(setsid -w)
+        command -v timeout > /dev/null 2>&1 && runner+=(timeout -k 30 "${PB_TEST_TIMEOUT:-900}")
+        "${runner[@]}" "$interpreter" "$HERE/$name" || code=$?
+        if [ "$code" -ne 0 ]; then
+            if [ "$code" -eq 124 ] || [ "$code" -eq 137 ]; then echo "TIMEOUT: $name did not finish within ${PB_TEST_TIMEOUT:-900} s (exit $code)"; else echo "FAILED: $name (exit $code)"; fi
+            exit "$code"
+        fi
+    else
+        "$interpreter" "$HERE/$name"
+    fi
     # Per-test wall time, read back from CI logs to balance test/shard_weights.tsv.
     echo "PB_TIME $name $((SECONDS - started))"
 }
