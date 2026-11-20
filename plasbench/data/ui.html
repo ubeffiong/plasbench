@@ -419,6 +419,19 @@ dialog.dkdlg ul.dknotes{margin:6px 0 0 18px;padding:0}.dkerr{color:var(--bad);ma
 .runtoast.attn{border-left-color:var(--bad)}.runtoast.attn .rt-bar{display:none}.runtoast .rt-x{position:absolute;top:4px;right:6px;border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
 .runtoast .rt-act{margin-top:6px;display:flex;gap:6px}
 @media (prefers-reduced-motion:reduce){#connbar .rt-spin{animation:none}.sess .sbar.ind i{animation:none;width:100%;opacity:.4}}
+/* ==INSTALL-TOAST-CSS== the installing toast: a region in the toast area, one card per thing to say; at phone width a full-width bar with 40 px targets */
+.insttoast{display:flex;flex-direction:column;gap:6px;width:360px;max-width:calc(100vw - 32px)}.insttoast[hidden]{display:none}
+.it-card{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-left:3px solid var(--primary);padding:10px 12px;border-radius:var(--radius);box-shadow:var(--shadow-lg);font-size:13px}
+.it-card.ok{border-left-color:var(--ok)}.it-card.bad{border-left-color:var(--bad)}.it-card.warn{border-left-color:var(--warn)}
+.it-h{display:flex;align-items:center;gap:8px}.it-h .it-t{flex:1;min-width:0}.it-h .rt-spin{margin:0}.it-el{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
+.it-sub{color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.it-sub.it-wrap{white-space:normal;overflow-wrap:anywhere}
+.it-act{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.it-list{margin:6px 0 0;padding:0;list-style:none}.it-list li{padding:4px 0;border-top:1px solid var(--line-2)}.it-rowact{display:flex;gap:6px;margin-top:2px}
+#instchipwrap{display:inline-flex;align-items:center;gap:2px}#instchipwrap[hidden]{display:none}
+.instchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:2px 10px;font-size:12px;cursor:pointer;min-height:28px}
+.instchip .rt-spin{width:12px;height:12px;border-width:2px;margin:0}
+@media (max-width:640px){#toasts{left:8px;right:8px}.insttoast{width:100%;max-width:none}.it-act .btn{min-height:40px;flex:1 1 auto}.instchip{min-height:40px}}
+@media (prefers-reduced-motion:reduce){.it-card .rt-spin,.instchip .rt-spin{animation:none;border-top-color:var(--line);border-right-color:var(--primary)}}
+/* ==INSTALL-TOAST-CSS-END== */
 .toast .ico{margin-top:2px;color:var(--primary)}.toast.bad{border-left-color:var(--bad)}.toast.bad .ico{color:var(--bad)}.toast.ok{border-left-color:var(--ok)}.toast.ok .ico{color:var(--ok)}
 
 /* ---------- job console ---------- */
@@ -728,6 +741,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
   <kbd>/</kbd>
   <div class="results" id="qres" role="listbox"></div>
  </div>
+ <span id="instchipwrap" hidden><button class="instchip" id="instchip" type="button" aria-controls="insttoast"><span class="rt-spin" aria-hidden="true"></span><span id="instchiptx">Installing</span></button><span data-tipid="install_chip"></span></span>
  <span class="pill" id="jobpill" hidden><span class="pulse"></span><span id="jobpilltx">1 job running</span></span>
  <button class="tbtn" id="gdbtn" aria-pressed="false" title="Side panel: Studies, Jobs and Git (Ctrl+Shift+G opens Git)"><svg class="ico sm"><use href="#i-sidebar"/></svg><span>Panel</span><span class="badge" id="gdbadge" hidden></span></button>
  <button class="tbtn netind" id="netind" title="Checking the internet connection…" aria-label="Internet status: checking"><span class="nd" aria-hidden="true"></span><span class="nl">Checking…</span></button>
@@ -1326,7 +1340,7 @@ plasmid_values = plasmid
 
 <div id="connbar" hidden role="status"><span class="rt-spin" aria-hidden="true"></span><span id="connmsg">Connection to PlasBench lost. Retrying… Your runs keep going in the background.</span></div>
 <div id="stalebar" hidden role="alert" aria-labelledby="ss_t"></div>
-<div id="toasts" aria-live="polite"></div>
+<div id="toasts" aria-live="polite"><div id="insttoast" class="insttoast" role="region" aria-label="Installations" aria-live="polite" aria-busy="false" hidden></div></div>
 <div id="tipbox" role="tooltip" hidden></div>
 
 <script>
@@ -1647,12 +1661,13 @@ async function startJob(argv, label, env) {
     if (answer === "install") env = Object.assign({}, env, {INSTALL_MISSING_TOOLS: "1"});
   }
   if (bench) { S.pendingBench = {label: label || cmdText(argv), t0: Date.now()}; renderRunToast(); }   // the toast appears the moment the button is clicked
+  const inst = itIsInstallArgv(argv); if (inst) itPend(label || cmdText(argv));   // so does the installing toast
   try {
     const job = await api("jobs", {argv, label, env});
     toast(`Started: ${label || cmdText(argv)}`, "ok");
     await refreshJobs(); showConsole(job.id, true); return job;
   } catch (e) { toast(e.message, "bad"); }
-  finally { S.pendingBench = null; renderRunToast(); }
+  finally { S.pendingBench = null; renderRunToast(); if (inst) itPendClear(); }
 }
 
 /* ---- the persistent "benchmarking is running" toast ----
@@ -1796,10 +1811,170 @@ function renderRunToast() {
   el.querySelector(".rt-sub").textContent = `${first ? first.label : pending.label} · ${fmtElapsed((Date.now() - started) / 1000)}`;
 }
 setInterval(renderRunToast, 1000);
+/* ==INSTALL-TOAST-BEGIN== The installing toast (docs: USER_GUIDE "The window at a glance"). Which jobs are installs, and their labels, come from the server (plasbench/jobs_labels.py:
+   is_install, install_label, install_tools, last_line, installed_version in every /api/jobs entry), so this block only renders. It is driven by refreshJobs (the one job poll) and a
+   one-second tick for the clock; nothing here runs on the page-load path beyond reading the job list that is already fetched. Pure state and markup functions first (tested in node). */
+/* ==INSTALL-TOAST-PURE-BEGIN== */
+const IT_DONE_MS = 8000, IT_CAP = 4, IT_RECENT_S = 86400;
+const itLive = j => !!j.is_install && (j.state === "running" || j.state === "cancelling");
+function itKind(j) {   // what the toast says about one install job; "" = nothing (cancelled on purpose)
+  const ds = j.display_state || j.state;
+  if (j.state === "cancelling") return "cancelling";
+  if (ds === "waiting_for_you") return "waiting";
+  if (ds === "consent_needed") return "consent";
+  if (ds === "manual_step") return "manual";
+  if (ds === "stalled") return "stalled";
+  if (j.state === "running") return "running";
+  if (j.state === "done") return "done";
+  if (j.state === "failed" || j.state === "interrupted") return "failed";
+  return "";
+}
+function itIsInstallArgv(argv) {   // the click-time guess for the optimistic toast; the job record (server: jobs_labels.describe) confirms it. Kept equal to the server by a shared test table.
+  if (!Array.isArray(argv) || !argv.length) return false;
+  const c = argv[0], r = argv.slice(1), pos = r.filter((a, i) => !a.startsWith("-") && r[i - 1] !== "--env" && r[i - 1] !== "--prefix");
+  if (c === "install-tools") return !r.includes("--dry-run") && !["plan", "list", "validate", "locked"].includes(pos[0] || "core");
+  if (c === "tools") return r[0] === "install";
+  if (c === "install-conda" || c === "upgrade") return true;
+  if (c === "runtime") return ["pull", "build"].includes(pos[0]);
+  return c === "check" && r.includes("--yes");
+}
+const itBase = j => String(j.install_label || j.label || "").replace(/^(Installing|Updating|Pulling|Building) /, "").replace(/…$/, "");
+function itDoneTitle(j) {
+  const v = j.installed_version ? ` (version ${j.installed_version})` : "";
+  return ({upgrade: "PlasBench updated", "runtime-pull": "Image pulled", "runtime-build": "Image built", "check-yes": "Tools and databases ready"})[j.install_kind] || `${itBase(j)} installed${v}`;
+}
+function itLiveTitle(live) {
+  if (live.length === 1) return live[0].state === "cancelling" ? `Cancelling: ${itBase(live[0])}` : live[0].install_label || "Installing…";
+  const names = [...new Set(live.flatMap(j => j.install_tools || []))];
+  return live.every(j => (j.install_tools || []).length && ["install-tools", "tools-install"].includes(j.install_kind)) && names.length > 1 ? `Installing ${names.length} tools…` : `${live.length} installations running…`;
+}
+function itAway(jobs, seenT, dismissed) {   // once, on the first look at the list: installs that ended after the last time this browser saw it
+  if (!seenT) return [];
+  return (jobs || []).filter(j => j.is_install && !itLive(j) && j.ended && j.ended > seenT && !dismissed.has(j.id) && ["done", "failed", "cancelled", "interrupted"].includes(j.state)).map(j => j.id);
+}
+function itModel(jobs, ctx) {   // ctx: {now (s), dismissed:Set, hidden:Set, away:[ids], doneUntil:{id: s}, pending:{label,t0}|null}
+  const inst = (jobs || []).filter(j => j.is_install);
+  const live = inst.filter(itLive).sort((a, b) => a.started - b.started);
+  const attn = [], done = [];
+  for (const j of inst) {
+    if (itLive(j) || ctx.dismissed.has(j.id)) continue;
+    const k = itKind(j), age = ctx.now - (j.ended || j.started);
+    if (age > IT_RECENT_S) continue;
+    if (k === "done") { if (age * 1000 <= IT_DONE_MS || (ctx.doneUntil && ctx.doneUntil[j.id] > ctx.now)) done.push(j); }
+    else if (["waiting", "consent", "manual", "failed"].includes(k)) {
+      if (inst.some(o => o.id !== j.id && o.started > j.started && o.install_label === j.install_label && (itLive(o) || itKind(o) === "done"))) continue;   // a newer try replaced it
+      attn.push(j);
+    }
+  }
+  attn.sort((a, b) => (b.ended || 0) - (a.ended || 0));
+  const shown = new Set(attn.concat(done).map(j => j.id));
+  const away = inst.filter(j => (ctx.away || []).includes(j.id) && !ctx.dismissed.has(j.id) && !shown.has(j.id));
+  const pending = ctx.pending && !live.some(j => j.started * 1000 >= ctx.pending.t0 - 2000) ? ctx.pending : null;
+  return {live, attn, done, away, pending, hidden: live.length > 0 && live.every(j => ctx.hidden.has(j.id)) && !pending};
+}
+function itStateWord(j) { return ({running: "running", cancelling: "cancelling", stalled: "no output for a while"})[itKind(j)] || ""; }
+function itLiveCard(live, ui) {
+  const one = live.length === 1, j = live[0], k = one ? itKind(j) : "", stalled = live.filter(x => itKind(x) === "stalled").length;
+  const title = one && k === "stalled" ? `Stalled? ${itLiveTitle(live)}` : itLiveTitle(live);
+  const sub = one ? (k === "stalled" ? "No output for a while. It may still be working." : j.last_line || "Starting…") : live.map(itBase).join(", ").slice(0, 120) + (stalled ? ` · ${stalled} may be stalled` : "");
+  const rows = ui.open && !one ? `<ul class="it-list">${live.slice(0, IT_CAP).map(x => `<li><span class="it-n">${esc(itBase(x))}</span> <span class="mut small">${esc(itStateWord(x))} · <span class="it-el" data-s="${x.started}"></span></span>
+      ${x.last_line ? `<div class="it-sub">${esc(x.last_line)}</div>` : ""}<span class="it-rowact"><button class="btn ghost sm" data-it="view" data-id="${esc(x.id)}">View log</button>${x.state === "running" ? `<button class="btn ghost sm" data-it="cancel" data-id="${esc(x.id)}">Cancel</button>` : ""}</span></li>`).join("")}
+    ${live.length > IT_CAP ? `<li class="mut small">and ${live.length - IT_CAP} more (see Jobs)</li>` : ""}</ul>` : "";
+  return `<section class="it-card${k === "stalled" || stalled ? " warn" : ""}" data-k="live" aria-label="Installing">
+    <div class="it-h"><span class="rt-spin" aria-hidden="true"></span><b class="it-t">${esc(title)}</b><span class="it-el" data-s="${Math.min(...live.map(x => x.started))}"></span><span data-tipid="install_toast"></span></div>
+    <div class="it-sub" title="${esc(sub)}">${esc(sub)}</div>${rows}
+    <div class="it-act"><button class="btn sec sm" data-it="view" data-id="${esc(j.id)}">View log</button>${one ? (j.state === "running" ? `<button class="btn ghost sm" data-it="cancel" data-id="${esc(j.id)}">Cancel</button>` : "")
+      : `<button class="btn ghost sm" data-it="expand" aria-expanded="${!!ui.open}">${ui.open ? "Hide list" : `Show ${live.length}`}</button>`}<button class="btn ghost sm" data-it="hide">Hide</button></div></section>`;
+}
+function itAttnCard(j) {
+  const k = itKind(j), base = itBase(j), place = j.waiting_place || "Docker";
+  const [cls, title, sub] = k === "waiting" ? ["warn", `Waiting for you to finish in ${place}`, "Nothing failed. Do the steps in the log, then Re-check."]
+    : k === "consent" ? ["warn", "Consent needed", `${base}: nothing was changed. Confirm the install to go ahead.`]
+    : k === "manual" ? ["warn", "Manual step needed", `${base}: nothing failed. The log lists the steps.`]
+    : ["bad", `${base} failed`, j.last_line || (j.exit != null ? `Exit ${j.exit}` : "Stopped before it finished")];
+  const re = k === "waiting" && (j.install_tools || []).includes("docker") ? `<button class="btn sm" data-it="recheck" data-id="${esc(j.id)}">Re-check</button>` : "";
+  return `<section class="it-card ${cls}" data-k="${esc(j.id)}" role="${cls === "bad" ? "alert" : "status"}"><div class="it-h"><b class="it-t">${esc(title)}</b></div>
+    <div class="it-sub it-wrap">${esc(sub)}</div><div class="it-act">${re}<button class="btn sec sm" data-it="view" data-id="${esc(j.id)}">View log</button><button class="btn ghost sm" data-it="dismiss" data-id="${esc(j.id)}">Dismiss</button></div></section>`;
+}
+const itDoneCard = j => `<section class="it-card ok" data-k="${esc(j.id)}" role="status"><div class="it-h"><b class="it-t">${esc(itDoneTitle(j))}</b></div>
+  <div class="it-act"><button class="btn sec sm" data-it="view" data-id="${esc(j.id)}">View log</button><button class="btn ghost sm" data-it="dismiss" data-id="${esc(j.id)}">Dismiss</button></div></section>`;
+const itAwayCard = away => `<section class="it-card" data-k="away" role="status"><div class="it-h"><b class="it-t">Finished while you were away</b></div>
+  <ul class="it-list">${away.slice(0, IT_CAP).map(j => `<li><span class="it-n">${esc(itBase(j))}</span> <span class="mut small">${j.state === "done" ? "done" : j.state === "cancelled" ? "cancelled" : "failed"}</span></li>`).join("")}${away.length > IT_CAP ? `<li class="mut small">and ${away.length - IT_CAP} more</li>` : ""}</ul>
+  <div class="it-act"><button class="btn sec sm" data-it="jobs">Open Jobs</button><button class="btn ghost sm" data-it="dismiss" data-id="away">Dismiss</button></div></section>`;
+const itPendCard = p => `<section class="it-card" data-k="pending"><div class="it-h"><span class="rt-spin" aria-hidden="true"></span><b class="it-t">Starting: ${esc(p.label)}…</b></div></section>`;
+function itHTML(m, ui) {   // the toast's markup (no clock text: the tick fills the .it-el spans, so a poll that changes nothing leaves the DOM alone)
+  const parts = [];
+  if (m.live.length && !m.hidden) parts.push(itLiveCard(m.live, ui));
+  if (m.pending) parts.push(itPendCard(m.pending));
+  m.attn.slice(0, IT_CAP).forEach(j => parts.push(itAttnCard(j)));
+  if (m.attn.length > IT_CAP) parts.push(`<div class="it-more mut small">and ${m.attn.length - IT_CAP} more in Jobs</div>`);
+  m.done.slice(0, IT_CAP).forEach(j => parts.push(itDoneCard(j)));
+  if (m.away.length) parts.push(itAwayCard(m.away));
+  return parts.join("");
+}
+/* ==INSTALL-TOAST-PURE-END== */
+const IT_KEYS = {dismissed: "plasbench.instDismissed", hidden: "plasbench.instHidden", seen: "plasbench.instSeen"};
+const itGet = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; } };
+const itSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+S.itDismissed = new Set(itGet(IT_KEYS.dismissed, [])); S.itHidden = new Set(itGet(IT_KEYS.hidden, [])); S.itOpen = false; S.itPending = null; S.itAway = []; S.itDoneUntil = {}; S.itPrevLive = new Set();
+function itPend(label) { S.itPending = {label, t0: Date.now()}; renderInstallToast(); }
+function itPendClear() { S.itPending = null; renderInstallToast(); }
+function itDismiss(ids) { ids.forEach(i => S.itDismissed.add(i)); itSet(IT_KEYS.dismissed, [...S.itDismissed].slice(-200)); renderInstallToast(); }
+function itCtx() { return {now: Date.now() / 1000, dismissed: S.itDismissed, hidden: S.itHidden, away: S.itAway, doneUntil: S.itDoneUntil, pending: S.itPending}; }
+function itOnJobs() {   // called by refreshJobs with the fresh list
+  const now = Date.now() / 1000, jobs = S.jobs || [];
+  if (!S.itBooted) { S.itBooted = true; S.itAway = itAway(jobs, itGet(IT_KEYS.seen, null), S.itDismissed); }   // only what ended after this browser last saw the list; never on a first visit
+  const live = new Set(jobs.filter(itLive).map(j => j.id));
+  S.itPrevLive.forEach(id => { if (!live.has(id)) S.itDoneUntil[id] = now + IT_DONE_MS / 1000; });   // seen running here: its Done card gets its full 8 s even if the poll was late
+  S.itPrevLive = live;
+  S.itHidden = new Set([...S.itHidden].filter(id => live.has(id))); itSet(IT_KEYS.hidden, [...S.itHidden]);
+  itSet(IT_KEYS.seen, now);
+  renderInstallToast();
+}
+function renderInstallToast() {
+  const el = document.getElementById("insttoast"); if (!el) return;
+  const m = itModel(S.jobs, itCtx()), html = itHTML(m, {open: S.itOpen}), nlive = m.live.length;
+  const chip = document.getElementById("instchipwrap");
+  if (chip) { chip.hidden = !(m.hidden && nlive); const b = document.getElementById("instchip"); if (b && !chip.hidden) { b.querySelector("#instchiptx").textContent = `Installing ${nlive}`; b.setAttribute("aria-label", `${nlive} installation${nlive > 1 ? "s" : ""} running: show details`); } }
+  el.setAttribute("aria-busy", String(nlive > 0 && !m.hidden)); el.hidden = !html;
+  if (el._html !== html) {
+    const f = document.activeElement && el.contains(document.activeElement) ? document.activeElement : null;
+    const key = f && f.closest("[data-k]") ? [f.closest("[data-k]").dataset.k, f.dataset.it, f.dataset.id || ""] : null;
+    el._html = html; el.innerHTML = html; hydrateTips(el);
+    if (key) { const t = [...el.querySelectorAll(`[data-k="${CSS.escape(key[0])}"] [data-it="${key[1]}"]`)].find(x => (x.dataset.id || "") === key[2]); if (t) t.focus(); }
+  }
+  itTick();
+}
+function itTick() {
+  const now = Date.now() / 1000;
+  document.querySelectorAll("#insttoast .it-el").forEach(s => { const t = fmtElapsed(now - Number(s.dataset.s)); if (s.textContent !== t) s.textContent = t; });
+}
+async function itCancel(id) {
+  const j = (S.jobs || []).find(x => x.id === id); if (!j) return;
+  if (!await askConfirm({title: "Cancel this installation?", danger: true, cancelLabel: "Keep installing", confirmLabel: "Cancel install", body: "What is already installed is kept. Run the install again to finish it.",
+    facts: [["Install", itBase(j)], ["Command", j.command || ""], ["Started", j.started ? fmtTime(j.started) : ""]]})) return;
+  try { await api(`jobs/${id}/cancel`, {}); toast("Cancelling…"); refreshJobs(); } catch (e) { toast(e.message, "bad"); }
+}
+document.addEventListener("click", async e => {
+  const chip = e.target.closest && e.target.closest("#instchip");
+  if (chip) { S.itHidden = new Set(); itSet(IT_KEYS.hidden, []); renderInstallToast(); const b = document.querySelector('#insttoast [data-it="hide"]'); if (b) b.focus(); return; }
+  const b = e.target.closest && e.target.closest("#insttoast [data-it]"); if (!b) return;
+  const id = b.dataset.id, a = b.dataset.it;
+  if (a === "view") showConsole(id, true);
+  else if (a === "cancel") await itCancel(id);
+  else if (a === "hide") { (S.jobs || []).filter(itLive).forEach(j => S.itHidden.add(j.id)); itSet(IT_KEYS.hidden, [...S.itHidden]); renderInstallToast(); const c = document.getElementById("instchip"); if (c && !c.closest("[hidden]")) c.focus(); }
+  else if (a === "expand") { S.itOpen = !S.itOpen; renderInstallToast(); }
+  else if (a === "dismiss") itDismiss(id === "away" ? S.itAway.slice() : [id]);
+  else if (a === "jobs") go("jobs");
+  else if (a === "recheck") { itDismiss([id]); dockerRecheck(); }
+});
+setInterval(() => { if (document.getElementById("insttoast") && (S.jobs || []).length) renderInstallToast(); }, 1000);
+/* ==INSTALL-TOAST-END== */
 async function refreshJobs() {
   if (S.conn) return;
   try { S.jobs = (await api("jobs")).jobs; } catch { return; }
   renderInstallBar();
+  itOnJobs();
   renderRunToast();
   if (!$("#v_runs").hidden || S.jobs.some(j => j.state === "running" || j.state === "cancelling") || !S.sessionsLoaded) { S.sessionsLoaded = true; refreshSessions(); }
   const running = S.jobs.filter(j => j.state === "running" || j.state === "cancelling");
@@ -2508,7 +2683,7 @@ async function rtBuild() {
       <ul class="small">${r.build_note.map(l => `<li>${esc(l)}</li>`).join("")}</ul>
       <p class="small mut">The build runs as a job with a live log; if it fails the reason and the last lines are shown. Needs the internet.</p>`});
   if (x.id !== "ok") return;
-  try { const job = await api("runtime/pull", {build: true}); toast("Started: build the image", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (e) { toast(e.message, "bad"); }
+  itPend("Build the image"); try { const job = await api("runtime/pull", {build: true}); toast("Started: build the image", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (e) { toast(e.message, "bad"); } finally { itPendClear(); }
 }
 async function rtTest() {
   const box = $("#rt_test"); box.hidden = false; box.innerHTML = `<span class="mut">Testing Docker (a few small containers)...</span>`;
@@ -2525,12 +2700,12 @@ async function rtReady() {
       <li><b>Databases:</b> Platon, MOB-suite and the others the enabled tools use, into <span class="mono">${esc(S.rt.extras.home)}</span> (tools) and your database folder (databases). Total size: not measured; some databases are several GB, so check the free space first.</li>
       <li><b>Needs the internet.</b> Times are not measured. The image is not changed; everything is kept between runs.</li></ul>`});
   if (x.id !== "ok") return;
-  try { const job = await api("runtime/ready", {}); toast("Started: make everything ready", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (e) { toast(e.message, "bad"); }
+  itPend("Make everything ready"); try { const job = await api("runtime/ready", {}); toast("Started: make everything ready", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (e) { toast(e.message, "bad"); } finally { itPendClear(); }
 }
 document.addEventListener("click", async e => {
   const b = e.target.closest && e.target.closest("#env_card button"); if (!b || b.disabled || b.getAttribute("aria-disabled") === "true") return;
   if (b.id === "rt_docker") rtUseDocker(); else if (b.id === "rt_conda") rtUseConda(); else if (b.id === "rt_build") rtBuild(); else if (b.id === "rt_test_btn") rtTest(); else if (b.id === "rt_ready") rtReady();
-  else if (b.id === "rt_pull") { try { const job = await api("runtime/pull", {}); toast("Started: pull the image", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (err) { toast(err.message, "bad"); } }
+  else if (b.id === "rt_pull") { itPend("Pull the image"); try { const job = await api("runtime/pull", {}); toast("Started: pull the image", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (err) { toast(err.message, "bad"); } finally { itPendClear(); } }
 });
 /* ==RUNTIME-UI-END== */
 
