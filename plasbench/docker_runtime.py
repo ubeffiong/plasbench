@@ -269,14 +269,16 @@ def probe(root=None, run=None, exe=None, environ=None, exists=os.path.exists, in
 def image_state(root, exe, run=None, environ=None) -> dict:
     run = run or _run
     image, explicit = configured_image(root, exe=exe, run=run, environ=environ)
-    code, out = run([exe, "image", "inspect", image, "--format", "{{.Id}}|{{.Size}}|{{.Created}}"], 15)
+    code, out = run([exe, "image", "inspect", image, "--format", "{{.Id}}|{{.Size}}|{{.Created}}|{{len .RepoDigests}}"], 15)
     present = code == 0 and "|" in out
     tag_version = image_tag_version(image)
     row = {"name": image, "explicit": explicit, "present": present, "version": tag_version,
            "matches": (tag_version == __version__) if tag_version else None, "source": "built-locally" if image.endswith("-local") or image.startswith("plasbench:") else "pulled"}
     if present:
-        ident, size, created = (out.split("|", 2) + ["", ""])[:3]
+        ident, size, created, digests = (out.split("|", 3) + ["", "", ""])[:4]
         row.update(id=ident, size_bytes=int(size) if size.isdigit() else None, created=created)
+        if digests.strip().isdigit():     # an image that came from a registry has a repo digest; one built here has none
+            row["source"] = "pulled" if int(digests) > 0 else "built-locally"
     return row
 
 
