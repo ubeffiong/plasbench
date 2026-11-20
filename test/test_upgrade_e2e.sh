@@ -96,7 +96,6 @@ echo "--check-only reports available / current / newer, changes nothing and down
 # --- --archive: no network, phases, rollback copy -------------------------------------------------------------------------------------
 no_curl "$TMP/bin_none"
 : > "$TMP/install_invocations.log"
-before_marker="$(cat "$PB/RELEASE_MARKER")"
 PATH="$TMP/bin_none:$PATH" bash "$PB/update.sh" --archive "$TMP/rel/plasbench-0.3.2.tar.gz" --yes > "$TMP/out.log" 2>&1 || fail "--archive should install"
 [[ ! -e "$TMP/curl_forbidden.log" ]] || fail "--archive must not call curl (no network)"
 grep -q '0.3.2' "$PB/plasbench/__init__.py" || fail "--archive did not install 0.3.2"
