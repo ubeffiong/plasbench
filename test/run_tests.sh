@@ -19,6 +19,12 @@ pb_run() {
     local interpreter="$1" name="$2" started
     if [ "${PB_LIST:-0}" = "1" ]; then echo "$name"; return 0; fi
     if [ -n "$PB_SHARDS" ] && ! grep -qxF "$name" "$SHARD_FILE"; then return 0; fi
+    # Some tests (the web UI ones) run `demo` jobs that clear results_demo; the unsharded suite rebuilds it in test_demo_end_to_end.py before the report tests.
+    # A shard has no such fixed point, so it rebuilds the demo before a test that reads it whenever the demo is not whole.
+    if [ -n "$PB_SHARDS" ] && grep -q results_demo "$HERE/$name" && [ ! -f "$HERE/../results_demo/ecoli_a/visualization/alignment_blocks.json" ]; then
+        echo "rebuilding results_demo for $name"
+        bash "$HERE/run_demo.sh" > /dev/null
+    fi
     started=$SECONDS
     "$interpreter" "$HERE/$name"
     # Per-test wall time, read back from CI logs to balance test/shard_weights.tsv.
