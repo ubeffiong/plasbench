@@ -13,6 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed -- the documents said no real-data run exists (21 November 2026)
+- **FAQ Q22 and the statements that rest on it** (FAQ, Scientific Guide, implementation catalogue) said "No" to "Has any of this been run on real data?". A real run exists: `results_real_cohort1` (PlasBench 0.2.3, 10 public isolates, three real tools and a baseline, 40 score rows). The answer now says what it shows and what it cannot: it works on real reads, it cannot rank tools (one Tier-2 reference, run-level tables only), and a run large enough to rank is still the largest open item. Dated reviews and audits (`INDEPENDENT_REVIEW`, `EXTERNAL_REVIEW_LOG`, `QA_RESULT`, `audit/`) are left as the records they are.
+
 ### Added -- every annotation tool can be installed and switched on or off from the Workflow (21 November 2026)
 - **One switch per caller.** `ANNOTATE_WITH_MOB_TYPER`, `ANNOTATE_WITH_ABRICATE`, `ANNOTATE_WITH_AMRFINDER`, `ANNOTATE_WITH_ISESCAN` and `ANNOTATE_WITH_BARRNAP` (default on; they only matter while `RUN_REFERENCE_ANNOTATION=1`). A caller switched off is not run and is recorded as not evaluated with the switch named, never as "no feature found"; an annotation made with fewer callers is never reused from the cache of one made with all of them.
 - **Workflow.** Five new rows under *Annotate the reference* (switch, install state, Install button), and install state with an Install button on the cards of QUAST, MultiQC, protein annotation (Bakta) and difficulty features (samtools, deadends). The Install button opens the usual consent dialog. *Install all enabled tools* and the offer before a run now include these tools when their switch is on (an *auto* switch is left alone). Checked by `test/test_support_tools.py`, `test/test_annotation_parallel.py` and the existing UI tests; not looked at in a browser.

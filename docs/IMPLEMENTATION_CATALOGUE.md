@@ -25,7 +25,7 @@ test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an o
 
 **What "tested" does and does not mean.** A test shows the code does what its author intended on the cases the test builds. It does not show that the
 scientific claim holds on real data. The one thing that has been checked against an independent reference implementation is the PlasEval-style binning
-dissimilarity (section 3.8). No real-data run of the whole tool set has been made yet; that is the largest open item and it is stated again in section 11.
+dissimilarity (section 3.8). Only a small real-data run exists (10 isolates, PlasBench 0.2.3, three real tools and a baseline: too small to rank tools, FAQ Q22); a run large enough to rank is the largest open item and it is stated again in section 11.
 
 **Descriptive versus scoring.** Many analyses here are *descriptive*: they add a table or a figure and never change a score or a ranking. Where that is
 true the section says so. The scores and rankings come from a small, fixed core (sections 3.2 to 3.4).
@@ -1045,7 +1045,7 @@ A passing test is not scientific validation (section 1). The independent evidenc
 
 Stated plainly so no one has to find it by looking. Full detail and a status for every reviewer question: [`REVIEWER_ASSESSMENT_MATRIX.md`](REVIEWER_ASSESSMENT_MATRIX.md).
 
-- **A real-data run of the whole tool set.** Nothing about ranking or generalisation is demonstrated on real data until one exists. This is the largest open item.
+- **A real-data run of the whole tool set that is large enough to rank.** A 10-isolate run exists (`results_real_cohort1`, FAQ Q22); nothing about ranking or generalisation is demonstrated until a larger one is published. This is the largest open item.
 - **Independent third-party re-run** and an **external validation cohort**.
 - **Frozen, platform-specific thresholds** for QC, assembly eligibility, candidate relationships and the CPRR limits, set from pilot data.
 - **Evidence beyond NCBI metadata** for most references, and plasmid-free, hard-structure and taxonomically broader isolates in the released cohorts.

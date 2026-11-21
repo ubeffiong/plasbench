@@ -305,10 +305,14 @@ property. This is a known limitation of the results-directory design, not yet fi
 **Status.** Open (low severity): clear `results/` between runs that change the tool set.
 
 ### Q22. Has any of this been run on real data?
-**Answer.** No. `results/` is empty in this checkout and `data/` holds only `db/`. The demo
-results (`results_demo/`, `results_audit/`) come from synthetic tools. Every claim about ranking
-stability, leakage or per-species performance is therefore unsupported until a `public-v2` run exists.
-**Status.** **Open.** This is the largest gap, and it needs compute and data, not code.
+**Answer.** Yes, on a small scale; a run large enough to rank tools is not yet published. `results_real_cohort1/` holds a real-data run made with PlasBench 0.2.3: 10 public
+isolates (`arbank_0346`, `arbank_0349`, `tahini_salmonella` and seven `upec_ecpf` isolates), three real tools (MOB-recon, Platon, plasmidSPAdes) and a coverage baseline, 40 score
+rows, with the run manifest recording the tool versions. It shows that the pipeline works on real reads. It cannot rank tools: its headline rests on one Tier-2 reference
+(`docs/INDEPENDENT_VERIFICATION.md`), only the run-level tables were kept, not the per-isolate files (`docs/COHORT1_REBUILD_STATUS.md`), and it predates version 0.5. The maintainer has
+also started runs on larger cohorts (`public-v4`); their results are not in this repository, so nothing here relies on them. The demo results (`results_demo/`, `results_audit/`)
+come from synthetic tools. Claims about ranking stability, leakage or per-species performance stay unsupported until a run large enough to rank is published with its manifest.
+**Evidence.** `results_real_cohort1/scores.tsv`, `results_real_cohort1/run_manifest.json`, `docs/COHORT1_REBUILD_STATUS.md`.
+**Status.** **Partly done.** A small real run exists; the large, published one is the largest open item and needs compute and data, not code.
 
 ### Q23. Is CI actually checking anything?
 **Answer.** It now does. The `test` job used to fail at the shellcheck install step, so no tests ran; the apt-based install and a
@@ -507,7 +511,7 @@ independent review.** The answers below cover what the review added.
 
 ### Q36. Where does PlasBench stand against the 215 questions?
 Of 215: 77 satisfied (a capability exists and a test exercises it), 86 partially satisfied, 51 need validation on real data, 1 is a major gap, none is
-out of scope. *Satisfied* does not mean validated on real cohorts: the biggest single limit is still that no real-data run of the full tool set
+out of scope. *Satisfied* does not mean validated on real cohorts: the biggest single limit is still that no real-data run of the full tool set large enough to rank exists (a 10-isolate run exists, Q22)
 exists (Q22). The review's four tests are answered like this. **Truth validity:** tiers, independence classes and a per-isolate audit (Q39) exist; an
 independently validated subset does not. **Attribution validity** (reads, assembly, classification, binning): QC gate (Q33), assembly policy (Q32),
 assembly adequacy and the sensitivity script (Q38) exist; a real multi-assembler result does not. **Scoring validity:** task-specific endpoints,
@@ -564,7 +568,7 @@ added to enlarge the leaderboard.
 9. **Is CPRR biologically meaningful?** Its thresholds are conventions with a published sweep, not derived and not expert-validated: **Needs validation**.
 10. **Can it recommend for an unseen organism?** The recommender abstains when evidence is insufficient and is validated by holding out studies, but on synthetic data so far: **Needs validation** on real independent studies.
 11. **What shows the scoring code is correct?** Constructed adversarial cases, and agreement with the original PlasEval program on 59 constructed cases and 210 of 211 real-bin pairs (Q31). That supports the binning dissimilarity, not every metric.
-12. **What is the most important discovery so far?** None yet, and PlasBench does not claim one: no real-data run of the full tool set exists. What exists is a framework whose scoring, input and reference controls are tested and whose claims carry evidence labels.
+12. **What is the most important discovery so far?** None yet, and PlasBench does not claim one: the only real-data run (10 isolates, Q22) is too small to rank tools. What exists is a framework whose scoring, input and reference controls are tested and whose claims carry evidence labels.
 
 ### Q43. What did the literature and public-data review add, and what was not adopted?
 A review of published plasmid benchmarks (PlasEval, Teixeira 2025, plsMD 2026, the MOB-suite benchmark) and of the published figures on resistance context and relatedness was checked against the code. **Already there:** the circular CGView-style plasmid maps with truth feature rings and a ring per tool, the PlasEval cohort, contig classification, AMR placement, flank context and NGOC, size, replicon and AMR strata (`stratify_recovery.py`), database-overlap screening and the depth and quality ladders.
@@ -958,7 +962,7 @@ out of synced folders. **Answered.**
 
 **23. Performance and scalability (Q355-368).** **Implemented here:** per-tool runtime, memory, success rate, cost per recovered
 plasmid, CPU utilisation (recorded beside peak memory in stage 4) and a log-log scaling exponent against reference size, shown
-only with enough samples across a real size range. No published figures exist yet (no real-data run), so claims about maximum
+only with enough samples across a real size range. No published figures exist yet (the only real-data run is 10 isolates, Q22), so claims about maximum
 dataset size or average time are **Open** until one is run. Interrupted runs resume at the stage level.
 
 ### Part XII. Outputs and applications (Q369-398)
@@ -1012,7 +1016,7 @@ open items below. Code is accessible; reproducibility is addressed above. A reso
 
 **31. Funder and innovation questions (Q471-484).** The gap addressed is evidence-based tool choice for plasmid reconstruction,
 including in under-sampled regions; the minimum useful version is the default-tool, short-read benchmark on a diverse cohort.
-Risks: no real-data run, single-maintainer sustainability, a very large documentation and feature surface. The project concept
+Risks: no real-data run large enough to rank (only 10 isolates so far, Q22), single-maintainer sustainability, a very large documentation and feature surface. The project concept
 note is in [docs/CONCEPT_NOTE.md](docs/CONCEPT_NOTE.md). What would justify further investment: a published real-data run with
 intervals, filled database dates, an independent truth audit and an external cohort.
 
@@ -1042,7 +1046,7 @@ power analysis, scenario tags, an optional gated composite with weight sensitivi
 
 Still open, and why:
 
-1. **No real-data run** (Q22): needs compute and data. Everything about ranking stability and generalisation depends on it.
+1. **No real-data run large enough to rank** (Q22; a 10-isolate run exists): needs compute and data. Everything about ranking stability and generalisation depends on it.
 2. **Database release dates and database FASTAs for tools whose databases are not installed** (Q16): the dates come from each
    tool's maintainers; the sequence-level screen needs the database on disk.
 3. **Independent audit of references, and read support for every truth replicon** (Q3, Q4): needs reads and curation.
