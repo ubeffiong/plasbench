@@ -81,11 +81,15 @@ check("none fits (3.8 GB free): skip with the exact numbers and the WSL advice",
 v = ra.decide("spades", "s1", 255, HAMMER, ctx(memory_gb=8, available_gb=16))
 check("a budget that already covers the need is never lowered, and not 'raised' either: skip says so", v["action"] == "skip" and "already covers" in v["message"], v)
 v = ra.decide("mob_recon", "s1", 137, "", ctx(memory_gb=4, available_gb=16))
-check("OOM kill with no stated need: 1.5 x the budget when it fits", v["action"] == "retry" and v["memory_gb"] == "6", v)
+check("OOM kill, budget well inside the free memory: a bigger budget cannot help, so threads are halved (the budget is not raised)", v["action"] == "retry" and v["response"] == "halve_threads" and v["threads"] == "3" and v["memory_gb"] == "", v)
+v = ra.decide("mob_recon", "s1", 137, "", ctx(memory_gb=8, available_gb=6.9))
+check("OOM kill, budget larger than the free memory: fit_memory lowers it to 85% of free (5 GB of 6.9)", v["action"] == "retry" and v["response"] == "fit_memory" and v["memory_gb"] == "5", v)
 v = ra.decide("mob_recon", "s1", 137, "", ctx(memory_gb=4, available_gb=4.2))
-check("OOM kill, nothing fits: with threads that scale, the ladder goes on to halve them", v["action"] == "retry" and v["threads"] == "3" and v["memory_gb"] == "", v)
-v = ra.decide("mob_recon", "s1", 137, "", ctx(memory_gb=4, available_gb=4.2, threads=1))
-check("OOM kill, nothing fits, one thread: skip", v["action"] == "skip", v)
+check("OOM kill, 4 GB budget with 4.2 GB free: the budget is lowered to 3 first", v["action"] == "retry" and v["response"] == "fit_memory" and v["memory_gb"] == "3", v)
+v = ra.decide("mob_recon", "s1", 137, "", ctx(memory_gb=2, available_gb=2.0, threads=1))
+check("OOM kill at the 2 GB floor with one thread: nothing smaller to try, skip", v["action"] == "skip", v)
+v = ra.decide("plassembler", "s1", 1, "java.lang.OutOfMemoryError: Java heap space", ctx(available_gb=16))
+check("Java heap is not mistaken for a Python MemoryError (id java_heap)", v["id"] == "java_heap", v)
 v = ra.decide("plassembler", "s1", 1, "java.lang.OutOfMemoryError: Java heap space", ctx(available_gb=16))
 check("Java heap: the memory budget rises; threads are not touched (the table says they do not scale)", v["action"] == "retry" and v["threads"] == "", v)
 
@@ -94,12 +98,12 @@ with tempfile.TemporaryDirectory() as tmp:
     state = str(tmp / "state" / "spades.s1.txt")
     ladder = []
     for attempt in range(4):
-        v = ra.decide("mob_recon", "s1", 137, "", ctx(memory_gb=4 + attempt, available_gb=64), state_file=state, max_attempts=2)
+        v = ra.decide("mob_recon", "s1", 137, "", ctx(memory_gb=40, available_gb=16), state_file=state, max_attempts=2)
         ladder.append(v["action"] + ":" + v["response"])
         if v["action"] == "retry":
             os.makedirs(os.path.dirname(state), exist_ok=True)
             open(state, "a").write("mob_recon|s1|memory|%s\n" % v["response"])
-    check("each response once, at most 2 adjustments, then skip", ladder[:2] == ["retry:raise_memory", "retry:halve_threads"] and ladder[2].startswith("skip") and ladder[3].startswith("skip"), ladder)
+    check("each response once, at most 2 adjustments, then skip", ladder[:2] == ["retry:fit_memory", "retry:halve_threads"] and ladder[2].startswith("skip") and ladder[3].startswith("skip"), ladder)
     v = ra.decide("mob_recon", "s2", 137, "", ctx(memory_gb=4, available_gb=64), state_file=state, max_attempts=2)
     check("another isolate has its own count", v["action"] == "retry", v)
     cli = subprocess.run([sys.executable, "-I", str(ROOT / "python" / "resource_adapt.py"), "decide", "--tool", "spades", "--isolate", "s9", "--exit-code", "255", "--log", str(tmp / "log.txt"),
@@ -223,7 +227,7 @@ echo "rc=$rc after: THREADS=$THREADS MEMORY_GB=$MEMORY_GB TMPDIR=${TMPDIR:-unset
         check("... the line is plain and a resource_adjust event is written", "raising memory from 4 to 7 GB" in r.stderr + r.stdout and "resource_adjust" in (tmp / "res" / "run_events.jsonl").read_text(), (r.stderr, r.stdout))
         check("... the changes were for that command only (the caller's settings are restored)", "THREADS=6 MEMORY_GB=4" in r.stdout, r.stdout)
         r, calls = drive("oomkill", "mob_recon")
-        check("run_adaptive: exit 137 -> memory budget raised first (1.5 x), still killed, then threads halved: succeeds on the 2nd adjustment", "rc=0" in r.stdout and len(calls) == 3, (r.stdout, calls))
+        check("run_adaptive: exit 137 -> a bigger budget cannot help a kill, so the threads are halved (6 -> 3) with the budget unchanged, and it succeeds on the 1st adjustment", "rc=0" in r.stdout and len(calls) == 2 and "mem=4 threads=6" in calls[0] and "mem=4 threads=3" in calls[1], (r.stdout, calls))
         r, calls = drive("tmp", "platon")
         check("run_adaptive: temp space -> TMPDIR moved to the roomier folder", "rc=0" in r.stdout and any("tmp=" + str(tmp / "bigger") in c for c in calls[1:]), (r.stdout, calls))
         r, calls = drive("files", "abricate", SOFT_NOFILE="512")

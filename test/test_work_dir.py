@@ -40,6 +40,8 @@ with tempfile.TemporaryDirectory() as tmp:
     check("WORK_DIR=data disables it even on a slow mount", not r["scratch"] and r["dir"] == "/mnt/f/x", r)
     r = wd.resolve(str(tmp / "mine"), "/mnt/f/x", "s", home, mounts=mounts)
     check("an explicit folder is used", r["scratch"] and r["dir"] == str(tmp / "mine"), r)
+    r = wd.resolve("auto", "/mnt/f/x", "s", "/home/u", mounts=wd.mount_table("/dev/sdc /mnt/f 9p rw 0 0" + chr(10) + "tmpfs /home/u tmpfs rw,size=1048576k 0 0" + chr(10) + "overlay / overlay rw 0 0" + chr(10)))
+    check("a tmpfs home (Docker mode) is never used as the scratch folder: the data folder is used and the reason says why", not r["scratch"] and "memory-backed" in r["reason"], r)
     r = wd.resolve("auto", "/mnt/f/x", "s", home, need_bytes=10 ** 18, mounts=mounts)
     check("not enough free space on the scratch file system: fall back to the data folder and say so", not r["scratch"] and "not enough free space" in r["reason"], r)
     r = wd.resolve("auto", "/mnt/f/x", "a b/c", home, mounts=mounts)
