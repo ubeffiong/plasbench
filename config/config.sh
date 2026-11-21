@@ -713,6 +713,13 @@ export REPORT_MAPPING_AMBIGUITY="${REPORT_MAPPING_AMBIGUITY:-1}"
 # derive replicon, MOB, AMR, and IS features instead of hand-curated tables.
 # Absent callers are recorded as "not evaluated", never as absent features.
 export RUN_REFERENCE_ANNOTATION="${RUN_REFERENCE_ANNOTATION:-1}"
+# One switch per annotation caller (each default 1 = on; 0 = off). A caller switched off is not run and is recorded as "not evaluated (switched off)", never as "no such feature".
+# They only matter while RUN_REFERENCE_ANNOTATION=1. Install a caller from the window (Tools, or the Workflow card) or with: plasbench install-tools reference-annotation
+export ANNOTATE_WITH_MOB_TYPER="${ANNOTATE_WITH_MOB_TYPER:-1}"   # replicon and relaxase typing (MOB-typer)
+export ANNOTATE_WITH_ABRICATE="${ANNOTATE_WITH_ABRICATE:-1}"     # AMR genes and replicons by BLAST (abricate)
+export ANNOTATE_WITH_AMRFINDER="${ANNOTATE_WITH_AMRFINDER:-1}"   # AMR genes (AMRFinderPlus; needs its database)
+export ANNOTATE_WITH_ISESCAN="${ANNOTATE_WITH_ISESCAN:-1}"       # insertion sequences (ISEScan; the slowest caller)
+export ANNOTATE_WITH_BARRNAP="${ANNOTATE_WITH_BARRNAP:-1}"       # rRNA genes (barrnap)
 export ANNOTATION_AMR_DB="${ANNOTATION_AMR_DB:-ncbi}"
 # Finished reference annotations are kept here, keyed by the reference's SHA-256 and the annotation tools' versions and databases, so a second study of the same
 # isolate reuses them (the truth annotation does not depend on the study). The stored result is byte-identical to a fresh one; the provenance file says it was reused.

@@ -13,6 +13,10 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- every annotation tool can be installed and switched on or off from the Workflow (21 November 2026)
+- **One switch per caller.** `ANNOTATE_WITH_MOB_TYPER`, `ANNOTATE_WITH_ABRICATE`, `ANNOTATE_WITH_AMRFINDER`, `ANNOTATE_WITH_ISESCAN` and `ANNOTATE_WITH_BARRNAP` (default on; they only matter while `RUN_REFERENCE_ANNOTATION=1`). A caller switched off is not run and is recorded as not evaluated with the switch named, never as "no feature found"; an annotation made with fewer callers is never reused from the cache of one made with all of them.
+- **Workflow.** Five new rows under *Annotate the reference* (switch, install state, Install button), and install state with an Install button on the cards of QUAST, MultiQC, protein annotation (Bakta) and difficulty features (samtools, deadends). The Install button opens the usual consent dialog. *Install all enabled tools* and the offer before a run now include these tools when their switch is on (an *auto* switch is left alone). Checked by `test/test_support_tools.py`, `test/test_annotation_parallel.py` and the existing UI tests; not looked at in a browser.
+
 ### Added -- publishing files for Galaxy, bio.tools, Bioconda / BioContainers, WorkflowHub and F1000Research (21 November 2026)
 - **What each platform needs, checked.** `docs/publishing/README.md` says per platform what is ready, what was verified and what only the maintainer can do (an account, a token, a submission, a DOI); nothing was submitted. BioBuntu documents no way to add a third-party tool, so nothing was prepared for it.
 - **bio.tools.** `docs/publishing/biotools.json`, validated against the official biotoolsSchema; its EDAM terms were looked up in the current EDAM release.
@@ -24,6 +28,9 @@ history is lost, only the numbering is cleaner. See
 
 ### Added -- the annotation tools in the tools setup (21 November 2026)
 - **Tools page.** The window's Tools page listed only the core tools, so abricate, AMRFinderPlus, ISEScan, barrnap and MOB-typer (all called by the default reference-annotation stage) could not be installed from it. They now appear under *Annotation tools* with an Install button (`install-tools reference-annotation`, `utilities` or `mobsuite`); AMRFinderPlus shows "installed, but its database is missing" when `amrfinder` is on PATH without its database. samtools, and the optional QUAST, MultiQC, Bakta, Prokka and deadends (no package exists: the manual steps are in INSTALL.md) appear under *Optional tools*.
+
+### Changed -- the page tabs stay in view (21 November 2026)
+- **Window.** The strip of page tabs under the top bar (the open page and any documents opened from it) is now fixed while the page scrolls, instead of scrolling away; the other sticky panels (the run form's side column, the command list) start below it. Checked statically and by the existing UI tests; not looked at in a browser.
 
 ## [0.5.6] - 2026-11-21
 Summary. Nothing in this release changes a score, a ranking or a threshold. Fixes and additions since 0.5.5, all described in the entries below:
