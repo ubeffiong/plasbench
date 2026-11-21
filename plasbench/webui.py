@@ -3312,10 +3312,11 @@ def running_servers(ping=None, ask=None, listeners=None, ports=range(8770, 8790)
             win = ask(rec["url"], "windows")
             entry.update(version=st.get("running_version") or entry["version"], stale=st.get("stale"), api_level=st.get("api_level"), windows_alive=(win or {}).get("alive"))
         out.append(entry)
-    for port in ports:
-        if port in seen:
-            continue
-        alive, instance, _seen = ping(port)
+    todo = [p for p in ports if p not in seen]
+    from concurrent.futures import ThreadPoolExecutor   # a closed port on Windows takes ~2 s to refuse: probe them side by side
+    with ThreadPoolExecutor(max_workers=max(1, min(10, len(todo)))) as pool:
+        probed = list(pool.map(ping, todo))
+    for port, (alive, instance, _seen) in zip(todo, probed):
         if alive:
             seen.add(port)
             out.append({"port": port, "pid": None, "version": "", "started": None, "root": None, "recorded": False, "running": True, "is_recorded_server": False, "windows_alive": None})
