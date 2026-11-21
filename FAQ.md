@@ -294,6 +294,10 @@ recognises the tool's output files by their content and fails loudly, listing wh
 **Answer.** Into the small green **?** next to each label. Each page now shows a title, one line of purpose and the controls; what a control means, what its options do and how the page works open when you hover the **?**, move to it with the Tab key, or tap it on a phone, and close with Escape. Warnings, errors, offline or blocked reasons, disk-space notes and decisions you must make stay on the page. Nothing was deleted: the words moved to `plasbench/ui_help.py`, and the guides (**Guides** page, F1 for the page's own help) still hold the long form.
 **Status.** Implemented (`plasbench/ui_help.py` `PAGE`, `test/test_ui_cleanup.py`, a word budget per page so the clutter cannot return).
 
+### Q20f. How do I know an install is still running?
+**Answer.** A card at the bottom right of every page says "Installing ..." with the time it has been running and the latest log line, for as long as any install, pull, build or update is going. **View log** opens the live log, **Cancel** stops it after you confirm, **Hide** folds it into an Installing chip in the top bar (click the chip to bring it back). It is drawn from the job list, so it is still there after a reload, in another window, and for an install started from the terminal. A step that waits for you (Docker Desktop), a missing consent, a manual step, a stall and a failure each say so and stay until you dismiss them; Done goes away by itself after about eight seconds.
+**Status.** Implemented (`plasbench/jobs_labels.py`, the toast in `plasbench/data/ui.html`, `test/test_install_toast.py`).
+
 ### Q21. Is the per-plasmid side file safe against stale results?
 **Answer.** It is rewritten on each scoring run, but a tool removed from a later run leaves its old
 `*.per_plasmid.tsv` behind, and the stratifier globs the results directory. `scores.tsv` has the same

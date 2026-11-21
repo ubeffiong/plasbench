@@ -32,7 +32,7 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import __version__
 from . import server_state
-from . import cohort_info, fsutil, ghops, ghsignin, jobrunner, loadcache, netgate, runfolders, runprogress, ui_help, ui_schema
+from . import cohort_info, fsutil, ghops, ghsignin, jobrunner, jobs_labels, loadcache, netgate, runfolders, runprogress, ui_help, ui_schema
 from .gitops import GitError   # a refused git action is the user's error (400), not the server's
 from .terminal import Terminal, TerminalError
 from .sessionlog import SessionLog, describe as describe_event
@@ -833,6 +833,7 @@ class Jobs:
         self.watchers: set[str] = set()
         self.deleted: set[str] = set()
         self._progress_cache: dict = {}
+        self._line_cache: dict = {}
         tomb = self._tombstones()
         for job in self._read_index():
             if isinstance(job, dict) and "id" in job and job["id"] not in tomb:
@@ -1220,7 +1221,8 @@ class Jobs:
             raise ValueError(refusal)
         command = [sys.executable, "-u", "-m", "plasbench", "--project-root", str(self.project.root)] + list(argv)
         shown = "plasbench " + " ".join(shlex.quote(a) for a in argv)
-        return self._launch(command, shown, label, env, list(argv), "plasbench", self.project.root)
+        job = self._launch(command, shown, label, env, list(argv), "plasbench", self.project.root)
+        return dict(job, **self.install_fields(job))   # the install fields too, so the window can confirm its optimistic toast from the start response
 
     def running_results(self) -> list:
         """The results folders of runs that are going (running or cancelling)."""
@@ -1440,7 +1442,33 @@ class Jobs:
 
     def list(self) -> list[dict]:
         self._refresh_from_folder()
-        return [dict(j, display_state=self.display_state(j)) for j in sorted(self.jobs.values(), key=lambda j: -j["started"])]
+        return [dict(j, display_state=self.display_state(j), **self.install_fields(j)) for j in sorted(self.jobs.values(), key=lambda j: -j["started"])]
+
+    # ==INSTALL-LABELS-BEGIN== additive jobs-payload fields for the window's installing toast (labels and the install predicate live in plasbench/jobs_labels.py)
+    def install_fields(self, job: dict) -> dict:
+        """is_install, install_label, install_tools, install_kind for every job; for an install that is going or ended in the last day also last_line (one line of its log: the phase,
+        or the reason when it failed) and, when done, installed_version. Cached on the log's size and time, so a poll of a quiet log reads nothing."""
+        info = jobs_labels.describe(job.get("argv"), job.get("kind", "plasbench"))
+        out = {"is_install": info["is_install"], "install_label": info["label"], "install_tools": info["install_tools"], "install_kind": info["install_kind"]}
+        if not info["is_install"]:
+            return out
+        state, ended = job.get("state"), job.get("ended")
+        if state not in ("running", "cancelling") and not (ended and time.time() - ended < 86400):
+            return out
+        try:
+            stat = os.stat(self._paths(job["id"])["log"])
+        except OSError:
+            return out
+        key = (stat.st_size, stat.st_mtime_ns, state, job.get("exit"))
+        cached = self._line_cache.get(job["id"])
+        if not cached or cached[0] != key:
+            tail = _tail_bytes(self._paths(job["id"])["log"], 6000).decode("utf-8", "replace")
+            bad = state in ("failed", "interrupted") and job.get("exit") not in ((MANUAL_STEP_EXIT, CONSENT_EXIT))
+            cached = (key, {"last_line": jobs_labels.last_line(tail, failed=bad), "installed_version": jobs_labels.installed_version(tail) if state == "done" else ""})
+            self._line_cache[job["id"]] = cached
+        out.update(cached[1])
+        return out
+    # ==INSTALL-LABELS-END==
 
     def progress(self, job_id: str) -> dict:
         """The parsed progress of a job's log, cached until the log changes."""
