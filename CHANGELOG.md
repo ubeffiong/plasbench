@@ -13,6 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed -- compiled Python cache files were tracked in git (21 November 2026)
+- 14 `__pycache__/*.pyc` files were committed although `.gitignore` lists them, so every test run modified tracked files. They are untracked (nothing else changes).
+
 ### Changed -- the report's metric tables open as a chart per question, and the multiplicity charts are compact (21 November 2026)
 Presentation only: no number, rank, threshold or score changes, and every metric is still in the report.
 - **Visual summary first.** Each leaderboard, graded-recovery, scoring-additions, contig-layer, outcome, sequence-accuracy, bin-quality, performance, composite, feature and gene-order table now opens as a compact chart grouped by plain-language question ("How accurate are the bases?", "How many plasmids come back whole?", "How well are contigs grouped?"): one numbered dot per tool on one axis per metric, a ring and a star on the best, a whisker for the interval, run-outcome counts and not-assessed metrics as plain values, and the alignment error shares as one stacked bar per tool. A *Chart* / *Heatmap* switch shows the same rows as rank-shaded cells. The full grid (sort, find tool, heatmap, collapse groups, CSV) is kept under **All N metrics**; it stays open when JavaScript is off and when printing.
