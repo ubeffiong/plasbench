@@ -84,6 +84,9 @@ test_discover_negative_controls.py	0.3
 test_discover_plasmid_free.py	0.3
 test_disk_guard.sh	26.7
 test_doc_versions.py	0.3
+test_docker_extras.py	0.5
+test_docker_extras.sh	30.0
+test_docker_extras_e2e.py	180.0
 test_docker_install.sh	1.0
 test_docker_post_install.py	1.0
 test_docker_runtime.py	0.7

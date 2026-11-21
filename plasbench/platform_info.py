@@ -32,8 +32,20 @@ def os_kind() -> str:
     return "windows" if os.name == "nt" else "macos" if sys.platform == "darwin" else "linux"
 
 
+def in_container() -> bool:
+    """True inside a container (PLASBENCH_IN_DOCKER, /.dockerenv, cgroup evidence)."""
+    try:
+        from plasbench import docker_helper
+        return docker_helper.in_docker()
+    except Exception:  # noqa: BLE001
+        return os.path.exists("/.dockerenv")
+
+
 def in_wsl() -> bool:
     if os_kind() != "linux":
+        return False
+    # A container on Docker Desktop shares WSL2's kernel ("microsoft" in osrelease) but is not a WSL distribution: the WSL notes do not apply to it.
+    if in_container():
         return False
     try:
         return "microsoft" in Path("/proc/sys/kernel/osrelease").read_text(encoding="utf-8").lower()

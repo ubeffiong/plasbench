@@ -41,7 +41,17 @@ have mob_init || die "mob_init not found; install MOB-suite first: plasbench ins
 # to MOB-suite's own environment, so the database checked here is the one the
 # running tool reads, not an unused copy importable from this interpreter.
 
-DB_DIR="$(mobsuite_db_dir)"
+# A read-only MOB-suite folder (the image, run as the host user) cannot receive a database: it is built in the mounted store instead (mob_init -d) and the tools are
+# pointed at it (mobsuite_db_args). USE_STORE=1 says so.
+USE_STORE=0
+resolve_db_dir() {
+    DB_DIR="$(mobsuite_db_dir)"
+    if [[ -z "$DB_DIR" && "${PLASBENCH_IN_DOCKER:-}" == "1" ]] || { [[ -n "$DB_DIR" ]] && ! mobsuite_env_writable "$DB_DIR"; }; then
+        DB_DIR="$(mobsuite_db_store)"; USE_STORE=1
+        mkdir -p "$DB_DIR" 2>/dev/null || die "cannot create $DB_DIR for the MOB-suite database (is the databases folder mounted and writable?)"
+    fi
+}
+resolve_db_dir
 
 # A directory is only "present" if the files mob_recon actually reads are there.
 # status.txt alone is not enough: an interrupted mob_init can leave a partial
@@ -66,7 +76,7 @@ database_present() {
 # A database kept in the machine store is linked in instead of downloaded again.
 if [[ "$FORCE" -ne 1 ]]; then
     mobsuite_db_preserve
-    DB_DIR="$(mobsuite_db_dir)"
+    resolve_db_dir
 fi
 if [[ -n "$DB_DIR" ]] && database_present "$DB_DIR"; then
     log "  [ok]   MOB-suite DB already present at $DB_DIR"
@@ -126,19 +136,20 @@ if [[ -n "$MOB_PY" && -x "$MOB_PY" ]]; then
         die "the MOB-suite archive did not match MOBSUITE_DB_SHA256; it was deleted and not used"
     }
     log "Building the MOB-suite database from the downloaded archive (a status line appears every minute after 3 quiet minutes) ..."
-    run_with_heartbeat "MOB-suite database index build" env PATH="$MOB_ROOT/bin:$PATH" PLASBENCH_MOB_ARCHIVE="$ARCHIVE" \
+    run_with_heartbeat "MOB-suite database index build" env PATH="$MOB_ROOT/bin:$PATH" PLASBENCH_MOB_ARCHIVE="$ARCHIVE" PLASBENCH_MOB_DB_TARGET="$([[ "$USE_STORE" -eq 1 ]] && printf %s "$DB_DIR" || true)" \
         "$MOB_PY" -c '
 import os, sys
 import mob_suite.mob_init as m
 m.config["db_mirrors"] = ["file://" + os.environ["PLASBENCH_MOB_ARCHIVE"]]
-sys.argv = ["mob_init"]
+sys.argv = ["mob_init"] + (["-d", os.environ["PLASBENCH_MOB_DB_TARGET"]] if os.environ.get("PLASBENCH_MOB_DB_TARGET") else [])
 sys.exit(m.main())
 ' || die "building the MOB-suite database failed; see its output above. The downloaded archive is kept at $ARCHIVE, so a re-run does not download it again."
     rm -f "$ARCHIVE"
 else
     # MOB-suite's environment could not be located: fall back to mob_init's own (non-resumable) download.
     warn "could not locate MOB-suite's Python; using mob_init's own download, which cannot resume"
-    run_with_heartbeat "MOB-suite database download/index build" mob_init || die "mob_init failed; check network access and see its output above.
+    INIT_ARGS=(); [[ "$USE_STORE" -eq 1 ]] && INIT_ARGS=(-d "$DB_DIR")
+    run_with_heartbeat "MOB-suite database download/index build" mob_init ${INIT_ARGS[@]+"${INIT_ARGS[@]}"} || die "mob_init failed; check network access and see its output above.
 If your connection keeps dropping, a prebuilt database directory can be copied
 into $DB_DIR instead -- every file in it is plain data with no absolute paths."
 fi
