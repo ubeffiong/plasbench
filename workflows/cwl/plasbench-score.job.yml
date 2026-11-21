@@ -1,0 +1,13 @@
+# Test job: the synthetic isolate of the PlasBench Galaxy wrappers (galaxy/test-data): a 3,000 bp plasmid and a 4,000 bp chromosome, and a prediction that is the plasmid.
+# Run with:   cwltool plasbench-score.cwl plasbench-score.job.yml
+reference:
+  class: File
+  path: ../../galaxy/test-data/reference.fasta
+truth:
+  class: File
+  path: test-data/truth.tsv
+predictions:
+  - class: File
+    path: ../../galaxy/test-data/align_prediction.fasta
+tool_names: [demo_perfect]
+sample: synthetic

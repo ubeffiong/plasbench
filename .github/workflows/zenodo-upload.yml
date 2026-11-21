@@ -69,7 +69,7 @@ jobs:
                 "upload_type": "dataset",
                 "description": "Public cohort metadata (sample sheets and NCBI verification locks) shipped with PlasBench release ${{ github.ref_name }}. See https://github.com/${{ github.repository }} for the benchmarking pipeline itself.",
                 "creators": [{"name": "Effiong, Ubokobong"}],
-                "license": "CC-BY-4.0"
+                "license": "cc-by-4.0"
               }
             }'
 

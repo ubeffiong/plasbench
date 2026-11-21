@@ -1,12 +1,22 @@
 {
   "title": "PlasBench",
-  "description": "Benchmark plasmid-reconstruction tools against complete-reference truth.",
+  "description": "PlasBench benchmarks plasmid-reconstruction tools against complete-reference truth. Every tool, whether a classifier, a binner or a re-assembler, is reduced to one predicted-plasmid FASTA projected back onto a complete long-read or hybrid reference, so base-level precision, recall and F1 sit beside plasmid-level recovery and structural measures, with the evidence tier of every reference recorded. Command line and local browser window; Docker or conda; Galaxy and CWL wrappers for the scoring steps.",
   "upload_type": "software",
-  "license": "GPL-3.0-only",
+  "license": "gpl-3.0-only",
   "creators": [
-    {"name": "Effiong, Ubokobong"}
+    {
+      "name": "Effiong, Ubokobong"
+    }
   ],
-  "keywords": ["bioinformatics", "plasmid", "benchmarking", "genomics"],
+  "keywords": [
+    "bioinformatics",
+    "plasmid",
+    "benchmarking",
+    "genomics",
+    "antimicrobial resistance",
+    "reproducibility",
+    "workflow"
+  ],
   "related_identifiers": [
     {
       "identifier": "https://github.com/ubeffiong/plasbench",
@@ -14,5 +24,7 @@
       "resource_type": "software",
       "scheme": "url"
     }
-  ]
+  ],
+  "access_right": "open",
+  "language": "eng"
 }
