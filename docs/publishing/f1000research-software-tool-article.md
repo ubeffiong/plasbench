@@ -96,8 +96,8 @@ a CWL workflow (`workflows/cwl/`, runnable with `cwltool`).
    plasmid) the workflow returns precision, recall and F1 of 1.0, as it should; this was run in containers with `cwltool` on 21 November 2026.
 3. **Benchmarking tools on your own isolates.** A cohort of isolates with reads and a complete reference is declared, `plasbench run` carries out the stages, and the
    report ranks the tools within each input track with the evidence tier of each reference shown. [AUTHOR: add one worked example with real isolates and the resulting
-   report, with the accessions, if you want a results section; this draft contains none and the repository's own FAQ states that ranking, leakage and per-species claims
-   need a completed real-data run.]
+   report, with the accessions, if you want a results section; this draft contains none. The repository holds a 10-isolate real run (`results_real_cohort1`, FAQ Q22), which
+   shows the pipeline works on real reads but is too small to rank tools.]
 
 ## Discussion
 

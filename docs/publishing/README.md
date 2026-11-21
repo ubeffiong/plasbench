@@ -54,7 +54,7 @@ workflow: the full pipeline downloads data and runs for hours, which a workflow 
 F1000Research publishes Software Tool Articles; their guidelines require an open licence, a permanent archived copy of the software with a DOI (Zenodo is the usual one), and a
 "Software availability" section. The draft follows that structure. **Before submitting:** connect the GitHub repository to Zenodo and publish a release so that
 `.zenodo.json` creates the DOI (see `docs/RELEASING.md`), fill in the bracketed author items, and re-read the journal's current guidelines (the wording on licences and structure
-should be checked at submission; it was read from search results, not from the full checklist). One inconsistency to settle first: `FAQ.md` Q22 says no real-data run exists, while the
+should be checked at submission; it was read from search results, not from the full checklist). `FAQ.md` Q22 now says what the 10-isolate real run (`results_real_cohort1`, PlasBench 0.2.3) shows and cannot show; a reviewer will expect a run large enough to rank tools, so decide whether to add a worked real-data example (the `public-v4` runs) before submitting.
 repository also holds `results_real_cohort1` (10 isolates, PlasBench 0.2.3, run-level tables only, see `docs/COHORT1_REBUILD_STATUS.md`); a reviewer will see both.
 
 ### BioBuntu
