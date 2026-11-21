@@ -371,10 +371,25 @@ def disk_warning(path, need_gb=12.0, usage=shutil.disk_usage):
     return ""
 
 
-def ensure_image(root, *, assume_yes=False, ask=None, out=print, run=None, streamer=None, rebuild=False, policy=None, exe=None, environ=None, net_require=None) -> dict:
+def _stop(diag, image, what, environ=None, root=None, stage="pull") -> dict:
+    """The answer when PlasBench must stop (and build nothing): exit 20 ("waiting for you") when only the person can fix the engine, else 1. The diagnosis is recorded."""
+    from . import docker_health
+    if root is not None:
+        docker_health.record(root, diag, stage, environ)
+    code = 20 if (diag["user_action"] and diag["engine_unhealthy"]) else 1
+    message = (f"Docker cannot {what} right now: {diag['title']}. Nothing was pulled or built." if code == 20 else
+               f"The {what} failed: {diag['title']}. PlasBench stopped here and did not build the image (see the steps above).")
+    return {"ok": False, "image": image, "source": "", "code": code, "diagnosis": diag, "message": message}
+
+
+def ensure_image(root, *, assume_yes=False, ask=None, out=print, run=None, streamer=None, rebuild=False, policy=None, exe=None, environ=None, net_require=None, sleep=time.sleep) -> dict:
     """Make the image ready. -> {'ok', 'image', 'source': 'present'|'pulled'|'built-locally', 'code', 'message'}.
-    Order: present locally -> pull (PLASBENCH_DOCKER_PULL) -> build from the Dockerfile after consent (assume_yes, or `ask(question)` returns True).
-    Without consent the answer is code 21 (like install-tools) and nothing is built."""
+    Order: present locally -> engine health pre-flight -> pull (PLASBENCH_DOCKER_PULL; retried after a network or corrupted-layer failure) -> build from the Dockerfile after consent
+    (assume_yes, or `ask(question)` returns True), and ONLY when the pull failed because the image is genuinely unavailable (not published, private, wrong platform): after an engine, disk,
+    storage, corruption, network or unknown error PlasBench stops with the diagnosis (python/docker_diagnosis.py) and builds nothing.
+    Without consent the answer is code 21 (like install-tools) and nothing is built; 20 means only the person can fix the engine (restart, free disk)."""
+    from . import docker_health
+    injected = run is not None
     run = run or _run
     streamer = streamer or stream
     exe = exe if exe is not None else docker_exe()
@@ -385,6 +400,19 @@ def ensure_image(root, *, assume_yes=False, ask=None, out=print, run=None, strea
     present = run([exe, "image", "inspect", image, "--format", "{{.Id}}"], 15)[0] == 0
     if present and not rebuild and policy != "always":
         return {"ok": True, "image": image, "source": "present", "code": 0, "message": f"The image {image} is on this computer."}
+    ctx = {"image": image, "env": docker_health.detected_environment() if docker_health.enabled(environ) else {}}
+
+    def health(purpose):
+        if not docker_health.enabled(environ):
+            return None
+        if injected:
+            return docker_health.check(root, purpose=purpose, run=run, exe=exe, environ=environ, image=image)
+        return docker_health.cached(root, purpose=purpose, image=image)
+    sick = health("build" if (rebuild or policy == "never") else "pull")
+    if sick is not None:
+        docker_health.explain(sick, out)       # a failure prints what is wrong; a healthy engine prints only its notes (low disk, a proxy)
+        if not sick["healthy"]:
+            return _stop(sick["diagnosis"] or docker_health.diagnose("", ctx), image, "pull or build", environ, root, "preflight")
     if not rebuild and policy != "never":
         refused = None
         try:
@@ -395,12 +423,28 @@ def ensure_image(root, *, assume_yes=False, ask=None, out=print, run=None, strea
         if refused:
             out("[plasbench] " + refused.splitlines()[0])
         else:
-            out(f"[plasbench] Pulling {image} ...")
-            code, tail = streamer([exe, "pull", image], None, out, 60.0, f"pulling {image}")
-            if code == 0:
-                return {"ok": True, "image": image, "source": "pulled", "code": 0, "message": f"Pulled {image}."}
-            failure = classify_failure("\n".join(tail))
-            out(f"[plasbench] The pull failed ({failure['kind']}): {failure['advice']}")
+            attempts = 1 + docker_health.retries(environ)
+            diag = None
+            for attempt in range(attempts):
+                out(f"[plasbench] Pulling {image} ..." if attempt == 0 else f"[plasbench] Pulling {image} again (attempt {attempt + 1} of {attempts}; finished layers are kept) ...")
+                code, tail = streamer([exe, "pull", image], None, out, 60.0, f"pulling {image}")
+                if code == 0:
+                    return {"ok": True, "image": image, "source": "pulled", "code": 0, "message": f"Pulled {image}."}
+                diag = docker_health.diagnose("\n".join(tail), ctx)
+                out(f"[plasbench] The pull failed ({diag['cause']}): {diag['title']}.")
+                if diag["retryable"] and attempt + 1 < attempts:
+                    wait = docker_health.backoff(attempt, environ)
+                    out(f"[plasbench] Trying again in {wait:g} s (PLASBENCH_DOCKER_PULL_RETRIES sets how often).")
+                    sleep(wait)
+                    continue
+                break
+            docker_health.show(diag, out)
+            docker_health.record(root, diag, "pull", environ)
+            if not diag["build_ok"]:
+                if present and not rebuild:
+                    return {"ok": True, "image": image, "source": "present", "code": 0, "diagnosis": diag, "message": f"Could not update {image} ({diag['title']}); using the copy on this computer."}
+                return _stop(diag, image, "pull", environ)
+            out(f"[plasbench] The image is not available from the registry ({diag['cause'].replace('_', ' ')}): building it here is the remedy.")
     if present and not rebuild:
         return {"ok": True, "image": image, "source": "present", "code": 0, "message": f"Could not update {image}; using the copy on this computer."}
     target = image if explicit and "/" not in image else local_tag()
@@ -424,6 +468,10 @@ def ensure_image(root, *, assume_yes=False, ask=None, out=print, run=None, strea
     if not (assume_yes or (ask is not None and ask(f"Build the image {target} now?"))):
         return {"ok": False, "image": target, "source": "", "code": EXIT_CONSENT, "plan": plan,
                 "message": "The image is not available (the pull failed or it is not published). To build it here run: plasbench runtime build --yes   (consent needed; nothing was changed)"}
+    again = health("build")
+    if again is not None and not again["healthy"]:
+        docker_health.explain(again, out)
+        return _stop(again["diagnosis"] or docker_health.diagnose("", ctx), target, "build", environ, root, "preflight")
     buildkit = run([exe, "buildx", "version"], 10)[0] == 0
     env = dict(os.environ, DOCKER_BUILDKIT="1" if buildkit else "0")
     code, tail = streamer(build_argv(root, target, exe, buildkit=buildkit), env, out, 60.0, f"building {target}")
@@ -433,7 +481,11 @@ def ensure_image(root, *, assume_yes=False, ask=None, out=print, run=None, strea
         out("[plasbench] Last lines of the build output:")
         for line in tail[-12:]:
             out("    " + line)
-        return {"ok": False, "image": target, "source": "", "code": 1, "failure": why, "message": why["advice"]}
+        diag = docker_health.diagnose("\n".join(tail), dict(ctx, image=target))
+        out(f"[plasbench] Diagnosis: {diag['title']} ({diag['cause']}, confidence {diag['confidence']}).")
+        docker_health.show(diag, out)
+        docker_health.record(root, diag, "build", environ)
+        return {"ok": False, "image": target, "source": "", "code": 20 if (diag["user_action"] and diag["engine_unhealthy"]) else 1, "failure": why, "diagnosis": diag, "message": why["advice"]}
     return {"ok": True, "image": target, "source": "built-locally", "code": 0, "message": f"Built {target}."}
 
 
@@ -708,6 +760,8 @@ def execute(root, command, env=None, *, assume_yes=False, interactive_ok=True, o
             allow_build=True, runner=None) -> int:
     """Run `command` (an argument list, e.g. ['bash', 'scripts/run_all.sh', '0', '1']) inside the PlasBench container with the study folders mounted at their own paths.
     Returns the container's exit code (so 0/1/6/20/21 pass straight through), 21 when the image needs a build that was not agreed, or 1 when Docker cannot be used."""
+    from . import docker_health
+    injected = run is not None
     run = run or _run
     environ = dict(os.environ if environ is None else environ)
     exe = exe if exe is not None else docker_exe()
@@ -716,6 +770,13 @@ def execute(root, command, env=None, *, assume_yes=False, interactive_ok=True, o
         out(f"[plasbench] ERROR: Docker is not ready ({state['state'].replace('_', ' ')}). {state['hint']}")
         out("[plasbench] To run with conda instead: plasbench runtime use conda  (or add --runtime conda).")
         return 1
+    if docker_health.enabled(environ):        # the engine can write and has room: found in a second, not after hours of building
+        sick = docker_health.check(root, purpose="run", run=run, exe=exe, environ=environ) if injected else docker_health.cached(root, purpose="run")
+        docker_health.explain(sick, out)
+        if not sick["healthy"]:
+            stopped = _stop(sick["diagnosis"] or docker_health.diagnose("", {}), "", "start a container", environ, root, "preflight")
+            out("[plasbench] " + stopped["message"])
+            return stopped["code"]
 
     def ask(question):
         if not (interactive_ok and sys.stdin and sys.stdin.isatty()):
@@ -790,6 +851,13 @@ def check_steps(root, *, run=None, exe=None, environ=None, kind=None, workdir=No
     state = probe(root, run=run, exe=exe, environ=environ)
     if not add("Docker answers", state["state"] == "ready", (f"Docker {state['version']} ({state.get('arch') or 'unknown architecture'})" if state["state"] == "ready" else state["hint"] or state["state"])):
         return rows
+    from . import docker_health
+    if docker_health.enabled(environ):
+        health = docker_health.check(root, purpose="run", run=run, exe=exe, environ=environ)
+        bad = [r for r in health["checks"] if not r["ok"]]
+        if not add("Engine health (answers, can write)", health["healthy"], "; ".join(f"{r['name']}: {r['detail']}" for r in bad) or "the engine can write its metadata (test volume created and removed)"):
+            rows[-1]["diagnosis"] = health["diagnosis"]
+            return rows
     info = state["image"]
     add("Image on this computer", info.get("present"), (f"{info['name']} ({info.get('size_bytes') or 'size unknown'} bytes), {info.get('source')}" if info.get("present")
                                                           else f"{info.get('name')} is not here: plasbench runtime pull, or plasbench runtime build"))

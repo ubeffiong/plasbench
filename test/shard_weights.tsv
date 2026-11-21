@@ -88,6 +88,8 @@ test_docker_extras.py	0.5
 test_docker_extras.sh	30.0
 test_docker_extras_e2e.py	180.0
 test_docker_install.sh	1.0
+test_docker_diagnosis.py	0.5
+test_docker_health.py	12.0
 test_docker_post_install.py	1.0
 test_docker_runtime.py	0.7
 test_docker_runtime_e2e.py	22.3

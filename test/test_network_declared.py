@@ -44,6 +44,8 @@ ALLOWED = {
     "plasbench/server_state.py": "a loopback health check of the replacement window server on 127.0.0.1; not the internet",
     "plasbench/platform_info.py": "builds advice text (a curl and docker pull command the user is told to run); makes no request",
     "plasbench/ui_help.py": "tooltip text that mentions prefetch and aria2c; no request",
+    "python/docker_diagnosis.py": "advice text and the `docker pull <image>` command shown for the person to run; it reads error text and makes no request",
+    "plasbench/docker_health.py": "its checks are docker version / info / volume create and rm (no network); `docker pull` appears only in messages. The pulls themselves are in docker_runtime.ensure_image, behind net_require",
     "python/download_progress.py": "reads the local aria2c control file of a download another script runs; no request",
     "python/make_truth.py": "its docstring names the `datasets download` command whose output it reads; no request",
     "python/plaseval_gate.py": "an error message that tells the user to `git clone` PlasEval; no request",
