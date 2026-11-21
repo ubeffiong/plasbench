@@ -18,6 +18,8 @@ ROOT="$(cd "$HERE/.." && pwd)"
 TMP="$(mktemp -d)"
 # Fake SRA binaries only: never fall back to ENA over the network in tests.
 export READ_SOURCE=sra
+# The failing reference download is retried with a 15 s, 30 s ... backoff; the test checks the outcome, not the wait.
+export NETWORK_RETRY_DELAY_SECONDS=0
 trap 'rm -rf "$TMP"' EXIT
 
 mkdir -p "$TMP/bin" "$TMP/data/s1" "$TMP/logs"

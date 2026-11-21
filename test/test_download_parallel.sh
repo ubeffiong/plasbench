@@ -12,6 +12,9 @@ ROOT="$(cd "$HERE/.." && pwd)"
 TMP="$(mktemp -d)"
 # Fake SRA binaries only: never fall back to ENA over the network in tests.
 export READ_SOURCE=sra
+# The failing-fetch cases retry (NETWORK_RETRIES, default 3) with a linear backoff of 15 s, 30 s ... between attempts; the number of attempts is what the test checks,
+# not the wait between them, so the wait is zero (the stage still retries the same number of times).
+export NETWORK_RETRY_DELAY_SECONDS=0
 trap 'rm -rf "$TMP"' EXIT
 
 DELAY=0.4
