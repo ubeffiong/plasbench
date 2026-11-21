@@ -2253,7 +2253,7 @@ function afterJob(j) {
   if (n === "upgrade") { updLoad(true); if (j.state === "done" && typeof ssPoll === "function") ssPoll(); }   // the Updates card follows the job; a finished update makes the running server stale: the banner and Restart window appear
   if (j.kind === "git") refreshGit();   // fetch, pull, push: the drawer and the page show the new state
   if (n === "install-tools" && j.argv[1] === "docker") dockerLoad(true);      // the engine may be working now: look again (Re-check does the same by hand)
-  if (["check","install-tools","install-conda","tools"].includes(n)) { S.env = null; S.tools = null; S.toolsStale = true; S.user = null; if (!$("#v_setup").hidden) loadSetup(true); }
+  if (["check","install-tools","install-conda","tools"].includes(n)) { S.env = null; S.tools = null; S.toolsStale = true; S.user = null; if (!$("#v_setup").hidden) loadSetup(true); getEnv(true).then(() => { if (typeof wfRenderAll === "function") wfRenderAll(); }).catch(() => {}); }
   if (["run","demo","report","report-pdf"].includes(n)) { S.runs = null; if (!$("#v_runs").hidden) loadRuns(); if (!$("#v_home").hidden) loadHome(); }
 }
 setInterval(() => { pollConsole(); }, 1000);
@@ -2929,6 +2929,7 @@ function instButtons(t) {
 }
 function instWorkflow(it) {
   if (it.item_id === "docker") return dockerWorkflowHTML();
+  if (SUPPORT_OF[it.item_id]) return supportWorkflowHTML(it.item_id);
   const t = (S.tools || []).find(x => x.tool === it.item_id);
   if (!t || !t.profile) return "";
   const k = instKind(t);
@@ -2936,6 +2937,34 @@ function instWorkflow(it) {
     : t.installed === true ? `<span class="tag ok">installed</span>${instRevision(t)}` : t.installed === false ? `<span class="tag bad">not installed</span>` : "";
   return `<div class="inst small" style="margin-top:4px">${state} ${instButtons(t).replace(/<span class="tag warn"[^>]*>manual step<\/span> /, "")}</div>`;
 }
+/* Support tools: the callers of the reference-annotation stage and the tools of the optional features. They are not benchmark tools (no task, no run flag), so they come from the
+   environment checks (S.env, group "Annotation tools" / "Optional tools"), each tied to the Workflow switch that turns it on; the person chooses to install it (Install button, one
+   consent dialog) and to switch it on or off (the Workflow switch). */
+const SUPPORT_OF = {ANNOTATE_WITH_MOB_TYPER: ["mob_typer"], ANNOTATE_WITH_ABRICATE: ["abricate"], ANNOTATE_WITH_AMRFINDER: ["amrfinder"], ANNOTATE_WITH_ISESCAN: ["isescan.py"],
+  ANNOTATE_WITH_BARRNAP: ["barrnap"], RUN_QUAST_DIAGNOSTICS: ["quast.py"], multiqc: ["multiqc"], RUN_PROTEIN_ANNOTATION: ["bakta"], RUN_DIFFICULTY_FEATURES: ["samtools", "deadends"]};
+const supportCheck = id => (S.env || []).find(c => c.id === id);
+const supportProfile = c => c && c.fix && c.fix.startsWith("install-tools ") ? c.fix.split(" ")[1] : "";
+function supportWorkflowHTML(itemId) {
+  const checks = (SUPPORT_OF[itemId] || []).map(supportCheck).filter(Boolean);
+  if (!checks.length) return "";
+  return `<div class="inst small" style="margin-top:4px">${checks.map(c => {
+    const p = supportProfile(c);
+    const state = c.ok ? `<span class="tag ok">installed</span>` : `<span class="tag bad" title="${esc(c.detail || "")}">${/installed, but/.test(c.detail || "") ? "needs its database" : "not installed"}</span>`;
+    const act = c.ok ? "" : p ? ` <button class="btn sec sm" data-instsup="${esc(p)}" data-supid="${esc(c.id)}">Install</button>` : c.fix ? ` <span class="mut">${esc(c.fix)}</span>` : "";
+    return `<span style="margin-right:12px">${esc(c.label.replace(/ \(.*$/, ""))} ${state}${act}</span>`; }).join("")}</div>`;
+}
+/* The support tools that are missing although the Workflow switch for them is on (an "auto" switch is left alone: it runs when the tool is there). */
+function supportNeeded() {
+  if (!WF.data || !S.env) return [];
+  const st = wfStates(""), on = id => st[id] === "on", out = [], seen = new Set();
+  for (const [id, ids] of Object.entries(SUPPORT_OF)) {
+    if (!on(id) || (id.startsWith("ANNOTATE_WITH_") && !on("RUN_REFERENCE_ANNOTATION"))) continue;
+    for (const cid of ids) { const c = supportCheck(cid), p = supportProfile(c); if (c && !c.ok && p && !seen.has(cid)) { seen.add(cid); out.push({tool: cid, display: c.label, profile: p, installed: false, enabled: true, source: "support"}); } }
+  }
+  return out;
+}
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-instsup]"); if (!b) return; const c = supportCheck(b.dataset.supid);
+  installTools([{tool: b.dataset.supid, display: c ? c.label : b.dataset.supid, profile: b.dataset.instsup, source: "support"}], `Install ${c ? c.label : b.dataset.supid}`); });
 const instMinutes = t => (t.install && t.install.minutes) || "about 5-15 minutes (not measured)";
 async function installTools(tools, label) {
   const list = [], seen = new Set();
@@ -2950,8 +2979,9 @@ async function installTools(tools, label) {
   S.instStart = {t0: Date.now(), profiles: list.map(t => t.profile), minutes: list.map(instMinutes)};
   return startJob(["install-tools", list.map(t => t.profile).join(","), "--yes"], label || `Install ${list.map(t => t.display).join(", ")}`);
 }
-function installEnabled() {
-  const need = (S.tools || []).filter(t => t.enabled && instCanInstall(t));
+async function installEnabled() {
+  try { await wfLoad(); await getEnv(); } catch { /* the registry tools alone are still offered */ }
+  const need = (S.tools || []).filter(t => t.enabled && instCanInstall(t)).concat(supportNeeded());
   const manual = (S.tools || []).filter(t => t.enabled && instKind(t) === "manual");
   if (!need.length) return toast(manual.length ? `Every enabled tool that can be installed is installed. ${manual.map(t => t.display).join(", ")} need a manual step (Show steps).` : "Every enabled tool is installed.", "ok");
   return installTools(need, `Install the ${need.length} enabled tool${need.length > 1 ? "s" : ""} that ${need.length > 1 ? "are" : "is"} missing`);
@@ -2972,7 +3002,8 @@ setInterval(renderInstallBar, 1000);
 /* Before a benchmark starts: the enabled tools that are not installed are listed, and one confirmation installs them first (the run then carries on). Without it a run with no
    terminal stops at its first check, before any sample work, naming every missing tool. Returns "run", "install" or "cancel". */
 async function instPreRun() {
-  const need = (S.tools || []).filter(t => t.enabled && instCanInstall(t));
+  try { await wfLoad(); await getEnv(); } catch { /* the registry tools alone are still offered */ }
+  const need = (S.tools || []).filter(t => t.enabled && instCanInstall(t)).concat(supportNeeded());
   if (!need.length) return "run";
   const x = await modalDialog({title: `${need.length} enabled tool${need.length > 1 ? "s are" : " is"} not installed`, wide: true,
     buttons: [{id: "cancel", label: "Cancel"}, {id: "ok", label: "Install, then run", primary: true}],
@@ -7142,6 +7173,7 @@ async function wfLoad(force) {
   if (WF.loading) return WF.loading;
   WF.loading = (async () => {
     dockerLoad(false);
+    getEnv().then(() => { if (typeof wfRenderAll === "function") wfRenderAll(); }).catch(() => {});      // the install state of the support tools on the cards
     try { const d = await api("workflow"); WF.data = d; WF.loadError = ""; WF.vals = {}; for (const s of d.steps) for (const it of s.items) if (it.setting_key) WF.vals[it.setting_key] = it.value ?? ""; }
     catch (e) { WF.loadError = "The workflow could not be loaded: " + e.message; }
     finally { WF.loading = null; }

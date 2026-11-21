@@ -50,6 +50,24 @@ def main():
     check("every caller's result is recorded", sorted(order) == sorted(["mob_typer", "abricate_amr", "abricate_replicon",
                                                                         "amrfinder", "isescan", "isfinder", "barrnap"]), order)
     check("ISEScan gets the whole thread allowance", seen.get("isescan") == 16, seen)
+    # ---- one switch per caller: a caller switched off is not run and is recorded as not evaluated with the reason ----
+    import os
+    ran = []
+    for attr in ("call_mob_typer", "call_abricate", "call_amrfinder", "call_isescan", "call_isfinder", "call_barrnap"):
+        setattr(ar, attr, (lambda n: (lambda *a, **k: (ran.append(n) or ([], {"status": "ok", "features": 0}))))(attr))
+    os.environ.update({"ANNOTATE_WITH_ABRICATE": "0", "ANNOTATE_WITH_ISESCAN": "off"})
+    try:
+        sys.argv = ["annotate_reference.py", "--reference", str(ref), "--out", str(tmp / "f2.tsv"), "--provenance", str(tmp / "p2.json"), "--threads", "4", "--cache-dir", ""]
+        ar.main()
+    finally:
+        os.environ.pop("ANNOTATE_WITH_ABRICATE", None)
+        os.environ.pop("ANNOTATE_WITH_ISESCAN", None)
+    prov = json.loads((tmp / "p2.json").read_text(encoding="utf-8"))["callers"]
+    check("a caller switched off is not run", "call_abricate" not in ran and "call_isescan" not in ran and "call_amrfinder" in ran and "call_barrnap" in ran, ran)
+    check("... and is recorded as not evaluated, with the switch named (never as 'no feature found')",
+          prov["abricate_amr"]["status"] == "not_evaluated" and "ANNOTATE_WITH_ABRICATE=0" in prov["abricate_amr"]["reason"]
+          and prov["isescan"]["status"] == "not_evaluated" and prov["amrfinder"]["status"] == "ok", prov)
+    check("callers_switched_off reads 0, no, off and false and ignores everything else", ar.callers_switched_off({"ANNOTATE_WITH_BARRNAP": "No", "ANNOTATE_WITH_MOB_TYPER": "1", "ANNOTATE_WITH_AMRFINDER": "false", "ANNOTATE_WITH_ABRICATE": "maybe"}) == ["amrfinder", "barrnap"])
     print(f"\n{'FAILED: ' + ', '.join(FAILED) if FAILED else 'all parallel-annotation checks passed'}")
     return 1 if FAILED else 0
 
