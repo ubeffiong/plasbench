@@ -77,6 +77,12 @@ echo "[setup_conda] installing MOB-suite into its own environment ..."
 bash "$HERE/install_tools.sh" --env "$ENV_NAME" mobsuite \
     || echo "[setup_conda] WARNING: MOB-suite environment not installed; run: bash env/install_tools.sh mobsuite" >&2
 
+# The default reference-annotation stage (RUN_REFERENCE_ANNOTATION=1) needs abricate, AMRFinderPlus (+ its database, fetched once), ISEScan (with fastcluster<1.3) and
+# mob_typer. Installed here so a first run does not meet them missing; advisory, so a failure never fails the setup. PLASBENCH_SKIP_AMRFINDER_DB=1 skips the database.
+echo "[setup_conda] installing the annotation callers (abricate, AMRFinderPlus and its database, ISEScan) ..."
+bash "$HERE/install_tools.sh" --env "$ENV_NAME" reference-annotation \
+    || echo "[setup_conda] WARNING: annotation callers not installed; run: plasbench install-tools reference-annotation --yes" >&2
+
 echo
 echo "[setup_conda] done. Activate it with:"
 echo "    conda activate $ENV_NAME"
