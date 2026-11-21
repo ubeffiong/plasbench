@@ -13,6 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- the page tabs stay in view (21 November 2026)
+- **Window.** The strip of page tabs under the top bar (the open page and any documents opened from it) is now fixed while the page scrolls, instead of scrolling away; the other sticky panels (the run form's side column, the command list) start below it. Checked statically and by the existing UI tests; not looked at in a browser.
+
 ## [0.5.6] - 2026-11-21
 Summary. Nothing in this release changes a score, a ranking or a threshold. Fixes and additions since 0.5.5, all described in the entries below:
 - **Window stability.** The false "older than the page" banner (the page's own check was rewritten by the server), the pop-up that repeated every few seconds, and duplicate app windows are fixed; a stale window with an old key no longer gets 403 while the cookie holds the new one.

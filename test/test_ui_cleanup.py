@@ -122,5 +122,10 @@ check("the toast's actions are all there: View log, Cancel, Hide, Re-check, Dism
 # ---- 6. Report an issue: deliberate additions (More menu item, Guides page button; not in the before-fixture) ------------------------------------------------------------
 check("Report an issue is in the More menu and on the Guides page, with a tooltip id", 'id="reportbtn"' in html and 'id="reportbtn2"' in html and 'data-tipid="report_issue"' in html)
 
+# ---- 7. the page tabs (#mtabs) stay fixed under the application bar while the page scrolls ---------------------------------------------------------------------
+mt = re.search(r"^\.mtabs\{([^}]*)\}", html, re.M)
+check("the page tab strip is sticky under the top bar, above the content, with its own background (it does not scroll away)",
+      bool(mt) and "position:sticky" in mt.group(1) and "top:var(--hdr)" in mt.group(1) and "background:var(--bg)" in mt.group(1) and re.search(r"z-index:\d+", mt.group(1)) is not None, mt.group(1) if mt else "no .mtabs rule")
+check("other sticky panels start below the tab strip (--mtabh), so the strip never covers them", "--mtabh" in html and "var(--hdr) + var(--mtabh)" in html)
 print("ALL UI CLEANUP TESTS PASSED" if OK else "UI CLEANUP TESTS FAILED")
 sys.exit(0 if OK else 1)
