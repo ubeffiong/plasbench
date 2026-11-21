@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 
@@ -45,6 +46,14 @@ RULES = [
      None, True,
      "A folder PlasBench must write to cannot be written: the study folder, the data folder or the temporary folder ({tmp}). Check with: ls -ld <folder>; touch <folder>/x. "
      "A study folder under /mnt (Windows) can be read-only or locked by a sync program; use a folder inside Ubuntu (for example under your home) or set TMPDIR to a writable folder."),
+    ("spades_needs_memory", "SPAdes says exactly how much memory it needs and the budget was lower", "high",
+     [r"You need approx\.?\s*[0-9.]+\s*(GB|G|MB|TB).*RAM", r"reads contain too many k-?mers to fit into (the )?available memory",
+      r"too many k-?mers to fit"],
+     "memory_need", False,
+     "SPAdes stopped because its memory budget was too small: it needs about {need} GB of free memory for these reads (it was given {memory} GB; {available} GB is free now). "
+     "PlasBench retries once with the budget SPAdes asked for (plus a margin) when that fits in the free memory; otherwise it stops and says so. To fix it yourself: raise MEMORY_GB "
+     "(plasbench run --memory-gb N) to at least {need_up}, close other programs, give Ubuntu more memory (WSL: memory= in C:\\Users\\<you>\\.wslconfig, then wsl --shutdown), "
+     "or use a smaller read set (a smaller --max-isolates, or skip this isolate). Check with: free -h."),
     ("memory_limit_exceeded", "SPAdes reached its own memory limit (-m)", "high",
      [r"memory limit.*(exceed|reached|too low)", r"exceeded.*memory limit", r"not enough memory"],
      "memory", False,
@@ -123,11 +132,46 @@ KILL_SIGNALS = {9: "SIGKILL", 6: "SIGABRT", 4: "SIGILL", 11: "SIGSEGV", 15: "SIG
 RETURN_VALUE = re.compile(r"(?:OS return value|err(?:or)? code|return code|exit(?:ed)? (?:with )?(?:code|status))[: ]+(-?\d+)", re.I)
 
 
+# Lines every SPAdes run ends with (citation, thanks, where to report): never evidence of a failure.
+FOOTER = re.compile(r"doi\.org/|thank you for using|please,? cite|in case of any problems|in case you have troubles|spades\.support@|"
+                    r"github\.com/ablab|bioinf\.spbau|you can write to|provide us with params\.txt|^\s*SPAdes pipeline finished|"
+                    r"^\s*={3,}\s*SPAdes pipeline|log can be found|^\s*-{3,}\s*$|^\s*\*+\s*$|^\s*(Citation|Cite)", re.I)
+ERROR_MARK = re.compile(r"ERROR|error|Error|== Error ==|FATAL|Exception|failed|finished abnormally|terminate called|Assertion", )
+NEED_RE = re.compile(r"You need approx\.?\s*([0-9]+(?:\.[0-9]+)?)\s*(TB|GB|G|MB|M)?", re.I)
+
+
+def memory_need_gb(log_text):
+    """The memory SPAdes says it needs (`You need approx. 5.24277GB of free RAM`) in GB, or None when the log does not say."""
+    found = None
+    for m in NEED_RE.finditer(log_text or ""):
+        value = float(m.group(1))
+        unit = (m.group(2) or "GB").upper()
+        found = value * {"TB": 1024.0, "GB": 1.0, "G": 1.0, "MB": 1 / 1024.0, "M": 1 / 1024.0}[unit]
+    return found
+
+
+def memory_need_plan(need_gb, available_gb, margin=1.15, max_fraction=0.85, tight_fraction=0.92):
+    """The ONE retry for 'SPAdes needs X GB': (memory_gb, note) or (None, reason).
+    -m = ceil(need * 1.15 + 0.5 GB) when that is at most 85% of the memory available now; when only the bare need (rounded up) fits within 92% of it, that is used and the note
+    says it is tight; otherwise None with the exact need against what is free. The budget is never lowered: SPAdes asked for MORE."""
+    wanted = int(math.ceil(need_gb * margin + 0.5))
+    bare = int(math.ceil(need_gb))
+    if available_gb is None:
+        return wanted, "memory available now is unknown; using the size SPAdes asked for plus 15%"
+    if wanted <= available_gb * max_fraction:
+        return wanted, "needs %.2f GB, %.1f GB available: -m %d (need + 15%% + 0.5 GB)" % (need_gb, available_gb, wanted)
+    if bare <= available_gb * tight_fraction:
+        return bare, "needs %.2f GB, %.1f GB available: -m %d (exactly what SPAdes asked for, rounded up; tight, so other programs should be closed)" % (need_gb, available_gb, bare)
+    return None, "needs %.1f GB, %.1f GB are free" % (need_gb, available_gb)
+
+
 def _fill(text, context):
     values = {"free": "%s GB free" % context["free_gb"] if context.get("free_gb") is not None else "check df -h",
               "tmp": context.get("tmpdir") or "$TMPDIR", "threads": context.get("threads") or "?",
               "memory": context.get("memory_gb") or "?", "available": context.get("available_gb") if context.get("available_gb") is not None else "?",
-              "sample": context.get("sample") or "the isolate", "log": context.get("log") or "the log"}
+              "sample": context.get("sample") or "the isolate", "log": context.get("log") or "the log",
+              "need": ("%.2f" % context["need_gb"]) if context.get("need_gb") else "more",
+              "need_up": ("%d GB" % math.ceil(context["need_gb"] * 1.15)) if context.get("need_gb") else "what SPAdes asks for"}
     try:
         return text.format(**values)
     except (KeyError, IndexError, ValueError):
@@ -154,6 +198,9 @@ def diagnose(log_text, context=None):
     context = dict(context or {})
     lines = [ln.rstrip("\r") for ln in (log_text or "").splitlines()]
     lines = [ln for ln in lines if ln.strip()]
+    footer_free = [ln for ln in lines if not FOOTER.search(ln)]
+    context.setdefault("need_gb", memory_need_gb(log_text))
+    lines_all, lines = lines, footer_free
     for cause, title, confidence, patterns, retry, environmental, advice in RULES:
         compiled = [re.compile(p, re.I) for p in patterns]
         hits = [ln.strip()[:300] for ln in lines if any(c.search(ln) for c in compiled)]
@@ -163,7 +210,7 @@ def diagnose(log_text, context=None):
                 continue
             # "Resource temporarily unavailable" and "std::system_error" are thread-limit symptoms only together with a thread/process request.
             return _result(cause, title, confidence, hits[-MAX_EVIDENCE:], retry, environmental, _fill(advice, context))
-    code = _exit_code(lines, context)
+    code = _exit_code(lines_all, context)
     if code in (137, -9, 9):
         return _result("out_of_memory", "the process was killed (SIGKILL), most often for lack of memory", "medium",
                        [f"exit status {code} (SIGKILL); the log names no other cause"], "memory", False, _fill(RULES[3][6], context))
@@ -177,7 +224,8 @@ def diagnose(log_text, context=None):
     if free is not None and free < 0.2:
         return _result("disk_full", "the disk is full", "medium",
                        [f"only {free} GB was free where the study is when the failure was seen; the log names no other cause"], None, True, _fill(RULES[0][6], context))
-    tail = lines[-TAIL_LINES:]
+    marked = [ln for ln in lines if ERROR_MARK.search(ln)]
+    tail = [ln.strip()[:300] for ln in (marked[-MAX_EVIDENCE:] if marked else lines[-TAIL_LINES:])]
     note = "" if lines else " (the log is empty: the program failed before writing anything; a missing or broken install, or a full disk, do that)"
     advice = ("The cause is not one PlasBench recognises" + note + ". Read the end of the log: tail -30 " + (context.get("log") or "logs/<sample>.spades.log")
               + ". Check free space (df -h) and memory (free -h). If it fails for every isolate, run plasbench diagnose and report the log tail at "
@@ -221,11 +269,26 @@ def main(argv=None):
     ap.add_argument("--available-gb")
     ap.add_argument("--free-gb", type=float)
     ap.add_argument("--tmpdir", default="")
-    ap.add_argument("--format", choices=("tsv", "json", "text"), default="text")
+    ap.add_argument("--format", choices=("tsv", "json", "text", "need", "need-plan"), default="text")
+    ap.add_argument("--min-fraction", type=float, default=0.85, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     context = {"exit_code": args.exit_code, "tool": args.tool, "sample": args.sample, "threads": args.threads, "memory_gb": args.memory_gb,
                "available_gb": args.available_gb, "free_gb": args.free_gb, "tmpdir": args.tmpdir, "log": args.logfile}
-    result = diagnose(read_tail(args.logfile), context)
+    text = read_tail(args.logfile)
+    if args.format == "need":
+        need = memory_need_gb(text)
+        print("-" if need is None else "%.3f" % need)
+        return 0
+    if args.format == "need-plan":      # "<memory_gb> <note>" or "none <reason>": the one retry for a log that says how much memory it needs
+        need = memory_need_gb(text)
+        if need is None:
+            print("none the log does not say how much memory is needed")
+            return 0
+        avail = float(args.available_gb) if args.available_gb not in (None, "", "-") else None
+        mem, note = memory_need_plan(need, avail)
+        print("none %s" % note if mem is None else "%d %s" % (mem, note))
+        return 0
+    result = diagnose(text, context)
     if args.format == "json":
         print(json.dumps(result, indent=2))
     elif args.format == "tsv":

@@ -158,6 +158,13 @@ pb_run python3 test_zero_plasmid_bin_scoring.py
 pb_run python3 test_job_sleep_resume.py
 pb_run bash test_stage_failure_visibility.sh
 pb_run bash test_stage3_failure_diagnosis.sh
+pb_run bash test_stage3_continues.sh
+pb_run bash test_stage3_scratch.sh
+pb_run bash test_slow_step_and_aggregation.sh
+pb_run python3 test_run_status_stages.py
+pb_run python3 test_work_dir.py
+pb_run python3 test_resource_adapt.py
+pb_run python3 test_annotation_timeouts_and_readiness.py
 pb_run bash test_download_gate_and_prefetch.sh
 pb_run bash test_require_internet.sh
 pb_run bash test_run_events_and_heartbeat.sh

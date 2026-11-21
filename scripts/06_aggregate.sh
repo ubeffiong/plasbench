@@ -456,6 +456,9 @@ python3 "$HERE/../python/write_manifest.py" \
     --project-root "$PROJECT_ROOT" --sample-sheet "$SAMPLE_SHEET" \
     --data-dir "$DATA_DIR" --results-dir "$RESULTS_DIR" \
     --out "$RESULTS_DIR/run_manifest.json"
+# The `resources` section of the manifest: the final memory/threads/mode per tool and isolate and every automatic adjustment (AUTO_RESOURCES), so the results state exactly what ran.
+python3 -I "$HERE/../python/resource_adapt.py" manifest --table "$RESULTS_DIR/resource_profile.tsv" --manifest "$RESULTS_DIR/run_manifest.json" --events "$RESULTS_DIR/run_events.jsonl" </dev/null \
+    || warn "could not add the resources section to run_manifest.json"
 
 # Optional MultiQC companion over the fastp (and QUAST) outputs (MULTIQC_REPORT: auto runs it only when multiqc is installed). It never fails the run: a problem is a
 # warning event and a note in the report's QC panel, which links to results/multiqc/multiqc_report.html when it exists.

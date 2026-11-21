@@ -29,6 +29,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 need fastp
+stage_timing_begin 3        # stage_start/stage_end events, so `plasbench status` knows this is stage 3
 preflight_resources 3 quiet
 warn_resource_oversubscription "stage 3 (assembly)" "$MAX_PARALLEL_SAMPLES" "$THREADS" "$ASSEMBLY_MEMORY_GB"
 
@@ -53,9 +54,10 @@ ASSEMBLY_SELECTION_MODE="${ASSEMBLY_SELECTION_MODE:-report}"
 # parallel jobs actually interleaved.
 record_assembly_status() {
     local sample="$1"
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "${5:-}" "${6:-}" "${7:-}" \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "${5:-}" "${6:-}" "${7:-}" "${ASM_MEM_USED:-}" "${ASM_NEEDED_GB:-}" "${ASM_ATTEMPTS:-}" "${ASM_MODE:-}" \
         > "$STATUS_SHARDS/${sample}.tsv"
     run_event assembly_end "sample=$1" "status=$2" "reason=${4:-}" "cause=${6:-}"
+    run_event sample_end "sample=$1" "step=assembly" "status=$2"
 }
 
 # --- why a step failed, what was tried, and when to stop ------------------------------------------------------------------------------
@@ -93,27 +95,125 @@ verify_reads() {   # verify_reads SDIR R1 R2 T1 T2
     fi
 }
 
-# SPAdes with diagnosis and at most ONE retry. Returns 0 when it assembled (ASM_RETRY_NOTE says what was changed), 1 when it failed (recorded).
+# ---- assembly work folder (WORK_DIR, python/work_dir.py) -----------------------------------------------------------------------------------
+# SPAdes writes tens of thousands of small files; on a Windows drive seen from WSL (9p), NTFS/exFAT, a network share or a cloud-synced folder that is hundreds of times
+# slower than on a local disk. When the data folder is on such a mount the assembler works in a scratch folder (~/.plasbench/scratch/<study>/<sample>.<pid>) and only the
+# finished results are moved back, atomically. WORK_DIR=data turns it off; WORK_DIR=<folder> chooses one. Prints the scratch folder, or nothing (and returns 1) when the
+# assembly runs in the data folder. Leftovers of runs that died are removed here, with a log line.
+assembly_scratch_dir() {   # assembly_scratch_dir SAMPLE T1 T2
+    local sample="$1" t1="$2" t2="$3" study line dir reason fs kind need name bytes=0 f
+    have python3 || return 1
+    for f in "$t1" "$t2"; do bytes=$(( bytes + $(stat -c %s "$f" 2>/dev/null || stat -f %z "$f" 2>/dev/null || echo 0) )); done
+    need="$(awk -v b="$bytes" 'BEGIN { printf "%.1f", b * 8 / 1e9 + 2 }')"
+    study="$(basename "$(dirname "${RESULTS_DIR:-./results}")")"
+    line="$(python3 -I "${PROJECT_ROOT:-.}/python/work_dir.py" resolve --data-dir "$DATA_DIR" --study "$study" --mode "${WORK_DIR:-auto}" --need-gb "$need" 2>/dev/null </dev/null)" || return 1
+    IFS=$'\t' read -r dir reason fs kind <<< "$line"
+    if [[ "$kind" != "scratch" ]]; then
+        heartbeat_log "  assembly work folder: $DATA_DIR/$sample ($reason)"
+        return 1
+    fi
+    mkdir -p "$dir" 2>/dev/null || { heartbeat_log "  assembly work folder: $dir cannot be created; working in the data folder"; return 1; }
+    while IFS= read -r name; do
+        [[ -n "$name" ]] && heartbeat_log "  removed a leftover scratch folder from an earlier run: $dir/$name"
+    done < <(python3 -I "${PROJECT_ROOT:-.}/python/work_dir.py" clean --root "$dir" 2>/dev/null </dev/null)
+    mkdir -p "$dir/$sample.$$" || return 1
+    heartbeat_log "  assembly work folder: $dir/$sample.$$ (fast local disk; $reason; results are copied back to $DATA_DIR/$sample when done)"
+    run_event work_dir "sample=$sample" "dir=$dir" "fs=$fs"
+    printf '%s' "$dir/$sample.$$"
+}
+
+assembly_scratch_finish() {   # assembly_scratch_finish SCRATCH OUT ASMDIR: move the results back (atomic), say how much
+    local scratch="$1" out="$2" asmdir="$3" moved
+    moved="$(python3 -I "${PROJECT_ROOT:-.}/python/work_dir.py" finish --src "$out" --dst "$asmdir" 2>&1 </dev/null)" || { warn "could not move the assembly back from $scratch to $asmdir: $moved"; return 1; }
+    heartbeat_log "  assembly results moved back from the scratch folder: $moved"
+    return 0
+}
+
+# SPAdes with diagnosis and at most ONE automatic adjustment-and-retry. Returns 0 when it assembled (ASM_RETRY_NOTE says what was changed), 1 when it failed or was skipped (recorded).
+# AUTO_RESOURCES (default 1) is the adaptive part: the memory budget starts from what is free; when SPAdes says what it needs ("You need approx. X GB of free RAM") the isolate is
+# retried ONCE with -m = ceil(X * 1.15 + 0.5) when that fits in the free memory (else the bare need, rounded up, when that fits in 92%); the need is remembered per isolate
+# (results/assembly_memory.d, keyed by a checksum of the reads) so a resume starts at the right budget without the failing attempt; when it does not fit, THIS isolate is skipped
+# with the exact need and the others continue (or, only with ASSEMBLER_ALLOW_ONLY_ASSEMBLER=1, SPAdes --only-assembler is tried, recorded as a different mode).
+# Sets ASM_MEM_USED, ASM_NEEDED_GB, ASM_ATTEMPTS and ASM_MODE for assembly_status.tsv.
 run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SDIR
     local sample="$1" t1="$2" t2="$3" asmdir="$4" start="$5" r1="$6" r2="$7" sdir="$8"
-    local log="$LOG_DIR/${sample}.spades.log" threads="$THREADS" mem="$ASSEMBLY_MEMORY_GB" rc attempt=1 plan="" note="" first="" own="" nt nm av
-    local STOP_EARLY=0
+    local log="$LOG_DIR/${sample}.spades.log" threads="$THREADS" mem="$ASSEMBLY_MEMORY_GB" rc attempt=1 plan="" note="" first="" own="" nt nm av avail
+    local verdict vact vmem vmsg STOP_EARLY=0 MEMORY_REFUSAL="" out="$asmdir" scratch="" sig="" known="" needed="" mode="spades" opt=() auto="${AUTO_RESOURCES:-1}" memdir="$RESULTS_DIR" free_now=""
     ASM_RETRY_NOTE=""
+    rm -f "$RESULTS_DIR/resource_state.d/spades.$sample.txt"
+    ASM_MEM_USED="" ASM_NEEDED_GB="" ASM_ATTEMPTS="" ASM_MODE=""
+    # --- remembered need: start at the right budget, do not repeat the failing attempt ---
+    if [[ "$auto" == "1" ]] && have python3; then
+        sig="$(python3 -I "${PROJECT_ROOT:-.}/python/resource_adapt.py" sig --r1 "$r1" --r2 "$r2" 2>/dev/null </dev/null || true)"
+        [[ -n "$sig" ]] && known="$(python3 -I "${PROJECT_ROOT:-.}/python/resource_adapt.py" lookup --dir "$memdir" --sample "$sample" --sig "$sig" 2>/dev/null </dev/null || true)"
+        if [[ -n "$known" && "$known" != "none" ]]; then
+            read -r needed nm own _ <<< "$known"        # needed_gb, budget_gb, mode
+            own="${own:-spades}"; free_now="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" available 2>/dev/null </dev/null || true)"
+            if [[ "$needed" != "0.000" && "$needed" != "0" ]]; then
+                plan="$(python3 -I "${PROJECT_ROOT:-.}/python/resource_adapt.py" plan --need "$needed" ${free_now:+--available-gb "$free_now"} 2>/dev/null </dev/null || true)"
+                if [[ "${plan%% *}" =~ ^[0-9]+$ ]]; then
+                    if [[ "${plan%% *}" -gt "$mem" ]]; then
+                        log "  SPAdes needs about $(awk -v n="$needed" 'BEGIN { printf "%.1f", n }') GB for this isolate (remembered from an earlier attempt); starting with a memory budget of ${plan%% *} GB instead of $mem GB (${free_now:-?} GB are free)"
+                        run_event resource_adjust "sample=$sample" "what=memory" "from=$mem" "to=${plan%% *}" "needed=$needed" "why=remembered"
+                        mem="${plan%% *}"
+                    fi
+                    [[ "$own" == "only-assembler" && "${ASSEMBLER_ALLOW_ONLY_ASSEMBLER:-0}" == "1" ]] && { opt=(--only-assembler); mode="only-assembler"; }
+                elif [[ "${ASSEMBLER_ALLOW_ONLY_ASSEMBLER:-0}" == "1" ]]; then
+                    opt=(--only-assembler); mode="only-assembler"
+                    log "  SPAdes needs about $needed GB for this isolate and ${free_now:-?} GB are free: using --only-assembler (ASSEMBLER_ALLOW_ONLY_ASSEMBLER=1; a different assembly mode, recorded)"
+                else
+                    memory_skip "$sample" "$needed" "${free_now:-?}" "$start" "remembered"
+                    return 1
+                fi
+            fi
+        fi
+    fi
+    scratch="$(assembly_scratch_dir "$sample" "$t1" "$t2")" || scratch=""
+    [[ -n "$scratch" ]] && out="$scratch/asm"
     while :; do
         rc=0
-        WATCH_LOG="$log" run_with_heartbeat "$SAMPLE / SPAdes assembly" spades.py -1 "$t1" -2 "$t2" -o "$asmdir" \
-            --threads "$threads" --memory "$mem" > "$log" 2>&1 || rc=$?
+        WATCH_LOG="$log" run_with_heartbeat "$SAMPLE / SPAdes assembly" spades.py -1 "$t1" -2 "$t2" -o "$out" \
+            --threads "$threads" --memory "$mem" ${opt[@]+"${opt[@]}"} > "$log" 2>&1 || rc=$?
         if [[ "$rc" -eq 0 ]]; then
             [[ -n "$note" ]] && ASM_RETRY_NOTE="retried once after $first: $note"
+            if [[ -n "$scratch" ]] && ! assembly_scratch_finish "$scratch" "$out" "$asmdir"; then
+                record_assembly_status "$sample" "failed" "" "SPAdes: the finished assembly could not be moved back from the scratch folder $scratch (see the message above; the scratch folder is kept)" "$(( $(date +%s) - start ))" "scratch_move_failed" "Free space where the data folder is, or set WORK_DIR=data, then run the same plasbench run command again."
+                return 1
+            fi
+            [[ -n "$scratch" ]] && rm -rf "$scratch"
+            ASM_MEM_USED="$mem" ASM_NEEDED_GB="$needed" ASM_ATTEMPTS="$attempt" ASM_MODE="$mode"
+            [[ -n "$sig" && "$auto" == "1" && ( -n "$needed" || "$mode" != "spades" ) ]] && python3 -I "${PROJECT_ROOT:-.}/python/resource_adapt.py" record --dir "$memdir" --sample "$sample" --sig "$sig" \
+                --needed "${needed:-0}" --budget "$mem" --attempts "$attempt" --mode "$mode" --status completed 2>/dev/null </dev/null || true
             return 0
         fi
+        # keep what the failed attempt left (spades.log, params.txt) in the isolate's folder for inspection, as before, then clear the scratch folder
+        if [[ -n "$scratch" ]]; then assembly_scratch_finish "$scratch" "$out" "$asmdir" > /dev/null 2>&1 || true; fi
         THREADS="$threads" ASSEMBLY_MEMORY_GB="$mem" diagnose_failed_step "$log" "$rc" "$sample"
-        if [[ "$attempt" -ge 2 || "${ASSEMBLER_AUTO_RETRY:-1}" != "1" ]]; then break; fi
+        if [[ "$DIAG_RETRY" == "memory_need" ]]; then
+            needed="$(python3 -I "${PROJECT_ROOT:-.}/python/assembler_diagnosis.py" "$log" --format need 2>/dev/null </dev/null || true)"
+            [[ "$needed" == "-" ]] && needed=""
+        fi
+        if [[ "$attempt" -ge 2 || "${ASSEMBLER_AUTO_RETRY:-1}" != "1" || "$auto" != "1" ]]; then break; fi
         case "$DIAG_RETRY" in
+            memory_need)
+                # SPAdes said exactly how much memory it needs: raise the budget to that (never lower it), once, only when it fits in what is free now.
+                avail="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" available 2>/dev/null </dev/null || true)"
+                # the response ladder engine (python/resource_adapt.py, config/resource_signatures.tsv) chooses: raise the memory budget when it fits, else skip with the exact reason
+                verdict="$(python3 -I "${PROJECT_ROOT:-.}/python/resource_adapt.py" decide --tool spades --isolate "$sample" --exit-code "$rc" --log "$log" --threads "$threads" --memory-gb "$mem"                     ${avail:+--available-gb "$avail"} --state "$RESULTS_DIR/resource_state.d/spades.$sample.txt" 2>/dev/null </dev/null || true)"
+                IFS=$'\t' read -r vact _ vmem _ _ _ _ _ vmsg <<< "$verdict"
+                if [[ "$vact" != "retry" || ! "$vmem" =~ ^[0-9]+$ ]]; then
+                    MEMORY_REFUSAL="${vmsg:-the memory needed does not fit}"; free_now="$avail"; break
+                fi
+                nm="$vmem"; note="$vmsg"
+                log "  $vmsg"
+                run_event resource_adjust "tool=spades" "sample=$sample" "what=memory" "from=$mem" "to=$nm" "needed=$needed" "message=$vmsg"
+                note="memory budget $mem -> $nm GB ($note)"
+                [[ -n "$sig" ]] && python3 -I "${PROJECT_ROOT:-.}/python/resource_adapt.py" record --dir "$memdir" --sample "$sample" --sig "$sig" --needed "${needed:-0}" --budget "$nm" --attempts 1 --mode "$mode" --status started 2>/dev/null </dev/null || true
+                mem="$nm" ;;
             memory)
                 own=""; [[ "$DIAG_CAUSE" == "memory_limit_exceeded" ]] && own="--own-limit"
-                plan="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" retry-plan --threads "$threads" --memory-gb "$mem" ${own:+$own} 2>/dev/null || true)"
-                if [[ -z "$plan" || "$plan" == "none" ]]; then STOP_EARLY=1; break; fi
+                plan="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" retry-plan --threads "$threads" --memory-gb "$mem" ${own:+$own} 2>/dev/null </dev/null || true)"
+                if [[ -z "$plan" || "$plan" == "none" ]]; then break; fi
                 read -r nt nm av <<< "$plan"
                 note="threads $threads -> $nt, memory budget $mem -> $nm GB (memory available now: $av GB)"
                 threads="$nt"; mem="$nm" ;;
@@ -125,22 +225,61 @@ run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SD
         warn "SPAdes failed for $sample ($DIAG_TITLE); trying once more: $note"
         run_event assembly_retry "sample=$sample" "cause=$first" "change=$note"
         cp "$log" "$LOG_DIR/${sample}.spades.attempt${attempt}.log" 2>/dev/null || true
-        rm -rf "$asmdir"
+        rm -rf "$asmdir" "$out"
         attempt=$((attempt + 1))
     done
+    [[ -n "$scratch" ]] && rm -rf "$scratch"
+    # The need does not fit in the free memory: --only-assembler only when the user allowed it (one attempt), else THIS isolate is skipped and the others go on.
+    if [[ -n "$MEMORY_REFUSAL" && "$attempt" -lt 2 ]]; then
+        if [[ "${ASSEMBLER_ALLOW_ONLY_ASSEMBLER:-0}" == "1" ]]; then
+            warn "SPAdes for $sample: $MEMORY_REFUSAL. ASSEMBLER_ALLOW_ONLY_ASSEMBLER=1: trying once with --only-assembler (skips read error correction; a different assembly mode, recorded)."
+            run_event resource_adjust "sample=$sample" "what=mode" "from=spades" "to=only-assembler" "needed=$needed" "why=does_not_fit"
+            cp "$log" "$LOG_DIR/${sample}.spades.attempt${attempt}.log" 2>/dev/null || true
+            rm -rf "$asmdir" "$out"
+            local oa_rc=0
+            WATCH_LOG="$log" run_with_heartbeat "$SAMPLE / SPAdes assembly (only-assembler)" spades.py -1 "$t1" -2 "$t2" -o "$asmdir" \
+                --threads "$threads" --memory "$mem" --only-assembler > "$log" 2>&1 || oa_rc=$?
+            if [[ "$oa_rc" -eq 0 ]]; then
+                ASM_RETRY_NOTE="retried once after spades_needs_memory: --only-assembler (mode change; $MEMORY_REFUSAL)"
+                ASM_MEM_USED="$mem" ASM_NEEDED_GB="$needed" ASM_ATTEMPTS=2 ASM_MODE="only-assembler"
+                [[ -n "$sig" ]] && python3 -I "${PROJECT_ROOT:-.}/python/resource_adapt.py" record --dir "$memdir" --sample "$sample" --sig "$sig" --needed "${needed:-0}" --budget "$mem" --attempts 2 --mode only-assembler --status completed 2>/dev/null </dev/null || true
+                return 0
+            fi
+            THREADS="$threads" ASSEMBLY_MEMORY_GB="$mem" diagnose_failed_step "$log" "$oa_rc" "$sample"
+            handle_step_failure "SPAdes" "$sample" "$log" "$start" "Tried --only-assembler as well (ASSEMBLER_ALLOW_ONLY_ASSEMBLER=1) and it failed."
+            return 1
+        fi
+        memory_skip "$sample" "$needed" "${free_now:-?}" "$start" "spades_said"
+        return 1
+    fi
     local extra=""
     if [[ "$attempt" -ge 2 ]]; then
         extra="PlasBench already retried once ($note) and it failed again."
-        [[ "$DIAG_RETRY" == "memory" ]] && STOP_EARLY=1
-    elif [[ "$DIAG_RETRY" == "memory" && "$STOP_EARLY" == "1" ]]; then
-        extra="Memory and threads are already at the smallest setting PlasBench will try."
+    elif [[ "$DIAG_RETRY" == "memory" ]]; then
+        extra="Memory and threads are already at the smallest setting PlasBench will try; this isolate is skipped and the others continue."
     fi
+    # Memory belongs to this isolate's read set, not to the computer: the stage goes on with the next isolate (only disk, Python, CPU or folder causes stop it).
     if [[ "$DIAG_RETRY" == "reads" ]]; then
         verify_reads "$sdir" "$r1" "$r2" "$t1" "$t2"
         extra="$READS_NOTE"
     fi
+    ASM_MEM_USED="$mem" ASM_NEEDED_GB="$needed" ASM_ATTEMPTS="$attempt" ASM_MODE="$mode"
     handle_step_failure "SPAdes" "$sample" "$log" "$start" "$extra"
     return 1
+}
+
+# memory_skip SAMPLE NEEDED_GB FREE_GB START WHY: this isolate needs more memory than is free; say so exactly, remember the need, record it as skipped (needs_more_memory), go on.
+memory_skip() {
+    local sample="$1" needed="$2" free="$3" start="$4" why="$5" want msg
+    want="$(awk -v n="${needed:-0}" 'BEGIN { c = int(n); if (c < n) c++; printf "%d", c + 2 }')"
+    msg="needs $(awk -v n="${needed:-0}" 'BEGIN { printf "%.1f", n }') GB, $free GB are free; close programs or raise WSL memory in C:\\Users\\<you>\\.wslconfig (memory=${want}GB) then \`wsl --shutdown\`, or raise MEMORY_GB. This isolate is skipped and the others continue."
+    warn "SPAdes for $sample $msg"
+    run_event resource_adjust "sample=$sample" "what=skipped" "needed=$needed" "free=$free" "why=$why"
+    if [[ "${AUTO_RESOURCES:-1}" == "1" && -n "${sig:-}" ]]; then
+        python3 -I "${PROJECT_ROOT:-.}/python/resource_adapt.py" record --dir "$RESULTS_DIR" --sample "$sample" --sig "$sig" --needed "${needed:-0}" --budget "${ASSEMBLY_MEMORY_GB:-0}" --attempts 1 --status skipped 2>/dev/null </dev/null || true
+    fi
+    ASM_MEM_USED="${ASSEMBLY_MEMORY_GB:-}" ASM_NEEDED_GB="$needed" ASM_ATTEMPTS="1" ASM_MODE="spades"
+    record_assembly_status "$sample" "skipped" "" "needs_more_memory: $msg" "$(( $(date +%s) - start ))" "needs_more_memory" "$msg"
 }
 
 # Difficulty features (RUN_DIFFICULTY_FEATURES, off by default; see
@@ -254,10 +393,11 @@ select_assembly() {   # select_assembly SAMPLE SDIR T1 T2
 
 assemble_sample() {
     local SAMPLE="$1" ASM="$2" SRA="$3"
+    ASM_MEM_USED="" ASM_NEEDED_GB="" ASM_ATTEMPTS="" ASM_MODE=""
     local SDIR="$DATA_DIR/$SAMPLE"
     local R1="$SDIR/${SRA}_1.fastq.gz" R2="$SDIR/${SRA}_2.fastq.gz"
     if [[ ! -s "$R1" || ! -s "$R2" ]]; then
-        warn "no reads for $SAMPLE; run 01_download.sh"
+        note_missing reads "$SAMPLE"
         record_assembly_status "$SAMPLE" "skipped" "" "reads unavailable"
         return 0
     fi
@@ -395,7 +535,7 @@ assemble_sample() {
 }
 
 declare -A PIDS
-while IFS=$'\t' read -r SAMPLE ASM SRA; do
+while IFS=$'\t' read -r -u 3 SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     [[ -e "$STATUS_SHARDS/.stop" ]] && break      # a cause that belongs to the computer was found: do not try the rest
     if ! disk_guard 3 "$SAMPLE" "$SRA"; then      # the next isolate no longer fits (plus the reserve): stop cleanly BEFORE SPAdes, not in the middle of it
@@ -409,7 +549,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         assemble_sample "$SAMPLE" "$ASM" "$SRA" &
         PIDS["$SAMPLE"]=$!
     fi
-done < <(read_samples "$SAMPLE_SHEET")
+done 3< <(read_samples "$SAMPLE_SHEET")
 
 if [[ "$MAX_PARALLEL_SAMPLES" -gt 1 ]]; then
     # assemble_sample returns 0 for a per-sample trim/assembly failure, having
@@ -424,21 +564,30 @@ if [[ "$MAX_PARALLEL_SAMPLES" -gt 1 ]]; then
     fi
 fi
 
+report_missing reads "have no downloaded reads yet (stage 1 has not fetched them)" "Each is recorded as skipped in assembly_status.tsv."
 # Assemble the final status file once, in the order a sequential run produced it.
 STOP_INFO=""
 [[ -e "$STATUS_SHARDS/.stop" ]] && STOP_INFO="$(cat "$STATUS_SHARDS/.stop")"
 shards=()
 N_NOT_TRIED=0
-while IFS=$'\t' read -r SAMPLE ASM SRA; do
+while IFS=$'\t' read -r -u 3 SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     if [[ -n "$STOP_INFO" && ! -e "$STATUS_SHARDS/${SAMPLE}.tsv" ]]; then
-        record_assembly_status "$SAMPLE" "skipped" "" "not attempted: stage 3 stopped early (${STOP_INFO%%$'\t'*})" "" "${STOP_INFO%%$'\t'*}" "fix the cause above, then run the same plasbench run command again"
+        record_assembly_status "$SAMPLE" "skipped" "" "not attempted (stopped early: ${STOP_INFO%%$'\t'*})" "" "${STOP_INFO%%$'\t'*}" "fix the cause above, then run the same plasbench run command again"
         N_NOT_TRIED=$((N_NOT_TRIED + 1))
+    elif [[ ! -e "$STATUS_SHARDS/${SAMPLE}.tsv" ]]; then
+        # Never silent: an isolate of the sheet that no step recorded (the loop was cut short) is listed, so it cannot vanish from the table.
+        record_assembly_status "$SAMPLE" "skipped" "" "not attempted: stage 3 did not reach this isolate (the sample list ended early)" "" "not_attempted" "run the same plasbench run command again; finished isolates are reused"
+        N_NOT_TRIED=$((N_NOT_TRIED + 1))
+        warn "stage 3 did not reach $SAMPLE; it is recorded as not attempted"
     fi
     shards+=("$STATUS_SHARDS/${SAMPLE}.tsv")
-done < <(read_samples "$SAMPLE_SHEET")
-merge_shards "$STATUS" "$(printf 'sample\tstatus\tcontigs\treason\truntime_seconds\tcause\tadvice')" "${shards[@]}"
+done 3< <(read_samples "$SAMPLE_SHEET")
+merge_shards "$STATUS" "$(printf 'sample\tstatus\tcontigs\treason\truntime_seconds\tcause\tadvice\tmemory_gb_used\tneeded_gb\tattempts\tassembly_mode')" "${shards[@]}"
 rm -rf "$STATUS_SHARDS"
+if [[ "${AUTO_RESOURCES:-1}" == "1" ]]; then
+    python3 -I "$HERE/../python/resource_adapt.py" merge --dir "$RESULTS_DIR" --out "$RESULTS_DIR/resource_profile.tsv" 2>/dev/null </dev/null || true
+fi
 if [[ "$ASSEMBLY_SELECTION_MODE" != "off" ]] && compgen -G "$ASM_SHARDS/*.tsv" > /dev/null; then
     { head -1 "$(ls "$ASM_SHARDS"/*.tsv | head -1)"; for f in "$ASM_SHARDS"/*.tsv; do tail -n +2 "$f"; done; } > "$RESULTS_DIR/assembly_candidates.tsv"
 fi
@@ -472,7 +621,14 @@ if [[ -n "$STOP_INFO" ]]; then
     exit 5
 fi
 if [[ "$USABLE" -eq 0 ]]; then
-    die "no sample produced an assembly; nothing to benchmark (see $STATUS)"
+    # The verdict is only reached after EVERY isolate of the sheet was attempted (or recorded as not attempted): each one is listed with its cause.
+    die "no sample produced an assembly; nothing to benchmark: $(awk -F'\t' 'NR>1 {printf "%s%s [%s: %s]", sep, $1, $2, ($6 != "" ? $6 : $4); sep="; "}' "$STATUS") (see $STATUS)"
 fi
-
-log "Stage 3 (assembly) complete: $USABLE assembled, $UNUSABLE unavailable. Status -> $STATUS"
+N_ROWS=$(( USABLE + UNUSABLE ))
+if [[ "$UNUSABLE" -gt 0 ]]; then
+    PARTIAL_WHY="$(awk -F'\t' 'NR>1 && ($2=="failed"||$2=="skipped"||$2=="rejected") {c[($6 != "" ? $6 : $4)]++} END {for (k in c) {printf "%s%s x%d", sep, k, c[k]; sep=", "}}' "$STATUS")"
+    log "Stage 3 (assembly) complete WITH WARNINGS: $USABLE of $N_ROWS assembled; $UNUSABLE unavailable ($PARTIAL_WHY). The isolates that assembled go on to the tools. Status -> $STATUS"
+    run_event stage_partial "assembled=$USABLE" "unavailable=$UNUSABLE" "total=$N_ROWS"
+else
+    log "Stage 3 (assembly) complete: $USABLE of $N_ROWS assembled. Status -> $STATUS"
+fi

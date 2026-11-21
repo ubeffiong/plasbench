@@ -40,6 +40,9 @@ from concurrent.futures import ThreadPoolExecutor, wait
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import tool_readiness  # noqa: E402  (what a tool needs to work, not only that it starts)
+
 
 FIELDS = ("sequence_id", "start", "end", "feature_type", "label", "source", "version")
 CALLERS = ("mob_typer", "abricate", "amrfinder", "isescan", "isfinder", "barrnap")
@@ -52,7 +55,7 @@ ISFINDER_MIN_SUBJECT_COVERAGE = 0.80
 def tool_version(executable, flags=("--version", "-v", "version")):
     for flag in flags:
         try:
-            result = subprocess.run([executable, flag], text=True, capture_output=True, timeout=30)
+            result = subprocess.run([executable, flag], text=True, capture_output=True, timeout=30, stdin=subprocess.DEVNULL)
         except (OSError, subprocess.TimeoutExpired):
             continue
         output = (result.stdout or result.stderr).strip().splitlines()
@@ -61,16 +64,88 @@ def tool_version(executable, flags=("--version", "-v", "version")):
     return "unreported"
 
 
+NOISE = ("running:",)          # lines a tool prints to say what it is doing (AMRFinderPlus echoes its command line): never the reason for a failure
+
+
+def _reason(command, returncode, stderr, stdout):
+    """One line saying WHY a caller failed: the last informative lines of its stderr (else stdout), not the first (a traceback starts with 'Traceback ...')."""
+    lines = [ln.strip() for ln in ((stderr or "") + chr(10) + (stdout or "")).splitlines() if ln.strip() and not ln.strip().lower().startswith(NOISE)]
+    stderr_lines = [ln.strip() for ln in (stderr or "").splitlines() if ln.strip() and not ln.strip().lower().startswith(NOISE)]
+    picked = (stderr_lines or lines)[-3:]
+    detail = " | ".join(picked) if picked else "no output"
+    return "%s exited %s: %s" % (os.path.basename(command[0]), returncode, detail[:400])
+
+
+def _failed(error, version=None):
+    """The status record of a caller that did not finish: timed_out when it hit its time limit, else failed. Neither is ever cached."""
+    status = {"status": "timed_out" if str(error).startswith("timed out") else "failed", "reason": error}
+    if version:
+        status["version"] = version
+    return status
+
+
 def run(command, timeout):
-    """Return stdout, or None when the caller fails; never raise into the run."""
+    """Return (stdout, "") or (None, reason); never raise into the run. The command's own process group is killed on a timeout (ISEScan starts workers), and it never reads
+    this process's stdin."""
     try:
-        result = subprocess.run(command, text=True, capture_output=True, timeout=timeout)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return None, f"{command[0]} did not complete: {exc}"
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "").strip().splitlines()
-        return None, f"{command[0]} exited {result.returncode}: {detail[0] if detail else 'no output'}"
-    return result.stdout, ""
+        proc = subprocess.Popen(command, text=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                start_new_session=(os.name == "posix"))
+    except OSError as exc:
+        return None, f"{command[0]} did not start: {exc}"
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            if os.name == "posix":
+                import signal
+                os.killpg(proc.pid, signal.SIGKILL)
+            else:
+                proc.kill()
+        except OSError:
+            pass
+        try:
+            proc.communicate(timeout=10)
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+        return None, "timed out after %d s (ANNOTATION_TIMEOUT_SECONDS; the caller was stopped, its result is not used and not cached)" % int(timeout or 0)
+    if proc.returncode != 0:
+        return None, _reason(command, proc.returncode, stderr, stdout)
+    return stdout, ""
+
+
+# Typical seconds per caller for a ~4 Mbp genome on a 6-CPU laptop. ESTIMATED: abricate, barrnap and mob_typer were measured once; ISEScan's 663 s is one run that
+# ended in a failure (its usual time is a few minutes), so it is the least reliable. Used only for the "still running, typical N min" note, never to stop a caller.
+TYPICAL_SECONDS = {"mob_typer": 108, "abricate": 13, "amrfinder": 60, "isescan": 663, "barrnap": 31, "isfinder": 30}
+TYPICAL_GENOME_MBP = 4.0
+SLOW_FACTOR = 2.0
+
+
+def typical_seconds(name, total_bp):
+    base = TYPICAL_SECONDS.get("abricate" if name.startswith("abricate") else name)
+    if base is None:
+        return None
+    return base * max(0.25, (total_bp / 1e6) / TYPICAL_GENOME_MBP)
+
+
+def annotation_timeouts(total_bp, environ=None):
+    """{caller: seconds or None}. ANNOTATION_TIMEOUT_SECONDS: a number = that many seconds for every caller; 0, off or none = no limit. Default: max(300, 150 s per Mbp)
+    per caller, ISEScan three times that (it is the slow one), never below 900 s."""
+    environ = os.environ if environ is None else environ
+    raw = str(environ.get("ANNOTATION_TIMEOUT_SECONDS", "")).strip().lower()
+    if raw in ("0", "off", "none", "no", "false"):
+        return {}
+    if raw.isdigit():
+        return {"*": int(raw)}
+    mbp = total_bp / 1e6
+    base = max(300, int(150 * mbp))
+    return {"*": base, "isescan": max(900, 3 * base)}
+
+
+def timeout_for(timeouts, name):
+    if not timeouts:
+        return None
+    key = "isescan" if name == "isescan" else name
+    return timeouts.get(key) or timeouts.get("*")
 
 
 def parse_tabular(text, mapping, feature_type, source, version, sequence_filter=None):
@@ -103,7 +178,7 @@ def call_abricate(reference, database, timeout, sequences, kind=None, threads=1)
     version = tool_version(executable)
     text, error = run([executable, "--nopath", "--threads", str(threads), "--db", database, str(reference)], timeout)
     if text is None:
-        return [], {"status": "failed", "reason": error, "version": version}
+        return [], _failed(error, version)
     kind = kind or ("replicon" if database in ("plasmidfinder", "PlasmidFinder") else "amr")
     features = parse_tabular(text, {"sequence": "SEQUENCE", "start": "START", "end": "END",
                                     "label": "GENE"}, kind, f"abricate:{database}", version, sequences)
@@ -115,9 +190,13 @@ def call_amrfinder(reference, timeout, sequences, threads=1):
     if not executable:
         return [], {"status": "not_evaluated", "reason": "amrfinder is not installed"}
     version = tool_version(executable)
-    text, error = run([executable, "--threads", str(threads), "-n", str(reference)], timeout)
+    status, detail, fix = tool_readiness.check("amrfinder")
+    if status == "miss":      # a missing database fails in 0 s and would be recorded as a failure of the isolate: say what is wrong instead
+        return [], {"status": "not_evaluated", "reason": "%s: %s" % (detail, fix), "version": version}
+    db = tool_readiness.amrfinder_db_dir()
+    text, error = run([executable, "--threads", str(threads), "-n", str(reference)] + (["-d", db] if db else []), timeout)
     if text is None:
-        return [], {"status": "failed", "reason": error, "version": version}
+        return [], _failed(error, version)
     features = parse_tabular(text, {"sequence": "Contig id", "start": "Start", "end": "Stop",
                                     "label": "Element symbol"}, "amr", "amrfinderplus", version, sequences)
     if not features:
@@ -132,9 +211,12 @@ def call_isescan(reference, timeout, sequences, workdir, threads=1):
     if not executable:
         return [], {"status": "not_evaluated", "reason": "isescan is not installed"}
     version = tool_version(executable)
+    status, detail, fix = tool_readiness.check("isescan")
+    if status == "miss":      # ISEScan would search for minutes and then fail in its clustering step: do not start it
+        return [], {"status": "not_evaluated", "reason": "%s: %s" % (detail, fix), "version": version}
     _, error = run([executable, "--seqfile", str(reference), "--output", str(workdir), "--nthread", str(threads)], timeout)
     if error:
-        return [], {"status": "failed", "reason": error, "version": version}
+        return [], _failed(error, version)
     features = []
     for path in Path(workdir).rglob("*.csv"):
         features.extend(parse_tabular(path.read_text(encoding="utf-8").replace(",", "\t"),
@@ -184,7 +266,7 @@ def call_isfinder(reference, fasta, timeout, sequences):
                        "-evalue", "1e-10", "-perc_identity", str(ISFINDER_MIN_IDENTITY),
                        "-outfmt", "6 qseqid sseqid pident length qstart qend sstart send slen"], timeout)
     if text is None:
-        return [], {"status": "failed", "reason": error, "version": version}
+        return [], _failed(error, version)
     features = parse_isfinder_blast(text, sequences, version)
     return features, {"status": "ok", "version": version, "database": Path(fasta).name, "features": len(features)}
 
@@ -197,7 +279,7 @@ def call_barrnap(reference, timeout, sequences, threads=1):
     version = tool_version(executable)
     text, error = run([executable, "--quiet", "--threads", str(threads), "--kingdom", "bac", str(reference)], timeout)
     if text is None:
-        return [], {"status": "failed", "reason": error, "version": version}
+        return [], _failed(error, version)
     features = []
     for line in text.splitlines():
         if not line.strip() or line.startswith("#"):
@@ -238,7 +320,7 @@ def call_mob_typer(reference, timeout, sequences, threads=1):
     text, error = run([executable, "--multi", "--num_threads", str(threads), "--infile", str(reference),
                        "--out_file", str(out)] + mob_db_args(), timeout)
     if text is None and not out.is_file():
-        return [], {"status": "failed", "reason": error, "version": version}
+        return [], _failed(error, version)
     if not out.is_file():
         return [], {"status": "failed", "reason": "mob_typer produced no report", "version": version}
     features = []
@@ -355,7 +437,8 @@ def main():
                              "recorded as abricate_replicon, further ones as abricate_replicon_<name>")
     parser.add_argument("--isfinder-fasta", default="",
                         help="optional curated ISFinder FASTA; adds IS annotation by BLAST (blastn -subject, no database build)")
-    parser.add_argument("--timeout", type=int, default=1800)
+    parser.add_argument("--timeout", type=int, default=None,
+                        help="seconds per caller (default: ANNOTATION_TIMEOUT_SECONDS, else max(300, 150 s per Mbp), ISEScan three times that; 0 = no limit)")
     parser.add_argument("--threads", type=int, default=int(os.environ.get("THREADS") or os.cpu_count() or 1),
                         help="CPU threads in total; the callers run at the same time and share them (default: THREADS)")
     parser.add_argument("--workdir", type=Path)
@@ -372,19 +455,21 @@ def main():
 
     # The callers are independent, so they run at the same time (they used to run one after another, and ISEScan,
     # the slowest by far, had a single thread). ISEScan gets the whole thread allowance; the quick ones share a few.
+    total_bp = sum(sequences.values())
+    timeouts = {"*": args.timeout} if args.timeout else ({} if args.timeout == 0 else annotation_timeouts(total_bp))
     threads = max(1, args.threads)
     small = max(1, min(4, threads // 4))
     calls = (
-        ("mob_typer", lambda: call_mob_typer(args.reference, args.timeout, sequences, small)),
-        ("abricate_amr", lambda: call_abricate(args.reference, args.amr_database, args.timeout, sequences, threads=small)),
+        ("mob_typer", lambda: call_mob_typer(args.reference, timeout_for(timeouts, "mob_typer"), sequences, small)),
+        ("abricate_amr", lambda: call_abricate(args.reference, args.amr_database, timeout_for(timeouts, "abricate"), sequences, threads=small)),
         *[("abricate_replicon" if index == 0 else f"abricate_replicon_{name}",
-           lambda name=name: call_abricate(args.reference, name, args.timeout, sequences, kind="replicon", threads=small))
+           lambda name=name: call_abricate(args.reference, name, timeout_for(timeouts, "abricate"), sequences, kind="replicon", threads=small))
           for index, name in enumerate([n for n in args.replicon_database.replace(",", " ").split() if n]
                                        or ["plasmidfinder"])],
-        ("amrfinder", lambda: call_amrfinder(args.reference, args.timeout, sequences, max(1, threads // 2))),
-        ("isescan", lambda: call_isescan(args.reference, args.timeout, sequences, workdir, threads)),
-        ("isfinder", lambda: call_isfinder(args.reference, args.isfinder_fasta, args.timeout, sequences)),
-        ("barrnap", lambda: call_barrnap(args.reference, args.timeout, sequences, small)),
+        ("amrfinder", lambda: call_amrfinder(args.reference, timeout_for(timeouts, "amrfinder"), sequences, max(1, threads // 2))),
+        ("isescan", lambda: call_isescan(args.reference, timeout_for(timeouts, "isescan"), sequences, workdir, threads)),
+        ("isfinder", lambda: call_isfinder(args.reference, args.isfinder_fasta, timeout_for(timeouts, "isfinder"), sequences)),
+        ("barrnap", lambda: call_barrnap(args.reference, timeout_for(timeouts, "barrnap"), sequences, small)),
     )
     cache_id = fingerprint = None
     if args.cache_dir:
@@ -413,10 +498,11 @@ def main():
     def timed(name, call):
         started[name] = time.time()
         found, status = call()
-        print(f"  annotation: {name} finished in {time.time() - started[name]:.0f} s ({status.get('status')}, {len(found)} feature(s))", flush=True)
+        why = f": {status.get('reason')}" if status.get("status") in ("failed", "timed_out", "not_evaluated") and status.get("reason") else ""
+        print(f"  annotation: {name} finished in {time.time() - started[name]:.0f} s ({status.get('status')}, {len(found)} feature(s)){why}", flush=True)
         return found, status
 
-    features, provenance = [], {}
+    features, provenance, slow_noted = [], {}, set()
     with ThreadPoolExecutor(max_workers=len(calls)) as pool:
         futures = [(name, pool.submit(timed, name, call)) for name, call in calls]
         pending = {future for _, future in futures}
@@ -426,6 +512,13 @@ def main():
             if pending:
                 running = sorted(name for name, future in futures if future in pending)
                 print(f"  annotation: {int(time.time() - t0)} s in, still running: {', '.join(running)}", flush=True)
+                for name in running:      # a caller far past its usual time: say so once (typical times are estimates for a 6-CPU laptop)
+                    typical = typical_seconds(name, total_bp)
+                    ran = time.time() - started.get(name, t0)
+                    if typical and ran > SLOW_FACTOR * typical and name not in slow_noted:
+                        slow_noted.add(name)
+                        print(f"  annotation: NOTE {name} has run {ran / 60:.0f} min; typical is about {typical / 60:.0f} min for this genome size (estimated, 6-CPU laptop). "
+                              f"It is stopped at its limit ({timeout_for(timeouts, name) or 'none'} s) unless ANNOTATION_TIMEOUT_SECONDS says otherwise.", flush=True)
         for name, future in futures:                  # collected in the original order: output stays the same
             found, status = future.result()
             features.extend(found)
@@ -456,7 +549,7 @@ def main():
               "meaning": ("Absent callers yield 'not evaluated' for their feature class. "
                           "A missing feature class is not evidence that the feature is absent.")}
     stored = False
-    if cache_id and not any(status.get("status") == "failed" for status in provenance.values()):
+    if cache_id and not any(status.get("status") in ("failed", "timed_out") for status in provenance.values()):
         stored = cache_store(args.cache_dir, cache_id, args.out, record, fingerprint, args.reference)
     if cache_id:
         record["annotation_cache"] = {"hit": False, "key": cache_id, "stored": stored}

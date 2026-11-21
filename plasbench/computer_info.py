@@ -43,7 +43,7 @@ def _read(path) -> str | None:
 def _run(argv, timeout=20) -> str | None:
     """stdout of a command, or None when it is missing, fails or times out. Never raises."""
     try:
-        p = subprocess.run(argv, capture_output=True, text=True, errors="replace", timeout=timeout,
+        p = subprocess.run(argv, capture_output=True, text=True, errors="replace", timeout=timeout, stdin=subprocess.DEVNULL,
                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except (OSError, subprocess.TimeoutExpired, ValueError):
         return None

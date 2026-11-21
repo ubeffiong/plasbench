@@ -272,6 +272,7 @@ def _file_entries():
         S("benchmark.input_fingerprint.json", ag, "Input fingerprint", "aggregate_results.py", "leaderboard", "partly", "Which score table and tool set the leaderboard was ranked from; the report refuses a leaderboard paired with different scores.", expected=True),
         S("benchmark.input_consistency.tsv", ag, "Run tables that disagree", "run_consistency.py", "leaderboard", "partly", "Empty when the tables agree; otherwise a banner above the ranking and this list.", expected=True),
         S("assembly_status.tsv", ag, "How each assembly ended", "03_assemble.sh", "health", "partly", "Failures are counted in the health summary."),
+        S("resource_profile.tsv", ag, "Resources each isolate needed (learned)", "03_assemble.sh / resource_adapt.py", "health", "partly", "Memory and threads used, the memory a tool said it needed, attempts and assembly mode; also listed in the run metadata."),
         S("download_status.tsv", ag, "How each download ended", "01_download.sh", "health", "partly", "Failures are counted in the health summary."),
         S("quast_diagnostics.tsv", ag, "QUAST diagnostics, merged", "run_quast_diagnostics.py", "quast-diagnostics", "shown", "Table."),
         S("run_manifest.json", ag, "Run manifest (versions, settings)", "write_manifest.py", "method", "shown", "Method and reproducibility section.", expected=True),

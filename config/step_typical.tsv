@@ -1,0 +1,9 @@
+pattern	typical_seconds	basis	note
+reference annotation	665	measured once (4 Mbp genome, 6 CPUs, ISEScan failed after 663 s); typical on a 6-CPU laptop, estimated	mob_typer, abricate, amrfinder, ISEScan, barrnap run at once; ISEScan is the slowest
+SPAdes assembly	1200	assumed (a 4 Mbp isolate at 50-100x on 6 CPUs, 10 to 30 min); estimated	phases: read error correction (hammer), then K=21 to K=77, then repeat resolution
+Unicycler assembly	3600	assumed; estimated	includes SPAdes and a polishing step
+fastp trimming	120	assumed; estimated	seconds to a few minutes per isolate
+alternative SPAdes	1200	assumed; estimated	
+alternative Unicycler	3600	assumed; estimated	
+prefetch	600	assumed (400 MB to 2 GB read sets); estimated	resumable
+fasterq	600	assumed; estimated	

@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 213 analysis modules, 28 registered tools and baselines (20 real tools), 219 registered
-outputs, 54 run switches, 467 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 216 analysis modules, 28 registered tools and baselines (20 real tools), 220 registered
+outputs, 54 run switches, 474 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -375,7 +375,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-213 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+216 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -628,17 +628,20 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `regenerate_visuals.py` | say which report sections a finished results folder can draw, and rebuild the cheap missing inputs in place. |
 | `relabel_cohort_provenance.py` | Recompute a cohort sheet's truth_assembly_strategy and truth_polish_reads from the sheet's own assembly_method and assembly_sequencing_technology columns. |
 | `resolve_contributed_cohort.py` | verify importer candidates against NCBI, run the |
+| `resource_adapt.py` | Resource adaptation: classify why a tool failed for lack of a resource, choose ONE safe response, remember what an isolate needs. |
 | `run_consistency.py` | Do the run tables agree before anything is ranked? |
 | `run_multiqc.py` | Optional MultiQC companion: run `multiqc` over the fastp (and QUAST) outputs of a run into results/multiqc/. Never fails the run. |
 | `run_status.py` | What is this run doing right now, and why might it look stuck? |
 | `setting_ranges.py` | The one table of what each numeric Scoring-decision setting accepts (config/setting_ranges.tsv), and the checks built on it. |
 | `source_install.py` | Install the source-distributed tools PlasBench can run, pinned, isolated and verified. |
 | `tool_install_proof.py` | Prove, on a clean Linux runner, that every tool PlasBench installs really installs (.github/workflows/tool-install-proof.yml). |
+| `tool_readiness.py` | Is an annotation tool READY to work, not just present on PATH? |
+| `work_dir.py` | A fast work folder for assemblies when the data folder is on a slow file system. |
 
 
 ## 7. Every output file and where the report shows it
 
-219 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
+220 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
 
 | Output | Written by | Report section | Shown | What it holds |
 |---|---|---|---|---|
@@ -739,6 +742,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `orthogonal_validation.summary.json` | validate_orthogonal_evidence.py | orthogonal-evidence | shown | Orthogonal-evidence summary: Summarised. |
 | `quast_diagnostics.tsv` | run_quast_diagnostics.py | quast-diagnostics | shown | QUAST diagnostics, merged: Table. |
 | `regenerated_inputs.json` | regenerate_visuals.py | metadata | shown | Files rebuilt after the run: Run metadata says which files were regenerated after the run, when and from what. |
+| `resource_profile.tsv` | 03_assemble.sh / resource_adapt.py | health | partly | Resources each isolate needed (learned): Memory and threads used, the memory a tool said it needed, attempts and assembly mode; also listed in the run metadata. |
 | `run_manifest.json` | write_manifest.py | method | shown | Run manifest (versions, settings): Method and reproducibility section. |
 | `samples.tsv` | curate_cohort.py | samples | shown | Sample sheet: Sample metadata drives the strata and the drill-down. |
 | `score_failures.tsv` | 05_score.sh | outcome-states | shown | Runs that could not be scored: Listed with the reason. |

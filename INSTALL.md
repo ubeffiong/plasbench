@@ -554,6 +554,9 @@ system (`uname -a` or `ver`) and the installer's last 40 lines.
 
 - **The window says it is older than the page** -> run `plasbench ui-state`. If it reports two installs, run
   `conda activate plasbench && cd ~/PlasBench && python -m pip install --no-deps .`, then restart the window.
+- **`[MISS] amrfinder is installed but not ready: amrfinder database not installed`** -> run `amrfinder -u` once (needs the internet, about 100 MB), or `plasbench install-tools reference-annotation --yes`, which fetches it after the package install
+  (in Docker mode into the persistent databases folder, `PLASBENCH_DB_DIR/amrfinder`). `PLASBENCH_SKIP_AMRFINDER_DB=1` skips the fetch on an offline machine.
+- **`[MISS] isescan is installed but not ready ... fastcluster`** -> `pip install "fastcluster<1.3"` in the plasbench environment (fastcluster 1.3.0 is built for NumPy 2; with NumPy 1.x ISEScan fails after its minutes-long search). `plasbench install-tools reference-annotation --yes` does it.
 - **`datasets: command not found`** → you didn't `conda activate plasbench`.
 - **SRA download stalls** → run `vdb-config --interactive` once (sets the SRA cache dir),
   or try `prefetch --max-size 100g <SRR>`.

@@ -514,7 +514,9 @@ EOF
  # these are advisory, but without them replicon, AMR and insertion-sequence context is empty.
  # mob_suite supplies mob_typer; barrnap is in the 'utilities' profile above.
  reference-annotation)
-    PKGS=(abricate ncbi-amrfinderplus isescan mob_suite)
+    # fastcluster is pinned below 1.3: 1.3.0 is built for NumPy 2 and breaks ISEScan's clustering step ("NoneType copy mode not allowed") beside NumPy 1.x, after minutes of work.
+    PKGS=(abricate ncbi-amrfinderplus isescan "fastcluster<1.3" mob_suite)
+    AMRFINDER_DB_AFTER=1
     cat >&2 <<'EOF'
 NOTE: ncbi-amrfinderplus needs its reference database fetched once after install:
           amrfinder -u
@@ -615,5 +617,33 @@ if [[ "$NEEDS_MOBSUITE" -eq 1 ]]; then
             "$SOLVER_BIN" create -y -n "${ENV_NAME}-mobsuite" "${CHANNELS[@]}" "${MOBSUITE_SPEC[@]}"
         echo "[plasbench] after creating '$ENV_NAME' (bash env/setup_conda.sh), run: bash env/install_tools.sh mobsuite" >&2
         exit 1
+    fi
+fi
+
+# AMRFinderPlus needs its reference database once per machine (about 100 MB, from the internet). Without it every annotation fails in 0 s. Fetched here, after the
+# package install the user already agreed to, never in Docker mode's image: there it goes to the persistent databases folder (PLASBENCH_DB_DIR/amrfinder), which
+# annotate_reference.py then passes to amrfinder with -d. PLASBENCH_SKIP_AMRFINDER_DB=1 skips it (an offline machine).
+if [[ "${AMRFINDER_DB_AFTER:-0}" -eq 1 ]]; then
+    ENVBIN=""
+    [[ -n "${TARGET_PREFIX:-}" ]] && ENVBIN="$TARGET_PREFIX/bin"
+    AMR_EXE="$(PATH="${ENVBIN:+$ENVBIN:}$PATH" command -v amrfinder || true)"
+    if [[ -z "$AMR_EXE" ]]; then
+        echo "[plasbench] amrfinder is not on PATH after the install; fetch its database later with: amrfinder -u" >&2
+    elif [[ "${PLASBENCH_SKIP_AMRFINDER_DB:-0}" == "1" ]]; then
+        echo "[plasbench] skipping the AMRFinderPlus database (PLASBENCH_SKIP_AMRFINDER_DB=1); fetch it later with: amrfinder -u" >&2
+    elif PATH="${ENVBIN:+$ENVBIN:}$PATH" python3 -I "$HERE/../python/tool_readiness.py" amrfinder > /dev/null 2>&1; then
+        echo "[plasbench] the AMRFinderPlus database is already installed"
+    else
+        echo "[plasbench] fetching the AMRFinderPlus database (about 100 MB, needs the internet) ..."
+        AMR_UPDATE=("$AMR_EXE" -u)
+        if [[ "${PLASBENCH_IN_DOCKER:-0}" == "1" ]]; then
+            AMR_DB_HOME="${PLASBENCH_DB_DIR:-$HOME/.plasbench/databases}/amrfinder"
+            mkdir -p "$AMR_DB_HOME" && AMR_UPDATE=("$AMR_EXE" -u -d "$AMR_DB_HOME")
+        fi
+        if PATH="${ENVBIN:+$ENVBIN:}$PATH" "${AMR_UPDATE[@]}"; then
+            echo "[plasbench] AMRFinderPlus database installed"
+        else
+            echo "[plasbench] WARNING: the AMRFinderPlus database could not be fetched (network?). Annotation will skip AMRFinder (recorded as not evaluated) until you run: amrfinder -u" >&2
+        fi
     fi
 fi

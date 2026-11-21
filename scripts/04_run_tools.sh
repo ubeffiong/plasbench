@@ -173,7 +173,7 @@ retry_exec() {
     rm -f "$times_file"
     while true; do
         rc=0; t0="$(date +%s)"
-        "$@" || rc=$?
+        ADAPT_LOG="$LOG_DIR/${SAMPLE}.${TOOL}.log" run_adaptive "$TOOL" "$SAMPLE" -- "$@" || rc=$?
         printf '%s\n' "$attempt" > "$attempts_file"
         printf '%s:%s\n' "$attempt" "$(( $(date +%s) - t0 ))" >> "$times_file"
         if [[ "$rc" -eq 0 || "$rc" -eq 124 || "$rc" -eq 137 || "$attempt" -ge "$max" ]]; then
@@ -1027,6 +1027,7 @@ run_user_tool() {
 
 process_sample() {
     local SAMPLE="$1" ASM="$2" SRA="$3"
+    run_event sample_start "sample=$SAMPLE" "step=tools"
     local SDIR="$DATA_DIR/$SAMPLE"
     local RDIR="$RESULTS_DIR/$SAMPLE"; mkdir -p "$RDIR"
     local CONTIGS="$SDIR/contigs.fasta"
@@ -1106,22 +1107,22 @@ fi
 
 reset_shard_dir "run_tools_crashed"
 CRASHED_DIR="$(shard_dir "run_tools_crashed")"
-while IFS=$'\t' read -r SAMPLE ASM SRA; do
+while IFS=$'\t' read -r -u 3 SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     job_slot_wait "$MAX_PARALLEL_SAMPLES"
     start_sample_job "$CRASHED_DIR" "$SAMPLE" process_sample "$SAMPLE" "$ASM" "$SRA"
-done < <(read_samples "$SAMPLE_SHEET")
+done 3< <(read_samples "$SAMPLE_SHEET")
 wait
 
 # Assemble the final status file once, in the same sample x tool order a
 # sequential run would have produced it in.
 shards=()
-while IFS=$'\t' read -r SAMPLE ASM SRA; do
+while IFS=$'\t' read -r -u 3 SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasmidec plasgraph2 baseline_coverage baseline_reference plsmd baseline_replicon plasbin_flow "${USER_TOOL_IDS[@]}"; do
         shards+=("$STATUS_SHARDS/${SAMPLE}.${tool}.tsv")
     done
-done < <(read_samples "$SAMPLE_SHEET")
+done 3< <(read_samples "$SAMPLE_SHEET")
 # AU-001: a cohort with tools to run must leave status shards. None means they were lost (another process wiped them, or every sample job died before
 # recording anything): fail loudly instead of writing a header-only table and reporting "complete".
 found_shards=0

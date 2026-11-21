@@ -280,6 +280,40 @@ plasbench_detect_memory_gb() {
     echo $(( kb / 1024 / 1024 ))
 }
 
+# Same figure in MB, so a 6.9 GB machine is not treated as a 6 GB one (the integer GB figure above rounds DOWN, which cut the default budget from 5 GB to 4 GB). Memory
+# available to this process: MemAvailable, or what a container/cgroup limit leaves when that is smaller (cgroup v2 memory.max/current, v1 limit/usage).
+plasbench_detect_memory_mb() {
+    local kb="" limit="" used="" mb=""
+    if [[ -r /proc/meminfo ]]; then
+        kb="$(awk '/^MemAvailable:/ {print $2; exit}' /proc/meminfo)"
+        [[ -z "$kb" ]] && kb="$(awk '/^MemTotal:/ {print $2; exit}' /proc/meminfo)"
+    elif command -v sysctl >/dev/null 2>&1; then
+        kb="$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1024 ))"
+    fi
+    [[ "$kb" =~ ^[0-9]+$ && "$kb" -gt 0 ]] || { echo 8192; return; }
+    mb=$(( kb / 1024 ))
+    if [[ -r /sys/fs/cgroup/memory.max ]]; then
+        limit="$(cat /sys/fs/cgroup/memory.max 2>/dev/null || true)"; used="$(cat /sys/fs/cgroup/memory.current 2>/dev/null || true)"
+    elif [[ -r /sys/fs/cgroup/memory/memory.limit_in_bytes ]]; then
+        limit="$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || true)"; used="$(cat /sys/fs/cgroup/memory/memory.usage_in_bytes 2>/dev/null || true)"
+    fi
+    if [[ "$limit" =~ ^[0-9]+$ && "$used" =~ ^[0-9]+$ && "$limit" -lt 1125899906842624 ]]; then
+        local room=$(( (limit - used) / 1048576 ))
+        [[ "$room" -ge 0 && "$room" -lt "$mb" ]] && mb="$room"
+    fi
+    echo "$mb"
+}
+
+# plasbench_default_budget_gb AVAILABLE_MB: the default assembler memory budget, in whole GB: 85% of what is available now minus 512 MB for the OS (and WSL), rounded
+# down from MB (so 6.9 GB available gives 5, not the 4 an integer-GB 80% gave), never below 2 and never above 64 (a sanity bound; MEMORY_GB has no bound).
+plasbench_default_budget_gb() {
+    local mb="$1" gb
+    gb=$(( (mb * 85 / 100 - 512) / 1024 ))
+    [[ "$gb" -lt 2 ]] && gb=2
+    [[ "$gb" -gt 64 ]] && gb=64
+    echo "$gb"
+}
+
 # Thread budget. When THREADS is not set, the detected cores are divided across the
 # concurrent job slots (MAX_PARALLEL_SAMPLES x MAX_PARALLEL_TOOLS, below), so raising
 # the slots cannot make every job ask for every core at once (oversubscription:
@@ -296,11 +330,33 @@ export THREADS
 # Keep headroom: the OS, the other tools in the stage, and SPAdes overshooting
 # its own budget all need room. 80% of what is actually available, never below
 # 2GB (SPAdes fails outright under that) and never silently capped above.
-PLASBENCH_AVAILABLE_GB="$(plasbench_detect_memory_gb)"
-PLASBENCH_DEFAULT_MEMORY_GB=$(( PLASBENCH_AVAILABLE_GB * 80 / 100 ))
-[[ "$PLASBENCH_DEFAULT_MEMORY_GB" -lt 2 ]] && PLASBENCH_DEFAULT_MEMORY_GB=2
-export PLASBENCH_AVAILABLE_GB
+PLASBENCH_AVAILABLE_MB="${PLASBENCH_TEST_AVAILABLE_MB:-$(plasbench_detect_memory_mb)}"   # (the TEST variable only lets a test pretend to be a smaller or larger machine)
+PLASBENCH_AVAILABLE_GB="$(( PLASBENCH_AVAILABLE_MB / 1024 ))"
+PLASBENCH_DEFAULT_MEMORY_GB="$(plasbench_default_budget_gb "$PLASBENCH_AVAILABLE_MB")"
+export PLASBENCH_AVAILABLE_GB PLASBENCH_AVAILABLE_MB
 export MEMORY_GB="${MEMORY_GB:-$PLASBENCH_DEFAULT_MEMORY_GB}"   # assembler memory budget (GB)
+
+# AUTO_RESOURCES (1 = on, the default; 0 = fixed behaviour): PlasBench adapts resources by itself, deterministically, and logs every change. (1) the assembler memory budget starts at
+# 85% of the memory free now minus 512 MB; (2) when SPAdes says what it needs ("You need approx. X GB of free RAM") the isolate is retried ONCE with -m = ceil(X x 1.15 + 0.5) when that
+# fits in the free memory, and the need is remembered per isolate (results/assembly_memory.tsv) so a resume starts at the right budget; (3) when it does not fit that isolate is skipped
+# with the exact need and the others continue; (4) a tool killed for memory (exit 137) in stage 4 is retried once with half the threads (tools that read THREADS at run time).
+# An explicit MEMORY_GB / --memory-gb is still the starting budget. AUTO_RESOURCES=0 restores one attempt with the budget you set.
+export AUTO_RESOURCES="${AUTO_RESOURCES:-1}"
+# ASSEMBLER_ALLOW_ONLY_ASSEMBLER (default 0): when an isolate's need does not fit in the free memory, retry once with SPAdes --only-assembler (skips read error correction, the
+# hammer step that needs the most memory). It can change the assembly, so it is off by default, and an isolate assembled this way is recorded as mode only-assembler in
+# assembly_status.tsv, assembly_memory.tsv and run_manifest.json.
+export ASSEMBLER_ALLOW_ONLY_ASSEMBLER="${ASSEMBLER_ALLOW_ONLY_ASSEMBLER:-0}"
+# --- Work folder, annotation time limits and the slow-step note ------------------------------------
+# WORK_DIR: where assemblies run. auto (default) = a scratch folder under ~/.plasbench/scratch/<study> when the data folder is on a slow mount (a Windows drive seen from WSL,
+# NTFS/exFAT, a network share, a cloud-synced folder), else the data folder itself; data = always the data folder; any other value = that folder. Finished results are
+# always moved back to the isolate's folder. Takes effect at the next stage 3 start.
+export WORK_DIR="${WORK_DIR:-auto}"
+# ANNOTATION_TIMEOUT_SECONDS: per annotation caller (mob_typer, abricate, AMRFinder, ISEScan, barrnap). Blank = max(300, 150 s per Mbp of the reference), ISEScan three times that;
+# a number = that many seconds; 0 or off = no limit. A caller that hits the limit is stopped and recorded as timed_out (never cached); the others are kept.
+export ANNOTATION_TIMEOUT_SECONDS="${ANNOTATION_TIMEOUT_SECONDS:-}"
+# STEP_SLOW_FACTOR: a long command that has run this many times its typical time (config/step_typical.tsv) gets ONE "still running, typical N min" note and a slow_step event.
+# Nothing is stopped by it. 0 turns it off.
+export STEP_SLOW_FACTOR="${STEP_SLOW_FACTOR:-3}"
 
 # --- Parallelism ---------------------------------------------------------
 # Every default below (1) is exactly today's fully sequential behavior: one

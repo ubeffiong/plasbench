@@ -109,7 +109,7 @@ The table has one row for every file the report reads (the registry in `python/r
 | `{sample}/{tool}.replicon_hits.tsv` | 04_run_tools.sh | 4 tools | reads or assemblies, the tool and its database | re-run the tool (stage 4, scripts/04_run_tools.sh); it cannot be rebuilt from other files | none | enriches | none |
 | `{sample}/{tool}.prediction_summary.tsv` | keep_report_inputs.py | 5 scoring | the predictions (pred_<tool>.plasmid.fasta) | pred_<tool>.plasmid.fasta via keep_report_inputs.py (written at the end of stage 5) | none | enriches | `method` |
 
-## Per run (results folder top level) (108 files)
+## Per run (results folder top level) (109 files)
 
 | File | Written by | Stage | Needs | Rebuild from | --only | Role | Sections |
 |---|---|---|---|---|---|---|---|
@@ -120,6 +120,7 @@ The table has one row for every file the report reads (the registry in `python/r
 | `benchmark.input_fingerprint.json` | aggregate_results.py | 6 aggregation | scores.tsv, tool_status.tsv and the per-sample tables | re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder | none | enriches | `leaderboard` |
 | `benchmark.input_consistency.tsv` | run_consistency.py | 6 aggregation | scores.tsv, tool_status.tsv and the per-sample tables | re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder | none | enriches | `leaderboard` |
 | `assembly_status.tsv` | 03_assemble.sh | 3 assembly | reads (and the assembler or QC tool) | re-run stage 3 (scripts/03_assemble.sh) from the reads | none | enriches | `health` |
+| `resource_profile.tsv` | 03_assemble.sh / resource_adapt.py | 3 assembly | the memory, threads and attempts of each tool run (AUTO_RESOURCES) | re-run stage 3 (scripts/03_assemble.sh); optional | none | enriches | `health` |
 | `download_status.tsv` | 01_download.sh | 1 download | network access (ENA/NCBI) and the sample sheet | re-download with stage 1 (scripts/01_download.sh) | none | enriches | `health` |
 | `quast_diagnostics.tsv` | run_quast_diagnostics.py | 6 aggregation | scores.tsv, tool_status.tsv and the per-sample tables | re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder | none | enriches | `quast-diagnostics` |
 | `run_manifest.json` | write_manifest.py | 6 aggregation | scores.tsv, tool_status.tsv and the per-sample tables | re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder | none | enriches | `method` |

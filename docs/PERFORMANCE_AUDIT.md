@@ -396,3 +396,23 @@ skipped and no caller's output is dropped.
 ## Stage 3 disk and memory (the figures the resource check uses)
 
 The disk need per isolate is an **estimate**, and there are two figures. Peak per isolate (the working set) is the trimmed reads (1x the raw compressed reads) plus SPAdes working files at 8 times them (an assumption in the 5 to 10 times range; it was not measured on this project's data) plus 0.33 GB (reference, raw reads, results); the isolates in flight at once (`MAX_PARALLEL_SAMPLES`) must fit, or the run cannot start (exit 6). What stays per isolate is the raw and trimmed reads and the assembler folder (assumed 3 times the reads, because nothing is deleted after an isolate) plus 0.33 GB; the whole cohort not fitting is only a warning with the number of isolates that will fit, and a guard before each isolate's download and assembly stops the run cleanly when the next isolate no longer fits plus `PLASBENCH_DISK_RESERVE_GB`. Reads sizes come from the reads on disk, the verification lock's base counts, a sample of up to 20 ENA sizes, or last a typical 0.3 GB read set (a low-confidence figure, printed as not measured). `PLASBENCH_SKIP_DISK_CHECK=1` overrides all of it.
+
+## Run stalls: what a long quiet run was made of (21 November 2026)
+
+Evidence is from one real WSL2 run (6 CPUs, 7.8 GB, data on a 9p Windows drive); **measured** unless marked **assumed**.
+
+| Step | Finding | Fix |
+|---|---|---|
+| Stage 1, 134-row sheet | planned 134 downloads, handled 3: a command in the loop read the loop's stdin (the sample list) | every stage loop reads the list on its own descriptor (`read -u 3`); helpers get `stdin=/dev/null`; stage 3 records any isolate it did not reach |
+| Stage 3 SPAdes hammer | `You need approx. 5.24277GB of free RAM` under a 4 GB budget; failed after 2 to 22 min; classified `unknown`, evidence the citation line | rule `spades_needs_memory`, single retry with `-m` from the number, footer lines never evidence |
+| Default budget | 6.9 GB available gave 4 GB (integer GB floored before 80%) | computed from MB: 6.9 GB gives 5 GB |
+| ISEScan | 663 s then `failed`: `ValueError: NoneType copy mode not allowed` (fastcluster 1.3.0 for NumPy 2 with NumPy 1.26.4); the HMM search is wasted | readiness probe (1 s), pin `fastcluster<1.3`, skipped with the fix when not ready |
+| AMRFinderPlus | 0 s failure: database absent; `[ok] amrfinder` only tested the binary | `amrfinder --database_version` probe, `amrfinder -u` in the reference-annotation install |
+| mob_typer 108 s, barrnap 31 s, abricate 13 s, ISEScan 663 s | per-caller times for a 4 Mbp genome, 6 CPUs, **one run**; ISEScan's figure is a failed run | `TYPICAL_SECONDS` in `annotate_reference.py`, 'still running, typical N min' once past twice the typical |
+| Many small files on 9p | 2000 tiny files: create 16.4 s on /mnt/f (9p) against 0.059 s on ext4 (about 280x), read 10.3 s against 0.024 s, delete 3.6 s against 0.026 s. This is the file-system cost, **not** a measured SPAdes speed-up | `WORK_DIR=auto` runs assemblies on local disk when the data folder is slow |
+| `plasbench status` | said stage 1 during stage 2: stages 2 and 3 wrote no stage events | `stage_timing_begin` in every stage, `sample_start/sample_end` with step names, status reads the latest event |
+| Slow steps | no per-command typical time | `config/step_typical.tsv`, `STEP_SLOW_FACTOR` (default 3), one note and a `slow_step` event; nothing is stopped |
+| Warning flood | 131 'missing reference' lines | one aggregated warning per stage |
+
+Audit of the other long steps (assumed unless a figure is given): ENA/SRA downloads print percentages and resume; prefetch and fasterq-dump have heartbeat labels and typical times in the table; fastp and SPAdes are labelled, SPAdes also names its phase;
+tool runs (stage 4) have no limit unless `TOOL_TIMEOUT_SECONDS` or `PLASBENCH_TOOL_TIMEOUT_PRESET` is set (a limit can score a slow tool zero, so it stays opt-in, announced at the start of stage 4); minimap2 alignment, scoring and the report build run under the stage heartbeat. Not measured: stage 4 to 8 durations on this machine.
