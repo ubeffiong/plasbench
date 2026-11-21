@@ -10,6 +10,7 @@ it prints `n/a` lines (never `skip`: the suite counts skips) and passes. It prov
   * the exit code of the command comes back unchanged (0, 1, 6, 20, 21),
   * a container named like a window job can be stopped by name.
 """
+import json
 import os
 import shutil
 import subprocess
@@ -21,7 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from plasbench import __version__, docker_runtime as dr  # noqa: E402
+from plasbench import __version__, docker_health as dh, docker_runtime as dr  # noqa: E402
 
 BASE = "python:3.12-slim"
 ok = True
@@ -85,6 +86,24 @@ def main():
         check("the version inside equals the host's", verdict["ok"] and verdict["version"] == __version__, verdict)
         info = dr.image_state(proj, exe, environ=environ)
         check("the image is reported present and built here", info["present"] and info["source"] == "built-locally", info)
+
+        print("engine health against the real engine (plasbench/docker_health.py)")
+        tok = f"e2e{os.getpid()}"
+        health = dh.check(ROOT, purpose="doctor", exe=exe, environ=environ, image=tag, token=tok)
+        check("the real engine is healthy: it answers, `docker info` is read, a test volume is created and removed, a local container starts",
+              health["healthy"] and [c["name"] for c in health["checks"] if c["ok"]][:3] == ["Docker command", "Engine answers", "Engine details (docker info)"], [(c["name"], c["detail"]) for c in health["checks"] if not c["ok"]])
+        check("the write test really created and removed pb-health-<token>: no such volume remains", subprocess.run([exe, "volume", "inspect", f"pb-health-{tok}"], capture_output=True).returncode != 0)
+        check("root directory and storage driver come from the real `docker info`", bool(health["info"].get("root_dir")) and bool(health["info"].get("driver")), health["info"])
+        check("the container test ran against the local image and nothing was pulled", any(c["name"].startswith("A container starts") and c["ok"] and not c["warn"] for c in health["checks"]), [(c["name"], c["detail"]) for c in health["checks"]])
+        done = subprocess.run([sys.executable, "-m", "plasbench", "--project-root", str(ROOT), "runtime", "doctor", "--json"], capture_output=True, text=True, timeout=180,
+                              env=dict(environ, PYTHONPATH=str(ROOT)), cwd=str(tmp))
+        try:
+            report = json.loads(done.stdout)
+        except ValueError:
+            report = {}
+        check("`plasbench runtime doctor --json` on the real engine: exit 0, healthy, with checks and a plan", done.returncode == 0 and report.get("healthy") is True and report.get("checks") and report.get("plan"), (done.returncode, done.stdout[-300:], done.stderr[-300:]))
+        done = subprocess.run([sys.executable, "-m", "plasbench", "--project-root", str(ROOT), "runtime", "doctor"], capture_output=True, text=True, timeout=180, env=dict(environ, PYTHONPATH=str(ROOT)), cwd=str(tmp))
+        check("the text report says PASS per check and ends with the plan", done.returncode == 0 and "PASS  Engine can write" in done.stdout and "Next steps" in done.stdout, done.stdout[-400:])
 
         print("a run through the real wrapper")
         script = ('echo hello > "$RESULTS_DIR/out.txt"; printf "%s" "$RESULTS_DIR" > "$RESULTS_DIR/where.txt"; plasbench --version > "$RESULTS_DIR/ver.txt"; '

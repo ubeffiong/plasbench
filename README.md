@@ -977,6 +977,7 @@ plasbench desktop-icon       # (re)make the icon; --remove takes it away, --no-d
 plasbench picker-check       # Browse does not open the folder window? PASS or FAIL per step (--interactive lets you pick a folder)
 plasbench runtime status      # where the tools run (conda or Docker) and what Docker looks like; use conda|docker, check, pull, build
 plasbench runtime use docker  # run the tools in a container of the PlasBench image (PLASBENCH_RUNTIME); `plasbench run --runtime docker` for one run
+plasbench runtime doctor      # Docker engine health: PASS/FAIL per check with evidence, proxies, a numbered plan of safe steps (exit 0 healthy, 3 problems; --json)
 ```
 
 The window is a page served only to this computer (127.0.0.1). Each start gets its own session key, so other programs
@@ -1313,7 +1314,7 @@ window or the command line.
 | `plasbench check` | A tool or database is missing or will not start | Tool and database checks. **It offers to install what is missing**, so answer **n** if you only want to report |
 | `plasbench ui-state` | The window says it is older than the page, or shows the wrong version | Which program and which folder the window runs, every installed copy |
 | `plasbench picker-check` | **Browse** does not open the folder window | PASS or FAIL for each step |
-| `plasbench runtime check` | Docker mode: the image or a container does not work | Step-by-step Docker test (`plasbench runtime status` shows the setting; a more detailed Docker health check is in preparation for a later release) |
+| `plasbench runtime doctor` and `plasbench runtime check` | Docker mode: the engine, the image or a container does not work | `doctor`: the Docker engine's health, PASS or FAIL per check with evidence and a numbered plan of safe steps; `check`: a step-by-step test of the image and a mounted folder (`plasbench runtime status` shows the setting) |
 | `plasbench net` | A download or an install cannot reach the internet | Which services (NCBI, ENA, GitHub, conda, ...) answer, and why not |
 
 *Files to attach from the study folder.* A study is a folder in the workspace (the window's **Workspace** page shows where). Attach what exists:

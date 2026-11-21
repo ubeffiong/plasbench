@@ -230,6 +230,26 @@ def run_in_runtime(runtime, host_command, container_command, root, env=None, yes
     return code
 
 
+def runtime_doctor(args, root):
+    """`plasbench runtime doctor`: the engine health checks with evidence, the environment, proxies and a numbered plan. Exit 0 healthy, 3 problems found, 2 a wrong option."""
+    from . import docker_health as dh, docker_runtime as dr, docker_helper
+    if args.choice:
+        print("[plasbench] ERROR: `runtime doctor` takes no conda|docker argument.", file=sys.stderr)
+        return 2
+    exe = dr.docker_exe()
+    image = dr.configured_image(root, exe=exe)[0] if exe else None
+    result = dh.check(root, purpose="doctor", image=image, budget=45.0)
+    result["in_container"] = bool(docker_helper.in_docker())
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print("plasbench runtime doctor: Docker engine health")
+        if result["in_container"]:
+            print("Note: this command runs inside a container; Docker is normally on the computer outside.")
+        print(dh.render(result))
+    return 0 if result["healthy"] else 3
+
+
 def runtime_command(args, root):
     """`plasbench runtime ...`: status, use, check, pull, build."""
     from . import docker_runtime as dr, netcheck
@@ -245,7 +265,12 @@ def runtime_command(args, root):
             print(f"[plasbench] Docker: {st['state'].replace('_', ' ')}" + (f". {st['hint']}" if st["hint"] else ""))
             if st["state"] == "ready" and not (st["image"] or {}).get("present"):
                 print("[plasbench] The image is not on this computer yet: `plasbench runtime pull` (or `plasbench runtime build --yes` to build it here).")
+            if st["state"] == "ready":
+                from . import docker_health
+                docker_health.explain(docker_health.cached(root, purpose="run"), lambda text: print(text, flush=True))     # a note, not a refusal: the choice stays saved
         return 0
+    if action == "doctor":
+        return runtime_doctor(args, root)
     if action == "status":
         chosen = dr.runtime_setting(root)
         st = dr.probe(root)
@@ -521,15 +546,15 @@ def build_parser():
     picker_parser.add_argument("--json", action="store_true", help="Print the report as JSON.")
     runtime_parser = sub.add_parser(
         "runtime",
-        help="Choose where PlasBench's tools run, conda or Docker: status, use, check, pull, build.",
+        help="Choose where PlasBench's tools run, conda or Docker: status, use, check, doctor, pull, build.",
         description="status: the current choice and what Docker looks like.  use conda|docker: save the choice (PLASBENCH_RUNTIME in config/local.env).  "
-                    "check: step-by-step self-test of Docker (PASS or FAIL per step).  pull: get the published image.  build: build the image from this folder's Dockerfile "
+                    "check: step-by-step self-test of Docker (PASS or FAIL per step).  doctor: the Docker engine health checks with evidence and a plan (exit 0 healthy, 3 problems).  pull: get the published image.  build: build the image from this folder's Dockerfile "
                     "(when it cannot be pulled).  Guide: docs/USER_GUIDE.md, 'Choosing where tools run'.")
-    runtime_parser.add_argument("action", nargs="?", choices=("status", "use", "check", "pull", "build"), default="status", help="What to do (default: status).")
+    runtime_parser.add_argument("action", nargs="?", choices=("status", "use", "check", "doctor", "pull", "build"), default="status", help="What to do (default: status).")
     runtime_parser.add_argument("choice", nargs="?", choices=("conda", "docker"), help="With `use`: conda or docker.")
     runtime_parser.add_argument("--yes", action="store_true", help="Agree to a pull or build without asking.")
     runtime_parser.add_argument("--rebuild", action="store_true", help="With `build`: build again even if an image of this version exists.")
-    runtime_parser.add_argument("--json", action="store_true", help="Print status or check as JSON.")
+    runtime_parser.add_argument("--json", action="store_true", help="Print status, check or doctor as JSON.")
     demo_parser = sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
     demo_parser.add_argument("--open-report", action="store_true",
                              help="Open the completed demo report in your browser without asking.")

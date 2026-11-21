@@ -388,7 +388,7 @@ for needle in ("Ctrl+Shift+C", "Cmd+C", "Tee-Object", "2>&1 | tee plasbench-erro
                "plasbench status", "plasbench diagnose", "plasbench check", "plasbench ui-state", "plasbench picker-check", "plasbench runtime check", "plasbench net", "logs/run_", "results/run_events.jsonl",
                "results/assembly_status.tsv", "results/tool_status.tsv", "results/run_manifest.json", ".ncbi.env", "ghp_", "SECURITY.md", "plasbench issue-report", "Search first", "One problem per issue"):
     check(f"README names: {needle}", needle in section, needle)
-check("README does not mention a command that does not exist", "runtime doctor" not in section.replace("a more detailed Docker health check", ""))
+check("README names runtime doctor, which exists", "plasbench runtime doctor" in section and "doctor" in read("plasbench/cli.py"))
 check("README commands table lists issue-report", "| `issue-report` |" in readme)
 check("README is still CRLF throughout", readme.count("\r\n") == readme.count("\n"))
 check("CHANGELOG is still CRLF throughout", read("CHANGELOG.md").count("\r\n") == read("CHANGELOG.md").count("\n"))

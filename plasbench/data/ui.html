@@ -828,6 +828,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
    <div class="card" id="env_card" style="margin-bottom:16px"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Environment <span id="rt_tip"></span></h3><span class="sub" id="rt_sub"></span></div>
     <div class="bd" id="rt_body"><span class="mut">Looking at conda and Docker…</span></div>
     <div class="bd" id="rt_test" style="border-top:1px solid var(--line)" hidden></div>
+    <div class="bd" id="rt_health" style="border-top:1px solid var(--line)" hidden></div>
     <div class="ft" id="rt_ft"></div></div>
    <div class="split">
     <div class="card"><div class="hd"><h3>Checklist</h3><span class="sub" id="envsum"></span></div><div id="envlist"><div class="bd mut">Checking…</div></div></div>
@@ -2839,6 +2840,7 @@ function renderRuntime(r) {
     <button class="btn sec sm" id="rt_pull" data-needs="ghcr" ${d.state !== "ready" ? "disabled" : ""}>Pull / update the image${rtTip("pull_image")}</button>
     <button class="btn sec sm" id="rt_build" data-needs="docker" ${d.state !== "ready" ? "disabled" : ""}>Build the image${rtTip("build_image")}</button>
     <button class="btn sec sm" id="rt_test_btn" ${d.state !== "ready" ? "disabled" : ""}>Test Docker setup${rtTip("test_docker")}</button>
+    <button class="btn sec sm" id="rt_health_btn" ${d.pending || d.state === "not_installed" || d.state === "inside_docker" ? "disabled" : ""}>Run health check${rtTip("run_health")}</button>
     ${cur === "docker" && d.state === "ready" ? `<button class="btn sm" id="rt_ready" data-needs="conda">Make everything ready${rtTip("make_ready")}</button>` : ""}
     ${d.action === "restart" ? `<button class="btn sec sm" data-dk="restart">Restart window${rtTip("restart_window")}</button>` : d.action === "start" ? `<button class="btn sec sm" data-dk="start">Start Docker Desktop${rtTip("start_docker")}</button>` : d.action === "integration" ? `<button class="btn sec sm" data-dk="integration">Open WSL integration settings${rtTip("open_integration")}</button>` : d.state === "not_installed" || d.state === "wsl_integration_off" ? `<button class="btn sec sm" data-run='["install-tools","docker"]' data-label="Install Docker" title="Installs Docker on this computer (asks first)">Install Docker first${rtTip("install_docker")}</button>` : ""}`;
   setIfChanged($("#rt_ft"), ft);
@@ -2888,6 +2890,39 @@ document.addEventListener("click", async e => {
   else if (b.id === "rt_pull") { itPend("Pull the image"); try { const job = await api("runtime/pull", {}); toast("Started: pull the image", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (err) { toast(err.message, "bad"); } finally { itPendClear(); } }
 });
 /* ==RUNTIME-UI-END== */
+
+/* ==DOCKER-HEALTH-UI-BEGIN== The "Docker health" block of the Environment card (plasbench/docker_health.py; POST api runtime/health runs the bounded checks, GET returns the last result only).
+   Nothing runs on page load: the block stays hidden until the button is pressed. Commands are shown with Copy buttons and are never run by PlasBench. No browser dialogs. */
+const dhCmd = c => `<div style="display:flex;gap:8px;align-items:flex-start;margin-top:4px"><code class="mono small" style="overflow-wrap:anywhere;flex:1">${esc(c)}</code><button type="button" class="btn ghost sm" data-hcopy="${esc(c)}">Copy</button></div>`;
+function dhRender(r) {
+  const box = $("#rt_health"); if (!box) return;
+  if (!r || !r.checked) { box.hidden = true; return; }
+  box.hidden = false;
+  const info = r.info || {}, px = info.proxies || {}, diag = r.diagnosis;
+  const facts = [r.environment_label, info.server_version ? `Docker ${info.server_version}` : "", info.root_dir ? `root ${info.root_dir}` : "", info.driver ? `storage ${info.driver}` : "", info.free_gb != null ? `${info.free_gb} GB free` : "",
+    px.http_proxy || px.https_proxy ? `proxy ${px.https_proxy || px.http_proxy}` : ""].filter(Boolean).join(" · ");
+  const rows = r.checks.map(c => `<div class="note ${c.ok ? (c.warn ? "" : "ok") : "warn"}" data-dh="${esc(c.name)}" style="margin-top:6px">${icon(c.ok ? "check" : "alert", "ico")}<div><b>${c.ok ? (c.warn ? "NOTE" : "PASS") : "FAIL"}</b> ${esc(c.name)}`
+    + `<div class="small" style="overflow-wrap:anywhere">${esc(c.detail)}</div>${((c.diagnosis || {}).evidence_lines || []).slice(0, 3).map(l => `<div class="small mono mut" style="overflow-wrap:anywhere">${esc(l)}</div>`).join("")}</div></div>`).join("");
+  const cmds = [...new Set(r.checks.filter(c => !c.ok || c.warn).flatMap(c => c.commands || []))];
+  const last = (diag && diag.last_resort) || [];
+  setIfChanged(box, `<p style="margin:0 0 4px"><b>Docker health: ${r.healthy ? "the engine can pull, build and run" : "problems found: PlasBench will not pull or build until this is fixed"}</b>${rtTip("docker_health")}</p>
+    <div class="small mut">${esc(facts)}</div>${rows}
+    ${r.plan && r.plan.length ? `<p class="small" style="margin:10px 0 2px"><b>Next steps</b> (safest first)</p><ol class="small" style="margin:0 0 0 18px;padding:0">${r.plan.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}
+    ${cmds.length ? `<p class="small" style="margin:10px 0 2px"><b>Commands to run yourself</b>${rtTip("health_commands")}</p>${cmds.map(dhCmd).join("")}` : ""}
+    ${last.length ? `<p class="small warn-t" style="margin:10px 0 2px"><b>Last resort only</b>${rtTip("health_last_resort")}</p>${last.map(x => dhCmd(x.command) + `<div class="small warn-t">${esc(x.warning)}</div>`).join("")}` : ""}`);
+}
+async function dhRun(btn) {
+  const box = $("#rt_health"); btn.disabled = true; box.hidden = false;
+  setIfChanged(box, `<span class="mut">Checking the Docker engine (about 15 seconds; nothing is pulled, built or deleted)...</span>`);
+  try { const r = await api("runtime/health", {refresh: true}); S.dh = r; r.error && !r.checks ? setIfChanged(box, `<span class="warn-t">${esc(r.error)}</span>`) : dhRender(r); }
+  catch (e) { setIfChanged(box, `<span class="warn-t">${esc(e.message)}</span>`); }
+  finally { btn.disabled = false; }
+}
+document.addEventListener("click", e => {
+  const c = e.target.closest && e.target.closest("[data-hcopy]"); if (c) { copyText(c.dataset.hcopy, "Command copied"); return; }
+  const b = e.target.closest && e.target.closest("#rt_health_btn"); if (b && !b.disabled) dhRun(b);
+});
+/* ==DOCKER-HEALTH-UI-END== */
 
 /* ==DOCKER-UI-BEGIN== Docker in the tools setup (python/docker_setup.py): a live state chip from a cached background probe (api docker/setup, never on the page-load path),
    Install Docker (a consent dialog listing exactly what runs, who elevates and the licence note), Re-check, the Docker guide. Where PlasBench may not act (sudo, the Docker

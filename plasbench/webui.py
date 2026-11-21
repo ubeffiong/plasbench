@@ -1126,6 +1126,12 @@ class Jobs:
             if warning:
                 job["warnings"] = warning      # before the state flips, so a reader that sees "done" never sees it without the note
             job.update(ended=ended or time.time(), exit=code, state=state)
+            try:      # a Docker pull or build that stopped with a diagnosis (plasbench/docker_health.py record()) keeps it in the job's result
+                found = Path(self.dir) / (job_id + ".diagnosis.json")
+                if found.is_file():
+                    job["diagnosis"] = json.loads(found.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                pass
             if save:
                 self._save()
         if code not in (0, None):
@@ -1787,6 +1793,33 @@ def runtime_test(project) -> dict:
         return {"steps": rows, "ok": all(r["ok"] for r in rows), "text": dr.format_steps(rows)}
     finally:
         _runtime_test_lock.release()
+# ---- Docker health (plasbench/docker_health.py): GET /api/runtime/health returns the last result only (never starts anything); POST runs the bounded checks (about 15 s), remembered 30 s ----
+HEALTH_TTL = 30.0
+_health_lock = threading.Lock()
+_health_last = {}
+
+
+def docker_health_state() -> dict:
+    """The last health check of this window session ({'checked': False} before the first one). Starts no process: safe on any path."""
+    return dict(_health_last) if _health_last else {"checked": False}
+
+
+def docker_health_run(project, refresh: bool = False) -> dict:
+    """Run the Docker engine health checks once at a time (docker version / info / a test volume created and removed; no network, nothing pulled). A second click within 30 s gets the same answer."""
+    from . import docker_health
+    if not _health_lock.acquire(blocking=False):
+        return dict(docker_health_state(), busy=True, error="a Docker health check is already running")
+    try:
+        key = ("docker-health", str(project.root))
+        if refresh:
+            loadcache.forget(key)
+        result = loadcache.ttl(key, HEALTH_TTL, lambda: docker_health.check(project.root, purpose="doctor", budget=20.0))
+        _health_last.clear()
+        _health_last.update(dict(result, checked=True, at=time.time()))
+        session_log().event("docker_health", healthy=result["healthy"], cause=(result.get("diagnosis") or {}).get("cause", ""))
+        return dict(_health_last)
+    finally:
+        _health_lock.release()
 def _docker_setup_probe(root) -> dict:
     """One answer for the Docker item of the tools setup: the state chip, the diagnosis and the plan (python/docker_setup.py). Runs `docker --version`, `docker info` and
     `docker context show` only, in the background thread loadcache starts; nothing is installed or started."""
@@ -2142,6 +2175,8 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, dict(caps, exe=None, **native_picker_extras(caps)))
             if route == "runtime":           # where the tools run; the Docker probe is a background loadcache probe, never on the page-load path
                 return self.jsend(200, runtime_state(project))
+            if route == "runtime/health":    # the last Docker health result only: starts nothing (POST runs the checks)
+                return self.jsend(200, docker_health_state())
             if route == "docker/setup":      # the Docker item of the tools setup: chip, diagnosis, plan; Re-check = ?refresh=1 (a cached background probe, never on the page-load path)
                 return self.jsend(200, docker_setup_state(project.root, q.get("refresh") == "1"))
             if route == "docker/offer":      # "run in Docker instead": the docker probe runs in the background (loadcache.swr), never on the page-load path
@@ -2697,6 +2732,8 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, runtime_use(project, str(data.get("runtime") or "")))
             if route == "runtime/test":
                 return self.jsend(200, runtime_test(project))
+            if route == "runtime/health":    # the Docker engine health checks: bounded, one at a time, remembered 30 s
+                return self.jsend(200, docker_health_run(project, bool(data.get("refresh"))))
             if route in ("runtime/pull", "runtime/ready"):
                 if route == "runtime/ready":
                     argv, label = ["check", "--yes"], "Make everything ready in Docker (tools and databases)"
