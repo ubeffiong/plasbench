@@ -43,7 +43,7 @@ function init(root) {
     '<label>Find tool <input type="search" class="ct-q" placeholder="filter tools" aria-label="Filter tools (columns)"></label>' +
     '<label>Sort tools <select class="ct-sort" aria-label="Sort tools (columns)">' + sortOpts + '</select></label>' +
     '<button type="button" class="ct-btn ct-allg">Collapse groups</button><button type="button" class="ct-btn ct-csv">Download CSV</button>';
-  head.appendChild(tools);
+  ($(root, '.ct-toolslot') || head).appendChild(tools);
   var lv = document.createElement('div'); lv.className = 'ct-live'; lv.setAttribute('aria-live', 'polite'); root.appendChild(lv);
 
   /* ---- column handles */
@@ -84,7 +84,7 @@ function init(root) {
     mList.forEach(function (m) {
       var res = P.rankShade(vis.map(function (ci) { return val(m.id, ci); }), m.dir); S.res[m.id] = {res: res, vis: vis};
       var tr = table.querySelector('tr[data-m="' + m.id + '"]'), st = tr && $(tr, '[data-ct-stat]');
-      if (st) st.textContent = STATUS[res.status] || '';
+      if (st) { var why = STATUS[res.status] || ''; st.textContent = why ? '\u24D8' : ''; if (why) { st.title = why; st.setAttribute('aria-label', why); st.tabIndex = 0; st.setAttribute('role', 'img'); } else { st.removeAttribute('title'); st.removeAttribute('aria-label'); st.removeAttribute('role'); st.removeAttribute('tabindex'); } }
       vis.forEach(function (ci, k) {
         var td = cellEl(m.id, ci), r = rec(m.id, ci); if (!td) return;
         td.className = td.className.replace(/\bct-(s\d+|flat|na|best)\b/g, '').replace(/\s+/g, ' ').trim();

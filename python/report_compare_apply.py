@@ -104,7 +104,7 @@ def leaderboard(rows, texts, scores, table_html, label=None):
     ]
     out = ct.from_rows(cid, f"Leaderboard: {first.get('analysis_track', '')} {first.get('task', '')}".strip(), rows, specs,
                        col_track=lambda r: "", col_task=lambda r: (f"rank {r['rank']}" if r.get("rank") else ""), isolate_href=isolate_link,
-                       lead="Tools in rank order. Rank, 95% CI and the significance against the runner-up are in the Table below; the interval of the ranking score is in the panel.",
+                       lead="Chips show each tool's rank from the leaderboard table. Rank, 95% CI and significance against the runner-up are in the Table fold below.",
                        **_col_args(label))
     return out + fold(table_html)
 

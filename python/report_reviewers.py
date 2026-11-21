@@ -43,6 +43,42 @@ CSS = """<style>
 .qp-h{background:var(--heat);color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}.qp-noheat .qp-h{background:none;color:inherit}
 .rv table td.qp-sel,.rv table th.qp-sel{border-left:2px solid #0072B2;border-right:2px solid #0072B2}.qp-heatbox{font-weight:600}
 @media print{.qp-noheat .qp-h{background:var(--heat);color:#111}.qp-heatbox{display:none}}
+.mx{border:1px solid rgba(128,128,128,.35);border-radius:8px;padding:4px 10px 8px;margin:8px 0}
+.mx-head,.mx-row{display:grid;grid-template-columns:minmax(80px,130px) minmax(110px,1.1fr) minmax(120px,1fr) minmax(110px,1.1fr) minmax(130px,200px);gap:4px 12px;align-items:center}
+.mx-head{font-size:.78em;opacity:.75;padding:2px 0;border-bottom:1px solid rgba(128,128,128,.35)}
+.mx-tool{border-bottom:1px dotted rgba(128,128,128,.4)}
+.mx-tool>summary{cursor:pointer;list-style:none;padding:4px 0;min-height:26px}
+.mx-tool>summary::-webkit-details-marker{display:none}
+.mx-tool>summary:hover{background:rgba(128,128,128,.08)}
+.mx-tool>summary:focus-visible,.mx-track>summary:focus-visible,.mx-all>summary:focus-visible{outline:3px solid #0072B2;outline-offset:1px}
+.mx-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mx-name:before{content:"\\25B8";display:inline-block;margin-right:5px;transition:transform .1s}
+.mx-tool[open]>summary .mx-name:before{transform:rotate(90deg)}
+.mx-bar{display:flex;height:16px;border-radius:3px;overflow:hidden;background:rgba(128,128,128,.15)}
+.mx-bar i{display:block;height:100%;min-width:2px;font:700 10px/16px Arial,sans-serif;font-style:normal;text-align:center;color:#fff;overflow:hidden}
+.mx-c-unique{background:#0072B2}.mx-c-red{background:repeating-linear-gradient(45deg,#CC79A7 0 3px,#f0cfe2 3px 6px)}.mx-c-chrom{background:#D55E00}.mx-c-unm{background:repeating-linear-gradient(90deg,#999 0 3px,#ddd 3px 6px)}
+.mx-o-single{background:#0072B2}.mx-o-frag{background:#E69F00;color:#111!important}.mx-o-dup{background:#CC79A7;color:#111!important}.mx-o-fd{background:repeating-linear-gradient(45deg,#CC79A7 0 4px,#E69F00 4px 8px);color:#111!important}
+.mx-o-miss{background:#D55E00}.mx-o-other{background:repeating-linear-gradient(90deg,#999 0 3px,#ddd 3px 6px);color:#111!important}
+.mx-dumb{position:relative;display:block;height:16px;margin:0 6px}
+.mx-dumb:before{content:"";position:absolute;left:0;right:0;top:7px;height:2px;background:rgba(128,128,128,.3)}
+.mx-line{position:absolute;top:6px;height:4px;background:rgba(0,114,178,.5);border-radius:2px}
+.mx-best,.mx-comb{position:absolute;top:2px;width:12px;height:12px;margin-left:-6px;box-sizing:border-box;font-style:normal}
+.mx-best{border-radius:50%;background:#0072B2;border:2px solid #fff}
+.mx-comb{background:#E69F00;border:2px solid #fff;transform:rotate(45deg) scale(.85)}
+.mx-na{font-size:.85em;opacity:.7}
+.mx-txt{font-size:.8em;font-weight:400;line-height:1.25;opacity:.9}
+.mx-body{padding:4px 0 8px 14px}
+.mx-scroll{max-height:240px;overflow:auto;border:1px solid rgba(128,128,128,.3);border-radius:4px}
+.mx-t{border-collapse:collapse;font-size:.85em;width:100%}.mx-t th,.mx-t td{border-bottom:1px solid rgba(128,128,128,.25);padding:2px 8px;text-align:left}
+.mx-t thead th{position:sticky;top:0;background:var(--card,#fff)}
+.mx-h{margin:10px 0 2px;font-size:.95em}
+.mx-track{margin:4px 0}.mx-track>summary{cursor:pointer;font-weight:600;font-size:.9em}
+.mx-track svg{display:block;width:100%;max-height:250px}
+.mx-all{margin:8px 0}.mx-all>summary{cursor:pointer;font-weight:600}
+.mx-key{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.78em;margin-top:6px;opacity:.9}.mx-key span{display:inline-flex;align-items:center;gap:4px}.mx-key i{display:inline-block;width:12px;height:10px;border-radius:2px;position:static;margin:0}
+.mx-key i.mx-k{width:10px;height:10px;transform:none}.mx-key i.mx-comb.mx-k{transform:rotate(45deg) scale(.8)}
+@media (max-width:760px){.mx-head{display:none}.mx-row{grid-template-columns:1fr 1fr;grid-template-areas:"n n" "a b" "c t"}.mx-row .mx-name{grid-area:n}}
+@media print{.mx-scroll{max-height:none}}
 .rv-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.88em;margin:6px 0}.rv-legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 </style>"""
 
@@ -401,9 +437,51 @@ def track_figure(plasmid_row, intervals):
     return "".join(out)
 
 
+MX_OUTCOMES = [("single", "single candidate", BLUE, "mx-o-single"), ("fragmented", "fragmented", ORANGE, "mx-o-frag"), ("duplicated", "duplicated", PURPLE, "mx-o-dup"),
+               ("fragmented_and_duplicated", "fragmented and duplicated", PURPLE, "mx-o-fd"), ("missed", "missed", VERM, "mx-o-miss"),
+               ("carried_only_in_other_candidates", "carried only in other candidates", GREY, "mx-o-other")]
+
+
+def _pct(x):
+    return f"{max(0.0, min(100.0, x)):.2f}"
+
+
+def _mx_composition(tool, e):
+    """One thin stacked bar: where the sequence a tool predicted went. Each segment has a tooltip and a pattern; the legend names them."""
+    total = e["length"] or 1.0
+    unique = max(0.0, e["plasmid"] - e["redundant"])
+    unmapped = max(0.0, e["length"] - e["plasmid"] - e["chrom"])
+    vals = (("mx-c-unique", "unique plasmid sequence", unique), ("mx-c-red", "redundant plasmid sequence", e["redundant"]),
+            ("mx-c-chrom", "chromosome (off-target)", e["chrom"]), ("mx-c-unm", "unmapped", unmapped))
+    denom = max(sum(v for _, _, v in vals), total)
+    segs = "".join(f"<i class='{cls}' style='width:{_pct(100 * v / denom)}%' title='{esc(tool)}: {esc(label)} {v:,.0f} bp ({100 * v / total:.1f}% of {total:,.0f} bp predicted)'></i>"
+                   for cls, label, v in vals if v > 0)
+    words = "; ".join(f"{label} {100 * v / total:.0f}%" for _, label, v in vals if v > 0)
+    return f"<span class='mx-bar' role='img' aria-label='{esc(tool)}: predicted sequence split into {esc(words)}'>{segs}</span>"
+
+
+def _mx_dumbbell(tool, best, comb, count):
+    """Best single candidate (dot) against all candidates combined (diamond) on a fixed 0..1 scale; the line between them is what extra candidates add."""
+    if best is None or comb is None:
+        return "<span class='mx-dumb mx-na' title='not assessed'>not assessed</span>"
+    lo, hi = min(best, comb), max(best, comb)
+    return (f"<span class='mx-dumb' role='img' aria-label='{esc(tool)}: best single candidate covers {best:.2f} of a plasmid, all candidates together {comb:.2f}, over {count} plasmids'>"
+            f"<b class='mx-line' style='left:{_pct(100 * lo)}%;width:{_pct(100 * (hi - lo))}%'></b>"
+            f"<i class='mx-best' style='left:{_pct(100 * best)}%' title='{esc(tool)}: best single candidate {best:.3f} (mean over {count} plasmids)'></i>"
+            f"<i class='mx-comb' style='left:{_pct(100 * comb)}%' title='{esc(tool)}: all candidates combined {comb:.3f} (reference bases counted once)'></i>"
+            f"</span>")
+
+
+def _mx_outcomes(tool, counts):
+    total = sum(counts.values()) or 1
+    segs = "".join(f"<i class='{cls}' style='width:{_pct(100 * counts[key] / total)}%' title='{esc(tool)}: {counts[key]} plasmid(s) {esc(label)}'>{counts[key]}</i>"
+                   for key, label, _c, cls in MX_OUTCOMES if counts.get(key))
+    words = "; ".join(f"{counts[key]} {label}" for key, label, _c, _x in MX_OUTCOMES if counts.get(key))
+    return f"<span class='mx-bar mx-oc' role='img' aria-label='{esc(tool)}: reference plasmids by outcome: {esc(words)}'>{segs}</span>"
+
+
 def multiplicity_section(plasmids, candidates, intervals):
-    lead = ("Every record a tool predicted is accounted for. Per plasmid, <strong>combined coverage counts reference bases once</strong> (the union), "
-            "best-candidate coverage is the single best record, and redundancy is what other candidates already cover. "
+    lead = ("Does a tool return one clean record per plasmid, or several overlapping or mixed ones? Click a tool for its plasmids and tracks. "
             "<strong>Descriptive: it never changes a score, and extra candidates cannot raise the primary endpoint.</strong>")
     if not plasmids:
         return section("learn-multiplicity", "Reconstruction multiplicity", lead, note(
@@ -413,7 +491,7 @@ def multiplicity_section(plasmids, candidates, intervals):
     for r in plasmids:
         outcomes.setdefault(r["tool"], {}).setdefault(r["outcome"], 0)
         outcomes[r["tool"]][r["outcome"]] += 1
-    names = ["single", "fragmented", "duplicated", "fragmented_and_duplicated", "missed", "carried_only_in_other_candidates"]
+    names = [k for k, _l, _c, _x in MX_OUTCOMES]
     rows = []
     for tool in sorted(outcomes):
         group = [r for r in plasmids if r["tool"] == tool]
@@ -426,38 +504,62 @@ def multiplicity_section(plasmids, candidates, intervals):
         n.replace("_", " ") for n in names]
     table = ("<div class='panel' style='overflow-x:auto'><table><thead><tr>" + "".join(f"<th>{esc(h)}</th>" for h in head) + "</tr></thead><tbody>"
              + "".join("<tr>" + "".join(f"<td>{esc(c)}</td>" for c in r) + "</tr>" for r in rows) + "</tbody></table></div>")
-    reading = []
-    for tool in sorted(outcomes):
-        group = [r for r in plasmids if r["tool"] == tool]
-        gain = mean([number(r["coverage_gain"]) for r in group])
-        red = mean([number(r["redundancy_fraction"]) for r in group])
-        many = sum(1 for r in group if (number(r["n_candidates"]) or 0) > 1)
-        if many:
-            reading.append(f"{tool}: {many} of {len(group)} plasmids have more than one candidate; extra candidates add {100 * (gain or 0):.1f} "
-                           f"points of coverage over the best one and {100 * (red or 0):.1f}% of the candidate sequence on plasmids is redundant.")
-        else:
-            reading.append(f"{tool}: no plasmid has more than one candidate.")
-    figs = [composition_chart(comp), coverage_chart(plasmids)]
-    fig_html = "".join(f"<figure class='binfig'><div style='overflow-x:auto'>{f}</div></figure>" for f in figs if f)
-    legend = ("<div class='rv-legend'>" + "".join(f"<span><i style='background:{c}'></i>{esc(lbl)}</span>" for c, lbl in
-                                                  ((BLUE, "primary / covered once"), (ORANGE, "complementary fragment"), (PURPLE, "redundant / covered by several"),
-                                                   (VERM, "chimeric"), (GREEN, "reference"))) + "<span>grey hatching: not represented</span></div>")
     by_plasmid = {}
     for r in intervals or []:
         by_plasmid.setdefault((r["sample"], r["tool"], r["plasmid"]), []).append(r)
     chosen = sorted((r for r in plasmids if (r["sample"], r["tool"], r["plasmid"]) in by_plasmid and (number(r["n_touching"]) or 0) > 1),
                     key=lambda r: (-(number(r["n_touching"]) or 0), -(number(r["redundant_bp"]) or 0), r["sample"], r["tool"], r["plasmid"]))[:6]
-    tracks = "".join(f"<figure class='binfig'><div style='overflow-x:auto'>{track_figure(r, by_plasmid[(r['sample'], r['tool'], r['plasmid'])])}</div></figure>"
-                     for r in chosen)
-    if tracks:
-        tracks = ("<h3>Candidates against the reference</h3>" + legend + tracks
-                  + "<p class='small'>Plasmids with the most candidates first (up to six shown). A candidate that also carries chromosome or another "
-                    "plasmid is labelled chimeric and still counts toward the coverage it adds.</p>")
-    else:
-        tracks = note("No plasmid in this run has more than one candidate touching it, so there are no tracks to draw.", caution=False)
+    legend = ("<div class='rv-legend'>" + "".join(f"<span><i style='background:{c}'></i>{esc(lbl)}</span>" for c, lbl in
+                                                  ((BLUE, "primary / covered once"), (ORANGE, "complementary fragment"), (PURPLE, "redundant / covered by several"),
+                                                   (VERM, "chimeric"), (GREEN, "reference"))) + "<span>grey hatching: not represented</span></div>")
+    tool_rows = []
+    for tool in sorted(outcomes):
+        group = [r for r in plasmids if r["tool"] == tool]
+        gain = mean([number(r["coverage_gain"]) for r in group])
+        red = mean([number(r["redundancy_fraction"]) for r in group])
+        many = sum(1 for r in group if (number(r["n_candidates"]) or 0) > 1)
+        n_cand = mean([number(r["n_candidates"]) for r in group])
+        if many:
+            reading = (f"{tool}: {many} of {len(group)} plasmids have more than one candidate; extra candidates add {100 * (gain or 0):.1f} "
+                       f"points of coverage over the best one and {100 * (red or 0):.1f}% of the candidate sequence on plasmids is redundant.")
+        else:
+            reading = f"{tool}: no plasmid has more than one candidate."
+        best = mean([number(r["best_candidate_coverage"]) for r in group])
+        comb = mean([number(r["combined_coverage"]) for r in group])
+        order = {k: i for i, k in enumerate(names)}
+        body_rows = "".join(
+            f"<tr><td>{esc(r['sample'])}</td><td>{esc(r['plasmid'])}</td><td>{esc(r['n_candidates'])}</td><td>{esc(r['best_candidate_coverage'])}</td>"
+            f"<td>{esc(r['combined_coverage'])}</td><td>{esc(r['redundancy_fraction'])}</td><td>{esc(r['outcome'].replace('_', ' '))}</td></tr>"
+            for r in sorted(group, key=lambda r: (order.get(r["outcome"], 99), r["sample"], r["plasmid"]))[:300])
+        plasmid_table = ("<div class='mx-scroll'><table class='mx-t'><thead><tr><th>Isolate</th><th>Plasmid</th><th>Candidates</th><th>Best</th><th>Combined</th>"
+                         f"<th>Redundancy</th><th>Outcome</th></tr></thead><tbody>{body_rows}</tbody></table></div>"
+                         + (f"<p class='small'>The first 300 of {len(group)} plasmids; the full table is benchmark.candidate_multiplicity.tsv.</p>" if len(group) > 300 else ""))
+        mine = [r for r in chosen if r["tool"] == tool]
+        tracks = "".join(
+            f"<details class='mx-track'><summary>{esc(r['sample'])} / {esc(r['plasmid'])}: {esc(r['n_touching'])} records touch it, outcome {esc(r['outcome'].replace('_', ' '))}</summary>"
+            f"<figure class='binfig'>{track_figure(r, by_plasmid[(r['sample'], r['tool'], r['plasmid'])])}</figure></details>" for r in mine)
+        tool_rows.append(
+            f"<details class='mx-tool'><summary class='mx-row'><span class='mx-name'>{esc(tool)}</span>{_mx_composition(tool, comp.get(tool, {'length': 0, 'plasmid': 0, 'chrom': 0, 'redundant': 0}))}"
+            f"{_mx_dumbbell(tool, best, comb, len(group))}{_mx_outcomes(tool, outcomes[tool])}"
+            f"<span class='mx-txt'>coverage {best:.2f} &rarr; {comb:.2f}; {(n_cand or 0):.1f} candidates per plasmid; {100 * (red or 0):.0f}% redundant</span></summary>"
+            f"<div class='mx-body'><p class='small'>{esc(reading)}</p>{plasmid_table}"
+            + (f"<h4 class='mx-h'>Candidates against the reference</h4>{legend}{tracks}" if tracks else "") + "</div></details>")
+    key = ("<div class='mx-key'><span><i class='mx-c-unique'></i>unique plasmid sequence</span><span><i class='mx-c-red'></i>redundant</span>"
+           "<span><i class='mx-c-chrom'></i>chromosome</span><span><i class='mx-c-unm'></i>unmapped</span>"
+           "<span><i class='mx-best mx-k'></i>best single candidate</span><span><i class='mx-comb mx-k'></i>all combined</span>"
+           + "".join(f"<span><i class='{cls}'></i>{esc(lbl)}</span>" for _k, lbl, _c, cls in MX_OUTCOMES) + "</div>")
+    heads = ("<div class='mx-head' aria-hidden='true'><span>Tool</span><span>Where the predicted sequence went</span><span>Coverage of a plasmid: best &rarr; all combined</span>"
+             "<span>What happened to each reference plasmid (count)</span><span></span></div>")
+    full = ""
+    figs = [composition_chart(comp), coverage_chart(plasmids)]
+    if any(figs):
+        full = ("<details class='mx-all'><summary>Full-size charts</summary>"
+                + "".join(f"<figure class='binfig'><div style='overflow-x:auto'>{f}</div></figure>" for f in figs if f) + "</details>")
+    if not chosen:
+        full += note("No plasmid in this run has more than one candidate touching it, so there are no tracks to draw.", caution=False)
     return section("learn-multiplicity", "Reconstruction multiplicity", lead,
-                   "<div class='insight'><p><strong>What the figures say</strong></p><ul>" + "".join(f"<li>{esc(t)}</li>" for t in reading) + "</ul></div>"
-                   + table + fig_html + tracks)
+                   "<div class='mx'>" + heads + "".join(tool_rows) + key + "</div>"
+                   + "<details class='mx-all'><summary>All values (one row per tool)</summary>" + table + "</details>" + full)
 
 
 def stability_section(summary, study_rows=None, species_rows=None):

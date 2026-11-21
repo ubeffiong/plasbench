@@ -146,8 +146,8 @@ check("a count row (no direction) is not shaded and says 'direction not defined'
 check("a metric assessed for fewer than two tools is not shaded and says why", not re.search(r"ct-s\d", row_html["one"]) and "fewer than 2 tools assessed" in row_html["one"], row_html["one"][:400])
 check("a not-assessed cell is hatched (ct-na) with its reason and its text, never shaded", "ct-na" in row_html["one"] and "not bin-scored" in row_html["one"])
 check("an all-tied row is not shaded and says so", not re.search(r"ct-s\d", row_html["tie"]) and "every assessed tool is tied" in row_html["tie"])
-check("the legend says the shade is by rank and not by raw value", "by their <strong>rank</strong>" in frag and "not by raw value" in frag)
-check("the legend explains hatch, not-shaded rows and the best-in-row star", "hatched" in frag and "left unshaded" in frag and "best in row" in frag)
+check("the legend says the shade is by rank and not by raw value", "by rank within each row" in frag and "not by raw value" in frag)
+check("the legend explains hatch, not-shaded rows and the best-in-row star", "not assessed: never shaded, never zero" in frag and "are not shaded" in frag and "best in row" in frag)
 
 # escaping
 check("the tool label, metric and title are escaped in the HTML", "&lt;b&gt;" in frag and "TOOL&lt;A&gt;" in frag and "<b>x</b>" not in frag and "TOOL<A>" not in frag)
