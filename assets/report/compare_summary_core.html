@@ -9,7 +9,7 @@ var P = root.PBCT;
 function ok(v) { return typeof v === 'number' && isFinite(v); }
 
 /* The axis of one metric row: [lo, hi] and whether it is a fixed, natural scale. Shares in 0..1 use 0..1, a measure in -1..1 (MCC) uses -1..1,
-   a percentage uses 0..100, anything else 0..(largest value + 8%). The same scale is used for every tool of the row, never one per tool. */
+   a percentage uses 0..100, anything else 0 up to the next round tick above the largest value. The same scale is used for every tool of the row, never one per tool. */
 function scaleFor(values, disps, zoom) {
   var v = values.filter(ok);
   if (!v.length) return {lo: 0, hi: 1, fixed: true, kind: 'unit'};
@@ -27,7 +27,7 @@ function scaleFor(values, disps, zoom) {
     }
     return nat;
   }
-  var lo = Math.min(0, mn), hi = mx > lo ? nice(lo + (mx - lo) * 1.04) : lo + 1;
+  var lo = Math.min(0, mn), hi = mx > lo ? nice(mx) : lo + 1;
   return {lo: lo, hi: hi, fixed: false, kind: 'range'};
 }
 /* The next round number above x (1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10 times a power of ten), so an axis ends on a readable tick. */
