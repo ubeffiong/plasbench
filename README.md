@@ -977,6 +977,7 @@ plasbench desktop-icon       # (re)make the icon; --remove takes it away, --no-d
 plasbench picker-check       # Browse does not open the folder window? PASS or FAIL per step (--interactive lets you pick a folder)
 plasbench runtime status      # where the tools run (conda or Docker) and what Docker looks like; use conda|docker, check, pull, build
 plasbench runtime use docker  # run the tools in a container of the PlasBench image (PLASBENCH_RUNTIME); `plasbench run --runtime docker` for one run
+plasbench runtime doctor      # Docker engine health: PASS/FAIL per check with evidence, proxies, a numbered plan of safe steps (exit 0 healthy, 3 problems; --json)
 ```
 
 The window is a page served only to this computer (127.0.0.1). Each start gets its own session key, so other programs
