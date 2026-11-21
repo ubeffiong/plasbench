@@ -1064,8 +1064,8 @@ export PLASBENCH_DOCKER_EXTRA="${PLASBENCH_DOCKER_EXTRA:-}"
 export AI_HELP_ENABLED="${AI_HELP_ENABLED:-1}"
 # The free OpenRouter model to use, for example google/gemma-4-31b-it:free. Empty means the best-suited free model in OpenRouter's current list. A model that is not free (by its price in the list) is refused.
 export AI_MODEL="${AI_MODEL:-}"
-# The most tokens (questions plus answers) the AI help may use per day on this computer; it stops with a clear message at the limit. 0 means no limit of its own (OpenRouter's own free limits still apply).
-export AI_DAILY_TOKEN_CAP="${AI_DAILY_TOKEN_CAP:-200000}"
+# The most tokens (questions plus answers) the AI help may use per day on this computer; it stops with a clear message at the limit. The default 0 means no limit of its own (OpenRouter's own free limits still apply).
+export AI_DAILY_TOKEN_CAP="${AI_DAILY_TOKEN_CAP:-0}"
 # 1 asks the model for short answers (fewer tokens); the pane also has a Brief answers switch.
 export AI_BRIEF="${AI_BRIEF:-0}"
 # 1 tries the next free model when the chosen one hits a limit or is down (never a paid model); 0 stops with the message instead.

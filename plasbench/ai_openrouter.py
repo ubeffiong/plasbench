@@ -532,6 +532,8 @@ def stream_chat(base: str, key: str, model: str, messages: list, max_tokens: int
                 piece = (ch.get("delta") or {}).get("content")
                 if piece:
                     yield ("delta", piece)
+                if ch.get("finish_reason") and headers_out is not None:
+                    headers_out["finish_reason"] = ch["finish_reason"]       # "length" = the answer hit the output limit
                 if ch.get("error"):
                     raise (error_map or map_error)(500, json.dumps({"error": ch["error"]}), None, key)
             if isinstance(obj, dict) and obj.get("usage"):

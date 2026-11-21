@@ -29,7 +29,7 @@ from pathlib import Path
 
 from . import __version__, ai_actions, ai_kb, ai_openrouter as orr, ai_prompt, ai_providers
 
-DEFAULTS = {"AI_HELP_ENABLED": "1", "AI_PROVIDER": "openrouter", "AI_MODEL": "", "AI_DAILY_TOKEN_CAP": "200000", "AI_BRIEF": "0", "AI_FREE_FALLBACK": "1", "AI_OPENROUTER_BASE": "",
+DEFAULTS = {"AI_HELP_ENABLED": "1", "AI_PROVIDER": "openrouter", "AI_MODEL": "", "AI_DAILY_TOKEN_CAP": "0", "AI_BRIEF": "0", "AI_FREE_FALLBACK": "1", "AI_OPENROUTER_BASE": "",
             "AI_HF_CLIENT_ID": "", "AI_HF_BASE": "", "AI_HF_HUB": "", "AI_HF_USE_CREDITS": "0", "AI_LOCAL_BASE": "", "AI_LOCAL_ALLOW_REMOTE": "0"}
 CALLBACK_PATHS = {ai_providers.OR_CALLBACK: "openrouter", ai_providers.HF_CALLBACK: "huggingface"}
 CALLBACK_PATH = ai_providers.OR_CALLBACK
@@ -105,11 +105,21 @@ def give_consent(provider: str = "openrouter") -> None:
     orr.write_private(consent_path(), {"providers": provs, "t": int(time.time())})
 
 
+# The assistant works from documentation excerpts only. This is said to the person (the notice, a line that stays under the chat, `plasbench ask`) and to the model (the system prompt).
+DECLARATION = ("The assistant cannot see your files. It has no access to your FASTQ or FASTA files, sample sheets, results, logs, reports, databases or settings, and it does not know "
+               "what is on your computer. It knows only PlasBench's documentation, a short setup line, and what you type or choose to send with Send result. It cannot check, open or "
+               "analyse your data: to diagnose something, run the command it suggests and send the output.")
+GENERAL_NOTE = ("For general questions related to PlasBench (plasmids, sequencing, resistance genes, conda, Docker, WSL) the assistant may use the knowledge of its model; those parts "
+                "begin with \"General knowledge:\" and can be wrong, so check anything important. Facts about PlasBench itself (commands, options, settings, metrics) come from its documentation.")
+DECLARATION_SHORT = "I can't see your files (FASTQ, FASTA, results, logs). I only know PlasBench's guides and what you type or send me."
+
+
 def disclosure(p: "ai_providers.Provider") -> dict:
     """What the first-use notice says, for one provider: what is sent, what is not, where it goes, where the key lives, how to delete it."""
     pr = p.privacy()
     local = p.id == "local"
     return {"version": DISCLOSURE_VERSION, "provider": p.id, "name": p.name, "where": pr["where"],
+            "declaration": DECLARATION, "declaration_short": DECLARATION_SHORT, "general": GENERAL_NOTE,
             "sent": ["your question", "the few documentation excerpts found for it", "the last few turns of this chat", "a short setup line (PlasBench version, system type, WSL or not, conda or Docker, the stage or the failure the window knows)",
                      "command output only when you press Send result, after removing your folder names, user name, e-mail addresses, keys and IP addresses"],
             "not_sent": ["file names and folder paths", "your user name or e-mail address", "accession lists or your data", "any key or password"],
@@ -270,9 +280,9 @@ class Service:
             remaining["remaining"] = hdr["X-RateLimit-Remaining"]
         remaining.update(self.p.limits(key) if key else {})
         day = self.usage.day()
-        yield {"type": "done", "text": parsed["text"], "actions": parsed["actions"], "model": used_model, "provider": self.p.id, "free": self._is_free(used_model),
+        yield {"type": "done", "text": parsed["text"], "actions": parsed["actions"], "asks": parsed.get("asks") or [], "model": used_model, "provider": self.p.id, "free": self._is_free(used_model),
                "usage": {"prompt": pt, "completion": ct, "total": pt + ct, "estimated": not usage, "cached": int(((usage or {}).get("prompt_tokens_details") or {}).get("cached_tokens") or 0)},
-               "today": {"tokens": day["prompt"] + day["completion"], "requests": day["calls"], "cap": self.settings.cap()}, "free_requests": remaining}
+               "today": {"tokens": day["prompt"] + day["completion"], "requests": day["calls"], "cap": self.settings.cap()}, "free_requests": remaining, "truncated": (hdr.get("finish_reason") == "length")}
 
     def _is_free(self, model: str) -> bool:
         if self.p.id == "local":

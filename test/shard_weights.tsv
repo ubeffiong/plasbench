@@ -486,3 +486,4 @@ test_ai_cli.py	14.0
 test_ai_secrets_guard.py	2.0
 test_ai_ui_browser.py	0.3
 test_ai_ui.py	0.6
+test_ai_clarify.py	2.0

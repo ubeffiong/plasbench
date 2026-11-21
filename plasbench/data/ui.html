@@ -570,6 +570,8 @@ body.gd-ai{--gdw:min(430px,92vw)}
 .aibadge{font-size:10.5px;border-radius:9px;padding:0 7px;border:1px solid var(--ok);color:var(--ok);background:var(--ok-soft)}
 .aibadge.local{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
 .aibadge.credits{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+#ai_decl{flex:none;padding:2px 10px 4px;font-size:11px;line-height:1.35}
+.aiask{margin:8px 0;border:1px solid var(--primary);background:var(--primary-soft);border-radius:3px;padding:6px 8px;font-size:12.5px}.aiask .q{font-weight:600;margin-bottom:5px}.aiask .opts{display:flex;flex-wrap:wrap;gap:5px}
 .aicard2{margin:8px 0;border:1px solid var(--line);background:var(--surface);border-radius:3px;font-size:12.5px}
 .aicard2 .ch{padding:5px 8px;background:var(--surface-2);border-bottom:1px solid var(--line-2);display:flex;gap:6px;align-items:center;justify-content:space-between}
 .aicard2 .cb{padding:6px 8px}
@@ -1167,6 +1169,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
   <div id="ai_state"></div>
   <div id="ai_log" role="log" aria-live="polite" aria-label="AI help conversation" tabindex="0"></div>
   <div id="ai_starters"></div>
+  <div id="ai_decl" class="small mut" role="note"></div>
   <form id="ai_form" hidden><textarea id="ai_in" rows="1" aria-label="Your question (Enter sends, Shift+Enter adds a line)" placeholder="Ask about PlasBench"></textarea>
    <button class="btn" id="ai_send" type="submit">Send</button><button class="btn sec" id="ai_stop" type="button" hidden>Stop</button></form>
   <div id="ai_foot" hidden></div><div id="ai_live" role="status" aria-live="polite"></div>
@@ -6277,12 +6280,13 @@ async function aiLoadModels() {
 }
 function aiRender() {
   const st = AI.st, box = $("#ai_state"), p = aiProv();
+  { const decl = $("#ai_decl"); if (decl) decl.textContent = (st && st.disclosure && st.disclosure.declaration_short) || "I can't see your files (FASTQ, FASTA, results, logs). I only know PlasBench's guides and what you type or send me."; }
   if (!st) { box.innerHTML = `<div class="aicard bad">AI help could not reach this window's server. Reload the page.</div>`; return; }
   const d = st.disclosure || {}, prow = (st.providers || []).find(r => r.id === p) || {};
   let html = "";
   if (!st.kb) html += `<div class="aicard warn"><h4>No documentation index</h4>This installation has no AI help index (plasbench/data/ai_kb.json.gz), so answers cannot be grounded. Reinstall PlasBench.</div>`;
   if (!st.consent) {
-    html += `<div class="aicard"><h4>Before you start: ${esc(d.headline || "")}</h4><div>What is sent:</div><ul>${(d.sent || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul><div>What is not sent:</div><ul>${(d.not_sent || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+    html += `<div class="aicard"><h4>Before you start: ${esc(d.headline || "")}</h4><div style="margin-bottom:6px"><b>${esc(d.declaration || "")}</b></div><div style="margin-bottom:6px">${esc(d.general || "")}</div><div>What is sent:</div><ul>${(d.sent || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul><div>What is not sent:</div><ul>${(d.not_sent || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul>
       <div>${esc(d.free || "")}</div><div style="margin-top:4px">${esc(d.stored || "")} ${esc(d.delete || "")}</div>
       <div style="margin-top:4px">${Object.entries(d.links || {}).map(([k, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(k.replace(/_/g, " "))}</a>`).join(" · ")}</div>
       <div class="row"><button class="btn" id="ai_consent">I understand</button></div></div>`;
@@ -6333,10 +6337,15 @@ function aiActionCard(a, mi, i) {
     <div class="acts">${a.runnable ? `<button class="btn sm" data-aiact="run">${icon("play")}Run in PlasBench</button>` : ""}<button class="btn sec sm" data-aiact="copy">${icon("copy")}Copy</button>${termOk ? `<button class="btn sec sm" data-aiact="term">${icon("term")}Open Terminal tab</button>` : ""}</div>
     <div class="runstate" aria-live="polite"></div></div></div>`;
 }
+function aiAskCard(a, mi, i) {
+  return `<div class="aiask" data-m="${mi}" data-i="${i}" role="group" aria-label="The assistant asks a question"><div class="q">${esc(a.q)}</div><div class="opts">${(a.options || []).map((o, k) => `<button class="btn sec sm" type="button" data-aiask="${k}">${esc(o)}</button>`).join("")}<button class="btn ghost sm" type="button" data-aiask="other">Type my own answer</button></div></div>`;
+}
 function aiMsgHtml(m, mi) {
   if (m.role === "user") return `<div class="aimsg user">${esc(m.content)}</div>`;
   let h = `<div class="aimsg bot${m.error ? " err" : ""}" data-m="${mi}"><div class="aibody">${m.error ? `<p>${esc(m.content)}</p>` : md(m.content || "")}</div>`;
   (m.actions || []).forEach((a, i) => { h += aiActionCard(a, mi, i); });
+  (m.asks || []).forEach((a, i) => { h += aiAskCard(a, mi, i); });
+  if (m.truncated && !m.error) h += `<div class="aimeta"><span>The answer reached the length limit of the model.</span><button class="btn sec sm" type="button" data-aicont="1">Continue</button></div>`;
   if (m.sources && m.sources.length && !m.error) h += `<div class="aisrc">${m.sources.map(s => `<button type="button" data-aisrc="${esc(s.src)}" data-anchor="${esc(s.anchor)}" title="${esc(s.title)}">[${s.n}] ${esc(s.src.replace(/^docs\//, ""))}${s.anchor ? " › " + esc(s.title.split(" > ").pop().slice(0, 28)) : ""}</button>`).join("")}</div>`;
   if (m.link) h += `<div class="aimeta"><a href="${esc(m.link)}" target="_blank" rel="noopener">More information</a></div>`;
   if (m.usage) h += `<div class="aimeta"><span class="aibadge ${m.provider === "local" ? "local" : m.free === false ? "credits" : ""}">${m.provider === "local" ? "local" : m.free === false ? "credits" : "free"}</span><span>${esc(m.model || "")}</span><span>${m.usage.total} tokens${m.usage.estimated ? " (est.)" : ""}</span>
@@ -6367,7 +6376,8 @@ function aiError(e) { const m = {role: "bot", content: e.message || String(e), e
 /* ---- asking ---- */
 async function aiSend(text, extra) {
   text = String(text || "").trim(); if (!text || AI.busy || !AI.st) return;
-  const history = AI.msgs.filter(m => !m.error).map(m => ({role: m.role === "user" ? "user" : "assistant", content: m.content}));
+  const history = AI.msgs.filter(m => !m.error).map(m => ({role: m.role === "user" ? "user" : "assistant", content: m.content + (m.asks || []).map(a => `
+[Question I asked: ${a.q}]`).join("")}));
   AI.msgs.push({role: "user", content: text});
   const bot = {role: "bot", content: "", sources: [], actions: [], provider: aiProv()}; AI.msgs.push(bot);
   AI.busy = true; AI.ctl = new AbortController(); AI.pre = null; $("#ai_in").value = ""; aiFit(); aiRender();
@@ -6389,7 +6399,7 @@ async function aiSend(text, extra) {
         else if (ev.type === "delta") { bot.content += ev.text; if (!raf) raf = requestAnimationFrame(paint); }
         else if (ev.type === "notice") toast(ev.text, "");
         else if (ev.type === "error") { finished = true; bot.error = true; bot.content = (bot.content ? bot.content + "\n\n" : "") + ev.error; bot.link = ev.link || ""; aiAfterError(ev); }
-        else if (ev.type === "done") { finished = true; bot.content = ev.text; bot.actions = ev.actions || []; bot.usage = ev.usage; bot.model = ev.model; bot.free = ev.free; bot.provider = ev.provider; AI.last = ev; if (AI.st) AI.st.used_today = {requests: ev.today.requests, tokens: ev.today.tokens}; }
+        else if (ev.type === "done") { finished = true; bot.content = ev.text; bot.actions = ev.actions || []; bot.asks = ev.asks || []; bot.truncated = !!ev.truncated; bot.usage = ev.usage; bot.model = ev.model; bot.free = ev.free; bot.provider = ev.provider; AI.last = ev; if (AI.st) AI.st.used_today = {requests: ev.today.requests, tokens: ev.today.tokens}; }
       }
     }
   } catch (e) {
@@ -6491,6 +6501,11 @@ $("#gdp_ai").addEventListener("click", async e => {
   if (id === "ai_savekey") { const el = $("#ai_pastekey"); try { await api("ai/key", {provider: aiProv(), key: el.value}); el.value = ""; await aiStatus(true); await aiLoadModels(); aiRender(); } catch (err) { toast(err.message, "bad"); } return; }
   const q = t.closest("[data-aiq]"); if (q) return aiSend(q.dataset.aiq);
   const src = t.closest("[data-aisrc]"); if (src) return aiOpenSource(src.dataset.aisrc, src.dataset.anchor);
+  const cont = t.closest("[data-aicont]"); if (cont) { if (!AI.busy) { cont.disabled = true; aiSend("Continue from where you stopped."); } return; }
+  const ask = t.closest("[data-aiask]");
+  if (ask) { const card = ask.closest(".aiask"), q = (AI.msgs[+card.dataset.m] || {}).asks, a = q && q[+card.dataset.i];
+    if (ask.dataset.aiask === "other") { $("#ai_in").focus(); return; }
+    const text = a && a.options[+ask.dataset.aiask]; if (text && !AI.busy) { card.querySelectorAll("button").forEach(b => { b.disabled = true; }); return aiSend(text); } return; }
   const act = t.closest("[data-aiact]"); if (act) return aiAct(act.closest(".aicard2"), act.dataset.aiact);
   const snd = t.closest("[data-aisend]"); if (snd) return aiSendResult(snd.dataset.aisend, snd.dataset.cmd);
   const cp = t.closest("[data-aicopy]"); if (cp) { const pre = cp.closest(".aipre-hd").nextElementSibling; await copyText(pre.textContent); return; }
