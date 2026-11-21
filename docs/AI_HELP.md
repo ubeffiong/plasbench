@@ -169,6 +169,6 @@ Quick-action chips in the pane, also startable by a `pb-ui` `flow` card. *Set up
 
 ## Hardening pass: measured results
 
-Retrieval (`python test/ai_gold_eval.py`): 51 in-sample questions (tuned on) 51/51 at top 3; 67 held-out questions with a source (written before the pass, never tuned on) 62/67 = 93% (61/67 before the pass); 11 more need no source (general knowledge, off topic, vague). A question whose best excerpt contains little of its words and scores low (a poem) now sends no excerpt; weak tails below 0.3 of the best score are dropped. The held-out misses are listed by the script. Real model behaviour with these actions was not measured.
+Retrieval (`python test/ai_gold_eval.py`): 51 in-sample questions (tuned on) 51/51 at top 3; 67 held-out questions with a source (written before the pass, never tuned on) 61/67 = 91% (61/67 before the pass: unchanged; the new documentation chunks displaced one earlier match); 11 more need no source (general knowledge, off topic, vague). A question whose best excerpt contains little of its words and scores low (an off-topic request) now sends no excerpt; weak tails below 0.3 of the best score are dropped. The average prompt without history is about 1,680 tokens (1,570 before; the permanent prompt grew by about 58 tokens and the indexed material by the capabilities guide). The held-out misses are listed by the script. Real model behaviour with these actions was not measured.
 
 The UI review table is in `docs/qa/AI_UI_REVIEW.md`.

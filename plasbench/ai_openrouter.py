@@ -499,6 +499,19 @@ def log_event(status, model="", prompt=0, completion=0, note=""):
 
 
 # ------------------------------------------------------------------------------------------------------------------------------- chat
+def _bounded_lines(resp):
+    """The response's lines, each at most MAX_LINE + 1 bytes (a longer one arrives cut, and the caller refuses it). Works on a real response and on a plain iterable of lines."""
+    if hasattr(resp, "readline"):
+        while True:
+            raw = resp.readline(MAX_LINE + 1)
+            if not raw:
+                return
+            yield raw
+    else:
+        for raw in resp:
+            yield raw[:MAX_LINE + 1]
+
+
 def stream_chat(base: str, key: str, model: str, messages: list, max_tokens: int, opener=_open, no_reasoning: bool = False, headers_out: dict = None, error_map=None, extra_body: dict = None):
     """Yield ("delta", text) for each piece of the answer, then ("usage", dict) when the service reports it, then ("done", None).
 
@@ -527,8 +540,9 @@ def stream_chat(base: str, key: str, model: str, messages: list, max_tokens: int
                 headers_out[h] = v
     try:
         total = 0
+        lines = _bounded_lines(resp)
         while True:
-            raw = resp.readline(MAX_LINE + 1)           # a line is bounded: a hostile or broken service cannot make the window read an endless line into memory
+            raw = next(lines, b"")                       # a line is bounded: a hostile or broken service cannot make the window read an endless line into memory
             if not raw:
                 break
             total += len(raw)
