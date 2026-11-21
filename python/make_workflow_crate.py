@@ -118,6 +118,12 @@ Source, documentation and licence (GPL-3.0-only): https://github.com/ubeffiong/p
 """
 
 
+def _write(path: Path, text: str) -> None:
+    """UTF-8 with LF endings (Path.write_text(newline=) needs Python 3.10)."""
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+
 def build(out: Path) -> Path:
     version = project_version()
     stage = Path(tempfile.mkdtemp(prefix="plasbench-crate-"))
@@ -128,9 +134,9 @@ def build(out: Path) -> Path:
         for name in TEST_DATA:
             shutil.copyfile(TEST_DATA[name], stage / "test-data" / name)
         shutil.copyfile(ROOT / "LICENSE", stage / "LICENSE")
-        (stage / "plasbench-score.job.yml").write_text(JOB, encoding="utf-8", newline="\n")
-        (stage / "README.md").write_text(README, encoding="utf-8", newline="\n")
-        (stage / "ro-crate-metadata.json").write_text(json.dumps(metadata(version, release_date()), indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+        _write(stage / "plasbench-score.job.yml", JOB)
+        _write(stage / "README.md", README)
+        _write(stage / "ro-crate-metadata.json", json.dumps(metadata(version, release_date()), indent=2, ensure_ascii=False) + "\n")
         out.parent.mkdir(parents=True, exist_ok=True)
         if out.exists():
             out.unlink()
