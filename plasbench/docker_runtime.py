@@ -163,7 +163,7 @@ def docker_exe(which=shutil.which):
     return which("docker")
 
 
-def stream(argv, env=None, out=None, heartbeat=30.0, what="working"):
+def stream(argv, env=None, out=None, heartbeat=60.0, what="working"):
     """Run a long docker command, copying its output lines to `out` (default stdout) with a "still working" line when it is quiet.
     Returns (exit code, the last 60 lines)."""
     out = out or (lambda line: (sys.stdout.write(line + "\n"), sys.stdout.flush()))
@@ -427,7 +427,7 @@ def ensure_image(root, *, assume_yes=False, ask=None, out=print, run=None, strea
             diag = None
             for attempt in range(attempts):
                 out(f"[plasbench] Pulling {image} ..." if attempt == 0 else f"[plasbench] Pulling {image} again (attempt {attempt + 1} of {attempts}; finished layers are kept) ...")
-                code, tail = streamer([exe, "pull", image], None, out, 30.0, f"pulling {image}")
+                code, tail = streamer([exe, "pull", image], None, out, 60.0, f"pulling {image}")
                 if code == 0:
                     return {"ok": True, "image": image, "source": "pulled", "code": 0, "message": f"Pulled {image}."}
                 diag = docker_health.diagnose("\n".join(tail), ctx)
@@ -474,7 +474,7 @@ def ensure_image(root, *, assume_yes=False, ask=None, out=print, run=None, strea
         return _stop(again["diagnosis"] or docker_health.diagnose("", ctx), target, "build", environ, root, "preflight")
     buildkit = run([exe, "buildx", "version"], 10)[0] == 0
     env = dict(os.environ, DOCKER_BUILDKIT="1" if buildkit else "0")
-    code, tail = streamer(build_argv(root, target, exe, buildkit=buildkit), env, out, 30.0, f"building {target}")
+    code, tail = streamer(build_argv(root, target, exe, buildkit=buildkit), env, out, 60.0, f"building {target}")
     if code != 0:
         why = classify_failure("\n".join(tail))
         out(f"[plasbench] The build failed ({why['kind']}" + (f", step: {why['step']}" if why["step"] else "") + f"): {why['advice']}")
@@ -703,7 +703,8 @@ def build_run_argv(root, command, env=None, *, image, name, kind=None, uid=None,
         shown_env[key] = to_container(value, kind)
     if extra is not None:
         base = to_container(extra, kind)
-        shown_env.update(PLASBENCH_EXTRA_HOME=base, PLASBENCH_EXTRA_BIN=base + "/bin", CONDA_ENVS_PATH=base + "/envs:/opt/conda/envs", CONDA_PKGS_DIRS=base + "/pkgs")
+        shown_env.update(PLASBENCH_EXTRA_HOME=base, PLASBENCH_EXTRA_BIN=base + "/bin", PLASBENCH_EXTRA_PREFIX=base + "/envs/extras",
+                         CONDA_ENVS_PATH=base + "/envs:/opt/conda/envs", CONDA_PKGS_DIRS=base + "/pkgs")
     if tools_here:
         shown_env["PLASBENCH_TOOLS_PATH"] = tools_cont
     allowed = (config_names(root) | set(ALWAYS_PASS) | set(env)) - NEVER_PASS - set(paths) - set(shown_env)
@@ -720,7 +721,8 @@ def build_run_argv(root, command, env=None, *, image, name, kind=None, uid=None,
                 argv += ["-e", key]
     for key, value in sorted(shown_env.items()):
         argv += ["-e", f"{key}={value}"]
-    wrapper = 'PATH="${PLASBENCH_EXTRA_BIN:+$PLASBENCH_EXTRA_BIN:}$PATH"; export PATH; exec "$@"'
+    # Precedence on PATH: the extras' own wrappers (extras/bin), then the image (its pinned tools always win), then the extras environment (tools the image lacks).
+    wrapper = 'PATH="${PLASBENCH_EXTRA_BIN:+$PLASBENCH_EXTRA_BIN:}$PATH${PLASBENCH_EXTRA_PREFIX:+:$PLASBENCH_EXTRA_PREFIX/bin}"; export PATH; exec "$@"'
     argv += [image, "sh", "-c", wrapper, "plasbench-runtime"] + [str(c) for c in command]
     plan = {"image": image, "name": name, "mounts": [{"host": m["host"], "container": m["container"], "rw": m["rw"]} for m in mounts],
             "identical_paths": all(m["host"].replace("\\", "/") == m["container"] for m in mounts), "notes": notes}
@@ -899,10 +901,18 @@ def format_steps(rows) -> str:
 def extras_listing(root, environ=None) -> dict:
     """What the persistent storage holds, for the manifest and the window: {'home', 'tools': [name...], 'provenance': [{...}]} (names only, read from disk)."""
     home = extra_home(root, environ=environ)
-    tools, prov = [], []
+    tools, prov, packages = [], [], []
     try:
-        if (home / "bin").is_dir():
-            tools = sorted(p.name for p in (home / "bin").iterdir())
+        for folder in (home / "bin", home / "envs" / "extras" / "bin"):
+            if folder.is_dir():
+                tools += [p.name for p in folder.iterdir() if p.name not in tools]
+        tools.sort()
+        for meta in sorted((home / "envs" / "extras" / "conda-meta").glob("*.json"))[:2000]:
+            try:
+                rec = json.loads(meta.read_text(encoding="utf-8"))
+                packages.append(f"{rec.get('name')}={rec.get('version')}")
+            except (OSError, ValueError):
+                continue
         for path in sorted(home.glob("*/plasbench-install.json"))[:50] + sorted(home.glob("envs/*/plasbench-install.json"))[:50]:
             try:
                 prov.append(json.loads(path.read_text(encoding="utf-8")))
@@ -910,4 +920,4 @@ def extras_listing(root, environ=None) -> dict:
                 continue
     except OSError:
         pass
-    return {"home": str(home), "tools": tools, "provenance": prov}
+    return {"home": str(home), "tools": tools, "provenance": prov, "packages": packages}

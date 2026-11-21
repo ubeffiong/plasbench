@@ -218,6 +218,16 @@ def call_barrnap(reference, timeout, sequences, threads=1):
     return features, {"status": "ok", "version": version, "features": len(features)}
 
 
+def mob_db_args(environ=None):
+    """['-d', DIR] when the container's MOB-suite database lives in the mounted databases folder (the image's own folder is read-only and holds none), else []."""
+    environ = os.environ if environ is None else environ
+    if str(environ.get("PLASBENCH_IN_DOCKER", "")) != "1":
+        return []
+    store = Path(environ.get("PLASBENCH_DB_DIR") or Path.home() / ".plasbench" / "databases") / "mob_suite" / "databases"
+    needed = ("status.txt", "ncbi_plasmid_full_seqs.fas", "ncbi_plasmid_full_seqs.fas.msh", "repetitive.dna.fas")
+    return ["-d", str(store)] if all((store / n).is_file() and (store / n).stat().st_size for n in needed) else []
+
+
 def call_mob_typer(reference, timeout, sequences, threads=1):
     """MOB-typer reports per-sequence typing, not coordinates."""
     executable = shutil.which("mob_typer")
@@ -226,7 +236,7 @@ def call_mob_typer(reference, timeout, sequences, threads=1):
     version = tool_version(executable)
     out = Path(reference).with_suffix(".mobtyper.txt")
     text, error = run([executable, "--multi", "--num_threads", str(threads), "--infile", str(reference),
-                       "--out_file", str(out)], timeout)
+                       "--out_file", str(out)] + mob_db_args(), timeout)
     if text is None and not out.is_file():
         return [], {"status": "failed", "reason": error, "version": version}
     if not out.is_file():

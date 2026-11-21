@@ -337,13 +337,14 @@ if [[ "${RUN_MOB_RECON:-0}" -eq 1 || "${RUN_GPLAS2_MOB:-0}" -eq 1 || "${RUN_TRYC
     mobsuite_db_preserve
     MOBSUITE_DB_DIR="$(mobsuite_db_dir)"
     MOBSUITE_DB_OK=1
+    MOBSUITE_DB_WHY=""
     for f in status.txt ncbi_plasmid_full_seqs.fas ncbi_plasmid_full_seqs.fas.msh repetitive.dna.fas; do
-        [[ -n "$MOBSUITE_DB_DIR" && -s "$MOBSUITE_DB_DIR/$f" ]] || MOBSUITE_DB_OK=0
+        if [[ -z "$MOBSUITE_DB_DIR" || ! -s "$MOBSUITE_DB_DIR/$f" ]]; then MOBSUITE_DB_OK=0; MOBSUITE_DB_WHY="${MOBSUITE_DB_WHY:+$MOBSUITE_DB_WHY, }$f"; fi
     done
     if [[ "$MOBSUITE_DB_OK" -eq 1 ]]; then
-        log "  [ok]   MOB-suite DB at $MOBSUITE_DB_DIR"
+        log "  [ok]   MOB-suite DB at $MOBSUITE_DB_DIR (all four files present)"
     else
-        warn "  [MISS] MOB-suite DB not found${MOBSUITE_DB_DIR:+ at $MOBSUITE_DB_DIR}"
+        warn "  [MISS] MOB-suite DB not usable${MOBSUITE_DB_DIR:+ at $MOBSUITE_DB_DIR}: ${MOBSUITE_DB_DIR:+missing or empty: $MOBSUITE_DB_WHY}${MOBSUITE_DB_DIR:-no database folder was found}"
         NEED_MOBSUITE_DB=1; CORE_OK=0
     fi
 fi
@@ -492,13 +493,42 @@ DB_YES_FLAG=("${YES_FLAG[@]}")
 if [[ "$NEED_CONDA" -eq 1 ]]; then
     bash "$HERE/../env/bootstrap_conda.sh" "${YES_FLAG[@]}" || die "conda bootstrap failed; cannot continue without it"
 fi
+# A read-only environment (the image's, when run as a plain user in a container) fails every profile the same way: install_tools.sh records it in this file and the
+# remaining profiles are not attempted against the same prefix. Other failures (network, a solver conflict) do not stop the loop.
+PLASBENCH_INSTALL_STOP_FILE="$(mktemp "${TMPDIR:-/tmp}/plasbench-stop.XXXXXX" 2>/dev/null || true)"
+[[ -n "$PLASBENCH_INSTALL_STOP_FILE" ]] && { : > "$PLASBENCH_INSTALL_STOP_FILE"; export PLASBENCH_INSTALL_STOP_FILE; }
+# What each requested install did in this invocation (carried across the "check again" re-run): one line per profile, "OK|FAILED|MANUAL name: reason". A profile is attempted at most
+# once per invocation: a re-check that finds the same gap does not run the same failing install again.
+SETUP_SUMMARY="${PLASBENCH_SETUP_SUMMARY:-}"
+setup_attempted() { grep -qE "^(OK|FAILED|MANUAL) $1:" <<< "$SETUP_SUMMARY"; }
+setup_note() { SETUP_SUMMARY+="${SETUP_SUMMARY:+$'\n'}$1 $2: $3"; export PLASBENCH_SETUP_SUMMARY="$SETUP_SUMMARY"; }
 for profile in "${!NEEDED_PROFILES[@]}"; do
+    if setup_attempted "$profile"; then
+        log "not retrying $profile: it was already attempted above ($(grep -E "^(OK|FAILED|MANUAL) $profile:" <<< "$SETUP_SUMMARY" | head -1 | sed 's/^[A-Z]* [^:]*: //'))"
+        continue
+    fi
+    if [[ -n "${PLASBENCH_INSTALL_STOP_FILE:-}" && -s "$PLASBENCH_INSTALL_STOP_FILE" ]]; then
+        warn "install-tools $profile was not attempted: an earlier install could not write to its environment (the message above says where and what to do)"
+        setup_note FAILED "$profile" "not attempted: an earlier install could not write to its environment"
+        continue
+    fi
     log "Installing 'install-tools $profile' ..."
     profile_status=0
     # The consent was given above (the plan of a source-built tool was shown), so the installer is told --yes.
     bash "$HERE/../env/install_tools.sh" --yes "$profile" || profile_status=$?
-    if [[ "$profile_status" -eq 20 ]]; then log "install-tools $profile needs a manual step (nothing failed, this is a verified limit); the steps are above"
-    elif [[ "$profile_status" -ne 0 ]]; then warn "install-tools $profile failed; see output above"; fi
+    if [[ "$profile_status" -eq 20 ]]; then
+        log "install-tools $profile needs a manual step (nothing failed, this is a verified limit); the steps are above"
+        setup_note MANUAL "$profile" "a manual step is needed"
+    elif [[ "$profile_status" -ne 0 ]]; then
+        warn "install-tools $profile failed; see output above"
+        if [[ -n "${PLASBENCH_INSTALL_STOP_FILE:-}" && -s "$PLASBENCH_INSTALL_STOP_FILE" ]]; then
+            setup_note FAILED "$profile" "the environment is read-only for your user ($(awk '{print $2; exit}' "$PLASBENCH_INSTALL_STOP_FILE"))"
+        else
+            setup_note FAILED "$profile" "$(explain_exit "$profile_status") (exit $profile_status)"
+        fi
+    else
+        setup_note OK "$profile" "installed"
+    fi
 done
 if [[ "$NEED_PLATON_DB" -eq 1 ]]; then
     bash "$HERE/../env/download_platon_db.sh" || warn "Platon database step did not complete; see output above"
@@ -536,6 +566,10 @@ refresh_tool_path() {
             case ":$PATH:" in *":$cand/bin:"*) ;; *) PATH="$cand/bin:$PATH" ;; esac
         fi
     done
+    # Docker mode: the extras environment comes AFTER the image's tools (see docs: where extras live).
+    if [[ -n "${PLASBENCH_EXTRA_PREFIX:-}" && -d "$PLASBENCH_EXTRA_PREFIX/bin" ]]; then
+        case ":$PATH:" in *":$PLASBENCH_EXTRA_PREFIX/bin:"*) ;; *) PATH="$PATH:$PLASBENCH_EXTRA_PREFIX/bin" ;; esac
+    fi
     export PATH
     hash -r
 }
@@ -547,7 +581,13 @@ if [[ "$SETUP_ROUND" -lt 3 && "${PLASBENCH_SETUP_PREVIOUS:-}" != "$SETUP_SIGNATU
     PLASBENCH_SETUP_ROUND=$(( SETUP_ROUND + 1 )) PLASBENCH_SETUP_PREVIOUS="$SETUP_SIGNATURE" exec bash "$HERE/00_setup.sh" "${YES_FLAG[@]}"
 fi
 
+print_setup_summary() {
+    [[ -n "$SETUP_SUMMARY" ]] || return 0
+    echo "Summary of the installs requested by this check:"
+    sed 's/^/  /' <<< "$SETUP_SUMMARY"
+}
 echo
+print_setup_summary
 warn "Still missing after the installation: ${MISSING_NAMES:-a database}. The messages above say why (an install that failed, or a step only you can do)."
 log "Re-run 'plasbench check' once that is fixed."
 exit 1

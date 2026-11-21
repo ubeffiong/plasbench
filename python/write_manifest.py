@@ -257,10 +257,19 @@ def runtime_record():
     except ValueError:
         record["mounts"] = []
     extra = os.environ.get("PLASBENCH_EXTRA_HOME")
-    tools, provenance = [], []
+    tools, provenance, packages = [], [], []
     if extra and os.path.isdir(extra):
         try:
-            tools = sorted(os.listdir(os.path.join(extra, "bin"))) if os.path.isdir(os.path.join(extra, "bin")) else []
+            for folder in (os.path.join(extra, "bin"), os.path.join(extra, "envs", "extras", "bin")):
+                if os.path.isdir(folder):
+                    tools += [n for n in os.listdir(folder) if n not in tools]
+            tools.sort()
+            for meta in sorted(Path(extra).glob("envs/extras/conda-meta/*.json"))[:2000]:
+                try:
+                    found = json.loads(meta.read_text(encoding="utf-8"))
+                    packages.append("%s=%s" % (found.get("name"), found.get("version")))
+                except (OSError, ValueError):
+                    pass
             for found in sorted(Path(extra).glob("*/plasbench-install.json"))[:50] + sorted(Path(extra).glob("envs/*/plasbench-install.json"))[:50]:
                 try:
                     provenance.append(json.loads(found.read_text(encoding="utf-8")))
@@ -268,7 +277,7 @@ def runtime_record():
                     pass
         except OSError:
             pass
-    record["extras"] = {"home": extra, "tools": tools, "provenance": provenance}
+    record["extras"] = {"home": extra, "tools": tools, "provenance": provenance, "packages": packages}
     return record
 
 def main():
