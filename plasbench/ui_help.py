@@ -216,7 +216,15 @@ _ISSUE_REPORT = {
     "title": {"summary": "With open: the issue title to fill in.", "when": "Use the form <command or page> fails with <short message> on <OS>."},
 }
 
-ARGS = {"issue-report": _ISSUE_REPORT, "ui-state": _UI_STATE, "run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONSTRUCT, "intake": _INTAKE, "scan-isolates": _SCAN, "runtime": _RUNTIME}
+_STOP = {"all": {"summary": "Stop every PlasBench window server of this user on this computer (the default; the flag only says so)."},
+         "runs": {"summary": "Also cancel active runs and jobs. Without it they keep going in the background and are listed.", "when": "Finished work is kept and you can resume; the step running now is lost."},
+         "windows": {"summary": "Also close the app windows PlasBench opened (only windows opened for a PlasBench server address with the PlasBench profile).", "when": "Normally not needed: windows close themselves when their server ends."},
+         "dry_run": {"summary": "Print exactly what would be ended and skipped, with reasons, and change nothing."},
+         "yes": {"summary": "Do not ask before ending things."},
+         "json": {"summary": "Print the plan or result as JSON."},
+         "wsl_shutdown": {"summary": "WSL only: finally run wsl --shutdown from Windows. It ends every WSL distribution and Docker Desktop's engine.", "when": "Needs --yes, and --runs when runs are active. Never the default."}}
+
+ARGS = {"stop": _STOP, "issue-report": _ISSUE_REPORT, "ui-state": _UI_STATE, "run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONSTRUCT, "intake": _INTAKE, "scan-isolates": _SCAN, "runtime": _RUNTIME}
 _RUNTIME_ARG = {"summary": "Where this run's tools run: conda (the plasbench environment on this computer) or docker (a container of the PlasBench image, started for this run with your folders mounted). Empty uses the setting from Set up this computer. The choice is recorded in the study and the run manifest.",
                 "choices": {"conda": "Tools from the plasbench conda environment on this computer.", "docker": "Tools from a container of the PlasBench image; needs Docker (Set up this computer, Environment)."},
                 "when": "Leave empty unless this study should differ from the setting."}
@@ -499,6 +507,10 @@ PAGE = {
                    "when": "Windows shells started from Ubuntu cannot see the Ubuntu tools; Command Prompt cannot start in an Ubuntu folder, so it uses a temporary drive letter."},
     "p_setup": {"title": "Set up this computer", "summary": "What PlasBench needs, what is already here, and a one-click fix for anything missing.",
                 "bullets": ["Each fix runs the same plasbench command you would type.", "Its output appears in the console below."]},
+    "stop_runs": {"title": "Also stop the running runs", "summary": "Off by default: runs started from this window or a terminal keep going in the background after PlasBench stops. Switch it on to cancel them too.",
+                  "bullets": ["Finished work is kept.", "The step that is running now is lost.", "You can resume with the same command."]},
+    "stop_wsl": {"title": "Quit and restart WSL", "summary": "Runs wsl --shutdown from Windows after PlasBench has stopped. It ends EVERY WSL distribution, the Docker Desktop engine and every terminal open in WSL, so it is never done by default.",
+                 "bullets": ["Typically needed after changing .wslconfig (memory, processors, swap), after being added to the docker group, or to recover a stuck WSL.", "Blocked while runs are active unless you also stop them.", "Finished work and files are kept; the next WSL start takes a few seconds."]},
     "pc_help": {"title": "This computer", "summary": "The desktop icon starts PlasBench (or brings this window back). Quit, top right, stops it.", "when": "Every page also works from the command line, and from the Terminal tab of the console below."},
     "ncbi": {"title": "NCBI access", "summary": "Cohort downloads use NCBI.", "bullets": ["An email is courtesy.", "An API key raises the request allowance from 3 to 10 per second.", "Both are saved in config/local.env on this computer only."]},
     "profile": {"title": "Tool profiles", "summary": "Profiles group related tools.", "bullets": ["core is needed for everything.", "The rest add assemblers, binning-reconstruction tools and optional analyses."]},

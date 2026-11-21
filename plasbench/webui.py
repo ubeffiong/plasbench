@@ -41,6 +41,7 @@ TOKEN = secrets.token_urlsafe(24)
 PAGE_FILE = Path(__file__).resolve().parent / "data" / "ui.html"
 WINDOWS = windowlife.Registry()   # window stability: the windows that pinged recently
 REOPEN_LIMIT = windowlife.RateLimit()   # /api/reopen helps at most once per 10 s
+STOPPING = {"on": False}   # Stop all (plasbench/stopall.py): once set every answer carries X-PlasBench-Stopping, so a window shows "PlasBench has stopped" instead of reconnecting
 PAGE_SEEN = {"t": 0.0}   # when a window last loaded the page: the launcher uses it to check that clicking the icon really produced a window
 LOGO_FILE = Path(__file__).resolve().parent / "data" / "logo.svg"
 _SESSION: dict = {}
@@ -2054,6 +2055,8 @@ def make_handler(project: Project, jobs: Jobs):
                 self.send_header("Vary", "Accept-Encoding")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("X-PlasBench-Instance", str(int(SERVER_STARTED)))
+            if STOPPING["on"]:
+                self.send_header("X-PlasBench-Stopping", "1")
             if self.close_connection:
                 self.send_header("Connection", "close")   # tell the client, or it reuses a connection that is about to be closed
             self.send_header("X-Content-Type-Options", "nosniff")
@@ -2687,8 +2690,16 @@ def make_handler(project: Project, jobs: Jobs):
                     except (KeyError, ValueError):
                         pass
                 session_log().event("quit", forced=bool(running) and not keep or None, kept_running=len(running) if keep else None)
-                threading.Timer(0.3, self.server.shutdown).start()
+                if data.get("stopping"):   # asked by Stop all: windows of this server learn it from the next answer and show the final state, then the server ends
+                    STOPPING["on"] = True
+                threading.Timer(2.5 if data.get("stopping") else 0.3, self.server.shutdown).start()
                 return self.jsend(200, {"ok": True})
+            # BEGIN stop all
+            if route in ("stop/plan", "stop/run"):   # loopback only, token protected (do_POST); the plan only reads, the run answers FIRST and stops this server afterwards
+                if not self.loopback():
+                    raise PermissionError("Stop all can only be used from the computer PlasBench runs on")
+                return self.jsend(200, stop_all_route(self, route, data, project, jobs))
+            # END stop all
             if route == "updates/check":     # the Check for updates button: asks GitHub now (a gated, bounded request) and remembers the answer
                 from . import updatecheck
                 try:
@@ -3093,6 +3104,83 @@ def make_handler(project: Project, jobs: Jobs):
 
 def _instance_file() -> Path:
     return UI_HOME / "server.json"
+
+
+# BEGIN stop all
+STOP_CONFIRM_WORD = "SHUT DOWN WSL"   # typed in the window before `wsl --shutdown` is allowed
+STOP_PLAN_SECONDS = 120.0             # a plan the user was shown can be confirmed for this long, once
+STOP_PLANS = {}                       # plan id -> issue time. Closing, reloading or prefetching a page never reaches the stop route: it needs an explicit POST carrying a live plan id
+
+
+def issue_stop_plan(clock=time.time) -> str:
+    now = clock()
+    for k in [k for k, t in STOP_PLANS.items() if now - t > STOP_PLAN_SECONDS]:
+        STOP_PLANS.pop(k, None)
+    while len(STOP_PLANS) >= 16:
+        STOP_PLANS.pop(min(STOP_PLANS, key=STOP_PLANS.get))
+    pid = secrets.token_urlsafe(18)
+    STOP_PLANS[pid] = now
+    return pid
+
+
+def redeem_stop_plan(plan_id, clock=time.time) -> bool:
+    """True once for a plan id that was issued by /api/stop/plan less than STOP_PLAN_SECONDS ago (single use)."""
+    issued = STOP_PLANS.pop(str(plan_id or ""), None)
+    return issued is not None and clock() - issued <= STOP_PLAN_SECONDS
+
+
+def stop_env(project_root, **inject):
+    """The stop-all environment of THIS server: its own UI home first, then the other homes PlasBench knows about."""
+    from . import stopall
+    homes = [UI_HOME] + [h for h in stopall.Env(procs=stopall.Procs()).ui_homes() if h != UI_HOME]
+    kw = dict(ui_homes=homes, self_pid=os.getpid(), roots=[project_root])
+    kw.update(inject)
+    return stopall.Env(**kw)
+
+
+def stop_all_route(handler, route, data, project, jobs, env=None, schedule=None, clock=time.time):
+    """POST /api/stop/plan -> what `plasbench stop --dry-run --json` shows (read-only). POST /api/stop/run -> {"ok": True, ...} and THEN (after the answer was sent) the stop:
+    other servers and (when asked) runs and windows, optionally `wsl --shutdown`, and finally this server itself. `schedule(fn)` runs fn after the response (a timer; replaceable)."""
+    from . import stopall
+    runs, windows, wsl = bool(data.get("runs")), bool(data.get("windows")), bool(data.get("wsl"))
+    env = env or stop_env(project.root)
+    plan = stopall.build_plan(env, runs=runs, windows=windows, wsl=wsl, wsl_info=True)
+    payload = stopall.public(plan)
+    payload.update(own_pid=os.getpid(), own_port=handler.server.server_address[1], command="plasbench stop --all", restart_command="plasbench ui", confirm_word=STOP_CONFIRM_WORD)
+    if route == "stop/plan":
+        payload["plan_id"] = issue_stop_plan(clock)
+        payload["plan_expires_seconds"] = int(STOP_PLAN_SECONDS)
+        return payload
+    if not redeem_stop_plan(data.get("plan_id"), clock):
+        raise ValueError("this stop request is not valid any more (it must come from the plan shown a moment ago, and works once): open Quit, then Stop all PlasBench, again")
+    support = plan["wsl"]
+    active = stopall.active_runs(plan)
+    if wsl:
+        if not (support["offered"] and support["available"]):
+            raise ValueError("wsl --shutdown is not available here: " + (support["reason"] or "not running inside WSL"))
+        if str(data.get("confirm") or "") != STOP_CONFIRM_WORD:
+            raise ValueError("type " + STOP_CONFIRM_WORD + " to confirm wsl --shutdown")
+        if active and not runs:
+            raise ValueError("wsl --shutdown ends every run: switch on 'Also stop the running runs/jobs' first")
+    def work():
+        try:
+            if runs:   # this server's own watchers must read the end as a cancel, not as a lost run
+                with jobs.lock:
+                    for j in jobs.jobs.values():
+                        if j.get("state") == "running":
+                            j["state"] = "cancelling"
+            stopall.execute(env, plan, skip_pids=[os.getpid()])
+            stopall.log_stop(env, plan, by="window", extra={"wsl_shutdown": True} if wsl else None)
+            if wsl and not plan["summary"]["failed"]:
+                stopall.log_wsl_shutdown(env, None, "requested")
+                res = stopall.launch_wsl_shutdown(env, plan["_powershell"])
+                stopall.log_wsl_shutdown(env, res["ok"], "launched")
+        finally:
+            handler.server.shutdown()
+    STOPPING["on"] = True
+    (schedule or (lambda fn: threading.Timer(0.5, fn).start()))(work)
+    return {"ok": True, "stopping": True, "wsl": wsl, "runs_stopped": runs, "message": "PlasBench is stopping", "restart_command": "plasbench ui"}
+# END stop all
 
 
 def _page_seen_of(port: int):
