@@ -1,0 +1,54 @@
+# question<TAB>source file that must be among the top 3 retrieved chunks<TAB>optional lower-case phrase that the chunk title or text must contain
+# Realistic support questions across install, Docker, WSL, commands, inputs, metrics, workflow, troubleshooting and exit codes (some misspelt, some quoted from logs).
+# A question passes when one of the top three chunks comes from the named source (and contains the phrase when one is given). test/test_ai_kb.py reports the hit rate.
+How do I install PlasBench on Ubuntu?	INSTALL.md	conda
+How do I install and run my first benchmark?	docs/USER_GUIDE.md|README.md|plasbench/cli.py
+Can I run PlasBench on Windows?	docs/USER_GUIDE.md	wsl
+How do I use Docker instead of conda?	docs/USER_GUIDE.md|FAQ.md	docker
+How do I switch the runtime to docker?	plasbench/cli.py	runtime
+Docker Desktop says the engine is not running, what do I do?	python/docker_diagnosis.py
+dockerd configuration error daemon.json is invalid	python/docker_diagnosis.py
+You need approx 5.2 GB of free RAM	config/resource_signatures.tsv|python/assembler_diagnosis.py|docs/USER_GUIDE.md	need approx
+SPAdes stopped with: The reads contain too many k-mers to fit into available memory	python/assembler_diagnosis.py
+Could not open lockfile	python/docker_diagnosis.py|FAQ.md	lockfile
+installer says Could not resolve host	FAQ.md	could not resolve host
+install-tools all ended with killed (SIGKILL)	FAQ.md	sigkill
+what does exit code 137 mean	plasbench/exitcodes.py	137
+exit code 21 consent needed	plasbench/exitcodes.py	21
+exit code 124 time limit	plasbench/exitcodes.py	124
+My run looks stuck, how do I know?	docs/USER_GUIDE.md|FAQ.md	stuck
+the run is stalled while it downloads	FAQ.md	stalled
+my run is hanging for hours	docs/USER_GUIDE.md|FAQ.md	stuck
+How do I stop PlasBench completely?	docs/USER_GUIDE.md|plasbench/cli.py	plasbench stop
+How do I close all plasbench servers on this computer	docs/USER_GUIDE.md	stop
+How do I check my installation and tools?	plasbench/cli.py|INSTALL.md|docs/TOOL_INSTALL_AUDIT.md	plasbench check
+What does plasbench diagnose do?	docs/USER_GUIDE.md	diagnose
+how to see the status of a run	docs/USER_GUIDE.md|plasbench/cli.py	status
+How do I make a report PDF?	plasbench/cli.py	report-pdf
+How do I prepare my own isolates and a sample sheet?	docs/INPUT_GUIDE.md
+what columns does the sample sheet need	docs/INPUT_GUIDE.md	column
+my reads are not gzipped	docs/INPUT_GUIDE.md	reads-not-gzip
+The truth table does not match the reference	docs/INPUT_GUIDE.md	truth
+how do I use local reads without downloading	docs/USER_GUIDE.md	local
+What is the F1 metric in PlasBench?	docs/USER_GUIDE.md|README.md|docs/SCIENTIFIC_GUIDE.md|docs/METHODS.md	f1
+What is CPRR?	docs/SCIENTIFIC_GUIDE.md|README.md|docs/METHODS.md|docs/USER_GUIDE.md	cprr
+How is precision computed for plasmid bins?	docs/USER_GUIDE.md|docs/METHODS.md|README.md|docs/SCIENTIFIC_GUIDE.md	precision
+how is an isolate with no plasmids scored	FAQ.md	no plasmid
+what are the stages of the pipeline	config/workflow_steps.tsv|docs/SCIENTIFIC_GUIDE.md|docs/USER_GUIDE.md
+Which stage does the assembly?	config/workflow_steps.tsv	assembl
+how do I run only the scoring stage	config/workflow_steps.tsv|plasbench/cli.py	stages
+How do I turn on plasmidfinder or another tool?	config/workflow_steps.tsv|docs/USER_GUIDE.md
+Which tools does PlasBench support?	config/tool_capabilities.tsv|README.md|docs/USER_GUIDE.md
+How do I add my own tool?	docs/ADDING_TOOLS.md|FAQ.md
+how to limit the memory used by a run	docs/RESOURCE_ADAPTATION.md|python/assembler_diagnosis.py|config/config.sh	memory
+How many threads does it use and how do I change it	config/config.sh	threads
+metagenomic plasmid benchmark how to	docs/METAGENOMICS.md
+Is my data sent anywhere?	FAQ.md|README.md|SECURITY.md
+How do I upgrade PlasBench to a new version?	FAQ.md	upgrade
+the window says this address needs the session key	FAQ.md	session key
+What do I do when WSL runs out of memory?	docs/USER_GUIDE.md|FAQ.md|python/assembler_diagnosis.py	wsl
+how do i report a bug with diagnostics	plasbench/cli.py|FAQ.md|SUPPORT.md	issue-report
+plasbench is not recognised as a command in powershell	INSTALL.md|FAQ.md
+how to publish to Zenodo or bio.tools	docs/publishing/README.md
+instal-tools failed on conda solve is slow	INSTALL.md	mamba
+How do I work offline without internet?	docs/USER_GUIDE.md|FAQ.md	offline

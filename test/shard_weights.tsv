@@ -477,3 +477,12 @@ test_stop_all.py	40.0
 test_publishing.py	3.0
 test_no_conflict_markers.py	1.0
 test_support_tools.py	2.0
+test_ai_kb.py	25.0
+test_ai_prompt.py	1.5
+test_ai_actions.py	2.0
+test_ai_providers.py	6.0
+test_ai_routes.py	8.0
+test_ai_cli.py	14.0
+test_ai_secrets_guard.py	2.0
+test_ai_ui_browser.py	0.3
+test_ai_ui.py	0.6

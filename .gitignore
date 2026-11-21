@@ -81,3 +81,9 @@ docs/images/reference/*.jpg
 docs/images/reference/*.jpeg
 docs/images/reference/*.png
 !docs/images/reference/README.md
+
+# Local secrets of the AI help sign-in: never commit them (they live in ~/.plasbench/ai and ~/.plasbench/oauth, outside the repository)
+*.oauth.json
+google-client.json
+openrouter.json
+huggingface.json

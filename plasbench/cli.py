@@ -552,6 +552,8 @@ def build_parser():
     report_issue_parser.add_argument("--hostname", action="store_true", help="Keep this computer's name in the report (it is removed by default).")
     report_issue_parser.add_argument("--open", action="store_true", help="Open the GitHub new-issue form in your browser with the version and a short summary filled in.")
     report_issue_parser.add_argument("--title", help="With --open: the issue title to fill in (default: a template sentence to complete).")
+    from . import ai_cli
+    ai_cli.add_parsers(sub)
     icon_parser = sub.add_parser(
         "desktop-icon",
         help="Put a PlasBench icon on the desktop and in the applications/Start menu; clicking it starts PlasBench.")
@@ -1280,6 +1282,9 @@ def main(argv=None):
     if args.command == "issue-report":
         from . import issue_report
         raise SystemExit(issue_report.command(args, root, how))
+    if args.command in ("ask", "ai"):   # AI help (plasbench/ai_cli.py): works without a PlasBench folder; settings are read from it when there is one
+        from . import ai_cli
+        raise SystemExit(ai_cli.command(args, root))
     if args.command != "open-report":
         if root is None:
             print("[plasbench] ERROR: " + roots.not_found_message(tried), file=sys.stderr)

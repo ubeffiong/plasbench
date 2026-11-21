@@ -40,7 +40,7 @@ FAILED_LOGS = 5                   # at most this many failing assembler / tool l
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------- redaction
 _TOKEN_SHAPES = re.compile(
-    r"(?<![A-Za-z0-9_-])(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{16,}|sk-[A-Za-z0-9_-]{16,}|(?:AKIA|ASIA)[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}"
+    r"(?<![A-Za-z0-9_-])(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{16,}|sk-or-[A-Za-z0-9_-]{6,}|hf_(?:oauth_)?[A-Za-z0-9_]{12,}|sk-[A-Za-z0-9_-]{16,}|(?:AKIA|ASIA)[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}"
     r"|xox[baprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{16,}|hf_[A-Za-z0-9]{30,}|npm_[A-Za-z0-9]{30,}|pypi-[A-Za-z0-9_-]{30,})")
 _COOKIE = re.compile(r"(?im)^(\s*(?:set-)?cookie\s*:).*$")
 _PRIVATE_KEY = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?(?:-----END [A-Z ]*PRIVATE KEY-----|\Z)", re.S)
