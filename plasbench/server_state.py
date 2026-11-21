@@ -170,9 +170,11 @@ def state(root=None) -> dict:
             "server": {"pid": START.get("pid"), "port": START.get("port"), "started_at": START["at"]}}
 
 
-def replacement_command(root: Path, port: int) -> list[str]:
-    """The same Python, started on the package folder THIS server runs from (not whatever `-m plasbench` finds first in the current directory)."""
-    return [sys.executable, "-c", _BOOT, str(PKG.parent), "--project-root", str(root), "ui", "--new-instance", "--no-browser", "--port", str(port)]
+def replacement_command(root: Path, port: int, handoff_file: str = "") -> list[str]:
+    """The same Python, started on the package folder THIS server runs from (not whatever `-m plasbench` finds first in the current directory).
+    With `handoff_file` the replacement waits up to 25 s for THIS server's port (so the window keeps its address) and creates that file just before it binds."""
+    extra = ["--port-wait", "25", "--handoff-file", handoff_file] if handoff_file else []
+    return [sys.executable, "-c", _BOOT, str(PKG.parent), "--project-root", str(root), "ui", "--new-instance", "--no-browser", "--port", str(port)] + extra
 
 
 def group_launch(cmd: list[str], root=None, membership=None, which=shutil.which) -> tuple[list[str], bool, str]:
@@ -216,7 +218,7 @@ def _healthy(info: dict) -> bool:
         return False
 
 
-def restart(root: Path, port: int, record_file: Path, spawn=spawn_detached, healthy=None, wait: float = 30.0, membership=None, which=shutil.which) -> dict:
+def restart(root: Path, port: int, record_file: Path, spawn=spawn_detached, healthy=None, wait: float = 30.0, membership=None, which=shutil.which, release=None) -> dict:
     """Start a replacement server and wait until it answers. {"ok": True, "url": new address (with its new key)} or {"ok": False, "message", "manual": True}.
 
     The caller shuts THIS server down after the answer has been sent (the same keep-running shutdown as Quit: runs are detached and are not stopped)."""
@@ -226,7 +228,15 @@ def restart(root: Path, port: int, record_file: Path, spawn=spawn_detached, heal
     if not _RESTART_LOCK.acquire(blocking=False):
         return {"ok": False, "message": "a restart is already in progress"}
     try:
-        argv, wrapped, problem = group_launch(replacement_command(root, port), root, membership, which)
+        handoff = ""
+        if release is not None:   # window stability: the replacement binds the SAME port; `release` makes this server stop listening once the replacement says it is loaded
+            handoff = str(Path(record_file).parent / f"handoff-{os.getpid()}-{int(time.time() * 1000)}.ready")
+            try:
+                Path(handoff).unlink()
+            except OSError:
+                pass
+        released = False
+        argv, wrapped, problem = group_launch(replacement_command(root, port, handoff), root, membership, which)
         if problem:
             return {"ok": False, "manual": True, "message": problem}
         try:
@@ -237,7 +247,10 @@ def restart(root: Path, port: int, record_file: Path, spawn=spawn_detached, heal
         while time.time() < end:
             code = child.poll()
             if code is not None:
-                return {"ok": False, "manual": True, "message": f"the new PlasBench stopped while starting (exit code {code}); this window is unchanged"}
+                return {"ok": False, "manual": True, "message": f"the new PlasBench stopped while starting (exit code {code}); " + ("this window has stopped listening: start PlasBench again" if released else "this window is unchanged")}
+            if handoff and not released and os.path.exists(handoff):
+                released = True
+                release()
             try:
                 info = json.loads(record_file.read_text(encoding="utf-8"))
             except (OSError, ValueError):
@@ -245,6 +258,11 @@ def restart(root: Path, port: int, record_file: Path, spawn=spawn_detached, heal
             if (info.get("pid") != os.getpid() if wrapped else info.get("pid") == child.pid) and info.get("url") and (healthy or _healthy)(info):      # through sg the recorded pid is the shell's child
                 return {"ok": True, "url": info["url"], "pid": info["pid"]}
             time.sleep(0.25)
-        return {"ok": False, "manual": True, "message": "the new PlasBench did not answer in time; this window is unchanged"}
+        return {"ok": False, "manual": True, "message": "the new PlasBench did not answer in time; " + ("this window has stopped listening: start PlasBench again" if released else "this window is unchanged")}
     finally:
+        if handoff:
+            try:
+                Path(handoff).unlink()
+            except OSError:
+                pass
         _RESTART_LOCK.release()

@@ -150,7 +150,7 @@ def main():
     script = (ROOT / "scripts" / "plasbench_launcher.sh").read_text(encoding="utf-8")
     check("the launcher no longer execs away: a failed start is reported with a notification and the log path", "exec \"$PY\" -m plasbench" not in script and "notify-send" in script and "could not start or stopped unexpectedly" in script)
     src = (ROOT / "plasbench" / "webui.py").read_text(encoding="utf-8")
-    check("serve() verifies both a new and an existing window, and takes the launch lock", src.count("seen=lambda since") == 2 and "_LaunchLock()" in src and '"started": int(SERVER_STARTED)' in src)
+    check("serve() verifies both a new and an existing window (and /api/reopen verifies the window it opens: three), and takes the launch lock", src.count("seen=lambda since") == 3 and "_LaunchLock()" in src and '"started": int(SERVER_STARTED)' in src)
     print("ALL APP LAUNCH TESTS PASSED" if not FAILED else f"APP LAUNCH TESTS FAILED: {FAILED}")
     sys.exit(1 if FAILED else 0)
 

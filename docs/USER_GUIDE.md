@@ -1430,6 +1430,26 @@ The stage 2 and 3 loops print one summary line for isolates whose reference or r
 
 ## Troubleshooting
 
+**Reporting an issue.** When a step fails and nothing below fits: copy the complete error text (Ctrl+Shift+C in a Linux or Windows Terminal, Cmd+C on a Mac, or the **Copy** button of the
+console in the window), run `plasbench issue-report` (or **More > Report an issue > Prepare diagnostics** in the window), and open a
+[New issue](https://github.com/ubeffiong/plasbench/issues/new/choose). The README section [Reporting an issue](../README.md#reporting-an-issue) lists exactly what to send, with a
+template and three worked examples; [SUPPORT.md](../SUPPORT.md) is the short version.
+
+```text
+Pop-ups say "This window needs to be reopened", or "PlasBench's program files changed while this window was open"
+    These came from two faults in 0.5.5 (a check in the page that always said "older server", and an old window
+    that kept using the key of an earlier run); both are fixed. If they still appear, probably an old window is open:
+    1. Close EVERY PlasBench window (look in the taskbar; a window of an earlier run does not report in).
+    2. Run `plasbench ui` once. If a window is already open it says "PlasBench is already open" and brings it
+       to the front instead of opening another; otherwise it opens one.
+    3. Run `plasbench ui-state`. It lists every PlasBench server on this computer (port, pid, version, start
+       time; keys are never shown), how many windows reported in, and anything else listening on the same port,
+       and warns when more than one server or window is open.
+    A window that really belongs to an older session shows one bar, "This window belongs to an older PlasBench
+    session", with Close this window, Open the current window and Check again. It does not repeat.
+    Restart window keeps this window and its address; it no longer opens a second window or moves to another port.
+```
+
 ```text
 The banner says "This window is running an older version of PlasBench than the page"
     Open Details in the banner: it lists what the window runs (version and folder), the PlasBench folder, the window's

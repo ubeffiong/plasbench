@@ -31,7 +31,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import __version__
-from . import server_state
+from . import server_state, windowlife
 from . import cohort_info, fsutil, ghops, ghsignin, jobrunner, jobs_labels, loadcache, netgate, runfolders, runprogress, ui_help, ui_schema
 from .gitops import GitError   # a refused git action is the user's error (400), not the server's
 from .terminal import Terminal, TerminalError
@@ -39,6 +39,8 @@ from .sessionlog import SessionLog, describe as describe_event
 
 TOKEN = secrets.token_urlsafe(24)
 PAGE_FILE = Path(__file__).resolve().parent / "data" / "ui.html"
+WINDOWS = windowlife.Registry()   # window stability: the windows that pinged recently
+REOPEN_LIMIT = windowlife.RateLimit()   # /api/reopen helps at most once per 10 s
 PAGE_SEEN = {"t": 0.0}   # when a window last loaded the page: the launcher uses it to check that clicking the icon really produced a window
 LOGO_FILE = Path(__file__).resolve().parent / "data" / "logo.svg"
 _SESSION: dict = {}
@@ -1663,6 +1665,31 @@ def native_picker_extras(caps: dict) -> dict:
     return out
 
 
+_issue_report_lock = threading.Lock()
+
+
+def issue_report_state(root, q) -> dict:
+    """GET /api/issue-report: the same redacted Markdown as `plasbench issue-report`, one at a time, at most 200 lines of each log, never any network probe. {markdown, truncated, study, new_issue}."""
+    from . import issue_report
+    if not _issue_report_lock.acquire(blocking=False):
+        return {"error": "the diagnostics are already being prepared", "markdown": ""}
+    try:
+        try:
+            lines = max(0, min(200, int(q.get("lines", issue_report.DEFAULT_LOG_LINES))))
+        except ValueError:
+            lines = issue_report.DEFAULT_LOG_LINES
+        study = (q.get("study") or "").strip() or None
+        try:
+            out = issue_report.collect(root, "this window", study, lines, False, True, False)
+        except issue_report.StudyNotFound as exc:
+            return {"error": str(exc), "markdown": ""}
+        out["new_issue"] = issue_report.NEW_ISSUE_URL + "/choose"
+        out.pop("summary", None)
+        return out
+    finally:
+        _issue_report_lock.release()
+
+
 def native_picker_selftest() -> dict:
     """The same checks as `plasbench picker-check`, for the Settings button: one at a time, bounded (the window it opens closes itself after 2 s)."""
     from . import picker_check
@@ -1987,7 +2014,7 @@ def make_handler(project: Project, jobs: Jobs):
         mtime = (PAGE_FILE.stat().st_mtime, disk)
         if mtime != page_cache["mtime"]:
             html = PAGE_FILE.read_text(encoding="utf-8")
-            page_cache.update(etag=f"{mtime[0]:.6f}-{mtime[1]}-{__version__}", mtime=mtime, body=html.replace("__PAGE_VERSION__", disk or __version__).replace("__API_LEVEL__", str(server_state.API_LEVEL)).replace("__VERSION__", __version__).encode("utf-8"))
+            page_cache.update(etag=f"{mtime[0]:.6f}-{mtime[1]}-{__version__}", mtime=mtime, body=windowlife.render_page(html, __version__, disk, server_state.API_LEVEL).encode("utf-8"))   # window stability: the one place the placeholders are filled
         return page_cache["body"]
         # END server state
 
@@ -2070,13 +2097,32 @@ def make_handler(project: Project, jobs: Jobs):
             return f"plasbench_token_{self.server.server_address[1]}"
 
         def token_ok(self):
-            tok = self.headers.get("X-PlasBench-Token") or parse_qs(urlparse(self.path).query).get("t", [""])[0]
-            if not tok:
-                for part in (self.headers.get("Cookie") or "").split(";"):
-                    k, _, v = part.strip().partition("=")
-                    if k == self.cookie_name():
-                        tok = v
-            return secrets.compare_digest(tok or "", TOKEN)
+            """True when ANY credential the request presents is this server's key: the X-PlasBench-Token header, the ?t= query, or this port's cookie.
+
+            Before, the header or query was taken first and the cookie only when neither was present, so a window that still held the key of an EARLIER run of this server (a restart on the
+            same port: the cookie already carried the new key) was refused for ever with a valid cookie in hand. Accepting the cookie when the header is stale is no weaker than accepting it
+            when no header is sent, which the server always did: the cookie is HttpOnly (a page script cannot read it) and SameSite=Strict (a request started by another site does not carry
+            it); the Host check (DNS rebinding) and the same-origin Origin check on every POST are unchanged and run before this; and every candidate is compared in constant time."""
+            candidates = [self.headers.get("X-PlasBench-Token") or "", parse_qs(urlparse(self.path).query).get("t", [""])[0]]
+            for part in (self.headers.get("Cookie") or "").split(";"):
+                k, _, v = part.strip().partition("=")
+                if k == self.cookie_name():
+                    candidates.append(v)
+            return any(c and secrets.compare_digest(c.encode("utf-8", "replace"), TOKEN.encode("utf-8")) for c in candidates)
+
+        def reopen_window(self) -> dict:
+            """What an older window's "Open the current window" asks for. It needs no key (the window asking has none that works), so it is made harmless: it only ever opens THIS server's own
+            address, on this computer's desktop, through the same helper `plasbench ui` uses; it returns nothing private (no key, no path); the Host and same-origin checks of do_POST
+            already ran (another website cannot call it); a window that is already open is brought to the front instead of a second one being opened; and it acts at most once per 10 s."""
+            if WINDOWS.count():
+                return {"ok": True, "opened": False, "message": "A current PlasBench window is already open. It was brought to the front: use that one and close this window."
+                        if windowlife.bring_to_front() else "A current PlasBench window is already open: use that one and close this window."}
+            if not REOPEN_LIMIT.allow():
+                return {"ok": False, "opened": False, "message": "PlasBench was just asked to open a window. Wait a few seconds."}
+            from . import appwindow
+            url = f"http://127.0.0.1:{self.server.server_address[1]}/?t={quote(TOKEN)}"
+            threading.Thread(target=lambda: appwindow.open_app_window(url, UI_HOME / "app-window", False, seen=lambda since: PAGE_SEEN["t"] > since), daemon=True).start()
+            return {"ok": True, "opened": True, "message": "Opening the current PlasBench window. Close this old one."}
 
         def same_origin(self):
             origin = self.headers.get("Origin")
@@ -2163,6 +2209,12 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, info)
             if route == "schema":   # built from the argparse parser once (at start-up, in the background), then served as ready-made bytes
                 return self.send(200, schema_bytes())
+            # ---- Report an issue (plasbench/issue_report.py): the redacted diagnostics block, in-process and bounded ----
+            if route == "issue-report":
+                if not self.loopback():
+                    raise PermissionError("the diagnostics can only be prepared from the computer this window runs on")
+                return self.jsend(200, issue_report_state(project.root, q))
+            # ---- end Report an issue ----
             if route == "update-check":
                 from . import updatecheck
                 netgate.require("github", "check for updates")
@@ -2204,6 +2256,10 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "isolates/scan/status":
                 return self.jsend(200, iso_scans().status(q.get("id", "")))
             # -- END scan a folder for isolates --
+            # BEGIN window stability
+            if route == "windows":   # how many windows pinged recently (ids are random and not returned in full): used by `plasbench ui` and `plasbench ui-state`
+                return self.jsend(200, {"alive": WINDOWS.count(), "ids": [w[:6] for w in WINDOWS.alive()], "pid": os.getpid(), "port": self.server.server_address[1]})
+            # END window stability
             # BEGIN server state
             if route == "server-state":   # is this server older than the files on disk (an update while the window was open)? Stats a few files, spawns nothing
                 return self.jsend(200, loadcache.ttl("server-state", 3.0, lambda: server_state.state(project.root)))
@@ -2431,6 +2487,9 @@ def make_handler(project: Project, jobs: Jobs):
             if not self.host_ok() or not self.same_origin():
                 self.drain_body()
                 return self.jsend(403, {"error": "request refused (not from this window)"})
+            if unquote(urlparse(self.path).path) == "/api/reopen":   # window stability: token-free ON PURPOSE (an old window has no valid key to ask with); see reopen_window()
+                self.drain_body()
+                return self.jsend(200, self.reopen_window())
             if not self.token_ok():
                 self.drain_body()
                 return self.jsend(403, {"error": "missing or wrong session token"})
@@ -2656,13 +2715,24 @@ def make_handler(project: Project, jobs: Jobs):
                 job = jobs.start(plan["argv"], plan["label"], None)
                 session_log().event("update_started", update=plan["kind"], to=plan["to"], forced=plan["forced"] or None)
                 return self.jsend(200, {"job": job, "plan": plan})
+            # BEGIN window stability
+            if route == "window-ping":   # an open window says it is there (random id, no key): `plasbench ui` then brings it back instead of opening a second one
+                return self.jsend(200, {"ok": True, "alive": WINDOWS.ping(str(data.get("id", "")), bool(data.get("visible", True)))})
+            # END window stability
             # BEGIN server state
             if route == "server/restart":   # start a replacement server, then this one exits like Quit and keep running (detached runs are not touched)
-                result = server_state.restart(project.root, self.server.server_address[1], _instance_file(), spawn=server_state.spawn_detached)
-                if result.get("ok"):
-                    session_log().event("quit", restart=True)
-                    threading.Timer(1.5, self.server.shutdown).start()
-                return self.jsend(200, result)
+                def release_port():   # window stability: the replacement is loaded and waits for THIS port: stop listening now (requests in flight finish; the process stays until the answer is sent)
+                    HANDOFF["active"] = True
+                    self.server.shutdown()
+                    self.server.server_close()
+                try:
+                    result = server_state.restart(project.root, self.server.server_address[1], _instance_file(), spawn=server_state.spawn_detached, release=release_port)
+                    if result.get("ok"):
+                        session_log().event("quit", restart=True)
+                        threading.Timer(1.5, self.server.shutdown).start()
+                    return self.jsend(200, result)
+                finally:
+                    HANDOFF["done"].set()
             # END server state
             if route == "workspace/set":
                 from . import workspace
@@ -3153,8 +3223,143 @@ def iso_scans():
     return _ISO_SCANS[0]
 
 
+# BEGIN window stability
+HANDOFF = {"active": False, "done": threading.Event()}   # a restart in progress: this server has released its port and must stay alive until the restart's answer is sent
+
+
+def servers_dir() -> Path:
+    return UI_HOME / "servers"
+
+
+def write_server_record(port: int, url: str, root) -> Path:
+    """One record per running server (server.json is the last one started): `plasbench ui-state` lists them all. It holds the key like server.json does, so it is private (0600)."""
+    folder = servers_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{int(port)}.json"
+    path.write_text(json.dumps({"url": url, "port": int(port), "pid": os.getpid(), "started": int(SERVER_STARTED), "root": str(Path(root).resolve()), "version": __version__}), encoding="utf-8")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    return path
+
+
+def bind_server(host: str, port: int, handler, wait: float = 0.0, ready=None, sleep=time.sleep, clock=time.time, make=None):
+    """The server on `port`, or on the next free one. With `wait` > 0 (the replacement of a restarting window) it keeps trying THAT port for up to `wait` seconds, because the old server
+    is releasing it, before it moves to the next port: a restart used to hop 8770 -> 8771 -> 8770. `ready` is a file created just before the first attempt: the old server releases its port
+    when it appears (the replacement is loaded and only needs the port), so a replacement that fails to start never costs the old window."""
+    make = make or (lambda addr: UIServer(addr, handler))
+    if ready:
+        try:
+            Path(ready).write_text(str(os.getpid()), encoding="utf-8")
+        except OSError:
+            pass
+    end = clock() + wait
+    while True:
+        try:
+            return make((host, port))
+        except OSError:
+            if clock() >= end:
+                break
+            sleep(0.2)
+    for candidate in range(port + 1, port + 20):
+        try:
+            return make((host, candidate))
+        except OSError:
+            continue
+    return None
+
+
+def port_listeners(port: int, run=subprocess.run) -> list:
+    """The processes listening on 127.0.0.1:<port> as `ss -ltnp` shows them: [{"pid": int|None, "name": str}] ([] when ss is missing or nothing listens). Best effort, read-only."""
+    try:
+        done = run(["ss", "-ltnpH", f"sport = :{int(port)}"], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return []
+    out = []
+    for line in (done.stdout or "").splitlines():
+        m = re.search(r'users:\(\("([^"]*)",pid=(\d+)', line)
+        out.append({"pid": int(m.group(2)) if m else None, "name": m.group(1) if m else "(another user's process)"})
+    return out
+
+
+def running_servers(ping=None, ask=None, listeners=None, ports=range(8770, 8790)) -> dict:
+    """Every PlasBench window server on this computer, for `plasbench ui-state`: {"servers": [...], "windows_alive": n, "warnings": [...]}. Keys are never included.
+    Sources: the per-server records (UI_HOME/servers/*.json and server.json) and a probe of the ports PlasBench uses (a server started by an older version has no record)."""
+    ping = ping or _page_seen_of
+    ask = ask or _call_old_server
+    listeners = listeners or port_listeners
+    records, seen, out = [], set(), []
+    for path in sorted(servers_dir().glob("*.json")) + [_instance_file()]:
+        try:
+            rec = json.loads(path.read_text(encoding="utf-8"))
+            records.append(rec)
+        except (OSError, ValueError):
+            continue
+    for rec in records:
+        try:
+            port = int(rec["port"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        if port in seen:
+            continue
+        seen.add(port)
+        alive, instance, _seen = ping(port)
+        entry = {"port": port, "pid": rec.get("pid"), "version": rec.get("version") or "", "started": rec.get("started"), "root": rec.get("root"), "recorded": True,
+                 "running": bool(alive), "is_recorded_server": bool(alive) and (rec.get("started") is None or str(rec.get("started")) == str(instance))}
+        if alive and entry["is_recorded_server"] and rec.get("url"):
+            st = ask(rec["url"], "server-state") or {}
+            win = ask(rec["url"], "windows")
+            entry.update(version=st.get("running_version") or entry["version"], stale=st.get("stale"), api_level=st.get("api_level"), windows_alive=(win or {}).get("alive"))
+        out.append(entry)
+    todo = [p for p in ports if p not in seen]
+    from concurrent.futures import ThreadPoolExecutor   # a closed port on Windows takes ~2 s to refuse: probe them side by side
+    with ThreadPoolExecutor(max_workers=max(1, min(10, len(todo)))) as pool:
+        probed = list(pool.map(ping, todo))
+    for port, (alive, instance, _seen) in zip(todo, probed):
+        if alive:
+            seen.add(port)
+            out.append({"port": port, "pid": None, "version": "", "started": None, "root": None, "recorded": False, "running": True, "is_recorded_server": False, "windows_alive": None})
+    warnings = []
+    for e in out:
+        e["listeners"] = listeners(e["port"])
+        e["other_listeners"] = [x for x in e["listeners"] if e["pid"] and x["pid"] != e["pid"]]
+        if e["recorded"] and not e["running"]:
+            warnings.append(f"port {e['port']}: a record names pid {e['pid']} but nothing answers as PlasBench there" + (f" (something else listens: {', '.join(str(x['name']) for x in e['listeners'])})" if e["listeners"] else " (the server has stopped)"))
+        elif e["other_listeners"]:
+            warnings.append(f"port {e['port']}: besides PlasBench (pid {e['pid']}), these also listen: " + ", ".join(f"{x['name']} (pid {x['pid']})" for x in e["other_listeners"]))
+        if not e["recorded"]:
+            warnings.append(f"port {e['port']}: a PlasBench server answers but has no record (started by an older version): stop it with Quit in its window")
+    running = [e for e in out if e["running"]]
+    if len(running) > 1:
+        warnings.append(f"{len(running)} PlasBench servers are running: only the newest window is needed; close the older windows and use Quit in them")
+    alive = sum(int(e.get("windows_alive") or 0) for e in running)
+    if alive > 1:
+        warnings.append(f"{alive} PlasBench windows reported in recently: more than one is open. Close the extra ones")
+    if running:
+        warnings.append("Windows opened before this version do not report in. If pop-ups keep appearing, close EVERY PlasBench window, then run plasbench ui once.")
+    return {"servers": out, "windows_alive": alive, "warnings": warnings}
+
+
+def reuse_window(url: str, open_window, ask=None, front=None) -> str:
+    """`plasbench ui` found a server already running. If one of its windows is alive (it pinged in the last 25 s), do not open another: bring it to the front. Otherwise open one.
+    Returns the line to print. `open_window()` -> description; `ask(url, route)` -> the server's answer or None (an older server has no `windows` route: then a window is opened as before)."""
+    ask = ask or _call_old_server
+    front = front or windowlife.bring_to_front
+    live = ask(url, "windows")
+    if live and live.get("alive"):
+        raised = False
+        try:
+            raised = bool(front())
+        except Exception:   # noqa: BLE001 - raising the window is a courtesy
+            pass
+        return f"PlasBench is already open: {url}" + ("" if raised else "  (it could not be brought to the front: look for the PlasBench window in the taskbar)")
+    return "Opened: " + open_window()
+# END window stability
+
+
 def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: bool = True, tab: bool = False,
-          new_instance: bool = False):
+          new_instance: bool = False, port_wait: float = 0.0, handoff_file: str = ""):
     if host not in ("127.0.0.1", "localhost", "::1"):
         raise SystemExit("ERROR: the PlasBench window only listens on this computer (127.0.0.1).")
     from . import appwindow, platform_info
@@ -3171,7 +3376,7 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
         print(f"PlasBench is already running: {existing}", flush=True)
         if open_browser:
             port = int(urlparse(existing).port or 0)
-            print("Opened: " + appwindow.open_app_window(existing, UI_HOME / "app-window", tab, seen=lambda since: _page_seen_of(port)[2] > since), flush=True)
+            print(reuse_window(existing, lambda: appwindow.open_app_window(existing, UI_HOME / "app-window", tab, seen=lambda since: _page_seen_of(port)[2] > since)), flush=True)   # window stability
         return
     # Every check and command started from the window finds the plasbench environment's tools, however the window was
     # started (a desktop icon does not run `conda activate`).
@@ -3187,13 +3392,7 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
     warm(project, jobs)
     from . import updatecheck, updater
     updatecheck.start_background(__version__, lambda: updater.default_mode(project.local_env()))   # at most once a day, only with UPDATE_CHECK=auto; a thread, never on the load path
-    server = None
-    for candidate in range(port, port + 20):
-        try:
-            server = UIServer((host, candidate), handler)
-            break
-        except OSError:
-            continue
+    server = bind_server(host, port, handler, wait=port_wait, ready=handoff_file or None)   # window stability: a restart's replacement waits for the old server's port
     if server is None:
         if lock:
             lock.__exit__()
@@ -3204,6 +3403,7 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
     record = _instance_file()
     record.write_text(json.dumps({"url": url, "port": server.server_address[1], "pid": os.getpid(), "started": int(SERVER_STARTED),
                                   "root": str(Path(root).resolve())}), encoding="utf-8")
+    server_record = write_server_record(server.server_address[1], url, root)   # window stability
     if lock:
         lock.__exit__()   # the record exists: a second click now finds this server
     try:
@@ -3237,6 +3437,14 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
         if lock:
             lock.__exit__()
         server.server_close()
+        if HANDOFF["active"]:   # window stability: a restart released the port early; stay until the restart's answer has reached the window
+            HANDOFF["done"].wait(40)
+            time.sleep(0.3)
+        try:
+            if json.loads(server_record.read_text(encoding="utf-8")).get("pid") == os.getpid():
+                server_record.unlink()
+        except (OSError, ValueError):
+            pass
         session_log().event("server_stop")
         try:
             if json.loads(record.read_text(encoding="utf-8")).get("pid") == os.getpid():

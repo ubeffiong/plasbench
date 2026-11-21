@@ -1,0 +1,13 @@
+# blank_issues_enabled is false on purpose: every report goes through a form, so it arrives with the version, the command, the full error output and the
+# diagnostics block a maintainer needs. A free-form question has its own form (Question), so nobody is left without a way to ask.
+blank_issues_enabled: false
+contact_links:
+  - name: How to report an issue (read this first)
+    url: https://github.com/ubeffiong/plasbench/blob/main/README.md#reporting-an-issue
+    about: What to copy from the terminal, which logs to attach, how to remove secrets, with a template and worked examples.
+  - name: Get help
+    url: https://github.com/ubeffiong/plasbench/blob/main/SUPPORT.md
+    about: The short version of how to get help, and the one command that collects your diagnostics.
+  - name: Report a security vulnerability (private)
+    url: https://github.com/ubeffiong/plasbench/blob/main/SECURITY.md
+    about: Do not open a public issue for a security problem. Read the security policy for how to report it privately.
