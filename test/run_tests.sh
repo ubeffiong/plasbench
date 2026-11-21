@@ -163,6 +163,7 @@ pb_run bash test_stage3_scratch.sh
 pb_run bash test_slow_step_and_aggregation.sh
 pb_run python3 test_run_status_stages.py
 pb_run python3 test_work_dir.py
+pb_run python3 test_resource_adapt.py
 pb_run python3 test_annotation_timeouts_and_readiness.py
 pb_run bash test_download_gate_and_prefetch.sh
 pb_run bash test_require_internet.sh

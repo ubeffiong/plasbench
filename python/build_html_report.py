@@ -1065,6 +1065,14 @@ def run_manifest_html(manifest_path, tool_versions):
     shown = [f"{key}={settings[key]}" for key in KEY_SETTINGS if key in settings]
     if shown:
         item("Key settings", "; ".join(shown) + f" ({len(settings)} settings are recorded in run_manifest.json)")
+    resources = manifest.get("resources") if isinstance(manifest.get("resources"), dict) else {}
+    if resources:
+        adj = resources.get("adjustments") or []
+        prof = resources.get("profile") or []
+        shown = "; ".join(f"{p.get('sample', '?')}: {p.get('tool', 'spades')} memory {p.get('budget_gb', '?')} GB" + (f" (needed {p['needed_gb']} GB)" if p.get("needed_gb") else "")
+                          + (f", mode {p['mode']}" if p.get("mode") not in (None, "", "spades") else "") + (f", {p['attempts']} attempts" if str(p.get("attempts")) not in ("", "1") else "")
+                          for p in prof[:6])
+        item("Resources", f"{len(adj)} automatic adjustment(s) (AUTO_RESOURCES; resources only, never scientific parameters)" + (f"; {shown}" if shown else "") + (f" (and {len(prof) - 6} more)" if len(prof) > 6 else ""))
     warnings = manifest.get("warnings") if isinstance(manifest.get("warnings"), list) else []
     if warnings:
         item("Manifest warnings", "; ".join(str(w) for w in warnings[:5]) + (f" (and {len(warnings) - 5} more)" if len(warnings) > 5 else ""))

@@ -368,6 +368,8 @@ def summarize(results_dir, log_dir=None, data_dir=None, now=None, procs=None, ma
                 summary["newest_log"]["last_line"] = lines[-1][:200] if lines else ""
             except OSError:
                 pass
+    summary["adjustments"] = [{"sample": e.get("sample", ""), "tool": e.get("tool", ""), "what": e.get("what", ""), "message": e.get("message", ""), "from": e.get("from", ""),
+                               "to": e.get("to", "")} for e in events if e["event"] == "resource_adjust"][-10:]
     summary["assembly_failures"] = assembly_failures(results_dir, log_dir)
     asm = (summary.get("progress") or {}).get("assembly")
     summary["assembly_partial"] = {"assembled": asm["ok"], "total": asm["rows"], "failed": asm["failed"]} if asm and 0 < asm["ok"] < asm["rows"] else None
@@ -405,6 +407,15 @@ def hints(s):
         out.append(f"Only {avail} MB of memory is available on this computer: a tool may be killed (exit 137) or crawl. Lower THREADS or ASSEMBLY_MEMORY_GB.")
     if m.get("swap_used_mb", 0) > 1000 and (avail is None or avail < 2000):
         out.append(f"{m['swap_used_mb']} MB of swap is in use while little memory is free: the machine is swapping, which makes everything very slow.")
+    for adj in (s.get("adjustments") or [])[-3:]:
+        if adj.get("what") == "skipped" or adj.get("what") == "memory" and adj.get("to") == "":
+            out.append(f"Resource adjustment: {adj.get('message') or adj.get('what')}")
+        elif adj.get("message"):
+            out.append(f"Resources adjusted automatically (AUTO_RESOURCES): {adj['message']}")
+        elif adj.get("what") == "memory":
+            out.append(f"Resources adjusted automatically (AUTO_RESOURCES): memory raised to {adj.get('to')} GB for isolate {adj.get('sample')} (from {adj.get('from')} GB)")
+        elif adj.get("what") == "skipped":
+            out.append(f"Isolate {adj.get('sample')} was skipped: it needs more memory than is free.")
     part = s.get("assembly_partial")
     if part:
         causes = sorted({i["cause"] for i in (s.get("assembly_failures") or {}).get("items", []) if i.get("cause")})
@@ -472,6 +483,8 @@ def render(s, diagnose=False):
         lines.append(f"  newest log for this isolate: {log['file']} (changed {human_seconds(log['idle_seconds'])} ago)" + (f": {log['last_line']}" if log.get("last_line") else ""))
     if s.get("reads_bytes"):
         lines.append(f"  this isolate's reads: {human_bytes(s['reads_bytes'])} compressed")
+    for adj in (s.get("adjustments") or [])[-3:]:
+        lines.append("  adjusted: " + (adj.get("message") or f"{adj.get('what')} for {adj.get('sample')}: {adj.get('from')} -> {adj.get('to')}"))
     if s["hints"]:
         lines.append("What this means:")
         lines.extend(f"  - {h}" for h in s["hints"])

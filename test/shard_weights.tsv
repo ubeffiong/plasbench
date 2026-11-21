@@ -465,9 +465,10 @@ test_workspace_studies.py	1.7
 test_workspace_tree_ui.py	0.3
 test_zero_plasmid_bin_scoring.py	0.3
 test_zero_plasmid_isolate_scoring.py	0.3
-test_stage3_continues.sh	45.0
+test_stage3_continues.sh	90.0
 test_stage3_scratch.sh	20.0
 test_slow_step_and_aggregation.sh	30.0
 test_run_status_stages.py	0.5
 test_work_dir.py	0.5
 test_annotation_timeouts_and_readiness.py	8.0
+test_resource_adapt.py	12.0

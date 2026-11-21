@@ -70,6 +70,62 @@ report_missing() {   # report_missing KIND DESCRIPTION [HOW-TO-FIX]
     rm -f "$f"
 }
 
+# ---- run_adaptive: run a command; when it fails for lack of a resource, adapt ONCE and run it again --------------------------------------------------
+# run_adaptive TOOL ISOLATE -- COMMAND...   AUTO_RESOURCES=1 (default; 0 = run once, as before). On a nonzero exit it asks python/resource_adapt.py (config/resource_signatures.tsv) why,
+# from the exit code and the tail of ADAPT_LOG (the tool's own log, when the caller names it). The verdict is either a change to apply and a retry, or "skip": the failure is
+# returned unchanged and the caller records it as before. Changes are made through a documented contract, as environment variables for the retried command only:
+#   THREADS, MEMORY_GB and PB_MEMORY_MB (the budget), TMPDIR (work folder), PB_ULIMIT_N (the command runs under `ulimit -n`, never above the hard limit), TOOL_TIMEOUT_SECONDS,
+#   JAVA_TOOL_OPTIONS=-Xmx<budget>m. A command only benefits if it reads these when it starts (a function or wrapper script does; arguments already expanded do not).
+# At most RESOURCE_MAX_ATTEMPTS (default 2) adjustments, each once per cause. Never changes a scientific parameter. The helper never aborts the wrapped command: its own failures are
+# swallowed (a missing python3, a ps-less container) and the command's exit status is what it returns.
+run_adaptive() {
+    local tool="$1" isolate="$2"; shift 2
+    [[ "${1:-}" == "--" ]] && shift
+    local rc=0 attempt=0 verdict log="${ADAPT_LOG:-}" state="${RESULTS_DIR:-.}/resource_state.d/${tool}.${isolate}.txt" progress=0 mtime now
+    local o_threads="${THREADS:-}" o_mem="${MEMORY_GB:-}" o_tmp="${TMPDIR:-}" o_timeout="${TOOL_TIMEOUT_SECONDS:-}" o_ulimit="${PB_ULIMIT_N:-}" o_java="${JAVA_TOOL_OPTIONS:-}" o_mb="${PB_MEMORY_MB:-}"
+    local vact vcause vmem vthr vtmp vul vto vmsg avail
+    while :; do
+        rc=0
+        if [[ -n "${PB_ULIMIT_N:-}" ]]; then
+            ( ulimit -n "$PB_ULIMIT_N" 2>/dev/null || true; "$@" ) || rc=$?      # only a retry that raised the limit runs in a subshell
+        else
+            "$@" || rc=$?
+        fi
+        if [[ "$rc" -eq 0 || "${AUTO_RESOURCES:-1}" != "1" || "$attempt" -ge "${RESOURCE_MAX_ATTEMPTS:-2}" ]] || ! command -v python3 >/dev/null 2>&1; then break; fi
+        progress=0
+        if [[ -n "$log" && -f "$log" ]]; then
+            now="$(date +%s)"; mtime="$(stat -c %Y "$log" 2>/dev/null || stat -f %m "$log" 2>/dev/null || echo 0)"
+            [[ "$mtime" =~ ^[0-9]+$ && $(( now - mtime )) -lt 300 ]] && progress=1
+        fi
+        avail="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" available 2>/dev/null </dev/null || true)"
+        verdict="$(python3 -I "${PROJECT_ROOT:-.}/python/resource_adapt.py" decide --tool "$tool" --isolate "$isolate" --exit-code "$rc" ${log:+--log "$log"}             --threads "${THREADS:-1}" --memory-gb "${MEMORY_GB:-0}" ${avail:+--available-gb "$avail"} --tmpdir "${TMPDIR:-}" --state "$state"             --timeout "${TOOL_TIMEOUT_SECONDS:-0}" --progress "$progress" 2>/dev/null </dev/null || true)"
+        IFS=$'\t' read -r vact vcause vmem vthr vtmp vul vto _ vmsg <<< "$verdict"
+        if [[ "$vact" != "retry" ]]; then
+            if [[ "$vact" == "skip" ]]; then
+                heartbeat_log "NOTE: $vmsg"
+                run_event resource_adjust "tool=$tool" "sample=$isolate" "what=skipped" "cause=$vcause" "message=$vmsg"
+            fi
+            break
+        fi
+        heartbeat_log "$vmsg"
+        run_event resource_adjust "tool=$tool" "sample=$isolate" "what=$vcause" "cause=$vcause" "memory_gb=${vmem//-/}" "threads=${vthr//-/}" "tmpdir=${vtmp//-/}" "ulimit_n=${vul//-/}" "timeout=${vto//-/}" "message=$vmsg"
+        [[ "$vmem" =~ ^[0-9]+$ ]] && { export MEMORY_GB="$vmem" PB_MEMORY_MB="$(( vmem * 1024 ))" JAVA_TOOL_OPTIONS="-Xmx$(( vmem * 1024 ))m"; }
+        [[ "$vthr" =~ ^[0-9]+$ ]] && export THREADS="$vthr"
+        [[ "$vtmp" != "-" && -n "$vtmp" ]] && { mkdir -p "$vtmp" 2>/dev/null || true; export TMPDIR="$vtmp"; }
+        [[ "$vul" =~ ^[0-9]+$ ]] && export PB_ULIMIT_N="$vul"
+        [[ "$vto" =~ ^[0-9]+$ ]] && export TOOL_TIMEOUT_SECONDS="$vto"
+        attempt=$(( attempt + 1 ))
+    done
+    # the changes were for this command only
+    THREADS="$o_threads"; MEMORY_GB="$o_mem"; TMPDIR="$o_tmp"; TOOL_TIMEOUT_SECONDS="$o_timeout"; PB_ULIMIT_N="$o_ulimit"; JAVA_TOOL_OPTIONS="$o_java"; PB_MEMORY_MB="$o_mb"
+    [[ -n "$o_tmp" ]] || unset TMPDIR
+    [[ -n "$o_ulimit" ]] || unset PB_ULIMIT_N
+    [[ -n "$o_java" ]] || unset JAVA_TOOL_OPTIONS
+    [[ -n "$o_mb" ]] || unset PB_MEMORY_MB
+    [[ -n "$o_timeout" ]] || unset TOOL_TIMEOUT_SECONDS
+    return "$rc"
+}
+
 # proc_stats PID: "cpu=NN% rss=NNNMB procs=N" for PID and everything it started (Linux and macOS ps). Empty when ps cannot say.
 proc_stats() {
     # A heartbeat only observes: it must never fail the command it watches. `ps` is missing from minimal images (the PlasBench container had none), and under

@@ -86,7 +86,7 @@ check_tool() {
 log "Resources: ${THREADS} thread(s), ${MEMORY_GB}GB assembler budget (detected ${PLASBENCH_AVAILABLE_GB:-?}GB available)"
 if [[ -n "${PLASBENCH_AVAILABLE_MB:-}" ]]; then
     if [[ "${MEMORY_GB}" == "$(plasbench_default_budget_gb "$PLASBENCH_AVAILABLE_MB")" ]]; then
-        log "  assembler budget rule: 80% of the memory available now (${PLASBENCH_AVAILABLE_MB} MB), rounded down to whole GB, at least 2 GB. Override: MEMORY_GB or --memory-gb. If SPAdes says it needs more, PlasBench retries once with the size it asks for when that fits in free memory."
+        log "  assembler budget rule: 85% of the memory available now (${PLASBENCH_AVAILABLE_MB} MB) minus 512 MB, rounded down to whole GB, between 2 and 64 GB (AUTO_RESOURCES=1 also raises it for one isolate when SPAdes says it needs more). Override: MEMORY_GB or --memory-gb. If SPAdes says it needs more, PlasBench retries once with the size it asks for when that fits in free memory."
     else
         log "  assembler budget set by you (MEMORY_GB / --memory-gb); the default rule would have given $(plasbench_default_budget_gb "$PLASBENCH_AVAILABLE_MB") GB."
     fi

@@ -101,6 +101,7 @@ tool_outcomes.tsv	aggregate	aggregate_results.py	6	scores.tsv, tool_status.tsv a
 benchmark.input_fingerprint.json	aggregate	aggregate_results.py	6	scores.tsv, tool_status.tsv and the per-sample tables	re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder		enriches	leaderboard
 benchmark.input_consistency.tsv	aggregate	run_consistency.py	6	scores.tsv, tool_status.tsv and the per-sample tables	re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder		enriches	leaderboard
 assembly_status.tsv	aggregate	03_assemble.sh	3	reads (and the assembler or QC tool)	re-run stage 3 (scripts/03_assemble.sh) from the reads		enriches	health
+resource_profile.tsv	aggregate	03_assemble.sh / resource_adapt.py	3	the memory, threads and attempts of each tool run (AUTO_RESOURCES)	re-run stage 3 (scripts/03_assemble.sh); optional		enriches	health
 download_status.tsv	aggregate	01_download.sh	1	network access (ENA/NCBI) and the sample sheet	re-download with stage 1 (scripts/01_download.sh)		enriches	health
 quast_diagnostics.tsv	aggregate	run_quast_diagnostics.py	6	scores.tsv, tool_status.tsv and the per-sample tables	re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder		enriches	quast-diagnostics
 run_manifest.json	aggregate	write_manifest.py	6	scores.tsv, tool_status.tsv and the per-sample tables	re-run stage 6 (plasbench report / scripts/06_aggregate.sh) from the results folder		enriches	method

@@ -304,11 +304,13 @@ plasbench_detect_memory_mb() {
     echo "$mb"
 }
 
-# plasbench_default_budget_gb AVAILABLE_MB: the default assembler memory budget, in whole GB: 80% of what is available, rounded down, never below 2 and never above what is free.
+# plasbench_default_budget_gb AVAILABLE_MB: the default assembler memory budget, in whole GB: 85% of what is available now minus 512 MB for the OS (and WSL), rounded
+# down from MB (so 6.9 GB available gives 5, not the 4 an integer-GB 80% gave), never below 2 and never above 64 (a sanity bound; MEMORY_GB has no bound).
 plasbench_default_budget_gb() {
     local mb="$1" gb
-    gb=$(( mb * 80 / 100 / 1024 ))
+    gb=$(( (mb * 85 / 100 - 512) / 1024 ))
     [[ "$gb" -lt 2 ]] && gb=2
+    [[ "$gb" -gt 64 ]] && gb=64
     echo "$gb"
 }
 
@@ -334,6 +336,16 @@ PLASBENCH_DEFAULT_MEMORY_GB="$(plasbench_default_budget_gb "$PLASBENCH_AVAILABLE
 export PLASBENCH_AVAILABLE_GB PLASBENCH_AVAILABLE_MB
 export MEMORY_GB="${MEMORY_GB:-$PLASBENCH_DEFAULT_MEMORY_GB}"   # assembler memory budget (GB)
 
+# AUTO_RESOURCES (1 = on, the default; 0 = fixed behaviour): PlasBench adapts resources by itself, deterministically, and logs every change. (1) the assembler memory budget starts at
+# 85% of the memory free now minus 512 MB; (2) when SPAdes says what it needs ("You need approx. X GB of free RAM") the isolate is retried ONCE with -m = ceil(X x 1.15 + 0.5) when that
+# fits in the free memory, and the need is remembered per isolate (results/assembly_memory.tsv) so a resume starts at the right budget; (3) when it does not fit that isolate is skipped
+# with the exact need and the others continue; (4) a tool killed for memory (exit 137) in stage 4 is retried once with half the threads (tools that read THREADS at run time).
+# An explicit MEMORY_GB / --memory-gb is still the starting budget. AUTO_RESOURCES=0 restores one attempt with the budget you set.
+export AUTO_RESOURCES="${AUTO_RESOURCES:-1}"
+# ASSEMBLER_ALLOW_ONLY_ASSEMBLER (default 0): when an isolate's need does not fit in the free memory, retry once with SPAdes --only-assembler (skips read error correction, the
+# hammer step that needs the most memory). It can change the assembly, so it is off by default, and an isolate assembled this way is recorded as mode only-assembler in
+# assembly_status.tsv, assembly_memory.tsv and run_manifest.json.
+export ASSEMBLER_ALLOW_ONLY_ASSEMBLER="${ASSEMBLER_ALLOW_ONLY_ASSEMBLER:-0}"
 # --- Work folder, annotation time limits and the slow-step note ------------------------------------
 # WORK_DIR: where assemblies run. auto (default) = a scratch folder under ~/.plasbench/scratch/<study> when the data folder is on a slow mount (a Windows drive seen from WSL,
 # NTFS/exFAT, a network share, a cloud-synced folder), else the data folder itself; data = always the data folder; any other value = that folder. Finished results are

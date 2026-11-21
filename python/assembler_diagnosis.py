@@ -152,18 +152,17 @@ def memory_need_gb(log_text):
 
 def memory_need_plan(need_gb, available_gb, margin=1.15, max_fraction=0.85, tight_fraction=0.92):
     """The ONE retry for 'SPAdes needs X GB': (memory_gb, note) or (None, reason).
-    -m = ceil(need * 1.15) when that is at most 85% of the memory available now; when only the bare need (rounded up) fits within 92% of it, that is used and the note
+    -m = ceil(need * 1.15 + 0.5 GB) when that is at most 85% of the memory available now; when only the bare need (rounded up) fits within 92% of it, that is used and the note
     says it is tight; otherwise None with the exact need against what is free. The budget is never lowered: SPAdes asked for MORE."""
-    wanted = int(math.ceil(need_gb * margin))
+    wanted = int(math.ceil(need_gb * margin + 0.5))
     bare = int(math.ceil(need_gb))
     if available_gb is None:
         return wanted, "memory available now is unknown; using the size SPAdes asked for plus 15%"
     if wanted <= available_gb * max_fraction:
-        return wanted, "needs %.2f GB, %.1f GB available: -m %d (need + 15%%)" % (need_gb, available_gb, wanted)
+        return wanted, "needs %.2f GB, %.1f GB available: -m %d (need + 15%% + 0.5 GB)" % (need_gb, available_gb, wanted)
     if bare <= available_gb * tight_fraction:
         return bare, "needs %.2f GB, %.1f GB available: -m %d (exactly what SPAdes asked for, rounded up; tight, so other programs should be closed)" % (need_gb, available_gb, bare)
-    return None, ("SPAdes needs about %.2f GB of free memory for these reads and only %.1f GB is available (a retry needs at least %d GB, and PlasBench keeps 8%% back for the system)"
-                  % (need_gb, available_gb, bare))
+    return None, "needs %.1f GB, %.1f GB are free" % (need_gb, available_gb)
 
 
 def _fill(text, context):

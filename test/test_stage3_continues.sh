@@ -28,11 +28,11 @@ exec /bin/df "$@"
 EOS
 cat > "$TMP/bin/spades.py" <<'EOS'
 #!/usr/bin/env bash
-outdir="" mem=""
-while [[ $# -gt 0 ]]; do case "$1" in -o) outdir="$2"; shift 2;; --memory) mem="$2"; shift 2;; *) shift;; esac; done
+outdir="" mem="" oa=""
+while [[ $# -gt 0 ]]; do case "$1" in -o) outdir="$2"; shift 2;; --memory) mem="$2"; shift 2;; --only-assembler) oa=1; shift;; *) shift;; esac; done
 sample="$(basename "$(dirname "$outdir")")"
-echo "$sample $mem" >> "$CALLS"
-if [[ "$sample" == "$HUNGRY" && "$mem" -lt "${NEED_GB:-6}" ]]; then
+echo "$sample $mem${oa:+ oa}" >> "$CALLS"
+if [[ "$sample" == "$HUNGRY" && -z "$oa" && "$mem" -lt "${NEED_GB:-6}" ]]; then
     echo "  0:02:11.534   14G / 14G   ERROR   K-mer Counting          (kmer_data.cpp             : 350)   The reads contain too many k-mers to fit into available memory. You need approx. 5.24277GB of free RAM."
     printf '\n== Error ==  system call for: "[spades-hammer]" finished abnormally, OS return value: 255\nIn case you have troubles running SPAdes, you can write to spades.support@cab.spbu.ru\n\nThank you for using SPAdes! If you use it in your research, please cite:\n  doi.org/10.1002/cpbi.102\n'
     exit 255
@@ -87,9 +87,9 @@ new_case
 rc="$(run_stage PLASBENCH_TEST_AVAILABLE_MB=5120)"
 [[ "$rc" == "0" ]] || fail "one failed isolate out of three must not fail the stage (exit $rc)"
 [[ "$(grep -c '^s1 ' "$CALLS")" == "1" ]] || fail "no retry when the need does not fit"
-[[ "$(col s1 status)" == "failed" && "$(col s1 cause)" == "spades_needs_memory" ]] || fail "s1 is failed with the memory cause: $(col s1 cause)"
+[[ "$(col s1 status)" == "skipped" && "$(col s1 cause)" == "needs_more_memory" ]] || fail "s1 is skipped with needs_more_memory: $(col s1 status) $(col s1 cause)"
 [[ "$(col s2 status)" == "completed" && "$(col s3 status)" == "completed" && "$(rows)" == "3" ]] || fail "s2 and s3 assemble and all three are recorded"
-grep -q "5.24 GB of free memory for these reads and only 5.0 GB is available" "$P/results/assembly_status.tsv" || fail "the refusal must give the need and what is free"
+grep -q "needs 5.2 GB, 5.0 GB are free; close programs or raise WSL memory in C:.Users..you...wslconfig (memory=8GB) then .wsl --shutdown" "$P/results/assembly_status.tsv" || fail "the refusal must give the need and what is free"
 grep -q "raise MEMORY_GB" "$P/results/assembly_status.tsv" || fail "the options must be listed"
 grep -q "complete WITH WARNINGS: 2 of 3 assembled" "$P/stage.log" || fail "the stage must say 2 of 3 assembled"
 if grep -q "doi.org" "$P/results/assembly_status.tsv"; then fail "the citation line must never be the evidence"; fi
@@ -101,6 +101,58 @@ rc="$(run_stage PLASBENCH_TEST_AVAILABLE_MB=5120 STDIN_EATER=1)"
 [[ "$(rows)" == "3" && "$(col s3 status)" == "completed" ]] || fail "a stdin-reading helper swallowed the sample list: rows $(rows)"
 echo "a helper that reads stdin cannot swallow the rest of the sample list -> PASS"
 
+# 7. the learned need is remembered: a second run of the same isolate (assembly removed) starts at the right -m, with no failing attempt
+new_case
+rc="$(run_stage PLASBENCH_TEST_AVAILABLE_MB=7066)"
+[[ -s "$P/results/resource_profile.tsv" ]] && grep -q "^spades	s1	" "$P/results/resource_profile.tsv" || fail "the learned need must be written to results/resource_profile.tsv"
+rm -rf "$P/data/s1/contigs.fasta" "$P/data/s1/assembly_graph.gfa" "$P/data/s1/assembly" "$P/data/s1/assemblies"
+: > "$CALLS"
+rc="$(run_stage PLASBENCH_TEST_AVAILABLE_MB=7066)"
+[[ "$(grep -c '^s1 ' "$CALLS")" == "1" ]] && grep -q '^s1 6$' "$CALLS" || fail "a resumed isolate must start at -m 6 with one attempt: $(tr '
+' ';' < "$CALLS")"
+grep -q "remembered from an earlier attempt" "$P/stage.log" || fail "the log must say the need was remembered"
+echo "learned need remembered: the second run starts at -m 6 with no failing attempt -> PASS"
+# ... and a changed read set invalidates it
+printf '@r2
+ACGTACGTAC
++
+IIIIIIIIII
+' | gzip > "$P/data/s1/SRR_1.fastq.gz"
+rm -rf "$P/data/s1/contigs.fasta" "$P/data/s1/assembly_graph.gfa" "$P/data/s1/assembly" "$P/data/s1/assemblies" "$P/data/s1/SRR_1.trim.fastq.gz" "$P/data/s1/.fastp.complete"
+: > "$CALLS"
+rc="$(run_stage PLASBENCH_TEST_AVAILABLE_MB=7066)"
+[[ "$(grep -c '^s1 ' "$CALLS")" == "2" ]] || fail "changed reads must invalidate the remembered need (the failing attempt happens again): $(tr '
+' ';' < "$CALLS")"
+echo "changed reads invalidate the remembered need -> PASS"
+
+# 8. does not fit, with the opt-in: --only-assembler is tried once and recorded as a different mode
+new_case
+rc="$(run_stage PLASBENCH_TEST_AVAILABLE_MB=5120 ASSEMBLER_ALLOW_ONLY_ASSEMBLER=1)"
+grep -q '^s1 4 oa$' "$CALLS" || fail "--only-assembler must be tried: $(tr '
+' ';' < "$CALLS")"
+[[ "$(col s1 status)" == "completed" && "$(col s1 assembly_mode)" == "only-assembler" ]] || fail "the mode change must be recorded: $(col s1 assembly_mode)"
+python3 "$ROOT/python/resource_adapt.py" merge --dir "$P/results" --out "$P/results/resource_profile.tsv"
+echo '{}' > "$P/results/run_manifest.json"
+python3 "$ROOT/python/resource_adapt.py" manifest --table "$P/results/resource_profile.tsv" --manifest "$P/results/run_manifest.json" --events "$P/results/run_events.jsonl"
+grep -q '"only-assembler"' "$P/results/run_manifest.json" && grep -q '"resources"' "$P/results/run_manifest.json" || fail "the manifest must carry the resources section and the mode"
+echo "opt-in --only-assembler: tried once, recorded as a different mode in the status and run_manifest.json -> PASS"
+
+# 9. AUTO_RESOURCES=0: one attempt with the budget set, no memory retry
+new_case
+rc="$(run_stage PLASBENCH_TEST_AVAILABLE_MB=7066 AUTO_RESOURCES=0)"
+[[ "$(grep -c '^s1 ' "$CALLS")" == "1" && "$(col s1 status)" == "failed" ]] || fail "AUTO_RESOURCES=0 must not adapt: $(tr '
+' ';' < "$CALLS")"
+[[ "$(col s2 status)" == "completed" ]] || fail "the other isolates still run"
+echo "AUTO_RESOURCES=0: one attempt, failure recorded, others continue -> PASS"
+
+# 10. the adjustment is an event the status shows
+new_case
+rc="$(run_stage PLASBENCH_TEST_AVAILABLE_MB=7066)"
+grep -q '"event":"resource_adjust"' "$P/results/run_events.jsonl" || fail "resource_adjust event expected"
+python3 "$ROOT/python/run_status.py" --results-dir "$P/results" > "$P/status.txt" 2>&1 || true
+grep -q "adjusted:" "$P/status.txt" || fail "plasbench status must show the adjustment: $(cat "$P/status.txt")"
+echo "resource_adjust event written and shown by plasbench status -> PASS"
+
 # 5. a cause that belongs to the computer stops the stage, and every isolate not attempted is RECORDED
 new_case
 rc="$(run_stage DISK_FULL=1 NEED_GB=0)"
@@ -111,12 +163,12 @@ col s2 reason | grep -q "not attempted (stopped early: disk_full)" || fail "s2 m
 echo "machine-level cause: stage stops, the other isolates are recorded as 'not attempted (stopped early: disk_full)' -> PASS"
 
 # 6. the default budget comes from MB: 6.9 GB -> 5, 7.0 -> 5, 7.8 -> 6, 2 GB -> 2, an explicit MEMORY_GB always wins
-for pair in 7066:5 7168:5 7987:6 2048:2 1024:2 16384:12; do
+for pair in 7066:5 7168:5 7987:6 2048:2 1024:2 16384:13 200000:64; do
     mb="${pair%%:*}" want="${pair##*:}"
     got="$(PLASBENCH_TEST_AVAILABLE_MB="$mb" bash -c 'source "$1/config/config.sh" >/dev/null 2>&1; echo "$MEMORY_GB"' _ "$ROOT")"
     [[ "$got" == "$want" ]] || fail "available $mb MB -> budget $got GB, expected $want"
 done
 got="$(MEMORY_GB=9 PLASBENCH_TEST_AVAILABLE_MB=2048 bash -c 'source "$1/config/config.sh" >/dev/null 2>&1; echo "$MEMORY_GB"' _ "$ROOT")"
 [[ "$got" == "9" ]] || fail "an explicit MEMORY_GB must win (got $got)"
-echo "default budget: 6.9 GB -> 5, 7.0 -> 5, 7.8 -> 6, 2 GB -> 2, 16 GB -> 12, explicit MEMORY_GB wins -> PASS"
+echo "default budget: 6.9 GB -> 5, 7.0 -> 5, 7.8 -> 6, 2 GB -> 2, 16 GB -> 13, 200 GB capped at 64, explicit MEMORY_GB wins -> PASS"
 echo "ALL STAGE 3 CONTINUATION TESTS PASSED"

@@ -173,7 +173,7 @@ retry_exec() {
     rm -f "$times_file"
     while true; do
         rc=0; t0="$(date +%s)"
-        "$@" || rc=$?
+        ADAPT_LOG="$LOG_DIR/${SAMPLE}.${TOOL}.log" run_adaptive "$TOOL" "$SAMPLE" -- "$@" || rc=$?
         printf '%s\n' "$attempt" > "$attempts_file"
         printf '%s:%s\n' "$attempt" "$(( $(date +%s) - t0 ))" >> "$times_file"
         if [[ "$rc" -eq 0 || "$rc" -eq 124 || "$rc" -eq 137 || "$attempt" -ge "$max" ]]; then
