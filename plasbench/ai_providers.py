@@ -114,7 +114,7 @@ class Provider:
 
 # ------------------------------------------------------------------------------------------------------------------------------ OpenRouter
 class OpenRouter(Provider):
-    id, name, oauth, service, callback_path = "openrouter", "OpenRouter (free models)", True, "openrouter", OR_CALLBACK
+    id, name, oauth, service, callback_path = "openrouter", "OpenRouter", True, "openrouter", OR_CALLBACK
 
     def base(self):
         return orr.base_url(self.s.get("AI_OPENROUTER_BASE"))
@@ -305,7 +305,7 @@ class HuggingFace(Provider):
 
 # ------------------------------------------------------------------------------------------------------------------------------- local
 class Local(Provider):
-    id, name, needs_key, paste, service = "local", "This computer (Ollama, LM Studio)", False, False, ""
+    id, name, needs_key, paste, service = "local", "This computer", False, False, ""
 
     def configured(self):
         return (True, "") if self.base_ok() else (False, "AI_LOCAL_BASE points to another computer; set AI_LOCAL_ALLOW_REMOTE=1 if you really want that.")

@@ -514,7 +514,7 @@ dialog.pbdlg .stopsw{display:flex;gap:8px;align-items:center;margin:6px 0;font-w
  .rail.open{transform:none}.shell{grid-template-columns:minmax(0,1fr)}#navtoggle{display:inline-flex!important}main{padding:14px 12px 28px}.mtabs{margin:-14px -12px 14px;padding:8px 12px 0}:root{--mtabh:40px}.g3,.g2{grid-template-columns:minmax(0,1fr)}
  .top .search{display:none}.field{grid-template-columns:minmax(0,1fr)}.field .help{grid-column:1}.wsteps small{display:none}.vhead{flex-direction:column;align-items:flex-start}}
 @media (max-width:640px){
- .g4{grid-template-columns:minmax(0,1fr)}.top{gap:8px;padding:0 8px}.brand{padding-right:8px}.brand small,.brand .prod,#consbtn span,#jobpilltx,#gdbtn span:not(.badge),.netind .nl,.top .quit span{display:none}.top .tbtn{min-height:40px;min-width:40px;justify-content:center}.where{display:none}
+ .g4{grid-template-columns:minmax(0,1fr)}.top{gap:8px;padding:0 8px}.brand{padding-right:8px}.brand small,.brand .prod,#consbtn span,#jobpilltx,#gdbtn span:not(.badge),#aibtn span,.netind .nl,.top .quit span{display:none}.top .tbtn{min-height:40px;min-width:40px;justify-content:center}.where{display:none}
  .card>.hd{flex-wrap:wrap}.run{grid-template-columns:minmax(0,1fr)}.run .row{justify-content:flex-start!important}
  #chead select{max-width:46vw}#ccopy,#cfollow,#ctoggle span,#chead>b{display:none}#chead{overflow:hidden}
  .wsteps{overflow-x:auto}.wsteps button{min-width:110px}.leaders{width:auto}
@@ -535,6 +535,61 @@ body.gd-open #gdrawer{transform:none}
 #gd_tabs button.on{color:var(--fg);border-bottom-color:var(--primary);font-weight:600;background:var(--surface)}
 #gd_tabs .badge{margin-left:2px}
 #gd_head .gd-ib{align-self:center;margin:0 4px}
+
+/* ---------- AI help tab of the side panel ---------- */
+body.gd-ai{--gdw:min(430px,92vw)}
+#gdp_ai{min-height:0}
+#ai_tools{display:flex;gap:4px;flex-wrap:wrap;align-items:center;padding:4px 8px;border-bottom:1px solid var(--line-2);font-size:11.5px;color:var(--mut);flex:none}
+#ai_tools select{max-width:150px;font-size:11.5px;min-height:24px}
+#ai_tools label{display:inline-flex;gap:3px;align-items:center;cursor:pointer}
+#ai_tools .grow{flex:1}
+#ai_state{flex:0 1 auto;overflow-y:auto;max-height:78%;padding:0}
+#ai_state .aicard{margin:8px;padding:10px;border:1px solid var(--line);background:var(--surface-2);font-size:12.5px;line-height:1.45}
+#ai_state .aicard h4{margin:0 0 4px;font-size:13px}
+#ai_state .aicard ul{margin:4px 0 6px 16px;padding:0}
+#ai_state .aicard .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+#ai_state .aicard.bad{border-color:var(--bad);background:var(--bad-soft)}
+#ai_state .aicard.warn{border-color:var(--warn);background:var(--warn-soft)}
+#ai_state details{margin-top:8px}
+#ai_state input[type=password],#ai_state input[type=text]{width:100%;box-sizing:border-box}
+#ai_log{flex:1;overflow-y:auto;padding:8px;min-height:80px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5}
+.aimsg{max-width:100%;overflow-wrap:anywhere}
+.aimsg.user{align-self:flex-end;background:var(--primary-soft);color:var(--primary-ink);padding:6px 10px;border-radius:6px;white-space:pre-wrap;max-width:92%}
+.aimsg.bot{align-self:stretch;border-left:3px solid var(--line);padding-left:8px}
+.aimsg.bot.err{border-left-color:var(--bad)}
+.aimsg.bot h1,.aimsg.bot h2,.aimsg.bot h3,.aimsg.bot h4{font-size:13.5px;margin:8px 0 4px}
+.aimsg.bot p{margin:4px 0}.aimsg.bot ul,.aimsg.bot ol{margin:4px 0 4px 18px;padding:0}
+.aimsg.bot table{border-collapse:collapse;font-size:12px}.aimsg.bot td,.aimsg.bot th{border:1px solid var(--line);padding:2px 6px}
+.aimsg.bot pre{position:relative;margin:6px 0;padding:6px 8px;background:var(--term-bg);color:var(--term-fg);overflow-x:auto;border-radius:3px}
+.aimsg.bot pre code{background:transparent;border:0;color:inherit;padding:0;white-space:pre}
+.aipre-hd{display:flex;gap:6px;align-items:center;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:6px}
+.aisrc{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.aisrc button{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--surface);color:var(--fg-2);border-radius:10px;padding:1px 8px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aisrc button:hover,.aisrc button:focus-visible{border-color:var(--primary);color:var(--primary)}
+.aimeta{font-size:11px;color:var(--mut);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.aibadge{font-size:10.5px;border-radius:9px;padding:0 7px;border:1px solid var(--ok);color:var(--ok);background:var(--ok-soft)}
+.aibadge.local{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
+.aibadge.credits{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+.aicard2{margin:8px 0;border:1px solid var(--line);background:var(--surface);border-radius:3px;font-size:12.5px}
+.aicard2 .ch{padding:5px 8px;background:var(--surface-2);border-bottom:1px solid var(--line-2);display:flex;gap:6px;align-items:center;justify-content:space-between}
+.aicard2 .cb{padding:6px 8px}
+.aicard2 .cmdbox{font-family:var(--mono);font-size:12px;background:var(--term-bg);color:var(--term-fg);padding:5px 8px;border-radius:3px;overflow-x:auto;white-space:pre}
+.aicard2 .where{margin:5px 0;font-weight:600}
+.aicard2 .why{color:var(--mut);margin:2px 0 6px}
+.aicard2 .btns{display:flex;gap:6px;flex-wrap:wrap}
+.aicard2 .no{color:var(--warn);margin:4px 0}
+.aicard2 .risk{font-size:10.5px;border-radius:9px;padding:0 7px;border:1px solid var(--line)}
+.aicard2 .risk.changes_files{border-color:var(--warn);color:var(--warn)}.aicard2 .risk.destructive{border-color:var(--bad);color:var(--bad)}.aicard2 .risk.safe{border-color:var(--ok);color:var(--ok)}
+.aicard2 .runstate{margin-top:6px;font-size:12px}
+#ai_starters{display:flex;flex-wrap:wrap;gap:5px;padding:0 8px 6px;flex:none}
+#ai_starters button{font:inherit;font-size:12px;text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:12px;padding:3px 10px;cursor:pointer}
+#ai_starters button:hover,#ai_starters button:focus-visible{border-color:var(--primary);color:var(--primary)}
+#ai_form{flex:none;display:flex;gap:6px;padding:6px 8px;border-top:1px solid var(--line-2);align-items:flex-end}
+#ai_in{flex:1;resize:none;min-height:34px;max-height:140px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:3px;background:var(--surface);color:var(--fg)}
+#ai_foot{flex:none;padding:2px 10px 6px;font-size:11px;color:var(--mut);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#ai_live{position:absolute;left:-9999px}
+.aithumb{border:0;background:transparent;cursor:pointer;color:var(--mut);padding:0 3px;font-size:13px}.aithumb.on{color:var(--primary)}
+@media (max-width:640px){#ai_in{font-size:16px}}
 .gdpane{flex:1;display:flex;flex-direction:column;min-height:0}
 .gdpane[hidden]{display:none!important}
 .gd-tools{display:flex;gap:4px;align-items:center;padding:4px 8px;border-bottom:1px solid var(--line-2);font-size:11.5px;color:var(--mut);flex:none}
@@ -757,6 +812,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
  <span id="instchipwrap" hidden><button class="instchip" id="instchip" type="button" aria-controls="insttoast"><span class="rt-spin" aria-hidden="true"></span><span id="instchiptx">Installing</span></button><span data-tipid="install_chip"></span></span>
  <span class="pill" id="jobpill" hidden><span class="pulse"></span><span id="jobpilltx">1 job running</span></span>
  <button class="tbtn" id="gdbtn" aria-pressed="false" title="Side panel: Studies, Jobs and Git (Ctrl+Shift+G opens Git)"><svg class="ico sm"><use href="#i-sidebar"/></svg><span>Panel</span><span class="badge" id="gdbadge" hidden></span></button>
+ <button class="tbtn" id="aibtn" hidden title="AI help: ask about PlasBench, with commands you can run (Alt+Shift+H)"><svg class="ico sm"><use href="#i-help"/></svg><span>AI help</span></button>
  <button class="tbtn netind" id="netind" title="Checking the internet connection…" aria-label="Internet status: checking"><span class="nd" aria-hidden="true"></span><span class="nl">Checking…</span></button>
  <div class="menuwrap" id="morewrap"><button class="tbtn" id="morebtn" aria-haspopup="true" aria-expanded="false" aria-controls="moremenu" title="More: updates, help, reload the page, light or dark theme" aria-label="More"><svg class="ico sm"><use href="#i-more"/></svg><span class="updot" id="upd_dot" hidden title="A newer PlasBench release is available"></span></button>
   <div class="menu" id="moremenu" hidden>
@@ -1084,6 +1140,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
  <div id="gd_head"><div id="gd_tabs" role="tablist" aria-label="Side panel">
    <button data-pt="studies" role="tab" title="Your studies as a folder tree: reports, tables, logs"><svg class="ico sm"><use href="#i-folder"/></svg>Studies</button>
    <button data-pt="jobs" role="tab" title="Commands started from this window, newest first"><svg class="ico sm"><use href="#i-list"/></svg>Jobs<span class="badge" id="pjbadge" hidden></span></button>
+   <button data-pt="ai" role="tab" hidden title="Ask about PlasBench: answers from its own guides, with commands you can run (Alt+Shift+H)"><svg class="ico sm"><use href="#i-help"/></svg>AI help</button>
    <button data-pt="git" role="tab" title="Source control of the chosen study: changes, commit, branches, remote, files, history"><svg class="ico sm"><use href="#i-git"/></svg>Git<span class="badge" id="gdtabbadge" hidden></span></button></div>
   <button class="gd-ib" id="gd_close" title="Close the panel (Ctrl+Shift+G)" aria-label="Close the panel"><svg class="ico sm"><use href="#i-x"/></svg></button></div>
  <div class="gdpane" id="gdp_git">
@@ -1101,6 +1158,19 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
    <a class="gd-ib" href="#workspace" title="Open Workspace &amp; studies" aria-label="Open Workspace and studies"><svg class="ico sm"><use href="#i-ext"/></svg></a></div>
   <ul class="tree" id="ps_list" role="tree" aria-label="Studies"></ul>
   <div class="gd-tools" style="border-top:1px solid var(--line-2);border-bottom:0"><a class="btn sm" href="#wizard" style="flex:1;justify-content:center"><svg class="ico sm"><use href="#i-plus"/></svg>New benchmark</a></div></div>
+ <div class="gdpane" id="gdp_ai" hidden>
+  <div id="ai_tools"><select id="ai_prov" aria-label="Provider" title="Which provider answers" hidden></select><select id="ai_model" aria-label="Model" title="Which model answers"></select>
+   <label title="Ask for short answers (fewer tokens)"><input type="checkbox" id="ai_brief">Brief</label>
+   <label title="Keep this chat in this browser only (off by default)"><input type="checkbox" id="ai_remember">Remember chats</label>
+   <span data-tipid="ai_privacy"></span><span class="grow"></span>
+   <button class="gd-ib" id="ai_new" title="New chat" aria-label="New chat"><svg class="ico sm"><use href="#i-plus"/></svg></button></div>
+  <div id="ai_state"></div>
+  <div id="ai_log" role="log" aria-live="polite" aria-label="AI help conversation" tabindex="0"></div>
+  <div id="ai_starters"></div>
+  <form id="ai_form" hidden><textarea id="ai_in" rows="1" aria-label="Your question (Enter sends, Shift+Enter adds a line)" placeholder="Ask about PlasBench"></textarea>
+   <button class="btn" id="ai_send" type="submit">Send</button><button class="btn sec" id="ai_stop" type="button" hidden>Stop</button></form>
+  <div id="ai_foot" hidden></div><div id="ai_live" role="status" aria-live="polite"></div>
+ </div>
 </aside>
 <div id="console" class="min" aria-label="Job console">
  <div id="cgrip" title="Drag to resize"></div>
@@ -1749,14 +1819,14 @@ $("#theme").onclick = () => { const d = document.documentElement.dataset.theme =
    Jobs and console
    =================================================================================================== */
 let pendingRun = null;
-function confirmRun(argv, label, env) {
-  pendingRun = {argv, label, env};
+function confirmRun(argv, label, env, onStart) {
+  pendingRun = {argv, label, env, onStart};
   $("#cf_t").textContent = label || "Run this command?";
   $("#cf_p").textContent = "It runs in the background; follow its output in the console. You can keep using the window.";
   $("#cf_cmd").textContent = (env && Object.keys(env).length ? Object.entries(env).map(([k,v]) => `${k}=${quote(v)}`).join(" ") + " " : "") + cmdText(argv);
   $("#confirm").showModal();
 }
-$("#cf_ok").onclick = async () => { $("#confirm").close(); if (pendingRun) await startJob(pendingRun.argv, pendingRun.label, pendingRun.env); };
+$("#cf_ok").onclick = async () => { $("#confirm").close(); if (pendingRun) { const run = pendingRun, job = await startJob(run.argv, run.label, run.env); if (run.onStart) run.onStart(job); } };
 async function startJob(argv, label, env) {
   const bench = isBenchArgv(argv);
   if (bench && argv[0] === "run" && typeof instPreRun === "function" && !(env && env.INSTALL_MISSING_TOOLS)) {     // enabled tools that are missing: offer to install them first
@@ -6036,16 +6106,17 @@ function gdState(id) { try { const v = localStorage.getItem("pb_gd_" + id); retu
 const PT = {active: "studies"};
 try { PT.active = localStorage.getItem("pb_pt") || "studies"; } catch {}
 function setPanelTab(t) {
-  PT.active = ["studies", "jobs", "git"].includes(t) ? t : "studies";
+  PT.active = ["studies", "jobs", "git", "ai"].includes(t) ? t : "studies";
   try { localStorage.setItem("pb_pt", PT.active); } catch {}
   $$("#gd_tabs [data-pt]").forEach(b => { const on = b.dataset.pt === PT.active; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
-  for (const t of ["studies", "jobs", "git"]) $("#gdp_" + t).hidden = t !== PT.active;
+  for (const t of ["studies", "jobs", "git", "ai"]) $("#gdp_" + t).hidden = t !== PT.active;
+  document.body.classList.toggle("gd-ai", PT.active === "ai" && GD.open);
   if (GD.open) panelLoad();
 }
-function panelLoad(quiet) { if (PT.active === "git") loadDrawer(quiet); else if (PT.active === "jobs") renderPanelJobs(); else loadPanelStudies(); }
+function panelLoad(quiet) { if (PT.active === "git") loadDrawer(quiet); else if (PT.active === "jobs") renderPanelJobs(); else if (PT.active === "ai") aiOnShow(quiet); else loadPanelStudies(); }
 $("#gd_tabs").onclick = e => { const b = e.target.closest("[data-pt]"); if (b) setPanelTab(b.dataset.pt); };
 function setDrawer(open, remember = true) {
-  GD.open = open; document.body.classList.toggle("gd-open", open);
+  GD.open = open; document.body.classList.toggle("gd-open", open); document.body.classList.toggle("gd-ai", open && PT.active === "ai");
   $("#gdrawer").setAttribute("aria-hidden", open ? "false" : "true");
   $("#gdbtn").setAttribute("aria-pressed", open ? "true" : "false");
   if (remember) try { localStorage.setItem("pb_gd_open", open ? "1" : "0"); } catch {}
@@ -6163,6 +6234,274 @@ $("#gd_body").addEventListener("click", async e => {
 });
 $("#gdbtn").onclick = () => setDrawer(!GD.open);
 $("#gd_close").onclick = () => setDrawer(false);
+/* ===================================================================================================
+   AI help (the AI help tab of the side panel). Server side: plasbench/ai_help.py. Nothing is sent anywhere until the person signs in, accepts the notice and asks.
+   The model's text is DATA: it is shown through md() (escape first), and a command in it only ever becomes a card whose buttons the server has validated; Run goes through confirmRun.
+   =================================================================================================== */
+const AI = {st: null, models: null, msgs: [], busy: false, ctl: null, pop: null, state: "", prov: "", note: "", pre: null, popTimer: null, last: null, remember: false};
+const aiLS = (k, v) => { try { if (v === undefined) return localStorage.getItem("pb_ai_" + k); localStorage.setItem("pb_ai_" + k, v); } catch {} return null; };
+const aiProv = () => AI.prov || (AI.st && (AI.st.suggested || AI.st.provider)) || "openrouter";
+const aiSlug = s => String(s || "").trim().toLowerCase().replace(/`/g, "").replace(/[^\w\- ]/g, "").replace(/\s/g, "-");
+const AI_WHERE = {window: "In PlasBench's Terminal tab (bottom panel), or press Run in PlasBench", terminal: "In PlasBench's Terminal tab (bottom panel)", powershell: "In Windows PowerShell (not inside Ubuntu)",
+  wsl: "In your Ubuntu (WSL) terminal", host: "In a terminal on this computer"};
+const AI_PLAIN_WHERE = "Run it in your own terminal (PlasBench does not run this)";
+async function aiStatus(detect) {
+  try { AI.st = await api(`ai/status?provider=${encodeURIComponent(aiProv())}&detect=${detect ? 1 : 0}`); } catch { AI.st = null; return null; }
+  if (!AI.prov && AI.st.suggested) AI.prov = AI.st.suggested;
+  const on = !!AI.st.enabled;
+  $("#aibtn").hidden = !on; $("#gd_tabs [data-pt=ai]").hidden = !on;
+  if (!on && PT.active === "ai") setPanelTab("studies");
+  return AI.st;
+}
+async function aiBoot() { await aiStatus(false); }
+async function aiOnShow(quiet) {
+  if (quiet) return;
+  if (!AI.remember && aiLS("remember") === "1") { AI.remember = true; $("#ai_remember").checked = true; aiLoadChat(); }
+  $("#ai_brief").checked = aiLS("brief") === "1" || (aiLS("brief") == null && !!(AI.st && AI.st.brief));
+  await aiStatus(true);
+  if (AI.st && AI.st.enabled) { fillProv(); await aiLoadModels(); }
+  aiRender();
+  setTimeout(() => { if ($("#ai_in")) $("#ai_in").focus(); }, 40);
+}
+function fillProv() {
+  const rows = (AI.st.providers || []).filter(r => r.visible || r.id === aiProv());
+  $("#ai_prov").innerHTML = rows.map(r => `<option value="${esc(r.id)}" ${r.id === aiProv() ? "selected" : ""}>${esc(r.name)}${r.id === "local" ? " (stays on this computer)" : ""}</option>`).join("");
+  $("#ai_prov").hidden = rows.length < 2;
+}
+async function aiLoadModels() {
+  AI.models = null;
+  if (!AI.st || !AI.st.consent || (AI.st.needs_key && !AI.st.signed_in)) { $("#ai_model").innerHTML = ""; return; }
+  try { AI.models = await api(`ai/models?provider=${encodeURIComponent(aiProv())}`); } catch (e) { AI.models = {models: [], error: e.message}; }
+  const saved = aiLS("model_" + aiProv()), ids = AI.models.models.map(m => m.id), sel = ids.includes(saved) ? saved : AI.models.selected;
+  $("#ai_model").innerHTML = AI.models.models.map(m => `<option value="${esc(m.id)}" ${m.id === sel ? "selected" : ""}>${esc(m.name || m.id)}${m.context ? " · " + Math.round(m.context / 1000) + "k" : ""}</option>`).join("") || `<option value="">No model</option>`;
+}
+function aiRender() {
+  const st = AI.st, box = $("#ai_state"), p = aiProv();
+  if (!st) { box.innerHTML = `<div class="aicard bad">AI help could not reach this window's server. Reload the page.</div>`; return; }
+  const d = st.disclosure || {}, prow = (st.providers || []).find(r => r.id === p) || {};
+  let html = "";
+  if (!st.kb) html += `<div class="aicard warn"><h4>No documentation index</h4>This installation has no AI help index (plasbench/data/ai_kb.json.gz), so answers cannot be grounded. Reinstall PlasBench.</div>`;
+  if (!st.consent) {
+    html += `<div class="aicard"><h4>Before you start: ${esc(d.headline || "")}</h4><div>What is sent:</div><ul>${(d.sent || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul><div>What is not sent:</div><ul>${(d.not_sent || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+      <div>${esc(d.free || "")}</div><div style="margin-top:4px">${esc(d.stored || "")} ${esc(d.delete || "")}</div>
+      <div style="margin-top:4px">${Object.entries(d.links || {}).map(([k, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(k.replace(/_/g, " "))}</a>`).join(" · ")}</div>
+      <div class="row"><button class="btn" id="ai_consent">I understand</button></div></div>`;
+  } else if (st.needs_key && !st.signed_in) {
+    const blocked = AI.note === "blocked";
+    html += `<div class="aicard"><h4>Sign in to use ${esc(prow.name || p)}</h4>`
+      + (p === "openrouter" ? "Free models only. A small window opens where you sign up or sign in to OpenRouter; it closes by itself. No credit card is needed for free models." : "A small window opens where you sign in to Hugging Face; it closes by itself.")
+      + (blocked ? `<div class="warn-t" style="margin-top:6px">Your browser blocked the sign-in window. Allow pop-ups for this page, then press Try again.</div>` : "")
+      + (AI.note === "cancelled" ? `<div class="warn-t" style="margin-top:6px">Sign-in cancelled.</div>` : "") + (AI.note === "failed" ? `<div class="warn-t" style="margin-top:6px">The sign-in did not complete. Try again.</div>` : "")
+      + `<div class="row"><button class="btn" id="ai_signin" ${st.oauth ? "" : "disabled"}>${blocked ? "Try again" : AI.pop && !AI.pop.closed ? "Sign-in window open…" : "Sign up / Sign in"}</button></div>`
+      + (!st.oauth ? `<div class="mut small" style="margin-top:4px">${esc(prow.reason || "")}</div>` : "")
+      + (st.paste ? `<details><summary>Advanced: paste my own key</summary><div class="mut small" style="margin:4px 0">Stored only on this computer, never shown again.</div><input type="password" id="ai_pastekey" autocomplete="off" spellcheck="false" aria-label="Your key"><div class="row"><button class="btn sec sm" id="ai_savekey">Save key</button></div></details>` : "")
+      + `</div>`;
+  } else if (p === "local" && AI.models && !AI.models.models.length) {
+    html += `<div class="aicard warn"><h4>No local model found</h4>${esc(AI.models.error || "")}<div class="row"><button class="btn sec sm" id="ai_recheck">Check again</button></div></div>`;
+  } else if (AI.models && AI.models.outdated) {
+    html += `<div class="aicard warn">The model list could not be loaded${AI.models.error ? " (" + esc(AI.models.error) + ")" : ""}. ${AI.models.models.length ? "Showing a built-in list that may be out of date." : "Cannot load models."} <button class="btn sec sm" id="ai_recheck">Retry</button></div>`;
+  }
+  box.innerHTML = html;
+  const open = !!(st.consent && (!st.needs_key || st.signed_in));
+  $("#ai_form").hidden = !open; $("#ai_foot").hidden = !open;
+  const starters = $("#ai_starters");
+  if (open && !AI.msgs.length) {
+    const failed = aiContext().last_failure;
+    starters.innerHTML = (failed ? [`Why did my last run fail?`] : []).concat(["How do I install and run my first benchmark?", "How do I prepare my own isolates and sample sheet?", "What do F1, precision and recall mean here?", "My run looks stuck. What do I check?"])
+      .map(q => `<button type="button" data-aiq="${esc(q)}">${esc(q)}</button>`).join("");
+    if (failed && !AI.pre) { AI.pre = null; api("ai/validate", {cmd: "plasbench diagnose", where: "window", risk: "safe"}).then(v => { v.why = "Reads the latest run and says what went wrong. It changes nothing."; AI.pre = v; aiRenderLog(); }).catch(() => {}); }
+  } else starters.innerHTML = "";
+  $("#ai_send").disabled = AI.busy; $("#ai_stop").hidden = !AI.busy; $("#ai_send").hidden = AI.busy;
+  const u = st.used_today || {}, l = AI.last;
+  $("#ai_foot").innerHTML = `<span class="aibadge ${p === "local" ? "local" : ""}">${p === "local" ? "stays on this computer" : p === "huggingface" ? "your Hugging Face credits" : "free"}</span>`
+    + `<span title="Counted on this computer today">Today: ${u.requests || 0} requests, ${(u.tokens || 0).toLocaleString()} tokens${st.cap ? " of " + st.cap.toLocaleString() : ""}</span>`
+    + (l ? `<span>Last: ${l.usage.prompt} in / ${l.usage.completion} out${l.usage.estimated ? " (est.)" : ""}</span>` : "")
+    + (l && l.free_requests && l.free_requests.remaining != null ? `<span>${esc(l.free_requests.remaining)}${l.free_requests.limit ? " of " + esc(l.free_requests.limit) : ""} free requests left today</span>` : "")
+    + (st.signed_in && st.needs_key ? `<button class="btn sec sm" id="ai_signout" title="Delete the stored key from this computer">Sign out</button>` : "");
+  aiRenderLog();
+}
+function aiContext() {
+  const failed = (S.jobs || []).filter(j => j.state === "failed" || j.state === "interrupted").sort((a, b) => (b.started || 0) - (a.started || 0))[0];
+  return failed ? {last_failure: `${(failed.argv || [])[0] || "a command"} ${failed.state}${failed.exit != null ? " (exit " + failed.exit + ")" : ""}`} : {};
+}
+function aiActionCard(a, mi, i) {
+  const where = AI_WHERE[a.where] || AI_PLAIN_WHERE;
+  const termOk = a.ok && (a.where === "window" || a.where === "terminal");
+  return `<div class="aicard2" data-m="${mi}" data-i="${i}"><div class="ch"><b>Suggested command</b><span class="risk ${esc(a.risk)}">${esc(String(a.risk).replace("_", " "))}</span></div><div class="cb">
+    <div class="cmdbox">${esc(a.cmd)}</div><div class="where">Run it here: ${esc(where)}</div>${a.why ? `<div class="why">${esc(a.why)}</div>` : ""}
+    ${a.runnable ? "" : `<div class="no">Not runnable here: ${esc(a.reason)}</div>`}
+    <div class="btns">${a.runnable ? `<button class="btn sm" data-aiact="run">${icon("play")}Run in PlasBench</button>` : ""}<button class="btn sec sm" data-aiact="copy">${icon("copy")}Copy</button>${termOk ? `<button class="btn sec sm" data-aiact="term">${icon("term")}Open Terminal tab</button>` : ""}</div>
+    <div class="runstate" aria-live="polite"></div></div></div>`;
+}
+function aiMsgHtml(m, mi) {
+  if (m.role === "user") return `<div class="aimsg user">${esc(m.content)}</div>`;
+  let h = `<div class="aimsg bot${m.error ? " err" : ""}" data-m="${mi}"><div class="aibody">${m.error ? `<p>${esc(m.content)}</p>` : md(m.content || "")}</div>`;
+  (m.actions || []).forEach((a, i) => { h += aiActionCard(a, mi, i); });
+  if (m.sources && m.sources.length && !m.error) h += `<div class="aisrc">${m.sources.map(s => `<button type="button" data-aisrc="${esc(s.src)}" data-anchor="${esc(s.anchor)}" title="${esc(s.title)}">[${s.n}] ${esc(s.src.replace(/^docs\//, ""))}${s.anchor ? " › " + esc(s.title.split(" > ").pop().slice(0, 28)) : ""}</button>`).join("")}</div>`;
+  if (m.link) h += `<div class="aimeta"><a href="${esc(m.link)}" target="_blank" rel="noopener">More information</a></div>`;
+  if (m.usage) h += `<div class="aimeta"><span class="aibadge ${m.provider === "local" ? "local" : m.free === false ? "credits" : ""}">${m.provider === "local" ? "local" : m.free === false ? "credits" : "free"}</span><span>${esc(m.model || "")}</span><span>${m.usage.total} tokens${m.usage.estimated ? " (est.)" : ""}</span>
+      <button class="aithumb ${m.vote === 1 ? "on" : ""}" data-aivote="1" title="Helpful (kept only in this browser)" aria-label="Helpful">&#128077;</button><button class="aithumb ${m.vote === -1 ? "on" : ""}" data-aivote="-1" title="Not helpful (kept only in this browser)" aria-label="Not helpful">&#128078;</button></div>`;
+  return h + `</div>`;
+}
+function aiDecorate(root) {
+  $$("pre", root).forEach(pre => {
+    if (pre.dataset.dec) return; pre.dataset.dec = "1";
+    const hd = document.createElement("div"); hd.className = "aipre-hd";
+    hd.innerHTML = `<span>${AI_PLAIN_WHERE}</span><button class="btn sec sm" data-aicopy="1">${icon("copy")}Copy</button>`;
+    pre.parentNode.insertBefore(hd, pre);
+  });
+}
+function aiRenderLog() {
+  const log = $("#ai_log"); if (!log) return;
+  const near = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+  let h = AI.msgs.map((m, i) => aiMsgHtml(m, i)).join("");
+  if (!AI.msgs.length && AI.pre && AI.st && AI.st.consent) h = `<div class="aimsg bot"><div class="aibody"><p>You have a failed run. This check is safe and changes nothing:</p></div>${aiActionCard(AI.pre, -1, 0)}</div>`;
+  if (!AI.msgs.length && !AI.pre) h = `<div class="mut small" style="padding:6px">${AI.st && AI.st.consent && (!AI.st.needs_key || AI.st.signed_in) ? "Ask about installing, running, inputs, metrics, the workflow, settings or an error message. Answers come from PlasBench's own guides." : ""}</div>`;
+  log.innerHTML = h; aiDecorate(log);
+  if (near) log.scrollTop = log.scrollHeight;
+}
+function aiSaveChat() { if (!AI.remember) return; aiLS("chat", JSON.stringify(AI.msgs.slice(-30).map(m => ({role: m.role, content: m.content, sources: m.sources, error: m.error, usage: m.usage, model: m.model, provider: m.provider, free: m.free})))); }
+function aiLoadChat() { try { AI.msgs = JSON.parse(aiLS("chat") || "[]"); } catch { AI.msgs = []; } }
+function aiError(e) { const m = {role: "bot", content: e.message || String(e), error: true}; AI.msgs.push(m); aiRenderLog(); }
+
+/* ---- asking ---- */
+async function aiSend(text, extra) {
+  text = String(text || "").trim(); if (!text || AI.busy || !AI.st) return;
+  const history = AI.msgs.filter(m => !m.error).map(m => ({role: m.role === "user" ? "user" : "assistant", content: m.content}));
+  AI.msgs.push({role: "user", content: text});
+  const bot = {role: "bot", content: "", sources: [], actions: [], provider: aiProv()}; AI.msgs.push(bot);
+  AI.busy = true; AI.ctl = new AbortController(); AI.pre = null; $("#ai_in").value = ""; aiFit(); aiRender();
+  $("#ai_live").textContent = "The assistant is answering";
+  const body = Object.assign({provider: aiProv(), question: text, history, model: $("#ai_model").value || "", brief: $("#ai_brief").checked, context: aiContext()}, extra || {});
+  let finished = false;
+  try {
+    const r = await fetch("/api/ai/ask", {method: "POST", headers: {"X-PlasBench-Token": TOKEN, "Content-Type": "application/json"}, body: JSON.stringify(body), signal: AI.ctl.signal});
+    if (!r.ok) { let d = {}; try { d = await r.json(); } catch {} throw Object.assign(new Error(d.message || d.error || `HTTP ${r.status}`), {data: d}); }
+    const reader = r.body.getReader(), dec = new TextDecoder(); let buf = "", raf = 0;
+    const paint = () => { raf = 0; const el = $(`#ai_log .aimsg.bot[data-m="${AI.msgs.indexOf(bot)}"] .aibody`); if (el) { el.innerHTML = md(bot.content); aiDecorate(el); } };
+    for (;;) {
+      const {value, done} = await reader.read(); if (done) break;
+      buf += dec.decode(value, {stream: true}); let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl); buf = buf.slice(nl + 1); if (!line.trim()) continue;
+        let ev; try { ev = JSON.parse(line); } catch { continue; }
+        if (ev.type === "meta") { bot.sources = ev.sources; bot.model = ev.model; aiRenderLog(); }
+        else if (ev.type === "delta") { bot.content += ev.text; if (!raf) raf = requestAnimationFrame(paint); }
+        else if (ev.type === "notice") toast(ev.text, "");
+        else if (ev.type === "error") { finished = true; bot.error = true; bot.content = (bot.content ? bot.content + "\n\n" : "") + ev.error; bot.link = ev.link || ""; aiAfterError(ev); }
+        else if (ev.type === "done") { finished = true; bot.content = ev.text; bot.actions = ev.actions || []; bot.usage = ev.usage; bot.model = ev.model; bot.free = ev.free; bot.provider = ev.provider; AI.last = ev; if (AI.st) AI.st.used_today = {requests: ev.today.requests, tokens: ev.today.tokens}; }
+      }
+    }
+  } catch (e) {
+    if (e.name === "AbortError") { bot.content = (bot.content || "") + "\n\n(stopped)"; }
+    else { bot.error = true; bot.content = e.message; if (e.data) { bot.link = e.data.link || ""; aiAfterError(e.data); } }
+  } finally { AI.busy = false; AI.ctl = null; $("#ai_live").textContent = bot.error ? "The assistant could not answer" : "The assistant finished"; aiSaveChat(); aiRender(); }
+}
+function aiAfterError(d) {
+  if (d.kind === "signin") { if (AI.st) AI.st.signed_in = false; aiStatus(false).then(aiRender); }
+  if (d.kind === "consent" && AI.st) AI.st.consent = false;
+  if (d.kind === "disabled") aiStatus(false);
+}
+function aiFit() { const el = $("#ai_in"); el.style.height = "34px"; el.style.height = Math.min(140, el.scrollHeight) + "px"; }
+
+/* ---- the pop-up sign-in (OAuth with PKCE in a small window; this window is never navigated away) ---- */
+function aiSignIn() {
+  if (AI.pop && !AI.pop.closed) { AI.pop.focus(); return; }
+  const w = 520, h = 720, left = Math.max(0, Math.round((window.screenX || 0) + (window.outerWidth - w) / 2)), top = Math.max(0, Math.round((window.screenY || 0) + (window.outerHeight - h) / 2));
+  const pop = window.open("about:blank", "pb_ai_auth", `popup=yes,width=${w},height=${h},left=${left},top=${top},noopener=no`);   // opened by the click itself, so the browser allows it
+  if (!pop) { AI.note = "blocked"; aiRender(); return; }
+  AI.note = ""; AI.pop = pop; try { pop.document.title = "PlasBench sign-in"; pop.document.body.style.font = "16px system-ui,sans-serif"; pop.document.body.textContent = "Opening the sign-in page…"; } catch {}
+  try { pop.focus(); } catch {}
+  api("ai/auth/start", {provider: aiProv()}).then(r => { AI.state = r.state; pop.location.href = r.url; aiWatchPop(); aiRender(); })
+    .catch(e => { try { pop.close(); } catch {} AI.pop = null; AI.note = ""; toast(e.message, "bad"); aiRender(); });
+}
+function aiWatchPop() {
+  clearInterval(AI.popTimer);
+  AI.popTimer = setInterval(async () => {
+    let s = null; try { s = await api(`ai/auth/status?provider=${encodeURIComponent(aiProv())}&state=${encodeURIComponent(AI.state)}`); } catch {}
+    if (s && s.done) { aiAuthDone(s.ok); return; }
+    if (!AI.pop || AI.pop.closed) { clearInterval(AI.popTimer); AI.pop = null; AI.note = "cancelled"; aiRender(); }
+  }, 1000);
+}
+async function aiAuthDone(ok) {
+  clearInterval(AI.popTimer); try { if (AI.pop && !AI.pop.closed) AI.pop.close(); } catch {} AI.pop = null; AI.state = "";
+  AI.note = ok ? "" : "failed"; await aiStatus(true); fillProv(); await aiLoadModels(); aiRender(); if (ok) toast("Signed in", "ok");
+}
+addEventListener("message", e => {
+  const ok = new Set([location.origin, `http://localhost:${location.port}`, `http://127.0.0.1:${location.port}`]);
+  if (!ok.has(e.origin) || !AI.pop || e.source !== AI.pop) return;               // only the pop-up this page opened, from this window server
+  const d = e.data; if (!d || d.type !== "plasbench-ai-auth" || !AI.state || d.state !== AI.state) return;
+  aiAuthDone(!!d.ok);
+});
+
+/* ---- running a suggested command: the server validated it; the click, the consent dialog and Jobs do the rest ---- */
+function aiRunNote(el, text) { const r = el && el.querySelector(".runstate"); if (r) r.innerHTML = text; }
+async function aiAct(card, kind) {
+  const mi = +card.dataset.m, i = +card.dataset.i, a = mi < 0 ? AI.pre : (AI.msgs[mi].actions || [])[i]; if (!a) return;
+  if (kind === "copy") { try { await navigator.clipboard.writeText(a.cmd); toast("Copied", "ok"); } catch { toast("Copy failed: select the text and copy it", "bad"); } return; }
+  if (kind === "term") { setCTab("term"); $("#tcmd").value = a.cmd; tFit(); $("#tcmd").focus(); aiRunNote(card, "Typed into the Terminal tab. Press Enter there to run it."); return; }
+  let v; try { v = await api("ai/validate", {cmd: a.cmd, where: a.where, risk: a.risk}); } catch (e) { return toast(e.message, "bad"); }
+  if (!v.runnable) { aiRunNote(card, `Not runnable here: ${esc(v.reason)}`); return; }
+  if (v.needs_extra_confirm && !await askConfirm({title: "This command changes your computer", danger: true, confirmLabel: "Continue", body: `It ${v.why_extra}. Read the command on the next screen before you run it.`, facts: [["Command", v.cmd]]})) return;
+  confirmRun(v.argv, "AI help: " + v.cmd, undefined, job => { if (job) aiWatchJob(card, v.cmd, job.id); });
+}
+async function aiWatchJob(card, cmd, id) {
+  aiRunNote(card, `Running (job ${esc(id)})…`);
+  for (let n = 0; n < 4000; n++) {
+    await sleep(2000);
+    let j; try { j = await api(`jobs/${id}?offset=0`); } catch { continue; }
+    if (j.state === "running" || j.state === "cancelling") continue;
+    aiRunNote(card, `Finished: ${esc(j.state)}${j.exit != null ? " (exit " + esc(j.exit) + ")" : ""}. <button class="btn sec sm" data-aisend="${esc(id)}" data-cmd="${esc(cmd)}">Send result to the assistant</button>`);
+    return;
+  }
+}
+async function aiSendResult(id, cmd) {
+  let j; try { j = await api(`jobs/${id}?offset=0`); if (j.size > 24000) j = await api(`jobs/${id}?offset=${j.size - 24000}`); } catch (e) { return toast(e.message, "bad"); }
+  const tail = (j.log || "").split(/\r?\n/).slice(-40).join("\n");
+  let red; try { red = (await api("ai/redact", {output: tail})).text; } catch (e) { return toast(e.message, "bad"); }
+  if (!await askConfirm({title: "Send this result to the assistant?", confirmLabel: "Send", body: "This is what will be sent, after removing your folder names, user name, e-mail addresses, keys and IP addresses. Nothing is sent unless you press Send.", detail: `Exit code: ${j.exit}\n${red}`})) return;
+  aiSend("Here is the result of the command. What does it mean and what should I do next?", {result: {command: cmd, exit: j.exit == null ? 0 : j.exit, output: red}});
+}
+async function aiOpenSource(src, anchor) {
+  try { if (!S.docs) S.docs = (await api("docs")).docs; } catch {}
+  if ((S.docs || []).some(d => d.name === src)) { S.aiAnchor = anchor || ""; go("help", src); if (window.innerWidth < 1280) setDrawer(false); return; }
+  showMessage({title: "Source", body: `This part of the answer comes from ${src}, which is not one of the guides listed on the Guides page.`});
+}
+
+/* ---- wiring ---- */
+function aiOpen() { PT.active = "ai"; if (GD.open && document.body.classList.contains("gd-ai")) { setDrawer(false); return; } if (GD.open) setPanelTab("ai"); else setDrawer(true); }
+$("#aibtn").onclick = aiOpen;
+addEventListener("keydown", e => { if (e.altKey && e.shiftKey && (e.key === "H" || e.key === "h")) { e.preventDefault(); if (!$("#aibtn").hidden) aiOpen(); } });
+$("#ai_form").onsubmit = e => { e.preventDefault(); aiSend($("#ai_in").value); };
+$("#ai_in").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); aiSend($("#ai_in").value); } });
+$("#ai_in").addEventListener("input", aiFit);
+$("#ai_stop").onclick = () => { if (AI.ctl) AI.ctl.abort(); };
+$("#ai_new").onclick = () => { if (AI.ctl) AI.ctl.abort(); AI.msgs = []; AI.pre = null; AI.last = null; aiSaveChat(); aiRender(); };
+$("#ai_brief").onchange = e => aiLS("brief", e.target.checked ? "1" : "0");
+$("#ai_remember").onchange = e => { AI.remember = e.target.checked; aiLS("remember", AI.remember ? "1" : "0"); if (AI.remember) aiSaveChat(); else aiLS("chat", "[]"); };
+$("#ai_model").onchange = e => aiLS("model_" + aiProv(), e.target.value);
+$("#ai_prov").onchange = async e => { AI.prov = e.target.value; AI.note = ""; await aiStatus(true); fillProv(); await aiLoadModels(); aiRender(); };
+$("#gdp_ai").addEventListener("click", async e => {
+  const t = e.target;
+  const id = t.closest("button") && t.closest("button").id;
+  if (id === "ai_consent") { try { await api("ai/consent", {provider: aiProv()}); await aiStatus(false); await aiLoadModels(); aiRender(); } catch (err) { toast(err.message, "bad"); } return; }
+  if (id === "ai_signin") return aiSignIn();
+  if (id === "ai_recheck") { await aiStatus(true); await aiLoadModels(); aiRender(); return; }
+  if (id === "ai_signout") { if (await askConfirm({title: "Sign out of AI help?", confirmLabel: "Sign out", body: "The stored key is deleted from this computer."})) { await api("ai/signout", {provider: aiProv()}); await aiStatus(true); await aiLoadModels(); aiRender(); } return; }
+  if (id === "ai_savekey") { const el = $("#ai_pastekey"); try { await api("ai/key", {provider: aiProv(), key: el.value}); el.value = ""; await aiStatus(true); await aiLoadModels(); aiRender(); } catch (err) { toast(err.message, "bad"); } return; }
+  const q = t.closest("[data-aiq]"); if (q) return aiSend(q.dataset.aiq);
+  const src = t.closest("[data-aisrc]"); if (src) return aiOpenSource(src.dataset.aisrc, src.dataset.anchor);
+  const act = t.closest("[data-aiact]"); if (act) return aiAct(act.closest(".aicard2"), act.dataset.aiact);
+  const snd = t.closest("[data-aisend]"); if (snd) return aiSendResult(snd.dataset.aisend, snd.dataset.cmd);
+  const cp = t.closest("[data-aicopy]"); if (cp) { const pre = cp.closest(".aipre-hd").nextElementSibling; try { await navigator.clipboard.writeText(pre.textContent); toast("Copied", "ok"); } catch { toast("Copy failed", "bad"); } return; }
+  const vote = t.closest("[data-aivote]"); if (vote) {
+    const mi = +vote.closest(".aimsg").dataset.m, m = AI.msgs[mi]; m.vote = +vote.dataset.aivote;
+    try { const v = JSON.parse(aiLS("votes") || "[]"); v.push({t: Date.now(), up: m.vote}); aiLS("votes", JSON.stringify(v.slice(-200))); } catch {}   // kept only in this browser, used for nothing else
+    aiRenderLog();
+  }
+});
+aiBoot();
+
 $("#gd_ref").onclick = () => { GD.files = null; loadDrawer(); };
 addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "G" || e.key === "g")) { e.preventDefault();
   if (GD.open && PT.active !== "git") setPanelTab("git"); else { PT.active = "git"; setDrawer(!GD.open); } } });
@@ -6559,6 +6898,7 @@ async function loadHelp(sub) {
   $("#doclist").innerHTML = S.docs.map(d => `<button class="${d.name === sub ? "on" : ""}" data-doc="${esc(d.name)}">${esc(d.title)}<small>${esc(d.name)}</small></button>`).join("");
   const name = sub || "docs/ADDING_TOOLS.md";
   if (S.docs.some(d => d.name === name)) { const r = await api(`doc?name=${encodeURIComponent(name)}`); $("#docbody").innerHTML = md(r.text);
+    if (S.aiAnchor) { const a = S.aiAnchor; S.aiAnchor = ""; const h = $$("#docbody h1,#docbody h2,#docbody h3,#docbody h4").find(x => aiSlug(x.textContent) === a); if (h) h.scrollIntoView(); }
     $$("#doclist button").forEach(b => b.classList.toggle("on", b.dataset.doc === name)); }
 }
 $("#doclist").onclick = e => { const b = e.target.closest("[data-doc]"); if (b) go("help", b.dataset.doc); };

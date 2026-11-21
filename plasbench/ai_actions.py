@@ -107,7 +107,7 @@ def validate(cmd: str, where: str = "window", risk: str = "") -> dict:
 
     {"ok": the line is one valid plasbench command, "runnable": the window may offer Run in PlasBench, "argv", "risk", "needs_extra_confirm", "why_extra",
      "reason": why not (empty when runnable), "where": the (checked) place}."""
-    where = where if where in WHERE else "terminal"
+    where = where.strip().lower() if isinstance(where, str) and where.strip().lower() in WHERE else "host"    # an unknown place is never runnable here
     out = {"cmd": (cmd or "").strip(), "where": where, "ok": False, "runnable": False, "argv": None, "risk": risk if risk in RISKS else "safe",
            "needs_extra_confirm": False, "why_extra": "", "reason": ""}
     argv, problem = parse_command(cmd)

@@ -52,7 +52,7 @@ def command(args, root) -> int:
         print(f"AI help is {'on' if st['enabled'] else 'off (AI_HELP_ENABLED=0)'}.")
         for r in st["providers"]:
             extra = " (detected)" if r.get("detected") else ""
-            print(f"  {r['id']:<12} {'signed in' if r['signed_in'] else 'not signed in'}{extra}" + ("" if r["configured"] else f"  [{r['reason']}]"))
+            print(f"  {r['id']:<12} {('no sign-in needed' if not r['needs_key'] else 'signed in') if r['signed_in'] else 'not signed in'}{extra}" + ("" if r["configured"] else f"  [{r['reason']}]"))
         u = st["used_today"]
         print(f"Today: {u['requests']} requests, {u['tokens']} tokens (limit {st['cap'] or 'none'}).")
         return 0

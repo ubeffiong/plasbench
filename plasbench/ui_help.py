@@ -500,6 +500,9 @@ NATIVE_PICKER = {
 # Rule: text that explains what a control means or how it works is a tooltip (this dict); text that reports a state, a problem or a decision the person must
 # make stays visible. Entries: title (bold first line), summary, bullets (a short list), when (a closing line). test_ui_cleanup keeps the pages inside a word budget.
 PAGE = {
+    "ai_privacy": {"title": "AI help: free models and what is sent", "summary": "The assistant answers from PlasBench's own guides. Your question and a few guide excerpts go to the provider you chose; nothing is sent before you sign in, accept the notice and ask.",
+                   "bullets": ["Free models are limited by the provider (OpenRouter: 20 requests a minute, 50 a day; 1000 a day once 10 credits were ever bought).", "A provider of a free model may keep or train on prompts under its own policy; read the model's page before sending anything sensitive.", "Commands it suggests never run by themselves: you press Run, then confirm the exact command."],
+                   "when": "A model running on this computer (Ollama, LM Studio) sends nothing anywhere."},
     "report_issue": {"title": "Report an issue", "summary": "Open GitHub's issue form, or prepare a diagnostics block with the version, the computer and the last lines of your run's logs to paste into it.",
                      "bullets": ["Secrets, e-mail and IP addresses and your user name are removed before you see the text; read it once before posting.", "Nothing is sent from here: you paste it into GitHub yourself."]},
     "term_shell": {"title": "Which shells appear", "summary": "The list depends on where this window runs. A greyed entry says why it is off when you hover it.",

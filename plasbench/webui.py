@@ -824,7 +824,7 @@ class Project:
 
     def docs(self) -> list[dict]:
         out = []
-        for path in [self.root / "README.md"] + sorted((self.root / "docs").glob("*.md")) + sorted((self.root / "adapters").glob("*.md")):
+        for path in [self.root / "README.md", self.root / "FAQ.md", self.root / "INSTALL.md", self.root / "SUPPORT.md", self.root / "SECURITY.md"] + sorted((self.root / "docs").glob("*.md")) + sorted((self.root / "adapters").glob("*.md")):
             if path.is_file():
                 title, size = loadcache.memo(("doc", str(path)), loadcache.sig(path), lambda p=path: self._doc_title(p))
                 out.append({"name": str(path.relative_to(self.root)).replace("\\", "/"), "title": title, "size": size})
