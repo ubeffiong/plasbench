@@ -13,6 +13,8 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- the annotation tools in the tools setup (21 November 2026)
+- **Tools page.** The window's Tools page listed only the core tools, so abricate, AMRFinderPlus, ISEScan, barrnap and MOB-typer (all called by the default reference-annotation stage) could not be installed from it. They now appear under *Annotation tools* with an Install button (`install-tools reference-annotation`, `utilities` or `mobsuite`); AMRFinderPlus shows "installed, but its database is missing" when `amrfinder` is on PATH without its database. samtools, and the optional QUAST, MultiQC, Bakta, Prokka and deadends (no package exists: the manual steps are in INSTALL.md) appear under *Optional tools*.
 ### Changed -- the page tabs stay in view (21 November 2026)
 - **Window.** The strip of page tabs under the top bar (the open page and any documents opened from it) is now fixed while the page scrolls, instead of scrolling away; the other sticky panels (the run form's side column, the command list) start below it. Checked statically and by the existing UI tests; not looked at in a browser.
 
