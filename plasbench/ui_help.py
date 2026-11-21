@@ -477,6 +477,9 @@ NATIVE_PICKER = {
 # Rule: text that explains what a control means or how it works is a tooltip (this dict); text that reports a state, a problem or a decision the person must
 # make stays visible. Entries: title (bold first line), summary, bullets (a short list), when (a closing line). test_ui_cleanup keeps the pages inside a word budget.
 PAGE = {
+    "term_shell": {"title": "Which shells appear", "summary": "The list depends on where this window runs. A greyed entry says why it is off when you hover it.",
+                   "bullets": ["Windows: each Ubuntu (WSL), Git Bash, PowerShell, Command Prompt (cmd).", "Ubuntu (WSL): your Ubuntu shell, plus Windows PowerShell, Command Prompt (cmd) and Git Bash (Windows) through WSL interop.", "Linux and Mac: your login shell, and PowerShell if pwsh is installed.", "plasbench works in every shell and runs this PlasBench folder."],
+                   "when": "Windows shells started from Ubuntu cannot see the Ubuntu tools; Command Prompt cannot start in an Ubuntu folder, so it uses a temporary drive letter."},
     "p_setup": {"title": "Set up this computer", "summary": "What PlasBench needs, what is already here, and a one-click fix for anything missing.",
                 "bullets": ["Each fix runs the same plasbench command you would type.", "Its output appears in the console below."]},
     "pc_help": {"title": "This computer", "summary": "The desktop icon starts PlasBench (or brings this window back). Quit, top right, stops it.", "when": "Every page also works from the command line, and from the Terminal tab of the console below."},
