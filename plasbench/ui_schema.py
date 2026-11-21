@@ -31,7 +31,7 @@ CATEGORIES = [
     ("meta", "Metagenomics track", "The separate graph-aware metagenomic track.",
      ["metagenomics", "audit-meta-cohort", "design-meta-synthetic", "validate-meta-intake", "materialize-meta-bmock12",
       "normalize-meta-classifier", "import-mobilome-evidence"]),
-    ("help", "Help", "Guides and the concept note.", ["docs", "concept-note", "net", "issue-report"]),
+    ("help", "Help", "Guides and the concept note.", ["docs", "concept-note", "net", "issue-report", "ask", "ai"]),
 ]
 # Shorthand spellings argparse registers as separate choices; the window shows each command once.
 ALIASES = {"meta": "metagenomics", "beta": "metagenomics", "rebuild-report": "regenerate-visuals"}

@@ -32,7 +32,7 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import __version__
 from . import server_state, windowlife
-from . import cohort_info, fsutil, ghops, ghsignin, jobrunner, jobs_labels, loadcache, netgate, runfolders, runprogress, ui_help, ui_schema
+from . import ai_help, cohort_info, fsutil, ghops, ghsignin, jobrunner, jobs_labels, loadcache, netgate, runfolders, runprogress, ui_help, ui_schema
 from .gitops import GitError   # a refused git action is the user's error (400), not the server's
 from .terminal import Terminal, TerminalError
 from .sessionlog import SessionLog, describe as describe_event
@@ -824,7 +824,7 @@ class Project:
 
     def docs(self) -> list[dict]:
         out = []
-        for path in [self.root / "README.md"] + sorted((self.root / "docs").glob("*.md")) + sorted((self.root / "adapters").glob("*.md")):
+        for path in [self.root / "README.md", self.root / "FAQ.md", self.root / "INSTALL.md", self.root / "SUPPORT.md", self.root / "SECURITY.md"] + sorted((self.root / "docs").glob("*.md")) + sorted((self.root / "adapters").glob("*.md")):
             if path.is_file():
                 title, size = loadcache.memo(("doc", str(path)), loadcache.sig(path), lambda p=path: self._doc_title(p))
                 out.append({"name": str(path.relative_to(self.root)).replace("\\", "/"), "title": title, "size": size})
@@ -2190,6 +2190,8 @@ def make_handler(project: Project, jobs: Jobs):
                     return self.send(200, loadcache.memo("logo", loadcache.sig(LOGO_FILE), LOGO_FILE.read_bytes), "image/svg+xml", extra={"static": True})
                 from . import desktop
                 return self.send(200, loadcache.memo(("png", path), __version__, lambda: desktop.png_bytes(64) if path == "/favicon.ico" else desktop.png_bytes(192)), "image/png", extra={"static": True})
+            if path in ai_help.CALLBACK_PATHS:   # AI help sign-in: the provider sends the pop-up here; no key can be present (a cross-site redirect), so a one-time `state` is the guard (plasbench/ai_help.py)
+                return self.send(200, ai_help.handle_callback(ai_help.FLOWS, ai_help.Settings(project), q, path), "text/html; charset=utf-8")
             if not self.token_ok():
                 return self.send(403, KEY_PAGE.encode("utf-8"), "text/html; charset=utf-8")
             if path == "/":
@@ -2226,6 +2228,8 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(500, {"error": f"{type(exc).__name__}: {exc}"})
 
         def api_get(self, route, q):
+            if ai_help.is_ai_route(route):   # AI help (plasbench/ai_help.py)
+                return ai_help.serve(self, "GET", route, {}, q, project)
             state = load_state()
             # ---- native folder window (plasbench/native_picker.py): additive block, GET side ----
             if route in ("native-picker/capabilities", "native-picker/status"):
@@ -2572,6 +2576,8 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(500, {"error": f"{type(exc).__name__}: {exc}"})
 
         def api_post(self, route, data):
+            if ai_help.is_ai_route(route):   # AI help (plasbench/ai_help.py)
+                return ai_help.serve(self, "POST", route, data, {}, project)
             if route == "jobs":
                 argv = data.get("argv")
                 if not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv):

@@ -29,3 +29,7 @@ and a fix or a written assessment within 30 days.
 
 - The third-party tools PlasBench runs (MOB-suite, Platon, plasmidSPAdes and others) and their databases: report those to their authors.
 - Results that are scientifically questionable. That is not a vulnerability; open an ordinary issue.
+
+## The AI help and its stored key
+
+The AI help (`docs/AI_HELP.md`) keeps the key or token of the provider you signed in to (OpenRouter, Hugging Face) in `~/.plasbench/ai/<provider>.json`, mode 0600, on your own computer only; PlasBench ships no key of its own. It is never returned to the page, written to a log, a manifest, a job's environment or an issue report (the report redacts `sk-or-` and `hf_` shapes), and **Sign out** deletes it. The sign-in callbacks are the only window routes that need no session token; they accept only a one-time `state` that this server issued within the last ten minutes. A command the assistant suggests runs only after you press a button and confirm the exact command, and only if it is one plain `plasbench` command that the real parser accepts. Report a way around any of these in scope above.

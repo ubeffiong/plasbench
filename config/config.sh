@@ -1058,3 +1058,29 @@ export PLASBENCH_DOCKER_IMAGE="${PLASBENCH_DOCKER_IMAGE:-}"
 export PLASBENCH_DOCKER_PULL="${PLASBENCH_DOCKER_PULL:-missing}"
 # Where tools and databases added in Docker mode are kept between containers (empty: ~/.plasbench/docker/<version>/extras). The image itself is never changed.
 export PLASBENCH_DOCKER_EXTRA="${PLASBENCH_DOCKER_EXTRA:-}"
+
+# --- AI help (the assistant in the side panel; free OpenRouter models only) ---------------------------------
+# 1 shows the AI help (the AI help tab of the side panel, the top-bar button and `plasbench ask`); 0 hides it and the window refuses its requests. Nothing is sent anywhere until you sign in to OpenRouter, accept the notice, and ask a question.
+export AI_HELP_ENABLED="${AI_HELP_ENABLED:-1}"
+# The free OpenRouter model to use, for example google/gemma-4-31b-it:free. Empty means the best-suited free model in OpenRouter's current list. A model that is not free (by its price in the list) is refused.
+export AI_MODEL="${AI_MODEL:-}"
+# The most tokens (questions plus answers) the AI help may use per day on this computer; it stops with a clear message at the limit. 0 means no limit of its own (OpenRouter's own free limits still apply).
+export AI_DAILY_TOKEN_CAP="${AI_DAILY_TOKEN_CAP:-200000}"
+# 1 asks the model for short answers (fewer tokens); the pane also has a Brief answers switch.
+export AI_BRIEF="${AI_BRIEF:-0}"
+# 1 tries the next free model when the chosen one hits a limit or is down (never a paid model); 0 stops with the message instead.
+export AI_FREE_FALLBACK="${AI_FREE_FALLBACK:-1}"
+# For tests and for a self-hosted gateway that speaks the OpenRouter API: the address that replaces https://openrouter.ai/api/v1. Leave empty for OpenRouter. The key is sent to this address, so set it only to a service you trust.
+export AI_OPENROUTER_BASE="${AI_OPENROUTER_BASE:-}"
+# Which provider answers: openrouter (free models, sign-in in a pop-up), huggingface (needs AI_HF_CLIENT_ID) or local (a model server on this computer: Ollama or LM Studio). The window offers the choice and remembers it.
+export AI_PROVIDER="${AI_PROVIDER:-openrouter}"
+# The client id of a PUBLIC Hugging Face OAuth app (no secret) registered with the redirect address http://localhost/ai/hf/callback and the scope inference-api (see docs/AI_HELP.md). Empty: the Hugging Face sign-in button is off.
+export AI_HF_CLIENT_ID="${AI_HF_CLIENT_ID:-}"
+# 1 also allows cheap Hugging Face models that spend YOUR Hugging Face credits (free accounts have none); 0 uses only models that Hugging Face lists as free.
+export AI_HF_USE_CREDITS="${AI_HF_USE_CREDITS:-0}"
+# For tests and for a self-hosted gateway: the addresses that replace https://router.huggingface.co/v1 and https://huggingface.co. Leave empty for Hugging Face.
+export AI_HF_BASE="${AI_HF_BASE:-}"
+export AI_HF_HUB="${AI_HF_HUB:-}"
+# The address of the local model server (empty: Ollama http://localhost:11434/v1, then LM Studio http://localhost:1234/v1). Only addresses on this computer are used unless AI_LOCAL_ALLOW_REMOTE is 1.
+export AI_LOCAL_BASE="${AI_LOCAL_BASE:-}"
+export AI_LOCAL_ALLOW_REMOTE="${AI_LOCAL_ALLOW_REMOTE:-0}"

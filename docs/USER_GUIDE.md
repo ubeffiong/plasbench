@@ -1391,6 +1391,16 @@ The message names the service and the reason: no network at all; DNS not working
 
 Settings (environment variables, also in the window's Settings): `PLASBENCH_OFFLINE=1` refuses every online-only action at once, on purpose (for an offline session or a metered link); `PLASBENCH_ONLINE_TIMEOUT` is the seconds to wait for each service (default 5); `PLASBENCH_ASSUME_ONLINE=1` skips the check altogether (tests, or a network that only reaches a local mirror). The services and which commands use them are listed in `config/network_services.tsv`.
 
+## AI help
+
+The **AI help** tab of the side panel (the **AI help** button in the top bar, or Alt+Shift+H) answers questions about PlasBench from PlasBench's own guides, settings, command line and failure signatures, cites its sources, and proposes commands with the place to run each: PlasBench's Terminal tab, Windows PowerShell (not inside Ubuntu), your Ubuntu (WSL) terminal. It uses free models only; the provider switch offers OpenRouter (sign up or sign in in a small pop-up), Hugging Face (when `AI_HF_CLIENT_ID` is set) and a model on your own computer (Ollama or LM Studio, nothing leaves the computer).
+
+- Nothing is sent before you sign in, read the notice and ask. A question sends the question, a few guide excerpts and a short setup line; never paths, your user name, e-mail address or data. Command output is sent only when you press **Send result**, after you have seen the redacted text.
+- A suggested command is a card with **Run in PlasBench** (only when the checks pass; it opens the usual confirmation with the exact command and never runs by itself), **Copy** and **Open Terminal tab**. Commands that install, upgrade or stop get one more confirmation.
+- Settings: `AI_HELP_ENABLED`, `AI_PROVIDER`, `AI_MODEL`, `AI_DAILY_TOKEN_CAP`, `AI_BRIEF`, `AI_FREE_FALLBACK`, `AI_HF_CLIENT_ID`, `AI_LOCAL_BASE`. On the command line: `plasbench ask "question"`, `plasbench ai status`, `plasbench ai signout`.
+
+Everything about it (what is sent, where the key is stored, free-model limits, the providers considered, the safety checks) is in [AI_HELP.md](AI_HELP.md).
+
 ## Console Messages
 
 Console output is timestamped. It announces selected stages, each active stage,
