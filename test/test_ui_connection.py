@@ -179,11 +179,11 @@ def main():
     check("every POST carries a request id and a retry repeats the SAME one", 'opt.headers["X-PlasBench-Req"] = newReqId()' in html and "{...opt, signal: ctl.signal}" in html)
     check("a 3-minute ceiling on one call, so a half-open connection cannot hang the page", "setTimeout(() => ctl.abort(), 180000)" in html)
     check("the pollers stand down while the connection is down", all(f"async function {n}(" in html and html.split(f"async function {n}(")[1].split("\n", 2)[1].strip() == "if (S.conn) return;" for n in ("refreshJobs", "refreshSessions", "pollConsole")))
-    check("reconnect probes grow from 2 s to 10 s and run at once on wake, network return and tab focus",
-          "Math.min(10000" in html and 'addEventListener("online"' in html and 'addEventListener("visibilitychange"' in html and 'addEventListener("pageshow"' in html)
-    check("Retry now runs a real check (server answering, key valid) instead of reloading the page", "async function connCheck()" in html and 'fetch("/healthz"' in html and 'fetch("/api/info"' in html and "async function retryNow()" in html
+    check("reconnect probes back off from 3 s to 60 s (window stability: was 2 s to 10 s) and run at once on wake, network return and tab focus",
+          "const CONN_FIRST = 3000, CONN_MAX = 60000" in html and "prev * 2" in html and 'addEventListener("online"' in html and 'addEventListener("visibilitychange"' in html and 'addEventListener("pageshow"' in html)
+    check("Retry now runs a real check (server answering, key valid) instead of reloading the page", "async function connCheck()" in html and "async function connClassify(" in html and '"/api/server-state"' in html.split("async function connClassify")[1].split("==CONN-PURE-END==")[0] and "async function retryNow()" in html
           and "location.reload()" not in html.split("function showLost")[1].split("async function retryNow")[0])
-    check("a refused key (PlasBench restarted) is told apart from an unreachable server, with honest wording for each", '"expired"' in html and "needs to be reopened" in html and "Check again" in html and "Retry now" in html)
+    check("a refused key (PlasBench restarted) is told apart from an unreachable server, with honest wording for each", '"expired"' in html and "belongs to an older PlasBench session" in html and "Check again" in html and "Retry now" in html)
     print("ALL UI CONNECTION TESTS PASSED" if not FAILED else f"UI CONNECTION TESTS FAILED: {FAILED}")
     sys.exit(1 if FAILED else 0)
 

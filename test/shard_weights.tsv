@@ -456,6 +456,8 @@ test_wilcoxon.py	0.3
 test_window_git_show_and_rank_help.py	0.3
 test_window_help_cohorts.py	0.7
 test_window_load.py	8.7
+test_window_stability.py	25.0
+test_window_stability_browser.py	0.3
 test_wizard_data_location_ui.py	0.3
 test_workflow_steps.py	1.0
 test_workflow_ui.py	0.3
