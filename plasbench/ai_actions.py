@@ -29,6 +29,10 @@ WHERE = ("window", "terminal", "powershell", "wsl", "host")
 RISKS = ("safe", "changes_files", "destructive")
 MAX_CMD = 400
 MAX_ACTIONS = 4
+MAX_ASKS = 1          # one clarifying question per reply
+ASK_OPTIONS = 5
+ASK_TEXT = 220
+ASK_OPTION_TEXT = 70
 SHELL_CHARS = re.compile(r"[;&|<>`$(){}\\#\r\n\t!*?\[\]]")
 ABS_PATH = re.compile(r"^(?:/|~|[A-Za-z]:[\\/]|\\\\)")
 # Commands that open a window or a server, or end this one, are not started from the assistant: the person runs them from the terminal.
@@ -137,7 +141,7 @@ def validate(cmd: str, where: str = "window", risk: str = "") -> dict:
     return out
 
 
-_BLOCK = re.compile(r"```[ \t]*(pb[-_ ]?action|json|js|javascript)?[ \t]*\r?\n(.*?)(?:```|\Z)", re.S | re.I)
+_BLOCK = re.compile(r"```[ \t]*(pb[-_ ]?action|pb[-_ ]?ask|json|js|javascript)?[ \t]*\r?\n(.*?)(?:```|\Z)", re.S | re.I)
 _TRAILING_COMMA = re.compile(r",(\s*[}\]])")
 
 
@@ -188,6 +192,21 @@ def lenient_json(text: str):
         return None
 
 
+def clean_ask(obj):
+    """A clarifying question the model wants to put to the person: {"q": text, "options": [short answers]}, or None. Plain text only (the page escapes it), at most ASK_OPTIONS
+    options, each short; it can never become a command: choosing an option only sends that text as the person's next message."""
+    if not isinstance(obj, dict) or not isinstance(obj.get("q"), str) or not obj["q"].strip():
+        return None
+    options = []
+    for raw in obj.get("options") if isinstance(obj.get("options"), list) else []:
+        text = re.sub(r"\s+", " ", str(raw)).strip()[:ASK_OPTION_TEXT]
+        if text and text not in options:
+            options.append(text)
+        if len(options) >= ASK_OPTIONS:
+            break
+    return {"q": re.sub(r"\s+", " ", obj["q"]).strip()[:ASK_TEXT], "options": options}
+
+
 def parse_reply(reply: str) -> dict:
     """{"text": the reply without the blocks that were read as actions, "actions": [validated actions]}.
 
@@ -195,10 +214,18 @@ def parse_reply(reply: str) -> dict:
     stays in the text as a plain code block and never becomes an action. At most MAX_ACTIONS are taken. Only text the MODEL wrote is passed here: retrieved excerpts and command
     output are never parsed for actions, and the prompt builder defuses any such fence in them."""
     reply = reply or ""
-    actions, pieces, last = [], [], 0
+    actions, asks, pieces, last = [], [], [], 0
     for m in _BLOCK.finditer(reply):
         tag = (m.group(1) or "").lower()
         obj = lenient_json(m.group(2)) if tag else None
+        if isinstance(obj, dict) and "q" in obj and "cmd" not in obj and (("ask" in tag and tag.startswith("pb")) or "options" in obj):
+            ask = clean_ask(obj)
+            if ask:                      # a valid question is always taken out of the text; only the first one is kept
+                if len(asks) < MAX_ASKS:
+                    asks.append(ask)
+                pieces.append(reply[last:m.start()])
+                last = m.end()
+            continue
         is_action = isinstance(obj, dict) and isinstance(obj.get("cmd"), str) and (tag.startswith("pb") or ("where" in obj and "why" in obj))
         if not is_action or len(actions) >= MAX_ACTIONS:
             continue
@@ -208,7 +235,7 @@ def parse_reply(reply: str) -> dict:
         pieces.append(reply[last:m.start()])
         last = m.end()
     pieces.append(reply[last:])
-    return {"text": re.sub(r"\n{3,}", "\n\n", "".join(pieces)).strip(), "actions": actions}
+    return {"text": re.sub(r"\n{3,}", "\n\n", "".join(pieces)).strip(), "actions": actions, "asks": asks}
 
 
 def extract_actions(reply: str) -> list:

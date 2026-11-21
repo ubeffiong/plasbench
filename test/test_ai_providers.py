@@ -38,7 +38,7 @@ os.environ["PLASBENCH_UI_HOME"] = home + "/ui"
 os.environ["AI_HF_CLIENT_ID"] = "test-client-id"
 os.environ["AI_HF_USE_CREDITS"] = "0"
 
-from plasbench import ai_help, ai_openrouter as orr, ai_providers  # noqa: E402
+from plasbench import ai_help, ai_openrouter as orr, ai_prompt, ai_providers  # noqa: E402
 
 S = ai_help.Settings(None)
 print("PKCE")
@@ -139,7 +139,7 @@ check("no chat request reached the service for the paid model", not stub.chat_re
 ev = list(svc.ask({"question": "how do I check my installation?", "model": "stub/free-b:free"}))
 check("a free model is used", ev[0]["type"] == "meta" and ev[0]["model"] == "stub/free-b:free" and stub.chat_requests()[0]["body"]["model"] == "stub/free-b:free")
 body = stub.chat_requests()[0]["body"]
-check("request is streamed, capped, and system prompt first", body["stream"] is True and body["max_tokens"] == 700 and body["messages"][0]["role"] == "system")
+check("request is streamed, capped, and system prompt first", body["stream"] is True and body["max_tokens"] == ai_prompt.DEFAULT_MAX_TOKENS == 2000 and body["messages"][0]["role"] == "system")
 check("the key went in the Authorization header only", stub.chat_requests()[0]["headers"].get("Authorization") == "Bearer " + ai_stub.FAKE_KEY and ai_stub.FAKE_KEY not in json.dumps(body))
 done = ev[-1]
 check("done carries the answer, usage and a validated action", done["type"] == "done" and done["usage"]["total"] == 1240 and not done["usage"]["estimated"] and done["actions"][0]["runnable"], done)
