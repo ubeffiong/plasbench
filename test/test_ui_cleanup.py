@@ -115,5 +115,9 @@ check("it opens (pins) on click or tap", 'if (cur === b && pinned) hide(); else 
 check("it is kept on screen (clamped to the window edges)", "innerWidth - w - 12" in html and "innerHeight - 8" in html)
 check("the hit area of a (?) grows on touch screens (pointer: coarse)", "@media (pointer:coarse){.tipi::after" in html)
 
+# ---- 5. the installing toast's controls are deliberate additions (not in the before-fixture; the toast text is drawn by script, so it adds no static explanation) ----------------
+check("the installing toast region and its top-bar chip are in the page", 'id="insttoast"' in html and 'id="instchip"' in html and 'data-tipid="install_chip"' in html)
+check("the toast's actions are all there: View log, Cancel, Hide, Re-check, Dismiss, Show list, Open Jobs", all(f'data-it="{k}"' in html for k in ("view", "cancel", "hide", "recheck", "dismiss", "expand", "jobs")))
+
 print("ALL UI CLEANUP TESTS PASSED" if OK else "UI CLEANUP TESTS FAILED")
 sys.exit(0 if OK else 1)

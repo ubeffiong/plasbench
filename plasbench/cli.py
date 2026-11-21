@@ -445,7 +445,7 @@ def build_parser():
         description="PlasBench: benchmark plasmid-reconstruction tools against complete references.",
         epilog="Examples:\n"
                "  plasbench install-conda\n"
-               "  plasbench upgrade                 (latest release; also: Setup > Check for updates in the window)\n"
+               "  plasbench upgrade                 (latest release; also: Set up this computer > Updates in the window; --archive FILE installs a downloaded release)\n"
                "  plasbench ui --tab                (open the window in a normal browser tab)\n"
                "  plasbench desktop-icon            (put the PlasBench icon on the desktop; --remove undoes it)\n"
                "  plasbench picker-check            (why does Browse not open the folder window? PASS or FAIL per step)\n"
@@ -579,6 +579,14 @@ def build_parser():
     upgrade_parser.add_argument("--yes", action="store_true", help="Pass --yes to the new release installer.")
     upgrade_parser.add_argument("--refresh-tools", action="store_true",
                                 help="Also refresh Conda packages/tools; normally unnecessary and may download channel indexes.")
+    upgrade_parser.add_argument("--check-only", action="store_true",
+                                help="Only say whether a newer release exists (asks GitHub; nothing is downloaded or changed).")
+    upgrade_parser.add_argument("--version", metavar="X.Y.Z",
+                                help="Install this exact release instead of the latest. An older one is a deliberate downgrade and is announced as such.")
+    upgrade_parser.add_argument("--archive", metavar="FILE",
+                                help="Install a release file you already downloaded (plasbench-<version>.tar.gz, with its .sha256 beside it). Needs no internet.")
+    upgrade_parser.add_argument("--rollback", action="store_true",
+                                help="Go back to the release this folder had before the last update (a copy is kept in .plasbench-rollback/). Needs no internet.")
     check_parser = sub.add_parser(
         "check",
         help="Check configured runtime dependencies (tools and databases); offers to install what's missing.",
@@ -1107,6 +1115,8 @@ def network_preflight(args, root):
     Only the cases that certainly go online are checked: an action that can be done from files on disk must not demand the internet
     (`run` and `check` decide that themselves, in stage 1 and scripts/00_setup.sh)."""
     command = args.command
+    if command == "upgrade" and (getattr(args, "archive", None) or getattr(args, "rollback", False)):
+        return None                          # installing a file that is already on this computer needs no internet
     table = network_commands(root)
     sub_name = ""
     if command == "tools":
@@ -1304,8 +1314,16 @@ def main(argv=None):
             command.append("--yes")
         if args.refresh_tools:
             command.append("--refresh-tools")
+        if args.check_only:
+            command.append("--check-only")
+        if args.version:
+            command += ["--version", args.version]
+        if args.archive:
+            command += ["--archive", str(Path(args.archive).expanduser().resolve())]
+        if args.rollback:
+            command.append("--rollback")
         code = run(command, root)
-        if code == 0:
+        if code == 0 and not args.check_only:
             code = verify_after_upgrade(root)
     elif args.command == "check":
         command = [bash_command(), "scripts/00_setup.sh"]
