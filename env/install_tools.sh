@@ -8,6 +8,17 @@ ENV_NAME="plasbench"; PROFILE="core"; ASSUME_YES=0
 [[ "${1:-}" == "--yes" ]] && { ASSUME_YES=1; shift; }
 [[ $# -gt 0 ]] && PROFILE="$1"
 
+# Helpers shared by the profile loops (a comma list, `all`, plasbench check): an install that cannot write to its environment records why in PLASBENCH_INSTALL_STOP_FILE, and the
+# loop stops instead of trying the next profile against the same prefix. Other failures (network, a solver conflict) do not stop it.
+new_stop_file() {
+    if [[ -z "${PLASBENCH_INSTALL_STOP_FILE:-}" ]]; then
+        PLASBENCH_INSTALL_STOP_FILE="$(mktemp "${TMPDIR:-/tmp}/plasbench-stop.XXXXXX" 2>/dev/null || true)"
+        [[ -n "$PLASBENCH_INSTALL_STOP_FILE" ]] && : > "$PLASBENCH_INSTALL_STOP_FILE"
+        export PLASBENCH_INSTALL_STOP_FILE
+    fi
+}
+stop_requested() { [[ -n "${PLASBENCH_INSTALL_STOP_FILE:-}" && -s "$PLASBENCH_INSTALL_STOP_FILE" ]]; }
+
 # These inspection actions share the machine-readable registry with CI. They
 # do not touch an environment, which makes them safe before any download.
 case "$PROFILE" in
@@ -23,8 +34,11 @@ if [[ "$PROFILE" == *,* ]]; then
     list_failed=() list_manual=() list_consent=()
     list_yes=(); [[ "$ASSUME_YES" -eq 1 ]] && list_yes=(--yes)
     IFS=',' read -r -a LIST_PROFILES <<< "$PROFILE"
+    new_stop_file
     for listed in "${LIST_PROFILES[@]}"; do
         [[ -n "$listed" ]] || continue
+        # A read-only environment fails every profile the same way: say it once and never try the next one against the same prefix.
+        if stop_requested; then list_failed+=("$listed"); continue; fi
         echo "[plasbench] ===== install-tools $listed ====="
         listed_status=0
         "$0" --env "$ENV_NAME" "${list_yes[@]}" "$listed" || listed_status=$?
@@ -101,7 +115,62 @@ SOURCE_KIND="$(python3 "$HERE/../python/source_install.py" kind "$PROFILE" 2>/de
 # system micromamba produces -- `micromamba install -n plasbench` aborts with
 # "No prefix found at: ~/.local/share/mamba/envs/plasbench" even though the
 # environment exists. An absolute prefix is unambiguous for all three solvers.
+# Inside the PlasBench container the image's conda environments (/opt/conda/envs/*) belong to the image's own user and are read-only for the user the container runs as
+# (the host user). Every install goes to the persistent extras folder the runtime mounts instead (PLASBENCH_EXTRA_HOME): ONE overlay environment, <extras>/envs/extras, created
+# fresh with its own solve, so it neither inherits the image environment's pins nor changes its packages. The runtime puts its bin/ on PATH AFTER the image's, so the
+# image's pinned tools always win and the extras only add what the image does not have.
+in_container() {
+    [[ "${PLASBENCH_IN_DOCKER:-}" == "1" || -f /.dockerenv || -f /run/.containerenv ]]
+}
+docker_mode() { in_container && [[ -n "${PLASBENCH_EXTRA_HOME:-}" ]]; }
+
+# A failed install step names the profile and the cause, once (the ERR trap's "`return "$rc"` failed" line says nothing a person can act on).
+install_step() {
+    local rc=0
+    run_with_heartbeat "$@" || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        _PLASBENCH_ERR_REPORTED=1
+        echo "ERROR: install-tools $PROFILE failed: $1 ($(explain_exit "$rc"), exit $rc). The solver's own messages are above; retry with: plasbench install-tools $PROFILE --yes" >&2
+        exit "$rc"
+    fi
+}
+
+# Stop BEFORE any solver runs when a prefix (or the package cache) cannot be written, instead of letting it solve for minutes and sleep-retry on "Permission denied".
+# A failure of this kind also tells the profile loops to stop (see new_stop_file).
+guard_writable() {
+    local prefix="$1" bad="" cache d
+    if [[ -d "$prefix" ]]; then
+        [[ -w "$prefix" && ( ! -d "$prefix/conda-meta" || -w "$prefix/conda-meta" ) ]] || bad="$prefix"
+    else
+        d="$(dirname "$prefix")"; [[ -d "$d" ]] || d="$(dirname "$d")"
+        [[ -w "$d" ]] || bad="$prefix"
+    fi
+    if [[ -z "$bad" && -n "${CONDA_PKGS_DIRS:-}" ]]; then
+        cache="${CONDA_PKGS_DIRS%%:*}"
+        if [[ -d "$cache" ]]; then [[ -w "$cache" ]] || bad="$cache"; else mkdir -p "$cache" 2>/dev/null || bad="$cache"; fi
+    fi
+    [[ -z "$bad" ]] && return 0
+    if in_container; then
+        echo "ERROR: this environment is read-only for your user ($bad). The image's conda environments cannot be changed from a container; in Docker mode PlasBench installs into ${PLASBENCH_EXTRA_HOME:-the extras folder (~/.plasbench/docker/<version>/extras)} instead." >&2
+        echo "       This install tried to write to $bad. Nothing was changed. Update PlasBench to a version that installs extras there, and see INSTALL.md (Docker mode: where extras live)." >&2
+    else
+        echo "ERROR: this environment is read-only for your user ($bad), so nothing can be installed into it. Use an environment you own (bash env/setup_conda.sh) or ask whoever owns it." >&2
+    fi
+    [[ -n "${PLASBENCH_INSTALL_STOP_FILE:-}" ]] && printf 'read-only %s\n' "$bad" >> "$PLASBENCH_INSTALL_STOP_FILE" 2>/dev/null || true
+    return 1
+}
+
+if docker_mode; then
+    # The solver's own root, package cache, environment list and lock files all live in the extras folder (HOME is a writable scratch folder in the container).
+    export MAMBA_ROOT_PREFIX="$PLASBENCH_EXTRA_HOME/mamba" CONDA_PKGS_DIRS="$PLASBENCH_EXTRA_HOME/pkgs" CONDA_ENVS_PATH="$PLASBENCH_EXTRA_HOME/envs"
+    mkdir -p "$MAMBA_ROOT_PREFIX" "$CONDA_PKGS_DIRS" "$PLASBENCH_EXTRA_HOME/envs" "$PLASBENCH_EXTRA_HOME/bin" 2>/dev/null || true
+    [[ -n "${HOME:-}" && -w "${HOME:-/nonexistent}" ]] || { export HOME="$PLASBENCH_EXTRA_HOME/home"; mkdir -p "$HOME" 2>/dev/null || true; }
+fi
+
 resolve_prefix() {
+    if docker_mode; then
+        printf '%s' "$PLASBENCH_EXTRA_HOME/envs/extras"; return 0
+    fi
     # Already inside the target environment (the usual case: `plasbench
     # install-tools` runs under `conda run -n plasbench`).
     if [[ -n "${CONDA_PREFIX:-}" && "$(basename "$CONDA_PREFIX")" == "$ENV_NAME" ]]; then
@@ -170,6 +239,14 @@ if [[ "$USER_PLAN" == ENV$'\t'* ]]; then
 fi
 
 CHANNELS=(-c conda-forge -c bioconda)
+if docker_mode && TARGET_PREFIX="$(resolve_prefix)"; then
+    # Own, fresh solve (never the image environment's pins). An empty environment is made once; a pinned-packages file of the image is not copied.
+    guard_writable "$TARGET_PREFIX" || exit 1
+    if [[ ! -d "$TARGET_PREFIX/conda-meta" ]]; then
+        echo "[plasbench] creating the extras environment: $TARGET_PREFIX (the image's environments are read-only and are not changed)"
+        "$SOLVER_BIN" create -y -p "$TARGET_PREFIX" "${CHANNELS[@]}" || { echo "ERROR: could not create the extras environment $TARGET_PREFIX" >&2; exit 1; }
+    fi
+fi
 if TARGET_PREFIX="$(resolve_prefix)"; then
     SOLVER=("$SOLVER_BIN" install -y -p "$TARGET_PREFIX" "${CHANNELS[@]}")
     CREATE=("$SOLVER_BIN" create -y -p "$TARGET_PREFIX")
@@ -274,10 +351,11 @@ install_isolated() {
             echo "[plasbench]          it may be killed. If it is, the rest of PlasBench is unaffected." >&2
             memory_advice
         fi
-        run_with_heartbeat "Conda is solving/linking $label's own environment" \
+        guard_writable "$iso_prefix" && guard_writable "$main_prefix" || return 1
+        install_step "Conda is solving/linking $label's own environment" \
             "$SOLVER_BIN" create -y -p "$iso_prefix" "${channels[@]}" "${spec[@]}"
         if [[ -n "$pip_pkg" ]]; then
-            run_with_heartbeat "pip is installing $pip_pkg into $iso_prefix" "$iso_prefix/bin/pip" install "$pip_pkg"
+            install_step "pip is installing $pip_pkg into $iso_prefix" "$iso_prefix/bin/pip" install "$pip_pkg"
         fi
     fi
     for cmd in $cmds; do
@@ -299,7 +377,8 @@ install_mobsuite() {
         echo "[plasbench] MOB-suite environment already works: $mob_prefix"
     else
         echo "[plasbench] creating the MOB-suite environment (pinned, separate from the main one): $mob_prefix"
-        run_with_heartbeat "Conda is solving/linking MOB-suite's own environment" \
+        guard_writable "$mob_prefix" && guard_writable "$main_prefix" || return 1
+        install_step "Conda is solving/linking MOB-suite's own environment" \
             "$SOLVER_BIN" create -y -p "$mob_prefix" "${CHANNELS[@]}" "${MOBSUITE_SPEC[@]}"
     fi
     "$mob_prefix/bin/mob_recon" --version >/dev/null 2>&1 \
@@ -475,7 +554,12 @@ EOF
     # a redundant second solver transaction during install-tools all.
     ALL_PROFILES="core assembly mobsuite reconstruction simulate long-read plassembler hybracter trycycler genomad rfplasmid plasmidhunter plasmer plascope quast utilities reference-annotation annotation annotation-prokka gplas2 plasme plasgraph2 plasmidec plasbin_flow mobilome-map"
     # shellcheck disable=SC2086
+    new_stop_file
     for installed_profile in ${PLASBENCH_ALL_PROFILES:-$ALL_PROFILES}; do
+        if stop_requested; then
+            [[ "$required_profiles" == *" $installed_profile "* ]] && failures=1
+            failed_optional+=("$installed_profile"); continue
+        fi
         echo "[plasbench] ===== install-tools $installed_profile ====="
         profile_status=0
         "$0" --env "$ENV_NAME" "${ALL_YES[@]}" "$installed_profile" || profile_status=$?
@@ -516,7 +600,8 @@ for pkg in "${PKGS[@]}"; do
 done
 if [[ ${#OTHER_PKGS[@]} -gt 0 ]]; then
     echo "[plasbench] installing into $TARGET_LABEL: ${OTHER_PKGS[*]}"
-    run_with_heartbeat "Conda is solving/linking dependency tools: ${OTHER_PKGS[*]}" "${SOLVER[@]}" "${OTHER_PKGS[@]}"
+    [[ -z "${TARGET_PREFIX:-}" ]] || guard_writable "$TARGET_PREFIX" || exit 1
+    install_step "Conda is solving/linking dependency tools: ${OTHER_PKGS[*]}" "${SOLVER[@]}" "${OTHER_PKGS[@]}"
 fi
 if [[ "$NEEDS_MOBSUITE" -eq 1 ]]; then
     TARGET_PREFIX="${TARGET_PREFIX:-$(resolve_prefix || true)}"
@@ -526,7 +611,7 @@ if [[ "$NEEDS_MOBSUITE" -eq 1 ]]; then
         # No main environment to put wrappers in: still create MOB-suite's own
         # environment by name, and say how to finish once the main one exists.
         echo "[plasbench] main environment '$ENV_NAME' not found; creating ${ENV_NAME}-mobsuite on its own"
-        run_with_heartbeat "Conda is solving/linking MOB-suite's own environment" \
+        install_step "Conda is solving/linking MOB-suite's own environment" \
             "$SOLVER_BIN" create -y -n "${ENV_NAME}-mobsuite" "${CHANNELS[@]}" "${MOBSUITE_SPEC[@]}"
         echo "[plasbench] after creating '$ENV_NAME' (bash env/setup_conda.sh), run: bash env/install_tools.sh mobsuite" >&2
         exit 1

@@ -101,7 +101,7 @@ USER $MAMBA_USER
 # inside this image with a bare "No such file or directory: 'git'". Installed
 # last so it never invalidates the cache for the slow, network-fragile
 # mobsuite/gplas2 environment layers above.
-RUN micromamba install -y -n plasbench -c conda-forge git \
+RUN micromamba install -y -n plasbench -c conda-forge git procps-ng \
     && micromamba clean --all --yes
 
 WORKDIR /opt/plasbench

@@ -389,6 +389,14 @@ def parse_mac_mount(text) -> list:
     return out
 
 
+def _in_container() -> bool:
+    try:
+        from plasbench import docker_helper
+        return docker_helper.in_docker()
+    except Exception:  # noqa: BLE001
+        return False
+
+
 # ---------------------------------------------------------------- the environment this process runs in
 def environment(platform_name=None, meminfo=None, cpuinfo=None, cgroups=None, affinity=None, run=_run, in_wsl=False, wslconfig=None) -> dict:
     """What this process sees. Memory in bytes; every field may be None (unknown)."""
@@ -418,6 +426,10 @@ def environment(platform_name=None, meminfo=None, cpuinfo=None, cgroups=None, af
             if affinity and env["logical"] and affinity < env["logical"]:
                 env["limits"].append({"what": "cpu", "value": affinity, "by": "CPU affinity", "text": f"this process may use only {affinity} of the {env['logical']} CPUs (CPU affinity)"})
             env["usable_cpus"] = usable
+            if not in_wsl and cgroups is None and _in_container():
+                env["limits"].append({"what": "container", "value": None, "by": "Docker",
+                                      "text": "inside a container: memory and CPUs are the container's limits (from the container / Docker Desktop settings: Settings > Resources), "
+                                              "not the whole computer's"})
             if in_wsl:
                 env["limits"].append({"what": "wsl", "value": None, "by": ".wslconfig",
                                       "text": "inside WSL2 these numbers are the WSL virtual machine's, not the whole computer's: its memory, CPUs and swap are set by "

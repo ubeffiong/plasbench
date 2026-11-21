@@ -609,7 +609,19 @@ def _available_gb():
         return None
 
 
+def _in_container():
+    """True inside a container: it shares WSL2's kernel under Docker Desktop but is not a WSL distribution, so the WSL / Windows-drive checks do not apply."""
+    flag = os.environ.get("PLASBENCH_IN_DOCKER", "").strip().lower()
+    if flag in ("1", "true", "yes", "on"):
+        return True
+    if flag in ("0", "false", "no", "off"):
+        return False
+    return os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")
+
+
 def _is_wsl():
+    if _in_container():
+        return False
     if os.environ.get("WSL_DISTRO_NAME"):
         return True
     try:

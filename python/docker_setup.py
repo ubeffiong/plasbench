@@ -883,6 +883,8 @@ def check_line(st):
     d = diagnose(st)
     if st["state"] == "ready":
         return "  [ok]   docker (optional): ready, client %s, server %s, context %s" % (st.get("version") or "?", st.get("server_version") or "?", st.get("context") or "?")
+    if st["state"] == "in_container":
+        return "  [--]   docker (optional): %s Not needed inside a container: PlasBench is already running in one." % d["title"]
     nxt = {"start": "plasbench install-tools docker --start", "integration": "plasbench install-tools docker --open-integration"}.get(d.get("action"), "plasbench install-tools docker")
     return "  [--]   docker (optional): %s Next: %s" % (d["title"], nxt)
 
