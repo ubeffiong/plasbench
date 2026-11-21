@@ -9,6 +9,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 import webbrowser
 from pathlib import Path
 
@@ -111,6 +112,11 @@ def ui_state_command(args, root, how) -> int:
         info["server"] = {"record": {k: rec.get(k) for k in ("port", "pid", "root", "started")}, "state": webui._call_old_server(rec["url"], "server-state")}
     except (OSError, ValueError, KeyError):
         info["server"] = None
+    try:   # window stability: every running window server, the windows that reported in, and anything else on their ports (no keys)
+        from . import webui
+        info["servers"] = webui.running_servers()
+    except Exception as exc:  # noqa: BLE001 - diagnostics must not fail the report
+        info["servers"] = {"servers": [], "windows_alive": 0, "warnings": [f"could not list the running servers: {exc}"]}
     problems = []
     for c in info["copies"]:
         if root and c["version"] and info["project_root"]["version"] and c["version"] != info["project_root"]["version"]:
@@ -140,6 +146,14 @@ def ui_state_command(args, root, how) -> int:
             print("  it did not answer /api/server-state (a window from before 0.5.2, or it has stopped)")
     else:
         print("Running window: none recorded")
+    srv = info["servers"]
+    print(f"PlasBench servers running on this computer (keys are never shown): {sum(1 for e in srv['servers'] if e['running'])}; windows that reported in recently: {srv['windows_alive']}")
+    for e in srv["servers"]:
+        print(f"  port {e['port']}  pid {e.get('pid') or '?'}  version {e.get('version') or '?'}  " + ("running" if e["running"] else "NOT answering")
+              + (f"  started {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(e['started']))}" if e.get("started") else "")
+              + (f"  windows alive {e['windows_alive']}" if e.get("windows_alive") is not None else ""))
+    for w in srv["warnings"]:
+        print("  note: " + w)
     print("Problems: " + ("none found" if not problems else ""))
     for line in problems:
         print("  - " + line)
@@ -512,6 +526,8 @@ def build_parser():
                            help="Open the page in a normal browser tab instead of an app-style window.")
     ui_parser.add_argument("--new-instance", action="store_true",
                            help="Start another server even if a PlasBench window is already running for this folder.")
+    ui_parser.add_argument("--port-wait", type=float, default=0.0, help=argparse.SUPPRESS)       # a restart's replacement waits this long for the old server's port
+    ui_parser.add_argument("--handoff-file", default="", help=argparse.SUPPRESS)                  # created just before it binds: the old server releases its port then
     git_parser = sub.add_parser(
         "install-git",
         help="Install Git (optional): Git for Windows with Git Bash on Windows, conda-forge git elsewhere.")
@@ -1258,7 +1274,7 @@ def main(argv=None):
         raise SystemExit(3)
     if args.command == "ui":
         from .webui import serve
-        serve(root, port=args.port, open_browser=not args.no_browser, tab=args.tab, new_instance=args.new_instance)
+        serve(root, port=args.port, open_browser=not args.no_browser, tab=args.tab, new_instance=args.new_instance, port_wait=args.port_wait, handoff_file=args.handoff_file)
         return 0
     if args.command == "runtime":
         raise SystemExit(runtime_command(args, root))

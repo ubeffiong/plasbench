@@ -418,6 +418,8 @@ dialog.dkdlg ul.dknotes{margin:6px 0 0 18px;padding:0}.dkerr{color:var(--bad);ma
 /* BEGIN server state (stale window server) */
 #stalebar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:140;width:min(760px,calc(100vw - 32px));background:var(--warn-soft,#fff4d6);color:var(--fg);border:1px solid var(--warn,#b7791f);border-left-width:5px;border-radius:8px;padding:10px 14px;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.22)}
 #stalebar[hidden]{display:none}
+#oldsession{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:160;width:min(760px,calc(100vw - 32px));background:var(--warn-soft,#fff4d6);color:var(--fg);border:1px solid var(--warn,#b7791f);border-left-width:5px;border-radius:8px;padding:10px 14px;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.22)}
+#oldsession[hidden]{display:none}#oldsession .ss-row{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}#oldsession .ss-msg{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:2px}#oldsession .ss-btns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 #stalebar .ss-row{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}#stalebar .ss-msg{flex:1 1 320px;min-width:0}#stalebar .ss-msg b{display:block;margin-bottom:2px}
 #stalebar .ss-btns{display:flex;gap:8px;align-items:center}#stalebar details{margin-top:6px}#stalebar pre{margin:4px 0 0;white-space:pre-wrap;font-size:12px}
 /* END server state */
@@ -1357,6 +1359,7 @@ plasmid_values = plasmid
 
 <div id="connbar" hidden role="status"><span class="rt-spin" aria-hidden="true"></span><span id="connmsg">Connection to PlasBench lost. Retrying… Your runs keep going in the background.</span></div>
 <div id="stalebar" hidden role="alert" aria-labelledby="ss_t"></div>
+<div id="oldsession" hidden role="alert" aria-labelledby="os_t"></div>
 <div id="toasts" aria-live="polite"><div id="insttoast" class="insttoast" role="region" aria-label="Installations" aria-live="polite" aria-busy="false" hidden></div></div>
 <div id="tipbox" role="tooltip" hidden></div>
 
@@ -1365,7 +1368,7 @@ plasmid_values = plasmid
 /* ===================================================================================================
    App state and API
    =================================================================================================== */
-const TOKEN = new URLSearchParams(location.search).get("t") || sessionStorage.getItem("pb_t") || "";
+let TOKEN = new URLSearchParams(location.search).get("t") || sessionStorage.getItem("pb_t") || "";   // window stability: the server also accepts this window's cookie when this key is stale
 if (TOKEN) { sessionStorage.setItem("pb_t", TOKEN); }
 if (location.search) history.replaceState(null, "", location.pathname + location.hash);
 const S = {info:null, schema:null, env:null, tools:null, user:null, settings:null, cohorts:null, runs:null, jobs:[], docs:null,
@@ -1385,6 +1388,7 @@ const RETRY_DELAYS = [200, 500, 1000, 2000, 3500];   // ms: about 7 s of patienc
 /* One call to the PlasBench server. A network failure is retried quietly (the burst or hiccup that caused it is usually over in a second); a POST repeats the SAME request id, and the
    server answers a repeat with the first run's response, so "start the benchmark" can never start it twice. Only when the retries are used up does the page show the reconnect banner. */
 async function api(path, body) {
+  if (S.conn && S.conn.refused) throw new Error("session ended");   // window stability: a refused window sends nothing more (one bar, no polling) until Check again succeeds
   const opt = {headers: {"X-PlasBench-Token": TOKEN}};
   if (body !== undefined) { opt.method = "POST"; opt.body = JSON.stringify(body); opt.headers["Content-Type"] = "application/json"; opt.headers["X-PlasBench-Req"] = newReqId(); }
   let r;
@@ -1417,26 +1421,50 @@ async function api(path, body) {
    Runs are detached from the server (plasbench/jobrunner.py), so nothing is lost while it is down. The page shows a banner, probes /healthz with a growing delay (2 s up to 10 s),
    probes at once when the computer wakes up, the network returns or the tab is shown again, and reconnects by itself. After ~45 s it adds a full notice with a Retry now button
    that does a real check (is the server answering? is this window's key still valid?) instead of reloading a page that may have nothing to load. */
+/* BEGIN window stability: the connection state machine (one bar or dialog at a time, backoff 3 s -> 60 s, automatic retries stop after 10 min) */
+/* ==CONN-PURE-BEGIN== (no DOM access: node runs this block in test/test_window_stability.py with a fake fetch) */
+const CONN_FIRST = 3000, CONN_MAX = 60000, CONN_GIVE_UP = 600000;
+function connNextDelay(prev) { return prev ? Math.min(CONN_MAX, prev * 2) : CONN_FIRST; }
+function connGiveUp(since, now) { return now - since > CONN_GIVE_UP; }
+/* What is wrong, by asking a cheap token-protected route (/api/server-state) twice at most:
+   "up"        answers with this window's key, or with the cookie alone (the server accepts either)
+   "recovered" this window's key is refused but the browser's cookie is accepted: the page adopts the cookie (no UI)
+   "refused"   the key AND the cookie are refused: this window belongs to an older PlasBench session
+   "down"      no answer (network error, timeout, server error): PlasBench is not running or not reachable */
+async function connClassify(fetchFn, token) {
+  const ask = headers => fetchFn("/api/server-state", {headers: headers, cache: "no-store"});
+  let r;
+  try { r = await ask(token ? {"X-PlasBench-Token": token} : {}); } catch (e) { return "down"; }
+  if (r.ok) return "up";
+  if (r.status !== 403) return "down";
+  if (token) {   // the same request WITHOUT the header: only the cookie can authenticate it
+    try { const c = await ask({}); if (c.ok) return "recovered"; if (c.status !== 403) return "down"; } catch (e) { return "down"; }
+  }
+  return "refused";
+}
+/* ==CONN-PURE-END== */
 const LOST_DOWN = "PlasBench is not responding. It may have been closed, or the computer was asleep. This window keeps trying and will reconnect by itself as soon as PlasBench is running. "
   + "If it was closed, start it again from its desktop icon or with the command below. Runs you started keep going without it and are listed under Runs & reports > Run sessions.";
-const LOST_EXPIRED = "PlasBench was restarted, so this window's key is no longer valid and it cannot reconnect. Open the new window: start PlasBench from its desktop icon, or run the command below "
-  + "and open the link it prints. Your runs are not lost: they are listed under Runs & reports > Run sessions.";
+const LOST_EXPIRED = "This window belongs to an older PlasBench session: PlasBench was restarted and the key of this window is no longer valid. Close it and use the current PlasBench window. "
+  + "Your runs are not lost: they are listed under Runs & reports > Run sessions.";
 function setLostStatus(text) { const a = document.getElementById("connmsg"), b = document.getElementById("lost_status"); if (a) a.textContent = text; if (b) b.textContent = text; }
+const newConn = () => ({since: Date.now(), tries: 0, delay: CONN_FIRST, timer: null, probing: false, refused: false});
 function connLost() {
-  if (S.quit || S.conn) return;
-  S.conn = {since: Date.now(), tries: 0, delay: 2000, timer: null, probing: false};
+  if (S.quit || S.conn) return;   // idempotent: a second failing poll never starts a second reconnect loop
+  S.conn = newConn();
   $("#connbar").hidden = false; setLostStatus("Connection to PlasBench lost. Reconnecting… Your runs keep going in the background.");
   connSchedule();
 }
-function connSchedule() { if (!S.conn) return; clearTimeout(S.conn.timer); S.conn.timer = setTimeout(() => connProbe(false), S.conn.delay); }
-async function connCheck() {   // "up" (answering and the key is valid), "expired" (answering, key refused) or "down"
-  try {
-    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 5000);
-    const h = await fetch("/healthz", {cache: "no-store", signal: ctl.signal}); clearTimeout(t);
-    if (!h.ok) return "down";
-    const i = await fetch("/api/info", {headers: {"X-PlasBench-Token": TOKEN}, cache: "no-store"});
-    return i.status === 403 ? "expired" : i.ok ? "up" : "down";
-  } catch { return "down"; }
+function connSchedule() { if (!S.conn || S.conn.refused) return; clearTimeout(S.conn.timer); S.conn.timer = setTimeout(() => connProbe(false), S.conn.delay); }
+async function connCheck() {   // "up", "recovered", "refused" or "down" (see connClassify)
+  const f = (u, o) => { const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 5000); return fetch(u, {...o, signal: ctl.signal}).finally(() => clearTimeout(t)); };
+  return connClassify(f, TOKEN);
+}
+/* The cookie is valid but the key in this window is not: forget the key (never sent again) and reload the bare address, so the page is authenticated by the cookie alone. */
+function adoptCookie() {
+  try { sessionStorage.removeItem("pb_t"); } catch (e) { /* none */ }
+  S.quit = true; TOKEN = "";
+  location.replace("/");
 }
 async function connProbe(manual) {
   if (!S.conn || S.conn.probing) return;
@@ -1446,9 +1474,11 @@ async function connProbe(manual) {
   if (!S.conn) return;
   S.conn.probing = false;
   if (state === "up") { connBack(true); return; }
-  if (state === "expired") { clearTimeout(S.conn.timer); showLost("expired"); return; }
-  S.conn.delay = Math.min(10000, Math.round(S.conn.delay * 1.5));
+  if (state === "recovered") { adoptCookie(); return; }
+  if (state === "refused") { clearTimeout(S.conn.timer); showRefused(); return; }
+  S.conn.delay = connNextDelay(S.conn.delay);
   if (manual || Date.now() - S.conn.since > 45000) showLost("down");
+  if (connGiveUp(S.conn.since, Date.now())) { setLostStatus("Automatic retries stopped after 10 minutes. Press Retry now when PlasBench is running again."); return; }
   setLostStatus(`Still not reachable (attempt ${S.conn.tries}). Trying again in ${Math.round(S.conn.delay / 1000)} s.`);
   connSchedule();
 }
@@ -1456,33 +1486,57 @@ function connBack(announce) {
   if (!S.conn) return;
   clearTimeout(S.conn.timer); S.conn = null; $("#connbar").hidden = true;
   const d = document.getElementById("ended"); if (d) d.remove();
+  const o = document.getElementById("oldsession"); if (o) o.hidden = true;
   if (announce) { toast("Reconnected to PlasBench", "ok"); refreshJobs(); refreshSessions(); if (!$("#v_runs").hidden) loadRuns(); }
 }
-function showLost(kind) {
-  if (S.quit) return;
+function showLost(kind) {   // the "PlasBench is not responding" dialog: ONE element, created once; later calls only update its status line
+  if (S.quit || kind !== "down") return;
   let d = document.getElementById("ended");
-  if (!d) { d = document.createElement("div"); d.id = "ended"; d.style.cssText = "position:fixed;inset:0;z-index:200;background:rgba(5,15,10,.6);display:grid;place-items:center;padding:20px"; document.body.append(d); }
+  if (d) return;
+  d = document.createElement("div"); d.id = "ended"; d.style.cssText = "position:fixed;inset:0;z-index:200;background:rgba(5,15,10,.6);display:grid;place-items:center;padding:20px"; document.body.append(d);
   d.dataset.kind = kind;
-  d.innerHTML = `<div class="card" style="max-width:540px" role="alertdialog" aria-labelledby="lost_t"><div class="hd">${icon("alert", "ico")}<h3 id="lost_t">${kind === "expired" ? "This window needs to be reopened" : "Reconnecting to PlasBench"}</h3></div>
-    <div class="bd"><p style="margin-top:0">${esc(kind === "expired" ? LOST_EXPIRED : LOST_DOWN)}</p><div class="cmdline"><span class="p">$</span><code>plasbench ui</code></div>
+  d.innerHTML = `<div class="card" style="max-width:540px" role="alertdialog" aria-labelledby="lost_t"><div class="hd">${icon("alert", "ico")}<h3 id="lost_t">Reconnecting to PlasBench</h3></div>
+    <div class="bd"><p style="margin-top:0">${esc(LOST_DOWN)}</p><div class="cmdline"><span class="p">$</span><code>plasbench ui</code></div>
       <p id="lost_status" class="mut small" role="status" aria-live="polite" style="margin-bottom:0"></p></div>
-    <div class="ft"><button class="btn" id="lost_retry">${icon("refresh")}${kind === "expired" ? "Check again" : "Retry now"}</button></div></div>`;
+    <div class="ft"><button class="btn" id="lost_retry">${icon("refresh")}Retry now</button></div></div>`;
   d.querySelector("#lost_retry").onclick = retryNow;
   if (S.conn) setLostStatus(S.conn.tries ? `Still not reachable (attempt ${S.conn.tries}). Trying again automatically.` : "Trying automatically…");
 }
-async function retryNow() {
-  const btn = document.getElementById("lost_retry"); if (btn) { btn.disabled = true; btn.textContent = "Trying…"; }
-  if (!S.conn) S.conn = {since: Date.now(), tries: 0, delay: 2000, timer: null, probing: false};
-  clearTimeout(S.conn.timer); S.conn.probing = false;
-  await connProbe(true);
-  const again = document.getElementById("lost_retry");
-  if (again) { again.disabled = false; again.innerHTML = icon("refresh") + (document.getElementById("ended").dataset.kind === "expired" ? "Check again" : "Retry now"); }
-}
-function sessionEnded(msg) {   // the server answered, but refused this window's key (PlasBench was restarted)
+/* The key AND the cookie are refused: a persistent, non-modal bar (never a dialog that comes back), shown once. */
+function showRefused() {
   if (S.quit) return;
-  S.conn = S.conn || {since: Date.now(), tries: 0, delay: 2000, timer: null, probing: false};
-  clearTimeout(S.conn.timer); showLost("expired");
+  S.conn = S.conn || newConn();
+  S.conn.refused = true; clearTimeout(S.conn.timer);
+  $("#connbar").hidden = true;
+  const d = document.getElementById("ended"); if (d) d.remove();
+  const bar = document.getElementById("oldsession"); if (!bar) return;
+  setIfChanged(bar, `<div class="ss-row">${icon("alert", "ico")}<div class="ss-msg"><b id="os_t">This window belongs to an older PlasBench session</b>
+      <span>${esc(LOST_EXPIRED)}</span><span id="os_status" class="mut small" role="status"></span></div>
+    <div class="ss-btns"><button class="btn" id="os_close">Close this window</button><button class="btn sec" id="os_open">Open the current window</button><button class="btn sec" id="os_check">Check again</button></div></div>`);
+  bar.hidden = false;
+  const say = t => { const e = document.getElementById("os_status"); if (e) e.textContent = t; };
+  document.getElementById("os_close").onclick = () => { try { window.close(); } catch (e) { /* refused */ } setTimeout(() => say("This browser did not let the page close itself: close this window from the taskbar."), 400); };
+  document.getElementById("os_open").onclick = async () => {
+    say("Asking PlasBench to bring up the current window…");
+    try { const r = await fetch("/api/reopen", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"}); const j = await r.json(); say(j.message || (j.ok ? "Done: use the window that opened." : "PlasBench could not open it.")); }
+    catch (e) { say("PlasBench did not answer. Start it again from its desktop icon."); }
+  };
+  document.getElementById("os_check").onclick = retryNow;
 }
+async function retryNow() {
+  const btn = document.getElementById("lost_retry") || document.getElementById("os_check"); if (btn) { btn.disabled = true; btn.textContent = "Trying…"; }
+  if (!S.conn) S.conn = newConn();
+  clearTimeout(S.conn.timer); S.conn.probing = false; S.conn.refused = false; S.conn.since = Date.now(); S.conn.delay = CONN_FIRST;   // a manual check restarts the 10-minute allowance
+  await connProbe(true);
+  if (S.conn && S.conn.refused) { const e = document.getElementById("os_status"); if (e) e.textContent = "Still refused: this window really belongs to an older session."; }
+  const again = document.getElementById("lost_retry") || document.getElementById("os_check");
+  if (again) { again.disabled = false; again.innerHTML = again.id === "lost_retry" ? icon("refresh") + "Retry now" : "Check again"; }
+}
+function sessionEnded(msg) {   // the server answered 403 to this window's key: find out whether the cookie still works (silent recovery) or the window is really from an older session
+  if (S.quit) return;
+  if (!S.conn) { S.conn = newConn(); connProbe(false); }
+}
+/* END window stability */
 /* BEGIN server state (stale window server): the page is re-read from disk on every update but the server's code is fixed when it starts, so after an update the NEW page can be served by
    the OLD server. The banner below says so and offers Restart window (POST /api/server/restart starts a replacement server; runs are detached and are not touched). */
 /* ==SS-PURE-BEGIN== (no DOM access: node runs this block in test/test_stale_server.py) */
@@ -1500,8 +1554,9 @@ function staleMessage(started, disk) {
 function hardReloadUrl(href, stamp) { const u = new URL(href); u.searchParams.set("_r", String(stamp)); return u.toString(); }
 function withoutReloadParam(href) { const u = new URL(href); if (!u.searchParams.has("_r")) return href; u.searchParams.delete("_r"); return u.toString(); }
 const RELOAD_HINT = "Keyboard: Ctrl+Shift+R (Cmd+Shift+R on a Mac) does the same.";
-/* A server older than this page leaves the page's api-level placeholder unreplaced: that server cannot have the routes this page calls. */
-function serverTooOld(levelMeta) { return /^__API_LEVEL__$/.test(String(levelMeta || "")); }
+/* A server older than this page leaves the page's api-level placeholder unreplaced: that server cannot have the routes this page calls. The test is "is it not a number"; it must NOT
+   spell the placeholder out: the server replaces that text everywhere in this file, which once turned this very test into /^2$/ and showed the banner on every healthy server. */
+function serverTooOld(levelMeta) { return !/^[0-9]+$/.test(String(levelMeta || "0")); }
 /* The banner is shown only for a state the server itself calls stale (kind loaded_code or two_installs); a server without `kind` is an older server: its `stale` is trusted as loaded code. */
 function staleKind(st) { return st && st.stale ? (st.kind === "two_installs" ? "two_installs" : "loaded_code") : ""; }
 function dismissKey(st) { st = st || {}; const sv = st.server || {}; return [st.started_at || "", sv.pid || "", staleKind(st) || st.kind || ""].join(":"); }
@@ -1516,6 +1571,7 @@ function evidenceLines(st) {
   if (st.project_root_path) L.push(`Project folder: PlasBench ${st.project_root_version || "?"} at ${st.project_root_path}`);
   if (sv.pid || sv.port) L.push(`This window's server: pid ${sv.pid || "?"}, port ${sv.port || "?"}` + (st.started_at ? `, started ${new Date(st.started_at * 1000).toLocaleString()}` : ""));
   for (const m of (st.changed_modules || []).slice(0, 8)) L.push(`Changed since start: ${m.module}  ${m.old} -> ${m.new}`);
+  if (st.meta_api_level !== undefined) L.push(`Compared: the page declares api level "${st.meta_api_level}"` + (st.api_level !== undefined ? `, this server answers api_level ${st.api_level}` : ", this server did not report an api_level"));
   if (st.reason) L.push(st.reason);
   return L;
 }
@@ -1544,7 +1600,7 @@ function renderStale() {
 }
 function raiseStale(p) {
   p = p || {};
-  SS.stale = Object.assign({started: metaContent("plasbench-version"), disk: metaContent("plasbench-page-version"), reason: "", stale: true}, SS.stale || {}, p.state || {});
+  SS.stale = Object.assign({started: metaContent("plasbench-version"), disk: metaContent("plasbench-page-version"), meta_api_level: metaContent("plasbench-api-level"), reason: "", stale: true}, SS.stale || {}, p.state || {});
   if (p.sticky) SS.sticky = true;
   if (p.detail && !SS.details.includes(p.detail) && SS.details.length < 6) SS.details.push(p.detail);
   renderStale();
@@ -1582,7 +1638,7 @@ async function hardReload() {
 try { if (new URLSearchParams(location.search).has("_r")) history.replaceState(null, "", withoutReloadParam(location.href)); } catch (e) { /* cosmetic */ }
 { const rb = document.getElementById("reloadbtn"); if (rb) rb.onclick = hardReload; }
 async function ssPoll() {
-  if (serverTooOld(metaContent("plasbench-api-level"))) raiseStale({sticky: true, state: {reason: "this server is older than the page (it does not know the page's api level)"}});   // certain: no poll needed
+  if (serverTooOld(metaContent("plasbench-api-level"))) raiseStale({sticky: true, state: {reason: `this server is older than the page (the page's api-level meta is "${metaContent("plasbench-api-level")}", which is not a number: the server did not fill it in)`}});   // certain: no poll needed
   if (S.quit || S.conn || SS.restarting) return;
   try {
     const st = await api("server-state");
@@ -1591,6 +1647,10 @@ async function ssPoll() {
   }
   catch (e) { /* a server without this route is reported by api() itself (staleApi); anything else is the connection banner's business */ }
 }
+/* window liveness: a random id per window (sessionStorage), pinged every 10 s so `plasbench ui` can tell an open window from a closed one and not open a second */
+const WIN_ID = (() => { try { let w = sessionStorage.getItem("pb_win"); if (!w) { w = newReqId(); sessionStorage.setItem("pb_win", w); } return w; } catch (e) { return newReqId(); } })();
+async function winPing() { if (S.quit || S.conn) return; try { await api("window-ping", {id: WIN_ID, visible: !document.hidden}); } catch (e) { /* the connection banner is the poller's business */ } }
+setTimeout(winPing, 1500); setInterval(winPing, 10000);
 setTimeout(ssPoll, 0);
 setInterval(() => { if (!document.hidden) ssPoll(); }, 60000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && !SS.stale) ssPoll(); });

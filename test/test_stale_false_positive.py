@@ -149,7 +149,7 @@ def main():
 
     print("the served page and the banner")
     html = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
-    check("the page carries the api level it needs, substituted by the server", 'name="plasbench-api-level" content="__API_LEVEL__"' in html and "__API_LEVEL__" in (ROOT / "plasbench" / "webui.py").read_text(encoding="utf-8"))
+    check("the page carries the api level it needs, substituted by the server", 'name="plasbench-api-level" content="__API_LEVEL__"' in html and "__API_LEVEL__" in (ROOT / "plasbench" / "windowlife.py").read_text(encoding="utf-8"))   # window stability: the substitution moved to windowlife.render_page; test_window_stability.py renders and runs the served page
     block = html.split("/* BEGIN server state (stale window server)")[-1].split("/* END server state */")[0]
     check("the banner follows the server's answer: nothing is raised for stale:false and a state with kind clears it",
           "if (staleKind(st)) raiseStale({state: st});" in block and "else if (st.kind && !SS.sticky)" in block and "pageServerMismatch(metaContent" not in block.split("async function ssPoll")[1])
