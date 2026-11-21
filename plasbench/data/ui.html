@@ -1123,7 +1123,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
   <button type="submit" class="send">Send</button>
  </form>
  <form id="tin" class="termonly" autocomplete="off" aria-label="Terminal">
-  <select id="tsh" title="Which shell the command runs in" aria-label="Shell"></select><span class="pr" id="tpr"></span>
+  <select id="tsh" title="Which shell the command runs in" aria-label="Shell"></select><span data-tipid="term_shell"></span><span class="pr" id="tpr"></span>
   <textarea id="tcmd" rows="1" spellcheck="false" autocomplete="off" aria-label="Command (Enter runs, Shift+Enter adds a line)"
    title="Enter runs the command. Shift+Enter starts a new line. Up/Down recall earlier commands. Drag the corner to make the box taller."
    placeholder="A command, e.g.  plasbench check    ls studies    tail -n 40 logs/*.log   (Shift+Enter: new line)"></textarea>
@@ -2261,7 +2261,10 @@ function tShow(st) {
 async function termState() {
   try {
     const st = await api("terminal");
-    $("#tsh").innerHTML = st.shells.map(x => `<option value="${esc(x.id)}" title="${esc(x.what)}">${esc(x.label)}</option>`).join("");
+    if (st.pending) { if ((T.tries = (T.tries || 0) + 1) < 40) setTimeout(termState, 700); return; }   /* the shell probe runs in the background */
+    T.tries = 0;
+    $("#tsh").innerHTML = st.shells.map(x => `<option value="${esc(x.id)}" title="${esc(x.what)}">${esc(x.label)}</option>`).join("")
+      + (st.unavailable || []).map(x => `<option value="" disabled title="${esc(x.why)}">${esc(x.label)} (off)</option>`).join("");
     if (st.shell) $("#tsh").value = st.shell;
     tShow(st);
     if (!T.loaded) {
@@ -2299,7 +2302,7 @@ $("#tcmd").addEventListener("keydown", e => {
   else if (e.key === "ArrowDown" && T.hist.length && (oneLine || el.selectionEnd === el.value.length)) { e.preventDefault(); T.at = Math.min(T.hist.length, T.at + 1); el.value = T.hist[T.at] || ""; tFit(); }
 });
 $("#tsh").onchange = async e => {
-  try { const st = await api("terminal/shell", {shell: e.target.value}); tShow(st); tPrint(`<span class="t-mut">[now ${esc(st.shell_label)}] ${esc(st.about)}</span>\n`); $("#tcmd").focus(); }
+  try { const st = await api("terminal/shell", {shell: e.target.value}); tShow(st); T.hist = st.history || []; T.at = T.hist.length; tPrint(`<span class="t-mut">[now ${esc(st.shell_label)}] ${esc(st.about)}</span>\n`); $("#tcmd").focus(); }
   catch (err) { toast(err.message, "bad"); }
 };
 $("#tclear").onclick = () => { $("#tlog").innerHTML = ""; };
