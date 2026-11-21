@@ -76,6 +76,7 @@ test_demo_end_to_end.py	50.7
 test_depth_ladder.py	0.3
 test_derive_amr_truth.py	0.3
 test_desktop_window.py	32.7
+test_terminal_shells.py	3.0
 test_difficulty_features_stage.sh	7.3
 test_dimer_collapse.py	0.3
 test_discover_long_read_hint.py	0.3

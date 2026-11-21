@@ -720,6 +720,12 @@ writes the `docker run -v` command. From a window on your computer, **Run in Doc
 **Evidence.** `plasbench/updatecheck.py`, `plasbench/updater.py`, `update.sh`, `POST /api/updates/install`; `test/test_updates.py`, `test/test_upgrade_e2e.sh` (a fake GitHub and fake release files: a bad checksum, a misnamed or foreign file and a second update are refused with nothing replaced).
 **Status.** Tested with fakes, not against a real release download from the window or a real WSL/conda upgrade; not checked in a real browser.
 
+### Q71. Why does the Terminal only list Bash, and how do I get Windows PowerShell or Command Prompt there?
+
+**Answer.** The Terminal lists shells according to where the window runs. A window that runs inside Ubuntu (WSL) used to offer only its Ubuntu shell. It now also offers Windows PowerShell, Windows Command Prompt (cmd) and Git Bash (Windows) while WSL interop is on; the Ubuntu shell stays the default and is labelled with the distribution (*Ubuntu-24.04 (Bash)*). If a Windows entry is greyed, hover it: the reason is usually that interop is off (`/etc/wsl.conf` `[interop] enabled=false`, or restart WSL with `wsl --shutdown`) or that Windows is not mounted. Git Bash appears only when Git for Windows is installed. On a Windows window the list is each Ubuntu (WSL), Git Bash, PowerShell and Command Prompt (cmd); on Linux and macOS, your login shell and `pwsh` if installed. `plasbench` works in each of them and runs the same PlasBench folder. Command Prompt cannot start in an Ubuntu folder (a `\wsl.localhost` path), so the Terminal uses a temporary drive letter (`pushd`); Windows shells cannot see Ubuntu's tools.
+**Evidence.** `plasbench/terminal.py` (`available_shells`, `windows_side`, the shims); `test/test_terminal_shells.py`.
+**Status.** The lists, argument lists, quoting of hostile text, folder translation, shims, kill path and output decoding are tested with fakes. On the developer's Windows 11 computer the Command Prompt, PowerShell and Git Bash entries ran real commands, and from a real Ubuntu 24.04 under WSL2 the Windows PowerShell, cmd and Git Bash entries ran real commands (a drive folder and an Ubuntu folder). Not tested: WSL with interop switched off, WSL 1, other distributions, a non-Western Windows code page, cancelling from the window (there is no cancel button yet; a timeout does stop the whole tree).
+
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions

@@ -2203,7 +2203,7 @@ def make_handler(project: Project, jobs: Jobs):
                     return self.jsend(200, gitops.check_ignore(repo, q.get("path", "")))
                 raise FileNotFoundError(f"no such API: {route}")
             if route == "terminal":
-                return self.jsend(200, terminal.state())
+                return self.jsend(200, terminal.state(block=False))
             if route == "sessions":
                 log = session_log()
                 events = log.events(q.get("session", ""), int(q.get("limit", 500)))
