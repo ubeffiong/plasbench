@@ -84,6 +84,9 @@ test_discover_negative_controls.py	0.3
 test_discover_plasmid_free.py	0.3
 test_disk_guard.sh	26.7
 test_doc_versions.py	0.3
+test_docker_extras.py	0.5
+test_docker_extras.sh	30.0
+test_docker_extras_e2e.py	180.0
 test_docker_install.sh	1.0
 test_docker_diagnosis.py	0.5
 test_docker_health.py	12.0
@@ -205,6 +208,7 @@ test_performance_per_run_threads.py	0.3
 test_performance_summary.py	0.3
 test_permutation_reporting.py	0.3
 test_picker_diagnostics.py	7.0
+test_issue_report.py	4.0
 test_picker_ui_browser.py	0.3
 test_plasbench_common.py	0.3
 test_plasbin_flow_adapter.py	0.3

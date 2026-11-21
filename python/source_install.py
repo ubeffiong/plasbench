@@ -372,6 +372,17 @@ def status_of(name: str, entry: dict, main_prefix: Path, env_name: str) -> dict:
     return {"profile": name, "state": state, "pinned_commit": entry["commit"], "provenance": prov}
 
 
+def _first_unwritable(layout) -> str:
+    """The first folder this install must write to that the current user cannot write to, or ''. Missing folders are judged by their nearest existing parent."""
+    for target in (layout.main, layout.bin, layout.install):
+        probe = Path(target)
+        while not probe.exists() and probe != probe.parent:
+            probe = probe.parent
+        if probe.exists() and not os.access(str(probe), os.W_OK | os.X_OK):
+            return str(target)
+    return ""
+
+
 def install(name: str, entry: dict, main_prefix: Path | None, solver: str, env_name: str, assume_yes: bool) -> int:
     if entry["mode"] == "manual":
         print(manual_text(name, entry))
@@ -380,6 +391,25 @@ def install(name: str, entry: dict, main_prefix: Path | None, solver: str, env_n
         print(f"ERROR: the main environment '{env_name}' was not found; create it first (bash env/setup_conda.sh), then run:  plasbench install-tools {name} --yes", file=sys.stderr)
         return EXIT_FAILED
     layout = Layout(main_prefix, env_name, name)
+    # A read-only prefix (the image's conda environment, when run as the host user in a container) fails here, at once, instead of half way through a build.
+    blocked = _first_unwritable(layout)
+    if blocked:
+        try:
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            from install_diagnosis import diagnose
+            found = diagnose(f"permission denied '{blocked}'", os.environ.get("PLASBENCH_EXTRA_HOME", ""))
+            said = f"{found['title']}. {found['advice']}"
+        except Exception:  # noqa: BLE001
+            said = f"{blocked} is read-only for your user"
+        print(f"ERROR: this environment is read-only for your user ({blocked}): {said}", file=sys.stderr)
+        stop = os.environ.get("PLASBENCH_INSTALL_STOP_FILE")
+        if stop:
+            try:
+                with open(stop, "a", encoding="utf-8") as handle:
+                    handle.write(f"read-only {blocked}\n")
+            except OSError:
+                pass
+        return EXIT_FAILED
     wanted = entry["commit"]
     prov = read_provenance(layout.provenance)
     staging_wrappers = layout.base / f".plasbench-wrappers-{name}-{os.getpid()}"

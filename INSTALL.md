@@ -81,6 +81,13 @@ bash env/download_mobsuite_db.sh      # its database, into the new environment
 
 **Docker mode (switchable).** Set up this computer, **Environment**, chooses where the tools run: Conda or Docker (`plasbench runtime use docker`, `plasbench runtime check`). In Docker mode the window stays on your computer and each run, check and install executes in a container of `ghcr.io/ubeffiong/plasbench:v<version>` with your folders mounted at the same paths; if that image cannot be pulled, `plasbench runtime build --yes` builds it from the Dockerfile (internet, several GB, long). Tools and databases you add live in `~/.plasbench/docker/<version>/extras` and the database folder, not in the image.
 
+**Docker mode: where extras live.** The image's conda environments (`/opt/conda/envs/*`) belong to the image and are read-only for you (the container runs as your own user). Every install made in Docker mode (`plasbench check --yes`, `plasbench install-tools ...`) therefore goes to the persistent extras folder, one overlay environment created fresh with its own solve: `~/.plasbench/docker/<version>/extras/envs/extras` (tool wrappers in `extras/bin`, the package cache in `extras/pkgs`, the solver's own root in `extras/mamba`). PATH inside every container is: `extras/bin`, then the image's own tools, then `extras/envs/extras/bin`, so the image's pinned tools always win and the extras only add what the image lacks. Databases go to the mounted database folder (`~/.plasbench/databases`; MOB-suite's database is used from `~/.plasbench/databases/mob_suite/databases` through its `-d` option because the image's own folder is read-only). To look at what was installed: `ls ~/.plasbench/docker/<version>/extras/envs/extras/bin`. To start the extras over (PlasBench never deletes them for you; this does not touch the image, your databases or your results), run this yourself after checking the path:
+
+```
+rm -rf ~/.plasbench/docker/<version>/extras
+```
+
+
 **Docker and the folder window.** The window (`plasbench ui`) opens this computer's own folder window for Browse, so run it on your computer; Docker runs the pipeline
 (`scripts/docker_run.sh plasbench run ...`, see the README's Container section; no Docker yet? `plasbench install-tools docker`, see "Installing Docker"). Inside a container there is no desktop: Browse uses the built-in browser at the folders you mounted, and
 the window shows the `docker run -v` command for mounting another one. If Browse does not open the folder window on your computer, run `plasbench picker-check`.
@@ -539,6 +546,11 @@ Set `PLASBENCH_NO_LAUNCHER=1` to skip it. After an upgrade, `plasbench` checks t
 (`python -m pip install --no-deps .`) if not; `plasbench ui-state` shows the evidence.
 
 ## Troubleshooting
+
+Something failed and it is not listed here? See [Reporting an issue](README.md#reporting-an-issue) (or [SUPPORT.md](SUPPORT.md)): copy the **complete** error text, then run
+`plasbench issue-report` for one paste of your versions, computer and the last lines of the run's logs, with secrets removed, and open a
+[New issue](https://github.com/ubeffiong/plasbench/issues/new/choose). If `plasbench` itself will not start, paste the output of `python -m plasbench --version`, your operating
+system (`uname -a` or `ver`) and the installer's last 40 lines.
 
 - **The window says it is older than the page** -> run `plasbench ui-state`. If it reports two installs, run
   `conda activate plasbench && cd ~/PlasBench && python -m pip install --no-deps .`, then restart the window.

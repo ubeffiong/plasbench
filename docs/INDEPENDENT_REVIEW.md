@@ -449,7 +449,7 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E31 | Power analysis uses a normal approximation | `python/power_analysis.py:69` | `NormalDist().inv_cdf` |
 | E32 | Plasmid replicons under the long-read depth floor become ambiguous (default 5x) | `python/label_truth_evidence.py:154` | `--min-long-read-depth` |
 | E33 | Tier is decided from strategy, polish and cohort tier | `python/truth_provenance.py:334` | `reference_tier, tier_reason = tier(` |
-| E34 | Circularity guard for long-read tools | `scripts/lib.sh:663` | `truth_independent_of_long_reads` |
+| E34 | Circularity guard for long-read tools | `scripts/lib.sh:679` | `truth_independent_of_long_reads` |
 | E35 | Date-based overlap screen | `python/flag_database_overlap.py:101` | `possible_overlap` |
 | E36 | Mash screen is marked experimental and unvalidated | `python/classify_operational_plasmid.py:4` | `EXPERIMENTAL AND UNVALIDATED` |
 | E37 | The recommender's ridge penalty is chosen on the folds it reports | `python/fit_recommendation_model.py:242` | `lambda was selected on the same LOSO folds` |

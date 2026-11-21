@@ -362,7 +362,8 @@ run_mob_recon() {
             rm -rf "$OUT" "$PRED" "$DONE"
             log "  mob_recon ($SAMPLE) ..."
             local START; START=$(profile_start)
-            if profile_exec mob_recon --infile "$CONTIGS" --outdir "$OUT" --num_threads "$MOB_RECON_THREADS" --force > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+            local MOB_DB_ARGS=(); mapfile -t MOB_DB_ARGS < <(mobsuite_db_args)
+            if profile_exec mob_recon ${MOB_DB_ARGS[@]+"${MOB_DB_ARGS[@]}"} --infile "$CONTIGS" --outdir "$OUT" --num_threads "$MOB_RECON_THREADS" --force > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 run_adapter adapt_mob_recon.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else

@@ -55,13 +55,29 @@ run_event() {
 
 # proc_stats PID: "cpu=NN% rss=NNNMB procs=N" for PID and everything it started (Linux and macOS ps). Empty when ps cannot say.
 proc_stats() {
-    ps -eo pid=,ppid=,pcpu=,rss= 2>/dev/null | awk -v root="$1" '
-        { ppid[$1] = $2; cpu[$1] = $3; rss[$1] = $4 }
-        END {
-            for (p in ppid) { q = p; d = 0
-                while ((q in ppid) && d < 64) { if (q == root) { n++; c += cpu[p]; r += rss[p]; break } q = ppid[q]; d++ } }
-            if (n > 0) printf "cpu=%.0f%% rss=%.0fMB procs=%d", c, r / 1024, n
-        }'
+    # A heartbeat only observes: it must never fail the command it watches. `ps` is missing from minimal images (the PlasBench container had none), and under
+    # `set -e -o pipefail` its exit 127 used to abort the whole install. Without ps the figures come from /proc (memory and process count; no CPU share).
+    local out=""
+    if command -v ps >/dev/null 2>&1; then
+        out="$(ps -eo pid=,ppid=,pcpu=,rss= 2>/dev/null | awk -v root="$1" '
+            { ppid[$1] = $2; cpu[$1] = $3; rss[$1] = $4 }
+            END {
+                for (p in ppid) { q = p; d = 0
+                    while ((q in ppid) && d < 64) { if (q == root) { n++; c += cpu[p]; r += rss[p]; break } q = ppid[q]; d++ } }
+                if (n > 0) printf "cpu=%.0f%% rss=%.0fMB procs=%d", c, r / 1024, n
+            }' || true)"
+    elif [[ -d /proc/self ]]; then
+        out="$(cat /proc/[0-9]*/stat 2>/dev/null | awk -v root="$1" '
+            { i = index($0, ") "); if (i == 0) next; split(substr($0, i + 2), f, " "); pid = $1
+              ppid[pid] = f[2]; rss[pid] = f[22] * 4 }
+            END {
+                for (p in ppid) { q = p; d = 0
+                    while ((q in ppid) && d < 64) { if (q == root) { n++; r += rss[p]; break } q = ppid[q]; d++ } }
+                if (n > 0) printf "rss=%.0fMB procs=%d", r / 1024, n
+            }' || true)"
+    fi
+    printf '%s' "$out"
+    return 0
 }
 
 # sys_stats [DIR]: "mem_avail=NNNMB swap_used=NNNMB disk_free=NNGB" (Linux /proc/meminfo; the fields it cannot read are left out).
@@ -82,15 +98,15 @@ sys_stats() {
 # the caller) last changed and that log's last line, plus a plain warning when memory is nearly gone or the command is idle. Also written to the event log.
 heartbeat_report() {
     local pid="$1" description="$2" elapsed="$3" stats sysstats idle="" tail_line="" now mtime avail cpu
-    stats="$(proc_stats "$pid")"
-    sysstats="$(sys_stats "${RESULTS_DIR:-.}")"
+    stats="$(proc_stats "$pid" || true)"
+    sysstats="$(sys_stats "${RESULTS_DIR:-.}" || true)"
     if [[ -n "${WATCH_LOG:-}" && -f "$WATCH_LOG" ]]; then
         now="$(date +%s)"
         mtime="$(stat -c %Y "$WATCH_LOG" 2>/dev/null || stat -f %m "$WATCH_LOG" 2>/dev/null || true)"
         [[ "$mtime" =~ ^[0-9]+$ ]] && idle=$(( now - mtime ))
         tail_line="$(grep -v '^[[:space:]]*$' "$WATCH_LOG" 2>/dev/null | tail -n 1 | tr -d '\r' | cut -c1-110 || true)"
     fi
-    heartbeat_log "still working: $description (${elapsed}s elapsed; ${stats:-no process figures}${sysstats:+; $sysstats}${idle:+; its log last changed ${idle}s ago}${tail_line:+: \"$tail_line\"})"
+    heartbeat_log "still working: $description (${elapsed}s elapsed; ${stats:-process figures unavailable}${sysstats:+; $sysstats}${idle:+; its log last changed ${idle}s ago}${tail_line:+: \"$tail_line\"})"
     run_event heartbeat "what=$description" "elapsed=$elapsed" "stats=${stats}" "system=${sysstats}" "log_idle=${idle}"
     avail="$(sed -n 's/.*mem_avail=\([0-9]*\)MB.*/\1/p' <<< "$sysstats")"
     if [[ "$avail" =~ ^[0-9]+$ && "$avail" -lt 300 ]]; then
@@ -776,21 +792,47 @@ mobsuite_db_complete() {
 mobsuite_db_preserve() {
     # PLASBENCH_DB_PRESERVE=0 (the test suite) never moves or links a real database.
     [[ "${PLASBENCH_DB_PRESERVE:-1}" == "0" ]] && return 0
-    local env_db store="${PLASBENCH_DB_DIR:-$HOME/.plasbench/databases}/mob_suite/databases"
-    env_db="$(mobsuite_db_dir)"
+    local env_db store err
+    store="$(mobsuite_db_store)"
+    env_db="$(mobsuite_env_db_dir)"
     [[ -n "$env_db" ]] || return 0
     if [[ -L "$env_db" ]]; then
         return 0
     fi
-    mkdir -p "$(dirname "$store")"
-    if mobsuite_db_complete "$env_db" && ! mobsuite_db_complete "$store"; then
-        if [[ -e "$store" ]]; then mv "$store" "$store.incomplete.$(date +%s)"; fi
-        mv "$env_db" "$store" && ln -s "$store" "$env_db" \
-            && log "  MOB-suite database moved to the machine store: $store (linked from the environment)"
-    elif mobsuite_db_complete "$store"; then
-        mv "$env_db" "$env_db.pre-store.$(date +%s)" && ln -s "$store" "$env_db" \
-            && log "  MOB-suite environment linked to the stored database: $store"
+    # A read-only environment (the PlasBench image, run as the host user) cannot be moved or linked: the database stays in the store and the tools are pointed at it
+    # (mob_recon/mob_typer/mob_init -d, see mobsuite_db_args). Say so once, never attempt the mv.
+    if ! mobsuite_env_writable "$env_db"; then
+        [[ "$env_db" == "$store" ]] || log "  MOB-suite's own folder is read-only here ($env_db); its database is kept in the store and used from there: $store"
+        return 0
     fi
+    mkdir -p "$(dirname "$store")" 2>/dev/null || { warn "  cannot create the MOB-suite store folder $(dirname "$store")"; return 0; }
+    if mobsuite_db_complete "$env_db" && ! mobsuite_db_complete "$store"; then
+        if [[ -e "$store" ]]; then mv "$store" "$store.incomplete.$(date +%s)" || true; fi
+        if err="$(mv "$env_db" "$store" 2>&1)" && ln -s "$store" "$env_db"; then
+            log "  MOB-suite database moved to the machine store: $store (linked from the environment)"
+        else
+            warn "  MOB-suite database could not be moved to the store: ${err:-the link failed}"
+        fi
+    elif mobsuite_db_complete "$store"; then
+        if err="$(mv "$env_db" "$env_db.pre-store.$(date +%s)" 2>&1)" && ln -s "$store" "$env_db"; then
+            log "  MOB-suite environment linked to the stored database: $store"
+        else
+            warn "  MOB-suite environment could not be linked to the stored database: ${err:-the link failed}"
+        fi
+    fi
+    return 0
+}
+
+# Where the machine-wide MOB-suite database lives (inside the container: the mounted databases folder).
+mobsuite_db_store() { printf '%s' "${PLASBENCH_DB_DIR:-$HOME/.plasbench/databases}/mob_suite/databases"; }
+
+# True when the folder that holds DIR (the package directory) can be changed by this user.
+mobsuite_env_writable() { [[ -w "$(dirname "$1")" ]]; }
+
+# Inside the container the database is used from the store with -d: prints "-d" and the folder (one per line) when that applies and the stored database is complete.
+mobsuite_db_args() {
+    local store; store="$(mobsuite_db_store)"
+    if [[ "${PLASBENCH_IN_DOCKER:-}" == "1" ]] && mobsuite_db_complete "$store"; then printf -- '-d\n%s\n' "$store"; fi
     return 0
 }
 
@@ -982,7 +1024,16 @@ mobsuite_env_root() {
     (cd "$(dirname "$exe")/.." 2>/dev/null && pwd) || true
 }
 
+# The database the tools will use: inside the container the stored one (the image's own folder is read-only and empty), else the installed MOB-suite's own folder.
 mobsuite_db_dir() {
+    if [[ "${PLASBENCH_IN_DOCKER:-}" == "1" ]] && mobsuite_db_complete "$(mobsuite_db_store)"; then
+        printf %s "$(mobsuite_db_store)"; return 0
+    fi
+    mobsuite_env_db_dir
+}
+
+# The database folder inside the installed MOB-suite package (never the store).
+mobsuite_env_db_dir() {
     local exe target env_root candidate found
     exe="$(command -v mob_recon 2>/dev/null || true)"
     if [[ -n "$exe" ]]; then

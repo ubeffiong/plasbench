@@ -919,8 +919,10 @@ with a "still working" line, and on failure says which step failed and why (disk
 with a persistent folder mounted (`~/.plasbench/docker/<version>/extras`, or `PLASBENCH_DOCKER_EXTRA`): extra conda environments and tool wrappers land there and are put on PATH
 in every later container; databases land in the shared database folder. **Make everything ready** in the Environment card runs `plasbench check --yes` this way. A tool that needs a
 licence or a manual step stays exit 20, exactly as with conda. The extras (tool names and install provenance) are recorded in `run_manifest.json` under `runtime`, with the image, its
-source (`pulled` or `built-locally`), the Docker version and the mounts, and the report's Run metadata says where the tools ran. Installing tools into a container is exercised in the tests with a
-small fake tool and database; real bioconda installs inside the container have not been validated on every tool: if one fails, the log says why, and the supported fallbacks are a derived
+source (`pulled` or `built-locally`), the Docker version and the mounts, and the report's Run metadata says where the tools ran. Installs go to one overlay environment, `<extras>/envs/extras`, created fresh (the image's environments are read-only for the host user and are never written to; a read-only
+prefix is refused at once with the path and the fix). PATH in a container is `<extras>/bin`, the image's tools, then `<extras>/envs/extras/bin`. MOB-suite's database is used from the
+database folder with `-d`. A real install of a small conda package as a non-root user, and its use from a second container, is exercised in CI (`test/test_docker_extras_e2e.py`); real bioconda installs
+of each large tool inside the container have not been validated: if one fails, the log says why, and the supported fallbacks are a derived
 image (`FROM` the PlasBench image, install the tool, set `PLASBENCH_DOCKER_IMAGE`) or Conda for that tool.
 
 **Switching back.** `plasbench runtime use conda`, or **Use Conda**. Conda stays installed; runs already going keep the runtime they started with. The study record (`study.json`) says which
@@ -1397,6 +1399,11 @@ Long-running runs do not yet estimate total completion time; use log timestamps
 and `results/tool_status.tsv` to monitor progress.
 
 ## Troubleshooting
+
+**Reporting an issue.** When a step fails and nothing below fits: copy the complete error text (Ctrl+Shift+C in a Linux or Windows Terminal, Cmd+C on a Mac, or the **Copy** button of the
+console in the window), run `plasbench issue-report` (or **More > Report an issue > Prepare diagnostics** in the window), and open a
+[New issue](https://github.com/ubeffiong/plasbench/issues/new/choose). The README section [Reporting an issue](../README.md#reporting-an-issue) lists exactly what to send, with a
+template and three worked examples; [SUPPORT.md](../SUPPORT.md) is the short version.
 
 ```text
 Pop-ups say "This window needs to be reopened", or "PlasBench's program files changed while this window was open"

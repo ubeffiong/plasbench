@@ -757,6 +757,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
   <div class="menu" id="moremenu" hidden>
    <button type="button" class="mi" id="updmenu" hidden title="A newer release is published: open the Updates card"><svg class="ico sm"><use href="#i-refresh"/></svg><span class="mt">Update available</span></button>
    <button type="button" class="mi" id="helpbtn" title="Help for this page (F1)"><svg class="ico sm"><use href="#i-help"/></svg>Help for this page (F1)</button>
+   <button type="button" class="mi" id="reportbtn" title="Report a problem or ask for a feature on GitHub, with a redacted diagnostics block to paste"><svg class="ico sm"><use href="#i-ext"/></svg>Report an issue</button>
    <button type="button" class="mi" id="reloadbtn" title="Reload page (clear cache)"><svg class="ico sm"><use href="#i-refresh"/></svg>Reload page (clear cache)</button>
    <button type="button" class="mi" id="theme" title="Switch between light and dark"><svg class="ico sm"><use href="#i-moon"/></svg>Light / dark theme</button></div></div>
  <button class="tbtn" id="consbtn" title="Show or hide the console (job output and terminal)"><svg class="ico sm"><use href="#i-term"/></svg><span>Console</span></button>
@@ -1068,7 +1069,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
   <!-- HELP ---------------------------------------------------------------------------------------- -->
   <section id="v_doc" hidden aria-live="polite"></section>
   <section class="view" id="v_help" hidden>
-   <div class="vhead"><div class="ttl"><div class="crumbs">Settings &amp; help</div><h1>Guides</h1><p>The README and every guide shipped with this installation.</p></div></div>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Settings &amp; help</div><h1>Guides</h1><p>The README and every guide shipped with this installation.</p><p><button type="button" class="btn sm" id="reportbtn2">Report an issue</button><span data-tipid="report_issue"></span></p></div></div>
    <div class="cmdgrid"><div class="card cmdlist" id="doclist"></div><div class="card"><div class="bd md" id="docbody"><p class="mut">Choose a guide.</p></div></div></div>
   </section>
  </main>
@@ -1711,6 +1712,25 @@ $("#navtoggle").onclick = () => $("#rail").classList.toggle("open");
   mm.addEventListener("click", () => close(false));
   mm.addEventListener("keydown", e => { if (e.key === "Escape") { e.stopPropagation(); close(true); } else if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const it = [...mm.querySelectorAll(".mi")], i = it.indexOf(document.activeElement); it[(i + (e.key === "ArrowDown" ? 1 : it.length - 1)) % it.length].focus(); } });
   document.addEventListener("click", e => { if (!mm.hidden && !e.target.closest("#morewrap")) close(false); }); }
+/* ---- Report an issue: GitHub's issue chooser, and the redacted diagnostics block (GET /api/issue-report) in a dialog with a Copy button. Nothing is sent from here. ---- */
+async function reportIssue() {
+  const NEW = "https://github.com/ubeffiong/plasbench/issues/new/choose";
+  let text = "";
+  const bodyHTML = `<p>Search the <a href="https://github.com/ubeffiong/plasbench/issues" target="_blank" rel="noopener">existing issues</a> first, then open the form and paste the diagnostics into its Diagnostics box. Also paste the exact error text from the console.</p>
+    <p class="row" style="gap:8px;flex-wrap:wrap"><a class="btn" id="ri_open" href="${NEW}" target="_blank" rel="noopener">Open the GitHub issue forms</a><a class="btn sec" id="ri_bug" href="https://github.com/ubeffiong/plasbench/issues/new?template=bug_report.yml" target="_blank" rel="noopener">Bug report form</a><button type="button" class="btn sec" id="ri_prep" data-ri="prep" title="Collect versions, computer, Docker and the last lines of the newest run's logs, with secrets, e-mail and IP addresses and your user name removed">Prepare diagnostics</button><button type="button" class="btn sec" id="ri_copy" data-ri="copy" disabled title="Copy the text below">Copy diagnostics</button></p>
+    <pre class="detail" id="ri_text" aria-live="polite" style="max-height:40vh">Press Prepare diagnostics. Read the text before you post it.</pre>`;
+  await modalDialog({title: "Report an issue", bodyHTML, buttons: [{id: "close", label: "Close", primary: true}], cancelId: "close", wide: true,
+    onclick: async e => {
+      const b = e.target.closest("[data-ri]"); if (!b || b.disabled) return;
+      const pre = document.getElementById("ri_text"), copy = document.getElementById("ri_copy");
+      if (b.dataset.ri === "copy") { if (text) await copyText(text, "Diagnostics copied"); return; }
+      b.disabled = true; pre.textContent = "Collecting (a few seconds)..."; copy.disabled = true;
+      try { const r = await api("issue-report"); text = r.markdown || ""; pre.textContent = text || r.error || "Nothing was collected."; copy.disabled = !text; }
+      catch (err) { text = ""; pre.textContent = "Could not prepare the diagnostics: " + err.message + ". In a terminal, run: plasbench issue-report"; }
+      finally { b.disabled = false; }
+    }});
+}
+$("#reportbtn").onclick = reportIssue; $("#reportbtn2").onclick = reportIssue;
 /* theme */
 const savedTheme = localStorage.getItem("pb_theme");
 if (savedTheme) document.documentElement.dataset.theme = savedTheme;
