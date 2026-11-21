@@ -1,7 +1,7 @@
 # PlasBench Scientific Guide
 
 **What PlasBench does, how it does it, why, and how to check it.**
-This guide is for the people who must decide whether to trust and use the tool: microbiologists, bioinformaticians, AMR and public-health scientists, laboratory leads, programme implementers and reviewers. It describes PlasBench at version 0.5.5 (the version in `pyproject.toml`; `test/test_doc_versions.py` keeps the two in step). It does not require you to read the source code, and it tells you where the code is when you want to.
+This guide is for the people who must decide whether to trust and use the tool: microbiologists, bioinformaticians, AMR and public-health scientists, laboratory leads, programme implementers and reviewers. It describes PlasBench at version 0.5.6 (the version in `pyproject.toml`; `test/test_doc_versions.py` keeps the two in step). It does not require you to read the source code, and it tells you where the code is when you want to.
 
 <!-- TOC -->
 - [1. What PlasBench is, and what it is not](#1-what-plasbench-is-and-what-it-is-not)
