@@ -55,6 +55,9 @@ if [[ "$PROFILE" == "docker" ]]; then
     [[ "$ASSUME_YES" -eq 1 ]] && DOCKER_ARGS+=(--yes)
     [[ "${PLASBENCH_INSTALL_DRY_RUN:-0}" == "1" ]] && DOCKER_ARGS+=(--dry-run)
     [[ "${PLASBENCH_DOCKER_HELLO:-0}" == "1" ]] && DOCKER_ARGS+=(--hello-world)
+    [[ "${PLASBENCH_DOCKER_START:-0}" == "1" ]] && DOCKER_ARGS+=(--start)
+    [[ "${PLASBENCH_DOCKER_OPEN_INTEGRATION:-0}" == "1" ]] && DOCKER_ARGS+=(--open-integration)
+    [[ -n "${PLASBENCH_DOCKER_WAIT:-}" ]] && DOCKER_ARGS+=(--wait "$PLASBENCH_DOCKER_WAIT")
     if [[ "$ASSUME_YES" -eq 1 && "${PLASBENCH_INSTALL_DRY_RUN:-0}" != "1" ]]; then
         # Only the winget / Homebrew routes go online; the services are the ones the plan says (config/network_services.tsv: winget, brew, docker).
         read -r -a DOCKER_SERVICES <<< "$(python3 "$HERE/../python/docker_setup.py" services 2>/dev/null || true)"
