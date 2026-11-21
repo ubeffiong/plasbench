@@ -537,6 +537,11 @@ def build_parser():
         "ui-state",
         help="Say which PlasBench the window runs: version and folder of the running program, every installed copy, the PlasBench folder, and the running window's state (paste it when asking for help).")
     state_parser.add_argument("--json", action="store_true", help="Print the evidence as JSON.")
+    stop_parser = sub.add_parser(
+        "stop",
+        help="End every PlasBench window server of this user on this computer (safety net for stale windows and servers); runs keep going unless --runs.")
+    from . import stopall
+    stopall.add_arguments(stop_parser)
     report_issue_parser = sub.add_parser(
         "issue-report",
         help="Print one ready-to-paste block for a GitHub issue: versions, computer, Docker, the study's run status and the last lines of its logs, with secrets, e-mail and IP addresses and your user name removed.")
@@ -1269,6 +1274,9 @@ def main(argv=None):
     root, how, tried = roots.resolve(args.project_root)
     if args.command == "ui-state":
         raise SystemExit(ui_state_command(args, root, how))
+    if args.command == "stop":
+        from . import stopall
+        raise SystemExit(stopall.command(args, env=stopall.Env(roots=[root] if root else [])))
     if args.command == "issue-report":
         from . import issue_report
         raise SystemExit(issue_report.command(args, root, how))

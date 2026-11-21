@@ -1398,12 +1398,51 @@ sample/tool execution, warnings, output locations, and the final leaderboard.
 Long-running runs do not yet estimate total completion time; use log timestamps
 and `results/tool_status.tsv` to monitor progress.
 
+## Stopping PlasBench: closing the window, Quit, Quit everything, `plasbench stop`
+
+Closing the window vs quitting PlasBench. These are different things, and closing a window never stops anything.
+
+| What you do | What happens |
+|---|---|
+| **Close the window** (the window's X, Alt+F4, closing the app window or the browser tab) | Nothing is stopped. PlasBench (the server) and your runs keep going. Start `plasbench ui` or click the desktop icon: you get the same server back. A window that closes only lowers the "windows open" count; PlasBench never exits because no window is open. |
+| **Quit** (top right) | Ends this PlasBench server. If a run is going you choose Cancel, **Stop and quit** (cancels the run first) or **Quit and keep running** (the default; the run goes on in the background). |
+| **Quit, then "Stop all PlasBench on this computer..."** (Quit everything) | Ends every PlasBench server of your account on this computer, including stale ones left on other ports. Runs keep going unless you switch on the red "Also stop N running runs/jobs". |
+| **Quit everything and "Quit and restart WSL (wsl --shutdown)"** (WSL only) | Also runs `wsl --shutdown` from Windows: it ends everything in WSL. See below. |
+
+`plasbench stop` does the same from a terminal and works when a window cannot reach its server:
+
+```bash
+plasbench stop --dry-run          # show exactly what would end and what is skipped; changes nothing
+plasbench stop                    # list it, ask y/N, then stop every recorded PlasBench window server
+plasbench stop --runs             # also cancel active runs and jobs (finished work is kept; you can resume)
+plasbench stop --windows          # also close the app windows PlasBench opened
+plasbench stop --yes --json       # no question; machine-readable result
+```
+
+What it ends and what it never touches:
+- Only servers PlasBench itself recorded (`~/.plasbench/ui/server.json`, `servers/*.json`, other UI homes), and only after checking that the process is really a PlasBench server (its command line, and that the process start time agrees with the record, so a reused process id is never mistaken for one).
+- It asks each server politely first (the same quit as the Quit button, keeping runs going), then sends a stop request, and force-kills only after a grace period (10 s) if the same verified process is still there. On Windows the same steps use `taskkill` without, then with, `/F`.
+- A program that holds a PlasBench port (for example the WSL relay, Docker, or any other program) is never killed by its port number: it is reported ("port 8770 is held by another program (name, pid)") and left alone. Nothing runs with sudo, other users' processes are never touched, and `plasbench stop` never ends itself.
+- Runs and jobs keep going unless you add `--runs`. Terminal-started runs are found through their run lock; each is listed with its name, how long it has run and its last step. A stopped run is recorded (`stopped_by_user`).
+- `--windows` closes only browser windows whose command line carries the address of a PlasBench server and PlasBench's own app-window profile. Other Edge or Chrome windows are never touched. Windows normally close themselves when their server ends ("PlasBench has stopped").
+- Everything it ends is written to `~/.plasbench/ui/stop.log` and to the session log. Exit codes: 0 nothing left running (or only runs you chose to keep), 3 something could not be ended (listed), 2 usage.
+
+`wsl --shutdown` (`plasbench stop --wsl-shutdown --yes [--runs]`, or the checkbox in the Stop all dialog) is the most destructive choice and is never the default. It exists only when PlasBench runs inside WSL and Windows interop lets it start `wsl.exe`; otherwise it is shown disabled with the reason and the exact command to run in Windows PowerShell. It ends **every** WSL distribution, the Docker Desktop engine (Docker Desktop restarts its WSL backend), every terminal open in WSL (anything unsaved there is lost), every PlasBench server, this window and, if you also switch on the red runs switch, the running runs. With a run active it is blocked until you do. The window asks twice: a list of everything it ends, then you type `SHUT DOWN WSL` and press **Shut down WSL now**. PlasBench first stops its servers and runs, then starts `wsl --shutdown` from Windows after a short delay (so the page can say "WSL is shutting down"). Finished work and files are kept and runs can be resumed. You typically need it after changing `C:\Users\<you>\.wslconfig` (memory, processors, swap), after being added to the `docker` group, or to recover a stuck WSL. Afterwards reopen Ubuntu or run `plasbench ui`; the next WSL start takes a few seconds and PlasBench windows must be reopened.
+
 ## Troubleshooting
 
 **Reporting an issue.** When a step fails and nothing below fits: copy the complete error text (Ctrl+Shift+C in a Linux or Windows Terminal, Cmd+C on a Mac, or the **Copy** button of the
 console in the window), run `plasbench issue-report` (or **More > Report an issue > Prepare diagnostics** in the window), and open a
 [New issue](https://github.com/ubeffiong/plasbench/issues/new/choose). The README section [Reporting an issue](../README.md#reporting-an-issue) lists exactly what to send, with a
 template and three worked examples; [SUPPORT.md](../SUPPORT.md) is the short version.
+
+```text
+Too many windows or servers (several PlasBench windows, ports 8770 and 8771 both in use, a pop-up that keeps coming back)
+    1. `plasbench stop --dry-run` lists every PlasBench server and what would be ended; nothing changes.
+    2. `plasbench stop` ends them all (runs keep going; add `--runs` to stop those too). If a window shows the bar
+       "This window belongs to an older PlasBench session", its Stop all... button shows this command with a Copy button.
+    3. `plasbench ui` starts one clean server and window. Closing a window never stops PlasBench by itself.
+```
 
 ```text
 Pop-ups say "This window needs to be reopened", or "PlasBench's program files changed while this window was open"
