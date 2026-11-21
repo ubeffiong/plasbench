@@ -26,6 +26,7 @@ import platform
 import re
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 from . import __version__, ai_actions, ai_kb, ai_openrouter as orr, ai_prompt, ai_providers
 
@@ -33,7 +34,7 @@ DEFAULTS = {"AI_HELP_ENABLED": "1", "AI_PROVIDER": "openrouter", "AI_MODEL": "",
             "AI_HF_CLIENT_ID": "", "AI_HF_BASE": "", "AI_HF_HUB": "", "AI_HF_USE_CREDITS": "0", "AI_LOCAL_BASE": "", "AI_LOCAL_ALLOW_REMOTE": "0"}
 CALLBACK_PATHS = {ai_providers.OR_CALLBACK: "openrouter", ai_providers.HF_CALLBACK: "huggingface"}
 CALLBACK_PATH = ai_providers.OR_CALLBACK
-DISCLOSURE_VERSION = 3
+DISCLOSURE_VERSION = 4
 
 
 def truthy(value) -> bool:
@@ -106,12 +107,32 @@ def give_consent(provider: str = "openrouter") -> None:
 
 
 # The assistant works from documentation excerpts only. This is said to the person (the notice, a line that stays under the chat, `plasbench ask`) and to the model (the system prompt).
-DECLARATION = ("The assistant cannot see your files. It has no access to your FASTQ or FASTA files, sample sheets, results, logs, reports, databases or settings, and it does not know "
-               "what is on your computer. It knows only PlasBench's documentation, a short setup line, and what you type or choose to send with Send result. It cannot check, open or "
-               "analyse your data: to diagnose something, run the command it suggests and send the output.")
+DECLARATION = ("The assistant never opens your files. If you choose a folder, PlasBench itself reads names, sizes and the first lines on your computer and shows you what it found; "
+               "a summary goes to the assistant only when you press Share. Without that, it has no access to your FASTQ or FASTA files, sample sheets, results, logs, reports, databases or "
+               "settings. It knows PlasBench's documentation, a short setup line, and what you type or choose to send. It cannot run anything without your click.")
 GENERAL_NOTE = ("For general questions related to PlasBench (plasmids, sequencing, resistance genes, conda, Docker, WSL) the assistant may use the knowledge of its model; those parts "
                 "begin with \"General knowledge:\" and can be wrong, so check anything important. Facts about PlasBench itself (commands, options, settings, metrics) come from its documentation.")
-DECLARATION_SHORT = "I can't see your files (FASTQ, FASTA, results, logs). I only know PlasBench's guides and what you type or send me."
+DECLARATION_SHORT = "The assistant never opens your files. A folder you choose is read by PlasBench itself; a summary goes to the assistant only when you press Share."
+
+# Questions that look like navigation, setup, file or capability requests get the capabilities guide as one extra excerpt (docs/AI_CAPABILITIES.md), so the permanent prompt stays short.
+INTENT = re.compile(r"\b(go to|take me|open the|navigate|where (?:do|can|is|are)|change (?:a |the |my )?setting|turn (?:on|off)|switch (?:on|off|to)|set up|setup|prepare|prefill|fill in|"
+                    r"folder|directory|my files|rename|copy|move|sheet|spreadsheet|fix my|install the tools|add (?:a |my own )?tool|what can you|can you|are you able|your limits|"
+                    r"can the (?:ai|assistant)|see my|access my)\b", re.I)
+CAPABILITIES_SRC = "docs/AI_CAPABILITIES.md"
+
+
+def retrieve(kb, question: str, history: list = None, page: dict = None, k: int = 5) -> list:
+    """The excerpts worth sending for one question: the best-ranked ones that are actually relevant (none for an off-topic question), and for a navigation, setup, file or
+    capability question the capabilities guide as one extra excerpt."""
+    history = history or []
+    hint = "fail" if (page or {}).get("last_failure") else ""
+    q = question + (" " + str(history[-1].get("content", ""))[:200] if history and len(question.split()) < 4 else "")
+    hits = kb.relevant(q, k, hint)
+    if INTENT.search(question):
+        cap = kb.from_source(q, CAPABILITIES_SRC, 1, hint)
+        if cap and not any(h["id"] == cap[0]["id"] for h in hits):
+            hits = (hits[:k - 1] + cap) if len(hits) >= k else hits + cap      # after the best matches: it never pushes the guide that answers the question out of the top
+    return hits
 
 
 def disclosure(p: "ai_providers.Provider") -> dict:
@@ -121,8 +142,9 @@ def disclosure(p: "ai_providers.Provider") -> dict:
     return {"version": DISCLOSURE_VERSION, "provider": p.id, "name": p.name, "where": pr["where"],
             "declaration": DECLARATION, "declaration_short": DECLARATION_SHORT, "general": GENERAL_NOTE,
             "sent": ["your question", "the few documentation excerpts found for it", "the last few turns of this chat", "a short setup line (PlasBench version, system type, WSL or not, conda or Docker, the stage or the failure the window knows)",
-                     "command output only when you press Send result, after removing your folder names, user name, e-mail addresses, keys and IP addresses"],
-            "not_sent": ["file names and folder paths", "your user name or e-mail address", "accession lists or your data", "any key or password"],
+                     "command output only when you press Send result, after removing your folder names, user name, e-mail addresses, keys and IP addresses",
+                     "a summary of a folder you chose (relative file names, sizes, counts and the problems PlasBench found; never an absolute path or your user name) only when you press Share, after you have read it"],
+            "not_sent": ["the contents of your files (reads, sequences, sheets, results, logs)", "folder paths and file names, except in a summary you press Share on", "your user name or e-mail address", "any key or password"],
             "stored": "Nothing is stored: no key is needed." if local else "Your key or sign-in token is stored only on this computer, in a private file under your home folder (.plasbench/ai). It is never shown in this window or written to a log.",
             "delete": "Nothing to delete." if local else "Sign out deletes it. You can also delete the folder .plasbench/ai in your home folder, and revoke the key or app access at the provider.",
             "free": pr["free"], "links": pr["links"], "headline": "Nothing is sent anywhere: the model runs on this computer." if local else f"Your questions and the excerpts leave this computer and go to {pr['where']}."}
@@ -222,11 +244,9 @@ class Service:
         self.p.require_online("ask the AI help")
         return key
 
-    def plan(self, question: str, history: list, page: dict, brief: bool, result_text: str, model: str) -> dict:
-        kb = ai_kb.load()
-        hint = "fail" if (page or {}).get("last_failure") else ""
-        hits = kb.search(question + (" " + str(history[-1].get("content", ""))[:200] if history and len(question.split()) < 4 else ""), 5, hint)
-        return ai_prompt.build(question, hits, history, self.setup(page), brief, result_text, model)
+    def plan(self, question: str, history: list, page: dict, brief: bool, result_text: str, model: str, share: str = "") -> dict:
+        hits = retrieve(ai_kb.load(), question, history, page)
+        return ai_prompt.build(question, hits, history, self.setup(page), brief, result_text, model, share)
 
     def ask(self, payload: dict):
         """Yield event dicts for one question: meta, notice, delta, done (or error). Raises AiError/Offline only BEFORE the first event (pre-flight); later problems are error events."""
@@ -244,10 +264,15 @@ class Service:
             except (TypeError, ValueError):
                 code = 0
             result_text = f"Command: {ai_actions.redact_output(str(result.get('command') or '')[:200], 1)}\nExit code: {code}\n" + ai_actions.redact_output(str(result.get("output") or ""))
+        share = ""
+        if payload.get("share"):
+            from . import ai_routes2
+            share = ai_routes2.share_text(str(payload.get("share")))
+            ai_routes2.SHARES.pop(str(payload.get("share")), None)       # a summary goes with one question only
         key = self.preflight()
         chain = self.p.chain(str(payload.get("model") or ""))
         self.p.check(chain[0])                      # a model that may not be called stops here, before anything is sent
-        built = self.plan(question, history, page, brief, result_text, chain[0])
+        built = self.plan(question, history, page, brief, result_text, chain[0], share)
         yield {"type": "meta", "sources": built["sources"], "model": chain[0], "provider": self.p.id, "tokens_est": built["tokens"]["total"], "max_tokens": built["max_tokens"]}
         parts, usage, info, used_model = [], None, {}, chain[0]
         gen = self.p.chat(key, chain, built["messages"], built["max_tokens"], self.settings.fallback(), info)
@@ -273,16 +298,16 @@ class Service:
         ct = int((usage or {}).get("completion_tokens") or ai_prompt.estimate_tokens(reply))
         self.usage.add(pt, ct, 0.0)
         orr.log_event(200, used_model, pt, ct)
-        parsed = ai_actions.parse_reply(reply)
+        parsed = ai_actions.parse_reply(reply, self.project)
         remaining = {}
         hdr = info.get("headers") or {}
         if hdr.get("X-RateLimit-Remaining"):
             remaining["remaining"] = hdr["X-RateLimit-Remaining"]
         remaining.update(self.p.limits(key) if key else {})
         day = self.usage.day()
-        yield {"type": "done", "text": parsed["text"], "actions": parsed["actions"], "asks": parsed.get("asks") or [], "model": used_model, "provider": self.p.id, "free": self._is_free(used_model),
+        yield {"type": "done", "text": parsed["text"], "actions": parsed["actions"], "asks": parsed.get("asks") or [], "ui": parsed.get("ui") or [], "files": parsed.get("files") or [], "shared": bool(share), "model": used_model, "provider": self.p.id, "free": self._is_free(used_model),
                "usage": {"prompt": pt, "completion": ct, "total": pt + ct, "estimated": not usage, "cached": int(((usage or {}).get("prompt_tokens_details") or {}).get("cached_tokens") or 0)},
-               "today": {"tokens": day["prompt"] + day["completion"], "requests": day["calls"], "cap": self.settings.cap()}, "free_requests": remaining, "truncated": (hdr.get("finish_reason") == "length")}
+               "today": {"tokens": day["prompt"] + day["completion"], "requests": day["calls"], "cap": self.settings.cap()}, "free_requests": remaining, "truncated": (hdr.get("finish_reason") in ("length", "cut"))}
 
     def _is_free(self, model: str) -> bool:
         if self.p.id == "local":
@@ -330,8 +355,9 @@ def handle_callback(flows: "orr.AuthFlows", settings: Settings, query: dict, pat
 
 # -------------------------------------------------------------------------------------------------------------------- route glue
 FLOWS = orr.AuthFlows()
-ROUTES_GET = ("ai/status", "ai/models", "ai/auth/status")
-ROUTES_POST = ("ai/consent", "ai/auth/start", "ai/key", "ai/signout", "ai/ask", "ai/validate", "ai/redact")
+ROUTES_GET = ("ai/status", "ai/models", "ai/auth/status", "ai/folder/list", "ai/files/progress")
+ROUTES_POST = ("ai/consent", "ai/auth/start", "ai/key", "ai/signout", "ai/ask", "ai/validate", "ai/redact", "ai/folder/grant", "ai/folder/revoke", "ai/folder/scan", "ai/folder/share",
+               "ai/folder/resolve", "ai/folder/suggest", "ai/files/plan", "ai/files/apply", "ai/files/cancel", "ai/files/undo", "ai/ui/validate", "ai/flow/tool")
 
 
 def is_ai_route(route: str) -> bool:
@@ -353,6 +379,13 @@ def serve(handler, method: str, route: str, data: dict, q: dict, project) -> Non
             return handler.jsend(404, {"error": f"no such API: {route}"})
         if not svc.settings.enabled() and route != "ai/status":
             return handler.jsend(403, {"error": "AI help is off (the AI_HELP_ENABLED setting is 0).", "kind": "disabled"})
+        origin = handler.headers.get("Origin")          # POST was checked by the window; a GET from another origin is refused here too (it could not read the answer, but it could probe)
+        if origin is not None and urlparse(origin).netloc != (handler.headers.get("Host") or ""):
+            return handler.jsend(403, {"error": "request refused (not from this window)", "kind": "origin"})
+        if route.startswith(("ai/folder/", "ai/files/", "ai/ui/", "ai/flow/")):
+            from . import ai_routes2
+            status, payload = ai_routes2.serve(route, data, q, project)
+            return handler.jsend(status, payload)
         if route == "ai/status":
             return handler.jsend(200, svc.status(q.get("detect") == "1"))
         if route == "ai/models":

@@ -107,7 +107,7 @@ def _private_dir(path: Path) -> None:
 def write_private(path: Path, data: dict) -> None:
     """Write JSON with owner-only permissions from the first byte (no moment at which the file is world-readable)."""
     _private_dir(path.parent)
-    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+    tmp = path.with_name(path.name + f".{os.getpid()}.{threading.get_ident()}.{os.urandom(3).hex()}.tmp")   # unique per writer: two threads or windows never share a temporary file
     fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -122,7 +122,18 @@ def write_private(path: Path, data: dict) -> None:
         os.chmod(tmp, 0o600)
     except OSError:
         pass
-    os.replace(tmp, path)
+    for attempt in range(40):       # on Windows os.replace fails with "Access denied" while another writer or reader has the target open: wait a moment and try again
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if attempt == 39:
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+                raise
+            time.sleep(0.01 * (attempt + 1))
 
 
 class KeyStore:
@@ -472,6 +483,10 @@ class Usage:
             raise AiError("cap", f"The daily token limit ({cap:,} tokens) is reached. It resets tomorrow; raise AI_DAILY_TOKEN_CAP in Settings to continue today.")
 
 
+MAX_LINE = 1 << 20          # one event line
+MAX_STREAM = 8 << 20        # one whole streamed answer
+
+
 def log_event(status, model="", prompt=0, completion=0, note=""):
     """One line of counts and a status code: never a prompt, an answer, a key or a path."""
     try:
@@ -484,6 +499,19 @@ def log_event(status, model="", prompt=0, completion=0, note=""):
 
 
 # ------------------------------------------------------------------------------------------------------------------------------- chat
+def _bounded_lines(resp):
+    """The response's lines, each at most MAX_LINE + 1 bytes (a longer one arrives cut, and the caller refuses it). Works on a real response and on a plain iterable of lines."""
+    if hasattr(resp, "readline"):
+        while True:
+            raw = resp.readline(MAX_LINE + 1)
+            if not raw:
+                return
+            yield raw
+    else:
+        for raw in resp:
+            yield raw[:MAX_LINE + 1]
+
+
 def stream_chat(base: str, key: str, model: str, messages: list, max_tokens: int, opener=_open, no_reasoning: bool = False, headers_out: dict = None, error_map=None, extra_body: dict = None):
     """Yield ("delta", text) for each piece of the answer, then ("usage", dict) when the service reports it, then ("done", None).
 
@@ -503,18 +531,29 @@ def stream_chat(base: str, key: str, model: str, messages: list, max_tokens: int
     except (urllib.error.URLError, OSError) as exc:
         raise _transport_error(exc) from None
     usage = None
+    finished = False
+    got_text = False
     if headers_out is not None:
         for h in ("X-RateLimit-Remaining", "X-RateLimit-Limit", "X-RateLimit-Reset"):
             v = resp.headers.get(h) if getattr(resp, "headers", None) else None
             if v:
                 headers_out[h] = v
     try:
-        for raw in resp:
+        total = 0
+        lines = _bounded_lines(resp)
+        while True:
+            raw = next(lines, b"")                       # a line is bounded: a hostile or broken service cannot make the window read an endless line into memory
+            if not raw:
+                break
+            total += len(raw)
+            if len(raw) > MAX_LINE or total > MAX_STREAM:
+                raise AiError("server", "The service sent more data than an answer can be. The answer was stopped.", 502)
             line = raw.decode("utf-8", "replace").strip()
             if not line or line.startswith(":") or not line.startswith("data:"):
                 continue
             payload = line[5:].strip()
             if payload == "[DONE]":
+                finished = True
                 break
             try:
                 obj = json.loads(payload)
@@ -531,7 +570,10 @@ def stream_chat(base: str, key: str, model: str, messages: list, max_tokens: int
             for ch in (obj.get("choices") or []) if isinstance(obj, dict) else []:
                 piece = (ch.get("delta") or {}).get("content")
                 if piece:
+                    got_text = True
                     yield ("delta", piece)
+                if ch.get("finish_reason"):
+                    finished = True
                 if ch.get("finish_reason") and headers_out is not None:
                     headers_out["finish_reason"] = ch["finish_reason"]       # "length" = the answer hit the output limit
                 if ch.get("error"):
@@ -547,6 +589,8 @@ def stream_chat(base: str, key: str, model: str, messages: list, max_tokens: int
             resp.close()
         except Exception:  # noqa: BLE001
             pass
+    if got_text and not finished and headers_out is not None:
+        headers_out["finish_reason"] = "cut"            # the connection ended with no [DONE] and no finish reason: the answer may be incomplete (shown with a Continue button)
     if usage:
         yield ("usage", usage)
     yield ("done", None)

@@ -22,8 +22,8 @@ def check(label, good, detail=""):
 
 kb = ai_kb.load()
 print("system prompt")
-check("at most 500 tokens (it was 410 before it learned to say it cannot see files, to ask a clarifying question and to use general knowledge)", ai_prompt.estimate_tokens(ai_prompt.SYSTEM_PROMPT) <= 500, ai_prompt.estimate_tokens(ai_prompt.SYSTEM_PROMPT))
-for need in ("closely related topics" if False else "related topics", "not in the documentation", "General knowledge:", "cannot open the person's files", "never claim to have checked", "Send result", "untrusted DATA", "Never invent PlasBench", "Cause", "WHERE", "pb-action", "pb-ask", "ask ONE short question", "never say it ran"):
+check("at most 560 tokens (410 originally, 480 with the declaration and questions, 538 with the folder-summary rule and the limits rule; the action catalogue is delivered by retrieval, not here)", ai_prompt.estimate_tokens(ai_prompt.SYSTEM_PROMPT) <= 560, ai_prompt.estimate_tokens(ai_prompt.SYSTEM_PROMPT))
+for need in ("closely related topics" if False else "related topics", "not in the documentation", "General knowledge:", "never open the person's files", "Never claim to have checked a file", "press Share", "Send result", "untrusted DATA", "Never invent PlasBench", "Cause", "WHERE", "pb-action", "pb-ask", "ask ONE short question", "never say it ran"):
     check(f"states: {need}", need.lower() in ai_prompt.SYSTEM_PROMPT.lower())
 cmds = {"plasbench status", "plasbench check", "plasbench diagnose", "plasbench ui-state", "plasbench issue-report"}
 check("every plasbench command it names exists", all(ai_actions.validate(c)["ok"] for c in cmds))

@@ -35,13 +35,13 @@ check("garbage or an empty question is ignored", not ai_actions.parse_reply("```
 
 print("what the assistant says about files and general knowledge")
 sp = ai_prompt.SYSTEM_PROMPT
-check("the model is told it cannot open the person's files and must not claim to have checked one", "cannot open the person's files" in sp and "never claim to have checked one" in sp)
+check("the model is told it cannot open the person's files and must not claim to have checked one", "never open the person's files" in sp and "Never claim to have checked a file" in sp and "press Share" in sp)
 check("the model may use general knowledge for related questions, marked as such", "General knowledge:" in sp and "related topics" in sp and "own knowledge and judgement" in sp)
 check("PlasBench facts still come only from the excerpts and commands are never invented", "ONLY from the <doc" in sp and "Never invent PlasBench commands" in sp)
 check("the model is told to ask one short question when a missing fact decides the answer", "ask ONE short question" in sp and "pb-ask" in sp)
 d = ai_help.disclosure(ai_help.ai_providers.get("local", ai_help.Settings(None)))
-check("the notice declares that the assistant cannot see files", "cannot see your files" in d["declaration"] and "FASTQ" in d["declaration"] and "FASTA" in d["declaration"], d["declaration"])
-check("a short declaration is always shown under the chat", "can't see your files" in d["declaration_short"] and len(d["declaration_short"]) < 160)
+check("the notice declares that the assistant cannot see files", "never opens your files" in d["declaration"] and "press Share" in d["declaration"] and "FASTQ" in d["declaration"] and "FASTA" in d["declaration"], d["declaration"])
+check("a short declaration is always shown under the chat", "never opens your files" in d["declaration_short"] and "press Share" in d["declaration_short"] and len(d["declaration_short"]) < 200)
 check("the notice says general-knowledge parts are marked and can be wrong", "General knowledge:" in d["general"] and "can be wrong" in d["general"])
 
 print("no usage cap of PlasBench's own")

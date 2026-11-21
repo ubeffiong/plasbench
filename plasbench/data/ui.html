@@ -552,7 +552,7 @@ body.gd-ai{--gdw:min(430px,92vw)}
 #ai_state .aicard.warn{border-color:var(--warn);background:var(--warn-soft)}
 #ai_state details{margin-top:8px}
 #ai_state input[type=password],#ai_state input[type=text]{width:100%;box-sizing:border-box}
-#ai_log{flex:1;overflow-y:auto;padding:8px;min-height:80px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5}
+#ai_log{flex:1;overflow-y:auto;padding:8px;min-height:96px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5}
 .aimsg{max-width:100%;overflow-wrap:anywhere}
 .aimsg.user{align-self:flex-end;background:var(--primary-soft);color:var(--primary-ink);padding:6px 10px;border-radius:6px;white-space:pre-wrap;max-width:92%}
 .aimsg.bot{align-self:stretch;border-left:3px solid var(--line);padding-left:8px}
@@ -583,6 +583,15 @@ body.gd-ai{--gdw:min(430px,92vw)}
 .aicard2 .risk{font-size:10.5px;border-radius:9px;padding:0 7px;border:1px solid var(--line)}
 .aicard2 .risk.changes_files{border-color:var(--warn);color:var(--warn)}.aicard2 .risk.destructive{border-color:var(--bad);color:var(--bad)}.aicard2 .risk.safe{border-color:var(--ok);color:var(--ok)}
 .aicard2 .runstate{margin-top:6px;font-size:12px}
+.aifolder{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 8px;flex:none}
+.aichip{display:inline-flex;gap:4px;align-items:center;border:1px solid var(--primary);background:var(--primary-soft);color:var(--primary-ink);border-radius:12px;padding:1px 9px;font-size:12px;max-width:100%;overflow-wrap:anywhere}
+#ai_quick{display:flex;flex-wrap:wrap;gap:5px;padding:0 8px 6px;flex:none}
+#ai_quick.compact{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}#ai_quick.compact button{white-space:nowrap;flex:none}
+#ai_quick button{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:12px;padding:3px 10px;cursor:pointer;min-height:24px}
+#ai_quick button:hover,#ai_quick button:focus-visible{border-color:var(--primary);color:var(--primary)}
+.aipre-plain{white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;font-size:11.5px;background:var(--surface-2);padding:5px 7px;border-radius:3px;margin:4px 0}
+.aiops{list-style:none;margin:6px 0;padding:0}.aiops li{margin:3px 0}.aiops label{display:flex;gap:6px;align-items:flex-start}
+.aicard2 progress{width:100%;max-width:240px}
 #ai_starters{display:flex;flex-wrap:wrap;gap:5px;padding:0 8px 6px;flex:none}
 #ai_starters button{font:inherit;font-size:12px;text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:12px;padding:3px 10px;cursor:pointer}
 #ai_starters button:hover,#ai_starters button:focus-visible{border-color:var(--primary);color:var(--primary)}
@@ -1166,6 +1175,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
    <label title="Keep this chat in this browser only (off by default)"><input type="checkbox" id="ai_remember">Remember chats</label>
    <span data-tipid="ai_privacy"></span><span class="grow"></span>
    <button class="gd-ib" id="ai_new" title="New chat" aria-label="New chat"><svg class="ico sm"><use href="#i-plus"/></svg></button></div>
+  <div id="ai_folder" hidden></div><div id="ai_quick" hidden aria-label="Guided help"></div>
   <div id="ai_state"></div>
   <div id="ai_log" role="log" aria-live="polite" aria-label="AI help conversation" tabindex="0"></div>
   <div id="ai_starters"></div>
@@ -6316,6 +6326,7 @@ function aiRender() {
     if (failed && !AI.pre) { AI.pre = null; api("ai/validate", {cmd: "plasbench diagnose", where: "window", risk: "safe"}).then(v => { v.why = "Reads the latest run and says what went wrong. It changes nothing."; AI.pre = v; aiRenderLog(); }).catch(() => {}); }
   } else starters.innerHTML = "";
   $("#ai_send").disabled = AI.busy; $("#ai_stop").hidden = !AI.busy; $("#ai_send").hidden = AI.busy;
+  aiRenderFolder();
   const u = st.used_today || {}, l = AI.last;
   $("#ai_foot").innerHTML = `<span class="aibadge ${p === "local" ? "local" : ""}">${p === "local" ? "stays on this computer" : p === "huggingface" ? "your Hugging Face credits" : "free"}</span>`
     + `<span title="Counted on this computer today">Today: ${u.requests || 0} requests, ${(u.tokens || 0).toLocaleString()} tokens${st.cap ? " of " + st.cap.toLocaleString() : ""}</span>`
@@ -6341,11 +6352,16 @@ function aiAskCard(a, mi, i) {
   return `<div class="aiask" data-m="${mi}" data-i="${i}" role="group" aria-label="The assistant asks a question"><div class="q">${esc(a.q)}</div><div class="opts">${(a.options || []).map((o, k) => `<button class="btn sec sm" type="button" data-aiask="${k}">${esc(o)}</button>`).join("")}<button class="btn ghost sm" type="button" data-aiask="other">Type my own answer</button></div></div>`;
 }
 function aiMsgHtml(m, mi) {
+  if (m.kind === "scan") return aiScanCard(m, mi);
+  if (m.kind === "plan") return aiPlanCard(m, mi);
+  if (m.kind === "tool") return aiToolCard(m, mi);
   if (m.role === "user") return `<div class="aimsg user">${esc(m.content)}</div>`;
   let h = `<div class="aimsg bot${m.error ? " err" : ""}" data-m="${mi}"><div class="aibody">${m.error ? `<p>${esc(m.content)}</p>` : md(m.content || "")}</div>`;
   (m.actions || []).forEach((a, i) => { h += aiActionCard(a, mi, i); });
   (m.asks || []).forEach((a, i) => { h += aiAskCard(a, mi, i); });
-  if (m.truncated && !m.error) h += `<div class="aimeta"><span>The answer reached the length limit of the model.</span><button class="btn sec sm" type="button" data-aicont="1">Continue</button></div>`;
+  (m.ui || []).forEach((u, i) => { h += aiUiCard(u, mi, i); });
+  (m.fileplans || []).forEach((fp, i) => { h += `<div class="aicard2"><div class="ch"><b>Proposed file changes</b></div><div class="cb">${fp.error ? `<div class="no">${esc(fp.error)}</div>` : `<button class="btn sm" data-aif="reviewplan" data-i="${i}">Review the plan (nothing changes yet)</button>`}</div></div>`; });
+  if (m.truncated && !m.error) h += `<div class="aimeta"><span>The answer was cut off (the model's length limit or a lost connection).</span><button class="btn sec sm" type="button" data-aicont="1">Continue</button></div>`;
   if (m.sources && m.sources.length && !m.error) h += `<div class="aisrc">${m.sources.map(s => `<button type="button" data-aisrc="${esc(s.src)}" data-anchor="${esc(s.anchor)}" title="${esc(s.title)}">[${s.n}] ${esc(s.src.replace(/^docs\//, ""))}${s.anchor ? " › " + esc(s.title.split(" > ").pop().slice(0, 28)) : ""}</button>`).join("")}</div>`;
   if (m.link) h += `<div class="aimeta"><a href="${esc(m.link)}" target="_blank" rel="noopener">More information</a></div>`;
   if (m.usage) h += `<div class="aimeta"><span class="aibadge ${m.provider === "local" ? "local" : m.free === false ? "credits" : ""}">${m.provider === "local" ? "local" : m.free === false ? "credits" : "free"}</span><span>${esc(m.model || "")}</span><span>${m.usage.total} tokens${m.usage.estimated ? " (est.)" : ""}</span>
@@ -6367,16 +6383,17 @@ function aiRenderLog() {
   if (!AI.msgs.length && AI.pre && AI.st && AI.st.consent) h = `<div class="aimsg bot"><div class="aibody"><p>You have a failed run. This check is safe and changes nothing:</p></div>${aiActionCard(AI.pre, -1, 0)}</div>`;
   if (!AI.msgs.length && !AI.pre) h = `<div class="mut small" style="padding:6px">${AI.st && AI.st.consent && (!AI.st.needs_key || AI.st.signed_in) ? "Ask about installing, running, inputs, metrics, the workflow, settings or an error message. Answers come from PlasBench's own guides." : ""}</div>`;
   log.innerHTML = h; aiDecorate(log);
+  { const st = $("#ai_starters"), q = $("#ai_quick"); if (st) st.style.display = AI.msgs.length ? "none" : ""; if (q) q.classList.toggle("compact", AI.msgs.length > 0); }
   if (near) log.scrollTop = log.scrollHeight;
 }
-function aiSaveChat() { if (!AI.remember) return; aiLS("chat", JSON.stringify(AI.msgs.slice(-30).map(m => ({role: m.role, content: m.content, sources: m.sources, error: m.error, usage: m.usage, model: m.model, provider: m.provider, free: m.free})))); }
+function aiSaveChat() { if (!AI.remember) return; aiLS("chat", JSON.stringify(AI.msgs.filter(m => !m.kind).slice(-30).map(m => ({role: m.role, content: m.content, sources: m.sources, error: m.error, usage: m.usage, model: m.model, provider: m.provider, free: m.free})))); }
 function aiLoadChat() { try { AI.msgs = JSON.parse(aiLS("chat") || "[]"); } catch { AI.msgs = []; } }
 function aiError(e) { const m = {role: "bot", content: e.message || String(e), error: true}; AI.msgs.push(m); aiRenderLog(); }
 
 /* ---- asking ---- */
 async function aiSend(text, extra) {
   text = String(text || "").trim(); if (!text || AI.busy || !AI.st) return;
-  const history = AI.msgs.filter(m => !m.error).map(m => ({role: m.role === "user" ? "user" : "assistant", content: m.content + (m.asks || []).map(a => `
+  const history = AI.msgs.filter(m => !m.error && !m.kind && m.content).map(m => ({role: m.role === "user" ? "user" : "assistant", content: m.content + (m.asks || []).map(a => `
 [Question I asked: ${a.q}]`).join("")}));
   AI.msgs.push({role: "user", content: text});
   const bot = {role: "bot", content: "", sources: [], actions: [], provider: aiProv()}; AI.msgs.push(bot);
@@ -6399,13 +6416,14 @@ async function aiSend(text, extra) {
         else if (ev.type === "delta") { bot.content += ev.text; if (!raf) raf = requestAnimationFrame(paint); }
         else if (ev.type === "notice") toast(ev.text, "");
         else if (ev.type === "error") { finished = true; bot.error = true; bot.content = (bot.content ? bot.content + "\n\n" : "") + ev.error; bot.link = ev.link || ""; aiAfterError(ev); }
-        else if (ev.type === "done") { finished = true; bot.content = ev.text; bot.actions = ev.actions || []; bot.asks = ev.asks || []; bot.truncated = !!ev.truncated; bot.usage = ev.usage; bot.model = ev.model; bot.free = ev.free; bot.provider = ev.provider; AI.last = ev; if (AI.st) AI.st.used_today = {requests: ev.today.requests, tokens: ev.today.tokens}; }
+        else if (ev.type === "done") { finished = true; bot.content = ev.text; bot.actions = ev.actions || []; bot.asks = ev.asks || []; bot.ui = ev.ui || []; bot.fileRaw = ev.files || []; bot.truncated = !!ev.truncated; bot.usage = ev.usage; bot.model = ev.model; bot.free = ev.free; bot.provider = ev.provider; AI.last = ev; if (AI.st) AI.st.used_today = {requests: ev.today.requests, tokens: ev.today.tokens}; }
       }
     }
+    if (!finished && !(AI.ctl && AI.ctl.signal.aborted)) { bot.truncated = true; bot.content = (bot.content || "") + "\n\n(The connection ended before the answer was complete. Press Continue to ask it to go on.)"; }
   } catch (e) {
     if (e.name === "AbortError") { bot.content = (bot.content || "") + "\n\n(stopped)"; }
     else { bot.error = true; bot.content = e.message; if (e.data) { bot.link = e.data.link || ""; aiAfterError(e.data); } }
-  } finally { AI.busy = false; AI.ctl = null; $("#ai_live").textContent = bot.error ? "The assistant could not answer" : "The assistant finished"; aiSaveChat(); aiRender(); }
+  } finally { AI.busy = false; AI.ctl = null; $("#ai_live").textContent = bot.error ? "The assistant could not answer" : "The assistant finished"; aiSaveChat(); aiRender(); aiAttachPlans(bot); }
 }
 function aiAfterError(d) {
   if (d.kind === "signin") { if (AI.st) AI.st.signed_in = false; aiStatus(false).then(aiRender); }
@@ -6499,6 +6517,24 @@ $("#gdp_ai").addEventListener("click", async e => {
   if (id === "ai_recheck") { await aiStatus(true); await aiLoadModels(); aiRender(); return; }
   if (id === "ai_signout") { if (await askConfirm({title: "Sign out of AI help?", confirmLabel: "Sign out", body: "The stored key is deleted from this computer."})) { await api("ai/signout", {provider: aiProv()}); await aiStatus(true); await aiLoadModels(); aiRender(); } return; }
   if (id === "ai_savekey") { const el = $("#ai_pastekey"); try { await api("ai/key", {provider: aiProv(), key: el.value}); el.value = ""; await aiStatus(true); await aiLoadModels(); aiRender(); } catch (err) { toast(err.message, "bad"); } return; }
+  const fl = t.closest("[data-aiflow]"); if (fl) return aiStartFlow(fl.dataset.aiflow);
+  const af = t.closest("[data-aif]");
+  if (af) { const k = af.dataset.aif, mm = af.closest("[data-m]") ? AI.msgs[+af.closest("[data-m]").dataset.m] : null;
+    if (k === "choose") return aiChooseFolder();
+    if (k === "scan") return aiScan();
+    if (k === "revoke") { try { await api("ai/folder/revoke", {id: AI.grant.id}); } catch {} AI.grant = null; AI.scan = null; aiRenderFolder(); toast("Access to the folder was revoked", "ok"); return; }
+    if (k === "share") return aiShare();
+    if (k === "flow-setup") return aiFlowSetup();
+    if (k === "flow-sheet") return aiFlowSheet();
+    if (k === "apply" && mm) return aiApplyPlan(mm);
+    if (k === "cancel") { try { await api("ai/files/cancel", {job: af.dataset.job}); } catch {} return; }
+    if (k === "undo" && mm) return aiUndo(mm, af.dataset.j);
+    if (k === "reviewplan") return aiReviewPlan(af, +af.dataset.i);
+    if (k === "savetool" && mm) return aiSaveTool(mm);
+    if (k === "opentool") { go("addtool"); if (window.innerWidth < 1280) setDrawer(false); return; } }
+  const opx = t.closest("[data-aiop]"); if (opx) { const mm = AI.msgs[+opx.closest("[data-m]").dataset.m]; mm.sel = mm.sel || {}; mm.sel[+opx.dataset.aiop] = opx.checked; return; }
+  const aui = t.closest("[data-aiui]"); if (aui) return aiRunUi(aui.closest(".aicard2"));
+  const us = t.closest("[data-aiundoset]"); if (us) { try { await api("settings", {changes: {[us.dataset.aiundoset]: us.dataset.had === "1" ? us.dataset.old : null}}); S.settings = null; toast("Setting restored", "ok"); us.disabled = true; } catch (e) { toast(e.message, "bad"); } return; }
   const q = t.closest("[data-aiq]"); if (q) return aiSend(q.dataset.aiq);
   const src = t.closest("[data-aisrc]"); if (src) return aiOpenSource(src.dataset.aisrc, src.dataset.anchor);
   const cont = t.closest("[data-aicont]"); if (cont) { if (!AI.busy) { cont.disabled = true; aiSend("Continue from where you stopped."); } return; }
@@ -6515,6 +6551,219 @@ $("#gdp_ai").addEventListener("click", async e => {
     aiRenderLog();
   }
 });
+/* ---- a folder, file plans, window actions and guided flows. PlasBench's OWN code reads the folder (plasbench/ai_folder.py) and shows what it found; a summary reaches the model only
+   when "Share this summary" is pressed (the server makes the text again itself). A plan is executed by the server only after the dry run was shown and Apply was pressed; every window
+   action is validated by the server (plasbench/ai_ui.py) and then done through the window's EXISTING functions (go, the settings API, confirmRun, the runtime route). ---- */
+AI.grant = null; AI.scan = null; AI.remember = AI.remember || false;
+const aiFlowQuick = [["setup_run", "Set up a run from my folder"], ["fix_sheet", "Fix my sample sheet"], ["install_tools", "Install the tools I need"], ["add_tool", "Add my own tool"], ["diagnose", "Why did my last run fail?"]];
+function aiFolderHtml() {
+  const g = AI.grant;
+  if (!g) return `<div class="aifolder"><button type="button" class="btn sec sm" data-aif="choose" title="PlasBench itself reads names, sizes and the first lines of the folder and shows you what it found. Nothing goes to the assistant until you press Share.">${icon("folder")}Choose a folder</button>
+    <label class="small mut" title="Keep this folder chosen in future sessions (stored in your home folder, ~/.plasbench/ai/grants.json)"><input type="checkbox" id="ai_remfolder"> remember</label></div>`;
+  return `<div class="aifolder"><span class="aichip" title="PlasBench reads and writes only inside this folder">${icon("folder")}<b>${esc(g.name)}</b>${g.remember ? " (remembered)" : ""}</span>
+    <button type="button" class="btn sec sm" data-aif="scan">Look inside</button><button type="button" class="btn ghost sm" data-aif="revoke" aria-label="Revoke access to the folder ${esc(g.name)}">Revoke</button></div>`;
+}
+function aiQuickHtml() { return aiFlowQuick.map(([k, t]) => `<button type="button" data-aiflow="${k}">${esc(t)}</button>`).join(""); }
+function aiRenderFolder() {
+  const open = !!(AI.st && AI.st.consent && (!AI.st.needs_key || AI.st.signed_in));
+  const f = $("#ai_folder"), q = $("#ai_quick"); if (!f) return;
+  f.hidden = !open; q.hidden = !open;
+  if (!open) return;
+  if (!f.dataset.sig || f.dataset.sig !== JSON.stringify(AI.grant)) { f.innerHTML = aiFolderHtml(); f.dataset.sig = JSON.stringify(AI.grant); }
+  if (!q.innerHTML) q.innerHTML = aiQuickHtml();
+}
+const aiPush = m => { AI.msgs.push(Object.assign({role: "bot", content: ""}, m)); aiRenderLog(); return AI.msgs[AI.msgs.length - 1]; };
+const aiKb = n => n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : n < 1073741824 ? (n / 1048576).toFixed(1) + " MB" : (n / 1073741824).toFixed(1) + " GB";
+async function aiChooseFolder() {
+  const remember = !!($("#ai_remfolder") && $("#ai_remfolder").checked);
+  pickPath(true, async p => {
+    try { AI.grant = await api("ai/folder/grant", {path: p, remember}); aiRenderFolder(); $("#ai_live").textContent = "Folder chosen: " + AI.grant.name; await aiScan(); }
+    catch (e) { toast(e.message, "bad"); }
+  }, "Choose the folder with your files");
+}
+async function aiScan(quiet) {
+  if (!AI.grant) return null;
+  let r; try { r = await api("ai/folder/scan", {id: AI.grant.id}); } catch (e) { toast(e.message, "bad"); if (/no folder is chosen/.test(e.message)) { AI.grant = null; aiRenderFolder(); } return null; }
+  AI.scan = r; if (!quiet) aiPush({kind: "scan", scan: r.scan, summary: r.summary, tokens: r.tokens});
+  return r;
+}
+function aiScanCard(m, mi) {
+  const s = m.scan, c = s.counts;
+  const probs = s.problems.slice(0, 12).map(p => `<li><b>${esc(p.file || "folder")}</b> ${esc(p.text)} <span class="mut small">[${esc(p.rule)}]</span></li>`).join("");
+  return `<div class="aimsg bot" data-m="${mi}"><div class="aicard2 scan"><div class="ch"><b>What PlasBench found in your folder</b><span class="risk safe">read only</span></div><div class="cb">
+    <div>${c.files} files in ${c.dirs} folders (${aiKb(s.bytes)}): ${c.fastq || 0} FASTQ, ${c.fasta || 0} FASTA, ${c.sheet || 0} sheets${c.xlsx ? ", " + c.xlsx + " Excel" : ""}. Read pairs: ${s.pairs.filter(p => p.r1 && p.r2).length} complete.${s.truncated ? " (Only part of a large folder was looked at.)" : ""}</div>
+    ${s.samples.length ? `<div class="small mut">Samples: ${esc(s.samples.slice(0, 8).join(", "))}${s.samples.length > 8 ? " and " + (s.samples.length - 8) + " more" : ""}</div>` : ""}
+    ${probs ? `<div class="why">Problems found:</div><ul class="small">${probs}</ul>` : `<div class="ok-t">No problems found.</div>`}
+    <details><summary>Exactly what Share would send (about ${m.tokens} tokens)</summary><pre class="aipre-plain">${esc(m.summary)}</pre></details>
+    <div class="acts"><button class="btn sm" data-aif="share">Share this summary with the assistant</button><button class="btn sec sm" data-aif="scan">Look again</button>${s.pairs.length ? `<button class="btn sec sm" data-aif="flow-setup">Set up a run from this folder</button>` : ""}${s.sheets.some(x => x.problems.length) ? `<button class="btn sec sm" data-aif="flow-sheet">Fix my sample sheet</button>` : ""}</div>
+    <div class="runstate" aria-live="polite"></div></div></div></div>`;
+}
+async function aiShare() {
+  if (!AI.grant) return;
+  if (AI.busy) return toast("Wait for the answer to finish first", "");
+  let r; try { r = await api("ai/folder/share", {id: AI.grant.id}); } catch (e) { return toast(e.message, "bad"); }
+  if (!await askConfirm({title: "Share this summary with the assistant?", confirmLabel: "Share", body: "This exact text goes to the assistant with your next message. It holds relative file names, sizes, counts and the problems PlasBench found; never your files' contents, a folder path or your user name. Nothing is sent unless you press Share.", detail: r.summary})) return;
+  const q = AI.pendingQuestion || "Here is a summary of my folder made by PlasBench. What should I fix or do next?";
+  aiSend(q, {share: AI.grant.id}); AI.pendingQuestion = "";
+}
+/* ---- file plans ---- */
+function aiPlanCard(m, mi) {
+  const p = m.plan, ops = p.ops || [];
+  const rows = ops.map(o => `<li class="${o.can_apply ? "" : "bad-t"}"><label><input type="checkbox" data-aiop="${o.i}" ${m.sel && m.sel[o.i] === false ? "" : "checked"} ${o.can_apply && !m.done ? "" : "disabled"}> <span>${esc((o.lines || [])[0] || o.op)}</span></label>
+      ${o.error ? `<div class="small">Cannot be applied: ${esc(o.error)}</div>` : ""}${(o.identity || []).length ? `<div class="warn-t small">Sample ids change: ${esc(o.identity.slice(0, 6).map(x => x.join(" -> ")).join(", "))}</div>` : ""}
+      ${o.diff ? `<details><summary>Changes in this sheet</summary><pre class="aipre-plain">${esc(o.diff)}</pre></details>` : ""}</li>`).join("");
+  const prog = m.prog ? `<progress max="${m.prog.total || 1}" value="${m.prog.bytes || 0}" aria-label="Copying"></progress> <span class="small">${aiKb(m.prog.bytes || 0)} of ${aiKb(m.prog.total || 0)}</span>` : "";
+  return `<div class="aimsg bot" data-m="${mi}"><div class="aicard2 plan"><div class="ch"><b>${esc(m.title || "Proposed file changes")}</b><span class="risk changes_files">changes files</span></div><div class="cb">
+    ${m.why ? `<div class="why">${esc(m.why)}</div>` : ""}<div class="small mut">Nothing has been changed yet. Inside your chosen folder only; nothing is deleted; replaced sheets are backed up. ${p.bytes ? aiKb(p.bytes) + " to copy, " + aiKb(p.free) + " free." : ""}</div>
+    <ul class="aiops">${rows}</ul>${(p.problems || []).map(x => `<div class="bad-t small">${esc(x)}</div>`).join("")}${(m.skipped || []).length ? `<div class="small mut">Left out: ${esc(m.skipped.join("; "))}</div>` : ""}
+    <div class="acts">${m.undo ? `<button class="btn sec sm" data-aif="undo" data-j="${esc(m.undo)}">Undo these changes</button>` :
+      m.running ? `${prog}<button class="btn sec sm" data-aif="cancel" data-job="${esc(m.running)}">Cancel</button>` :
+      m.done ? "" : `<button class="btn sm" data-aif="apply" ${ops.some(o => o.can_apply) ? "" : "disabled"}>Apply the ticked changes</button>`}</div>
+    <div class="runstate" aria-live="polite">${m.note ? esc(m.note) : ""}</div></div></div></div>`;
+}
+async function aiShowPlan(ops, title, why, skipped) {
+  if (!AI.grant) return toast("Choose a folder first", "bad");
+  let pl; try { pl = await api("ai/files/plan", {id: AI.grant.id, ops}); } catch (e) { return toast(e.message, "bad"); }
+  return aiPush({kind: "plan", plan: pl, rawOps: ops, title, why, skipped, sel: {}});
+}
+async function aiApplyPlan(m) {
+  const sel = (m.plan.ops || []).filter(o => m.sel[o.i] !== false && o.can_apply).map(o => o.i);
+  if (!sel.length) return toast("Tick at least one change", "bad");
+  const ident = (m.plan.ops || []).some(o => sel.includes(o.i) && (o.identity || []).length);
+  if (!await askConfirm({title: "Apply these changes?", confirmLabel: "Apply", danger: ident, body: ident ? "This changes the ids of samples. Their data stays, but anything that refers to the old ids will not match." : "These changes are made inside your chosen folder. You can undo them afterwards.",
+    detail: (m.plan.ops || []).filter(o => sel.includes(o.i)).map(o => (o.lines || [""])[0]).join("\n")})) return;
+  let r; try { r = await api("ai/files/apply", {id: AI.grant.id, ops: m.rawOps, selected: sel, ack_identity: ident}); } catch (e) { m.note = e.message; aiRenderLog(); return; }
+  m.running = r.job; m.prog = {bytes: 0, total: 0}; aiRenderLog();
+  for (let n = 0; n < 20000; n++) {
+    await sleep(500);
+    let s; try { s = await api(`ai/files/progress?job=${encodeURIComponent(r.job)}`); } catch (e) { m.note = e.message; break; }
+    m.prog = {bytes: s.bytes, total: s.total};
+    if (s.state === "done") { m.running = ""; m.done = true; const x = s.result || {}; m.note = x.ok ? `Done: ${x.done} change(s) applied.` : `Not applied: ${x.error}`; if (x.ok) m.undo = x.journal; $("#ai_live").textContent = m.note; break; }
+    aiRenderLog();
+  }
+  aiRenderLog();
+  if (m.undo) { aiStatusAfterFiles(m); }
+}
+function aiStatusAfterFiles(m) { try { if (AI.grant && !$("#v_wizard").hidden) renderWizard(); } catch {} }
+async function aiUndo(m, j) {
+  if (!await askConfirm({title: "Undo these changes?", confirmLabel: "Undo", body: "The folder goes back to how it was before Apply. A file you changed since is left alone."})) return;
+  try { const r = await api("ai/files/undo", {id: AI.grant.id, journal: j}); m.undo = ""; m.done = true; m.note = r.ok ? `Undone: ${r.restored} step(s) restored.` : `Undone as far as possible: ${r.restored} restored, ${r.skipped} left alone because they changed.`; }
+  catch (e) { m.note = e.message; }
+  aiRenderLog();
+}
+/* ---- window actions ---- */
+function aiUiCard(u, mi, i) {
+  if (!u.ok) return `<div class="aicard2" data-m="${mi}"><div class="ch"><b>Window action</b></div><div class="cb"><div class="no">Not allowed: ${esc(u.reason)}</div></div></div>`;
+  const old = u.ui === "setting" ? `<div class="cmdbox">${esc(u.params.key)}: ${esc(u.params.old || "(default)")} &rarr; ${esc(u.params.value)}</div>` : "";
+  return `<div class="aicard2 ui" data-m="${mi}" data-i="${i}" data-ui="1"><div class="ch"><b>${esc(u.title)}</b><span class="risk ${esc(u.risk)}">${esc(String(u.risk).replace("_", " "))}</span></div><div class="cb">${old}<div class="why">${esc(u.desc)}</div>${u.why ? `<div class="small mut">${esc(u.why)}</div>` : ""}
+    <div class="acts"><button class="btn sm" data-aiui="run">${u.ui === "go" ? "Go there" : u.ui === "setting" ? "Change the setting" : u.ui === "prefill" ? "Fill the form" : u.ui === "flow" ? "Start" : "Do it"}</button></div><div class="runstate" aria-live="polite"></div></div></div>`;
+}
+async function aiRunUi(card) {
+  const mi = +card.dataset.m, u = (AI.msgs[mi] || {}).ui && AI.msgs[mi].ui[+card.dataset.i]; if (!u || !u.ok) return;
+  let v; try { v = (await api("ai/ui/validate", {ui: Object.assign({ui: u.ui}, uiAskBack(u))})); } catch (e) { return toast(e.message, "bad"); }
+  if (!v.ok) { aiRunNote(card, "Not allowed: " + esc(v.reason)); return; }
+  const p = v.params;
+  if (v.ui === "go") { go(p.target, p.sub); if (window.innerWidth < 1280) setDrawer(false); return aiRunNote(card, "Opened."); }
+  if (v.ui === "flow") return aiStartFlow(p.name);
+  if (v.ui === "setting") {
+    if (!await askConfirm({title: "Change this setting?", confirmLabel: "Change", body: v.desc, facts: [["Setting", p.key], ["Now", p.old || "(default)"], ["New", p.value]]})) return;
+    try { await api("settings", {changes: {[p.key]: p.value}}); S.settings = null; aiRunNote(card, `Changed. <button class="btn sec sm" data-aiundoset="${esc(p.key)}" data-old="${esc(p.old)}" data-had="${p.had_override ? 1 : 0}">Undo</button>`); toast("Setting changed", "ok"); }
+    catch (e) { aiRunNote(card, "Not changed: " + esc(e.message)); }
+    return;
+  }
+  if (v.ui === "prefill") return aiPrefill(p.fields, card);
+  if (v.ui === "open") {
+    if (p.what === "report") { try { await api("jobs", {argv: ["open-report"], label: "AI help: open the report"}); aiRunNote(card, "Asked PlasBench to open the report."); } catch (e) { aiRunNote(card, esc(e.message)); } return; }
+    setCTab("term"); $("#tcmd").value = p.cmd; tFit(); $("#tcmd").focus(); return aiRunNote(card, "Typed into the Terminal tab. Press Enter there to run it.");
+  }
+  if (v.ui === "install") return confirmRun(["install-tools", p.profile, "--yes"], "AI help: install " + p.profile, undefined, job => { if (job) aiRunNote(card, `Installing (job ${esc(job.id)}).`); });
+  if (v.ui === "runtime") {
+    if (!await askConfirm({title: "Switch where the tools run?", confirmLabel: "Switch", body: v.desc})) return;
+    try { S.rt = await api("runtime/use", {runtime: p.use}); aiRunNote(card, "Switched to " + esc(p.use) + "."); toast("Tools now run in " + p.use, "ok"); } catch (e) { aiRunNote(card, esc(e.message)); }
+  }
+}
+function uiAskBack(u) { const p = u.params || {}; return u.ui === "go" ? {target: p.target, sub: p.sub} : u.ui === "setting" ? {key: p.key, value: p.value} : u.ui === "prefill" ? {fields: p.fields} : u.ui === "open" ? {what: p.what, cmd: p.cmd} : u.ui === "install" ? {profile: p.profile} : u.ui === "runtime" ? {use: p.use} : {name: p.name}; }
+async function aiPrefill(fields, card) {
+  const f = Object.assign({}, fields);
+  if (f.samples) { if (!AI.grant) return aiRunNote(card, "Choose the folder first: the sheet is inside it."); try { f.samples = (await api("ai/folder/resolve", {id: AI.grant.id, rel: f.samples})).path; } catch (e) { return aiRunNote(card, "Not filled: " + esc(e.message)); } }
+  await getSchema(); await getCohorts(); const W = S.wiz;
+  if (f.source) W.source = f.source;
+  const V = W.values;
+  if (f.cohort) V.cohort = f.cohort; if (f.samples) V.samples = f.samples; if (f.study) V.study = f.study; if (f.max_isolates) V.max_isolates = f.max_isolates;
+  if (f.isolate_order !== undefined) V.isolate_order = f.isolate_order; if (f.local_inputs !== undefined) V.local_inputs = f.local_inputs;
+  W.step = 0; go("wizard"); if (window.innerWidth < 1280) setDrawer(false);
+  aiRunNote(card, "The New benchmark form is filled in. Nothing has been started: review the command on the last step.");
+}
+/* ---- guided flows: the steps and the checks are code; they work without a model ---- */
+async function aiStartFlow(name) {
+  if (AI.busy) return toast("Wait for the answer to finish first", "");
+  if (name === "diagnose") { try { const v = await api("ai/validate", {cmd: "plasbench diagnose", where: "window", risk: "safe"}); v.why = "Reads the latest run and says what went wrong. It changes nothing."; aiPush({content: "This check is safe and changes nothing. After it runs you can send the result to the assistant.", actions: [v]}); } catch (e) { toast(e.message, "bad"); } return; }
+  if (name === "install_tools") { aiPush({content: "I will show the tools that are switched on but not installed, and ask before anything is installed."}); try { await installEnabled(); } catch (e) { toast(e.message, "bad"); } return; }
+  if (name === "add_tool") return aiFlowAddTool();
+  if (!AI.grant) { aiPush({content: name === "fix_sheet" ? "Choose the folder that holds your sample sheet. PlasBench will look inside it; nothing goes to the assistant until you press Share." : "Choose the folder that holds your reads. PlasBench will look inside it; nothing goes to the assistant until you press Share."}); return aiChooseFolder(); }
+  const r = AI.scan || await aiScan(true); if (!r) return;
+  if (name === "setup_run") return aiFlowSetup();
+  if (name === "fix_sheet") return aiFlowSheet();
+}
+async function aiFlowSetup() {
+  const r = await aiScan(true); if (!r) return; AI.scan = r;
+  aiPush({kind: "scan", scan: r.scan, summary: r.summary, tokens: r.tokens});
+  let s; try { s = await api("ai/folder/suggest", {id: AI.grant.id, what: "setup"}); } catch (e) { return toast(e.message, "bad"); }
+  if (!s.ops.length) return aiPush({content: "I could not find a complete, compressed read pair to set up. " + (s.skipped.length ? "Left out: " + s.skipped.join("; ") + "." : "PlasBench expects pairs named like sample_R1.fastq.gz and sample_R2.fastq.gz (or _1 and _2).")});
+  const study = await askText({title: "Name this study", label: "A short name for the study folder (letters, digits, . _ -)", confirmLabel: "Continue", value: "my_isolates", validate: v => /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(v) ? "" : "Use letters, digits, dot, dash and underscore"});
+  if (study == null) return;
+  const m = await aiShowPlan(s.ops, `Set up ${s.samples} sample(s)`, "Lays the reads out the way PlasBench looks for them (data/<sample>/<sample>_1.fastq.gz) and writes config/my_isolates.tsv with assembly_accession NA: reads only, so plasmids are reconstructed but not scored. Add a truth reference later to score them.", s.skipped);
+  if (m) { m.afterApply = {source: "sheet", samples: "config/my_isolates.tsv", study, local_inputs: true}; aiPush({content: "After you apply these changes, press the button below to fill in the New benchmark form with this sheet.", ui: [{ok: true, ui: "prefill", title: "Fill the New benchmark form", risk: "safe", desc: "Fills the source (my own sample sheet), the sheet, the study name " + study + " and local inputs only. Nothing is started: you review the exact plasbench command on the last step.", params: {fields: m.afterApply}, why: ""}]}); }
+}
+async function aiFlowSheet() {
+  const r = await aiScan(true); if (!r) return; AI.scan = r;
+  aiPush({kind: "scan", scan: r.scan, summary: r.summary, tokens: r.tokens});
+  const bad = r.scan.sheets.filter(x => x.problems.length);
+  if (!r.scan.sheets.length) return aiPush({content: "I found no sample sheet in this folder. Use 'Set up a run from my folder' to have one written for your reads."});
+  if (!bad.length) return aiPush({content: "The sample sheet(s) in this folder pass PlasBench's own checks: " + r.scan.sheets.map(x => x.rel).join(", ") + "."});
+  const sheet = bad[0];
+  let s; try { s = await api("ai/folder/suggest", {id: AI.grant.id, what: "sheet_fix", rel: sheet.rel}); } catch (e) { return toast(e.message, "bad"); }
+  const list = (s.problems || []).slice(0, 8).map(x => "- " + x).join("\n");
+  if (!s.ops.length) return aiPush({content: `${sheet.rel} has problems PlasBench cannot repair mechanically:\n\n${list}\n\n${(s.unfixable || []).map(x => "- " + x).join("\n")}\n\nYou can press **Share this summary** above and ask the assistant what to change.`});
+  const m = await aiShowPlan(s.ops, `Fix ${sheet.rel}`, "Mechanical repairs only (tab separator, column names, unsafe ids). A repair is offered only when the repaired sheet passes PlasBench's own check; nothing is invented.", []);
+  if (m && (s.unfixable || []).length) aiPush({content: (s.unfixable || []).join("\n")});
+}
+async function aiFlowAddTool() {
+  aiPush({content: "I will ask a few questions, write the tool's manifest with the same writer as `plasbench tools new`, check it with `plasbench tools validate`'s checks, and show it to you before anything is saved. (Docs: ADDING_TOOLS.md.)"});
+  const name = await askText({title: "Name of the tool", label: "Lower-case letters, digits and _, starting with a letter (it becomes the tool's folder)", confirmLabel: "Continue", validate: v => /^[a-z][a-z0-9_]{1,40}$/.test(v) ? "" : "Lower-case letters, digits and _ only, starting with a letter"});
+  if (name == null) return;
+  const tasks = {binning_reconstruction: "Plasmid bins (binning reconstruction)", classification: "Label each contig plasmid or chromosome (classification)", sequence_reassembly: "Re-assemble plasmids (sequence reassembly)"};
+  const t = await aiChoose("What does the tool do?", tasks); if (!t) return;
+  const src = await aiChoose("How is the tool installed?", {conda: "From conda (bioconda)", pip: "With pip", script: "With my own install script", url: "From a download address", git: "From a git repository", local: "It is already on this computer"}); if (!src) return;
+  let url = ""; if (src === "url" || src === "git") { url = await askText({title: "Address", label: "The https address of the download or repository", confirmLabel: "Continue", validate: v => /^https:\/\/\S+$/.test(v) ? "" : "An https:// address"}); if (url == null) return; }
+  let r; try { r = await api("ai/flow/tool", {name, tasks: [t], source: src, url}); } catch (e) { return toast(e.message, "bad"); }
+  aiPush({kind: "tool", tool: r});
+}
+async function aiChoose(title, options) {
+  const x = await modalDialog({title, buttons: [{id: "cancel", label: "Cancel"}].concat(Object.entries(options).map(([k, t]) => ({id: k, label: t}))), cancelId: "cancel"});
+  return x.id === "cancel" ? null : x.id;
+}
+function aiToolCard(m, mi) {
+  const t = m.tool;
+  return `<div class="aimsg bot" data-m="${mi}"><div class="aicard2"><div class="ch"><b>Tool manifest: ${esc(t.name || "")}</b><span class="risk changes_files">saves a file</span></div><div class="cb">
+    ${t.ok ? `<div class="ok-t">The manifest passes the tool checks.</div>` : `<div class="bad-t">${(t.problems || []).map(esc).join("<br>")}</div>`}${(t.warnings || []).map(w => `<div class="small mut">${esc(w)}</div>`).join("")}
+    ${t.text ? `<details><summary>The manifest (edit it afterwards on the Add a tool page)</summary><pre class="aipre-plain">${esc(t.text)}</pre></details>` : ""}
+    <div class="acts">${t.ok && !m.done ? `<button class="btn sm" data-aif="savetool">Add this tool</button>` : ""}<button class="btn sec sm" data-aif="opentool">Open the Add a tool page</button></div><div class="runstate" aria-live="polite">${m.note ? esc(m.note) : ""}</div></div></div></div>`;
+}
+async function aiSaveTool(m) {
+  try { await api("usertools/save", {text: m.tool.text, overwrite: false}); m.done = true; m.note = "Added. It appears on the Tools and Add a tool pages."; S.tools = null; S.toolsStale = true; } catch (e) { m.note = "Not added: " + e.message; }
+  aiRenderLog();
+}
+
+async function aiAttachPlans(bot) {
+  if (!(bot.fileRaw || []).length) return;
+  if (!AI.grant) { bot.fileplans = [{error: "The assistant proposed file changes, but no folder is chosen. Choose a folder first; nothing can be changed without one."}]; aiRenderLog(); return; }
+  bot.fileplans = bot.fileRaw.map(f => ({ops: f.ops, why: f.why})); bot.fileRaw = []; aiRenderLog();
+}
+async function aiReviewPlan(card, i) {
+  const bot = AI.msgs[+card.closest("[data-m]").dataset.m], fp = bot && (bot.fileplans || [])[i]; if (!fp) return;
+  await aiShowPlan(fp.ops, "Proposed file changes", fp.why, []);
+}
 aiBoot();
 
 $("#gd_ref").onclick = () => { GD.files = null; loadDrawer(); };
