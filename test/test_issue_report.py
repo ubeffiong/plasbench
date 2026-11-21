@@ -394,7 +394,7 @@ check("README is still CRLF throughout", readme.count("\r\n") == readme.count("\
 check("CHANGELOG is still CRLF throughout", read("CHANGELOG.md").count("\r\n") == read("CHANGELOG.md").count("\n"))
 check("the other docs are still LF", all("\r" not in read(f) for f in ("INSTALL.md", "docs/USER_GUIDE.md", "FAQ.md", "SECURITY.md", "SUPPORT.md", "CONTRIBUTING.md")))
 check("INSTALL, USER_GUIDE, FAQ, CONTRIBUTING and SUPPORT point at the README section", all("reporting-an-issue" in read(f) for f in ("INSTALL.md", "docs/USER_GUIDE.md", "FAQ.md", "CONTRIBUTING.md", "SUPPORT.md")))
-check("SECURITY.md does not claim a private channel that is off", "not switched on" in read("SECURITY.md"))
+check("SECURITY.md names the private route (Report a vulnerability), a contact e-mail address, and says not to open a public issue", "Report a vulnerability" in read("SECURITY.md") and __import__("re").search(r"[\w.+-]+@[\w-]+\.[\w.-]+", read("SECURITY.md")) is not None and "public issue" in read("SECURITY.md"))
 
 print("links")
 link_files = ["README.md", "SUPPORT.md", "CONTRIBUTING.md", "SECURITY.md", ".github/ISSUE_TEMPLATE/config.yml", ".github/ISSUE_TEMPLATE/bug_report.yml", ".github/ISSUE_TEMPLATE/question.yml",
