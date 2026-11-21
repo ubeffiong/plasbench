@@ -880,8 +880,9 @@ def wait_ready(check, timeout, interval=5.0, sleep=time.sleep, log=print, clock=
         sleep(interval)
 
 
-def _settle(recheck, sleep, tries=4, pause=3.0):
+def _settle(recheck, sleep, tries=4, pause=None):
     """Right after an installer finishes its files can take a moment to show up: look again a few times, but only while nothing at all is found."""
+    pause = float(os.environ.get("PLASBENCH_DOCKER_SETTLE", "3")) if pause is None else pause
     st = recheck()
     for _ in range(tries - 1):
         if st["state"] != "not_installed":
