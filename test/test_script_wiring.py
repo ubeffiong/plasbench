@@ -28,6 +28,8 @@ ONE_OFF = {
     "relabel_cohort_provenance",   # a maintainer tool that recomputes a cohort sheet's strategy and polish labels after classify_method changes; test_truth_provenance_tokens.py checks the shipped sheets against the same function
     "tool_install_proof",          # run by .github/workflows/tool-install-proof.yml (outside the scanned folders); test_tool_install_proof.py covers it
     "refresh_sample_report",       # called at the end of test/run_demo.sh (the demo is not a pipeline stage); test_refresh_sample_report.py covers it
+    "make_workflow_crate",         # builds the WorkflowHub package (dist/plasbench-score.crate.zip) on a maintainer's request; test_publishing.py runs it with --check
+    "sync_publishing_versions",    # run in the version-bump commit of a release (docs/RELEASING.md); test_publishing.py checks what it rewrites
 }
 
 

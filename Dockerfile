@@ -108,6 +108,8 @@ WORKDIR /opt/plasbench
 COPY --chown=$MAMBA_USER:$MAMBA_USER . /opt/plasbench
 RUN micromamba run -n plasbench python -m pip install --no-deps .
 
+# The per-step entry points (plasbench-score, plasbench-aggregate) are called by Galaxy and CWL from any working directory: tell them where the pipeline is.
+ENV PLASBENCH_HOME=/opt/plasbench
 ENV PATH=/opt/plasbench-bin:/opt/conda/envs/plasbench/bin:$PATH
 ENV CONTAINER_IMAGE=$IMAGE_NAME CONTAINER_IMAGE_DIGEST=$IMAGE_DIGEST
 CMD ["plasbench", "--help"]
