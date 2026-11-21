@@ -173,8 +173,9 @@ _DEMO = {
 _UI_STATE = {"json": {"summary": "Print the evidence as JSON instead of a short report.", "when": "Only when you want to process it with a script; to ask for help, paste the plain report."}}
 
 _RUNTIME = {
-    "action": {"summary": "What to do: status shows the choice and Docker's state, use saves the choice, check tests Docker step by step, pull gets the published image, build makes the image on this computer from the Dockerfile.",
+    "action": {"summary": "What to do: status shows the choice and Docker's state, use saves the choice, check tests Docker step by step, doctor runs the engine health checks and prints a plan, pull gets the published image, build makes the image on this computer from the Dockerfile.",
                "choices": {"status": "Show where the tools run and what Docker looks like.", "use": "Save conda or docker as the place the tools run (PLASBENCH_RUNTIME).",
+                           "doctor": "Docker engine health: version, storage, free space, a write test, proxies, then numbered safe steps. Exit 0 healthy, 3 problems found. Changes nothing.",
                            "check": "Test Docker: the image, the version inside it, a file written in a mounted folder and read here, and the path mapping. PASS or FAIL per step.",
                            "pull": "Download the published image of this version.", "build": "Build the image from this folder's Dockerfile (long, needs the internet, asks first)."}},
     "choice": {"summary": "With use: conda (the plasbench environment on this computer) or docker (a container of the PlasBench image)."},
@@ -199,6 +200,10 @@ ENVIRONMENT = {
     "run_in": {"summary": "Where this study's tools run: Conda or Docker. The default is the setting above; the choice is recorded in the study and in the run manifest."},
     "make_ready": {"summary": "Install every enabled tool and its database into the persistent storage of Docker mode (the image is never changed). Asks first and says what will be downloaded."},
     "extras": {"summary": "Tools and databases added in Docker mode live in this folder on your computer and are mounted into every container, so they stay between runs."},
+    "docker_health": {"summary": "Whether the Docker engine can pull, build and run: it answers, it can write (a test volume is created and removed, no network), and its disk has room. If not, PlasBench stops before a pull or build and says why.", "when": "After a pull or build failed, or Docker Desktop crashed or was updated."},
+    "run_health": {"summary": "Runs the engine checks now (about 15 seconds). Nothing is pulled, built, changed or deleted; the result is remembered for 30 seconds."},
+    "health_commands": {"summary": "Commands for you to copy and run yourself in a terminal. PlasBench never runs these; the first ones only read."},
+    "health_last_resort": {"summary": "Steps that DELETE or MOVE Docker data. Only after the steps above, and only if you accept what each warning says."},
 }
 
 ARGS = {"ui-state": _UI_STATE, "run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONSTRUCT, "intake": _INTAKE, "scan-isolates": _SCAN, "runtime": _RUNTIME}

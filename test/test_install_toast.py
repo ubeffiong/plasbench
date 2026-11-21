@@ -51,7 +51,7 @@ TABLE = [
     (["runtime", "pull", "--yes"], True, "Pulling the PlasBench image…", ["image"]),                                      # Environment card: Pull the image
     (["runtime", "build", "--yes"], True, "Building the PlasBench image…", ["image"]),
     (["runtime", "build", "--yes", "--rebuild"], True, "Building the PlasBench image…", ["image"]),
-    (["runtime", "status"], False, "", []), (["runtime", "use", "docker"], False, "", []), (["runtime", "check"], False, "", []),
+    (["runtime", "status"], False, "", []), (["runtime", "use", "docker"], False, "", []), (["runtime", "check"], False, "", []), (["runtime", "doctor"], False, "", []),                  # the health check is a look, not an install
     (["check", "--yes"], True, "Installing missing tools and databases…", []),                                            # Make everything ready; Install tool databases; Check & fix all
     (["check"], False, "", []),
     (["upgrade", "--yes"], True, "Updating PlasBench…", ["plasbench"]),

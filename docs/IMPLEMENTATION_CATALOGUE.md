@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 211 analysis modules, 28 registered tools and baselines (20 real tools), 219 registered
-outputs, 54 run switches, 457 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 212 analysis modules, 28 registered tools and baselines (20 real tools), 219 registered
+outputs, 54 run switches, 459 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -375,7 +375,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-211 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+212 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -611,6 +611,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `build_selection_report.py` | write cohorts/<name>.selection.json: how a cohort was selected. |
 | `check_prediction_fasta.py` | Stage-4 well-formedness check of a tool's prediction FASTA (audit AU-035). |
 | `data_nature.py` | Is this run made of synthetic (demo) data, real data, or a mix? A mix is refused, and a synthetic run says so inside its report. |
+| `docker_diagnosis.py` | Say WHY a docker pull, build or start failed, from the words docker printed, and what to do about it. Never guess. |
 | `docker_setup.py` | Docker in PlasBench's tools setup: detect the situation, diagnose it precisely, and install where a user-level process may, handing off where it may not. |
 | `download_progress.py` | How far a read download has got, for the run log. |
 | `generate_install_audit.py` | Write docs/TOOL_INSTALL_AUDIT.md from the registries (config/tool_installers.tsv, config/metagenomic_tool_installers.tsv, config/source_tools.json). |
