@@ -238,6 +238,7 @@ def classify_failure(text: str) -> dict:
 def probe(root=None, run=None, exe=None, environ=None, exists=os.path.exists, in_wsl=None) -> dict:
     """What Docker is like on this computer: {'state', 'installed', 'running', 'version', 'hint', 'image': {...}}.
     state: not_installed | wsl_integration_off | permission_needed | daemon_stopped | ready. `docker version` and `docker image inspect` only; no container is started."""
+    real = run is None and exe is None and environ is None        # the real computer: the Windows-side check below runs only then, never in a test that fakes docker
     run = run or _run
     environ = os.environ if environ is None else environ
     exe = exe if exe is not None else docker_exe()
@@ -261,9 +262,31 @@ def probe(root=None, run=None, exe=None, environ=None, exists=os.path.exists, in
         info.update(state="permission_needed", hint="This account may not use Docker: add it to the docker group (sudo usermod -aG docker $USER), then log out and in.")
     else:
         info.update(state="daemon_stopped", hint="Docker is installed but not running: start Docker Desktop (or sudo systemctl start docker).")
+    if real and info["state"] != "ready":
+        _setup_refine(info)
     if info["running"] and root is not None:
         info["image"] = image_state(root, exe, run, environ)
     return info
+
+
+def _setup_refine(info: dict) -> None:
+    """Windows and WSL 2: the same detector as `plasbench install-tools docker` (python/docker_setup.py) looks at Docker Desktop on the Windows side, so that a Docker Desktop that
+    is installed is never reported as 'not installed': it is installed-but-not-started, starting, or running with WSL integration off."""
+    try:
+        import sys as _sys
+        folder = str(Path(__file__).resolve().parent.parent / "python")
+        if folder not in _sys.path:
+            _sys.path.insert(0, folder)
+        import docker_setup
+        environment = docker_setup.detect_environment()
+        if environment.get("kind") not in ("windows", "wsl2"):
+            return
+        found = docker_setup.probe(environment)
+        diag = docker_setup.diagnose(found, environment)
+    except Exception:  # noqa: BLE001 - a refinement only: the plain answer above stands
+        return
+    if found["state"] in docker_setup.WIN_STATES:
+        info.update(state="wsl_integration_off" if found["state"] == "engine_up_wsl_integration_off" else "daemon_stopped", installed=True, hint=diag["title"], setup_state=found["state"])
 
 
 def image_state(root, exe, run=None, environ=None) -> dict:

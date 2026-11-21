@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import threading
@@ -174,6 +175,28 @@ def replacement_command(root: Path, port: int) -> list[str]:
     return [sys.executable, "-c", _BOOT, str(PKG.parent), "--project-root", str(root), "ui", "--new-instance", "--no-browser", "--port", str(port)]
 
 
+def group_launch(cmd: list[str], root=None, membership=None, which=shutil.which) -> tuple[list[str], bool, str]:
+    """(argv, wrapped, problem). A process keeps the groups it was started with, so after `sudo usermod -aG docker $USER` a restarted window would still lack the group. When the
+    account IS in the docker group now but this process is not, the replacement is started as `sg docker -c 'exec <argv>'` (each word shell-quoted); without `sg` the answer is a
+    problem sentence and the caller falls back to the manual instructions. Nothing changes when the group is already applied or the account is not a member."""
+    try:
+        if membership is None:
+            folder = str(Path(root) / "python") if root else str(PKG.parent / "python")
+            if folder not in sys.path:
+                sys.path.insert(0, folder)
+            import docker_setup
+            membership = docker_setup.group_membership()
+    except Exception:  # noqa: BLE001 - detection is optional: without it the restart is the plain one
+        return cmd, False, ""
+    if not (membership.get("in_group") and not membership.get("process_has")):
+        return cmd, False, ""
+    sg = which("sg")
+    if not sg:
+        return cmd, False, ("You are in the docker group but `sg` is not available to start PlasBench with it. Restart the window from a terminal where the group applies "
+                            "(newgrp docker, then plasbench ui), or run wsl --shutdown in Windows PowerShell and reopen Ubuntu.")
+    return [sg, str(membership.get("group") or "docker"), "-c", "exec " + shlex.join(cmd)], True, ""
+
+
 def spawn_detached(cmd: list[str], cwd) -> subprocess.Popen:
     """Start `cmd` so that it outlives this server (own session / process group, no console, no inherited pipes)."""
     kw = {}
@@ -193,7 +216,7 @@ def _healthy(info: dict) -> bool:
         return False
 
 
-def restart(root: Path, port: int, record_file: Path, spawn=spawn_detached, healthy=None, wait: float = 30.0) -> dict:
+def restart(root: Path, port: int, record_file: Path, spawn=spawn_detached, healthy=None, wait: float = 30.0, membership=None, which=shutil.which) -> dict:
     """Start a replacement server and wait until it answers. {"ok": True, "url": new address (with its new key)} or {"ok": False, "message", "manual": True}.
 
     The caller shuts THIS server down after the answer has been sent (the same keep-running shutdown as Quit: runs are detached and are not stopped)."""
@@ -203,8 +226,11 @@ def restart(root: Path, port: int, record_file: Path, spawn=spawn_detached, heal
     if not _RESTART_LOCK.acquire(blocking=False):
         return {"ok": False, "message": "a restart is already in progress"}
     try:
+        argv, wrapped, problem = group_launch(replacement_command(root, port), root, membership, which)
+        if problem:
+            return {"ok": False, "manual": True, "message": problem}
         try:
-            child = spawn(replacement_command(root, port), root)
+            child = spawn(argv, root)
         except OSError as exc:
             return {"ok": False, "manual": True, "message": f"could not start the new PlasBench: {exc}"}
         end = time.time() + wait
@@ -216,7 +242,7 @@ def restart(root: Path, port: int, record_file: Path, spawn=spawn_detached, heal
                 info = json.loads(record_file.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 info = {}
-            if info.get("pid") == child.pid and info.get("url") and (healthy or _healthy)(info):
+            if (info.get("pid") != os.getpid() if wrapped else info.get("pid") == child.pid) and info.get("url") and (healthy or _healthy)(info):      # through sg the recorded pid is the shell's child
                 return {"ok": True, "url": info["url"], "pid": info["pid"]}
             time.sleep(0.25)
         return {"ok": False, "manual": True, "message": "the new PlasBench did not answer in time; this window is unchanged"}

@@ -85,6 +85,7 @@ test_discover_plasmid_free.py	0.3
 test_disk_guard.sh	26.7
 test_doc_versions.py	0.3
 test_docker_install.sh	1.0
+test_docker_post_install.py	1.0
 test_docker_runtime.py	0.7
 test_docker_runtime_e2e.py	22.3
 test_docker_setup.py	0.3
