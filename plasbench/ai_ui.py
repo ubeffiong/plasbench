@@ -42,7 +42,7 @@ def _bad(reason: str, ui: str = "") -> dict:
 SCORING = re.compile(r"^(HEADLINE_|CPRR_|PLASBENCH_CI_METHOD|PLASBENCH_DOMINANT_SHARE|ALLOW_PRIMARY_FALLBACK)|THRESHOLD")
 
 
-def settable(row: dict, ranged=()) -> str:
+def settable(row: dict, ranged=(), listed: bool = False) -> str:
     """"" when a Settings row may be changed by the assistant, else the reason it may not."""
     key = row.get("key", "")
     if key in ranged or SCORING.search(key):
@@ -51,10 +51,10 @@ def settable(row: dict, ranged=()) -> str:
         return "the assistant never changes its own settings"
     if SECRET_WORDS.search(key):
         return "a setting that holds a key, address or credential is never changed from here"
-    if PATHY.search(key) or row.get("computed"):
+    if PATHY.search(key) or (row.get("computed") and not listed):
         return "a setting that holds a path or address is never changed from here (use the Settings page)"
     default = str(row.get("default") or "")
-    if "/" in default or "\\" in default or "~" in default or default.startswith("$"):
+    if not listed and ("/" in default or "\\" in default or "~" in default or default.startswith("$")):
         return "a setting that holds a path is never changed from here (use the Settings page)"
     return ""
 
@@ -78,25 +78,27 @@ def validate(obj, project=None) -> dict:
         value = "" if value is None else ("1" if value is True else "0" if value is False else str(value))
         rows = {r["key"]: r for r in (project.settings() if project is not None else [])}
         row = rows.get(key)
+        table = allowed_settings(project)
         if row is None:
             return _bad("%s is not one of PlasBench's settings" % re.sub(r"[^\w]", "", key)[:40], ui)
-        refused = settable(row, _ranged(project))
+        entry = table.get(key)
+        if entry is None:       # first layer: only what config/ai_settable.tsv lists; a new setting is refused until someone lists it
+            return _bad("%s is not on the list of settings the assistant may change (config/ai_settable.tsv); change it yourself on the Settings page" % key, ui)
+        refused = settable(row, _ranged(project), listed=True)       # second layer: the never-settable rules
         if refused:
             return _bad(refused, ui)
         if not VALUE_RE.match(value):
             return _bad("the value has characters that are not allowed (letters, digits, space and . _ , : + - only)", ui)
-        kind = row.get("kind")
-        if kind == "flag" and value not in ("0", "1"):
-            return _bad("%s is a switch: the value must be 0 or 1" % key, ui)
-        if kind == "int" and not re.fullmatch(r"\d{1,9}", value):
-            return _bad("%s needs a whole number" % key, ui)
+        bad = check_value(entry, value)
+        if bad:
+            return _bad(bad, ui)
         try:
             project.setting_ranges().validate_changes({key: value}, project.local_env(), project.root)
         except ValueError as exc:
             return _bad(str(exc)[:200], ui)
         old = row.get("override") if row.get("override") is not None else row.get("default")
-        out.update(title="Change setting %s" % key, desc="%s: %s -> %s. It is saved for this computer (config/local.env) and can be undone." % (key, old, value),
-                   risk="changes_files", confirm=True, params={"key": key, "value": value, "old": "" if old is None else str(old), "had_override": row.get("override") is not None})
+        out.update(title="Change setting %s" % key, desc="%s (%s): %s -> %s. It is saved for this computer (config/local.env) and can be undone." % (key, entry["label"], old, value),
+                   risk="changes_files", confirm=True, params={"key": key, "value": value, "old": "" if old is None else str(old), "had_override": row.get("override") is not None, "level": entry["risk"]})
     elif ui == "prefill":
         f = obj.get("fields")
         if not isinstance(f, dict) or not f:
@@ -174,3 +176,40 @@ def _ranged(project) -> set:
         return set(project.setting_ranges().load(project.root))
     except Exception:  # noqa: BLE001
         return set()
+
+
+_TABLE = {}
+
+
+def allowed_settings(project) -> dict:
+    """key -> {"type", "allowed", "label", "risk"} from config/ai_settable.tsv (the explicit list of settings the assistant may change); {} when the file is missing, so nothing is settable."""
+    try:
+        path = project.root / "config" / "ai_settable.tsv"
+        sig = (path.stat().st_mtime_ns, path.stat().st_size)
+        got = _TABLE.get(str(path))
+        if got and got[0] == sig:
+            return got[1]
+        table = {}
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip() or line.startswith("#") or line.startswith("key" + chr(9)):
+                continue
+            c = line.split(chr(9))
+            if len(c) >= 5:
+                table[c[0]] = {"type": c[1], "allowed": c[2], "label": c[3], "risk": c[4]}
+        _TABLE[str(path)] = (sig, table)
+        return table
+    except (OSError, AttributeError):
+        return {}
+
+
+def check_value(entry: dict, value: str) -> str:
+    """"" when the value fits the listed type, else the reason."""
+    t, allowed = entry["type"], entry["allowed"]
+    if t in ("flag", "choice"):
+        return "" if value in allowed.split("|") else "the value must be one of: %s" % ", ".join(allowed.split("|"))
+    if t == "int":
+        lo, _, hi = allowed.partition("..")
+        if not re.fullmatch(r"\d{1,9}", value) or not int(lo) <= int(value) <= int(hi):
+            return "the value must be a whole number from %s to %s" % (lo, hi)
+        return ""
+    return "unknown type in the list"

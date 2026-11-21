@@ -26,8 +26,7 @@ def check(label, good, detail=""):
 project = webui.Project(ROOT)
 rows = {r["key"]: r for r in project.settings()}
 ranged = ai_ui._ranged(project)
-flag = next(k for k, r in rows.items() if r["kind"] == "flag" and not ai_ui.settable(r, ranged) and k.startswith("RUN_"))
-intkey = next(k for k, r in rows.items() if r["kind"] == "int" and not ai_ui.settable(r, ranged) and not r.get("computed"))
+flag, intkey = "RUN_DIMER_DETECTION", "NETWORK_RETRIES"
 V = lambda o: ai_ui.validate(o, project)  # noqa: E731
 
 print("go")
@@ -44,8 +43,29 @@ check("a switch refuses a value that is not 0 or 1", not V({"ui": "setting", "ke
 check("a number refuses text", not V({"ui": "setting", "key": intkey, "value": "lots"})["ok"])
 for key in ("PLASMID_RECOVERY_THRESHOLD", "CPRR_MIN_COVERAGE", "HEADLINE_INDEPENDENCE", "AI_HELP_ENABLED", "AI_PROVIDER", "AI_DAILY_TOKEN_CAP", "AI_LOCAL_BASE", "AI_LOCAL_ALLOW_REMOTE", "AI_MODEL", "NCBI_API_KEY", "NCBI_EMAIL", "PATH", "HOME", "PLASBENCH_LOCAL_SETTINGS", "NOT_A_SETTING"):
     check("refused: %s" % key, not V({"ui": "setting", "key": key, "value": "1"})["ok"])
-check("no AI_ key and no secret or path setting is ever settable", all(not k.startswith("AI_") for k, r in rows.items() if not ai_ui.settable(r)) and
-      all(("KEY" not in k and "TOKEN" not in k and "EMAIL" not in k) for k, r in rows.items() if not ai_ui.settable(r)))
+table = ai_ui.allowed_settings(project)
+check("the explicit list is loaded and non-trivial", len(table) >= 60 and "RUN_DIMER_DETECTION" in table, len(table))
+check("a made-up key, an AI_ key and a HEADLINE_ key are refused (not listed)", all(not V({"ui": "setting", "key": k, "value": "1"})["ok"] for k in ("MADE_UP_SETTING", "AI_PROVIDER", "HEADLINE_INDEPENDENCE", "HEADLINE_MIN_CLUSTERS")))
+v = V({"ui": "setting", "key": "HEADLINE_INDEPENDENCE", "value": "independent"})
+check("the reason names the list", "config/ai_settable.tsv" in v["reason"] or "not one of" in v["reason"], v["reason"])
+sc = open(ROOT / "config" / "config.sh", encoding="utf-8").read()
+setting_ranges = ai_ui._ranged(project)
+check("every listed key exists in config/config.sh", all(("export " + k) in sc for k in table), [k for k in table if ("export " + k) not in sc])
+check("no listed key is a scoring decision, an AI_ key, a secret or a path (the second layer agrees)", all(not ai_ui.settable(rows[k], setting_ranges, listed=True) for k in table), [k for k in table if ai_ui.settable(rows[k], setting_ranges, listed=True)])
+check("no listed key has a range in config/setting_ranges.tsv", not (set(table) & set(setting_ranges)))
+bad_types = [k for k, e in table.items() if e["type"] not in ("flag", "int", "choice") or e["risk"] not in ("low", "medium") or not e["label"]]
+check("every entry has a known type, a risk and a label", not bad_types, bad_types)
+ok_all, why = True, []
+for k, e in table.items():
+    good = {"flag": "1", "choice": e["allowed"].split("|")[0], "int": e["allowed"].split("..")[0]}[e["type"]]
+    r = V({"ui": "setting", "key": k, "value": good})
+    if not r["ok"]:
+        ok_all = False
+        why.append((k, r["reason"]))
+check("a valid value of every listed key is accepted", ok_all, why[:3])
+check("a value outside the listed type or range is refused", not V({"ui": "setting", "key": "THREADS", "value": "100000"})["ok"] and not V({"ui": "setting", "key": "READ_SOURCE", "value": "ftp"})["ok"] and
+      not V({"ui": "setting", "key": "RUN_PLATON", "value": "2"})["ok"] and not V({"ui": "setting", "key": "SHORT_READ_QC_MODE", "value": "enforce"})["ok"])
+check("a listed key whose range file entry exists would be refused by the range check (validate_changes is still called)", "validate_changes" in open(ROOT / "plasbench" / "ai_ui.py", encoding="utf-8").read())
 for val in ("1; rm -rf /", "$(id)", "a\nb", "x" * 100, "/etc/passwd", "..\\x", "`x`"):
     check("a value with unsafe text is refused: %r" % val[:20], not V({"ui": "setting", "key": flag, "value": val})["ok"])
 

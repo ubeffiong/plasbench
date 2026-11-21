@@ -1,0 +1,87 @@
+# The only settings the AI help may change (the `setting` window action, plasbench/ai_ui.py). A setting that is not listed here is refused, so a new setting is refused until someone lists it.
+# Columns: key, type (flag = 0 or 1; int = whole number inside min..max; choice = one of the values), allowed (int: min..max; choice: a|b|c; flag: 0|1), label (plain language), risk (low = a switch or a
+# convenience; medium = changes how much of the computer a run uses or what it downloads). The never-settable rules of ai_ui.settable (AI_*, keys, tokens, paths, scoring decisions) still apply on top.
+# test/test_ai_window_actions.py checks that every key exists in config/config.sh, that a range in config/setting_ranges.tsv is respected, and that anything not listed is refused.
+key	type	allowed	label	risk
+RUN_TRUTH_LABEL_EVIDENCE	flag	0|1	Evidence-based truth labels	low
+RUN_DIMER_DETECTION	flag	0|1	Tandem-dimer truth plasmids: halves at >= DIMER_MIN_IDE	low
+RUN_RECOMMENDER_EVAL	flag	0|1	Recommender evaluation	low
+RUN_AMR_PLACEMENT	flag	0|1	AMR placement	low
+RUN_ASSEMBLY_QC_GATE	flag	0|1	Pre-ranking assembly QC gate	low
+RUN_TRUTH_EXCLUSION_SENSITIVITY	flag	0|1	Stage 6 writes the headline with and without the replicon-database exc	low
+RUN_MOB_RECON	flag	0|1	Turn tools off if you have not installed them yet	low
+RUN_PLATON	flag	0|1	run platon	low
+RUN_PLASMIDSPADES	flag	0|1	run plasmidspades	low
+RUN_GPLAS2_MOB	flag	0|1	gplas2 modes are kept separate because binning quality depends on the	low
+RUN_GPLAS2_EXTERNAL	flag	0|1	run gplas2 external	low
+RUN_GENOMAD	flag	0|1	ML/graph-based classifier, off by default	low
+RUN_PLASME	flag	0|1	Alignment+transformer classifier, off by default	low
+RUN_PLASGRAPH2	flag	0|1	plASgraph2: a GNN per-node classifier over the assembly graph	low
+RUN_RFPLASMID	flag	0|1	RFPlasmid: a random-forest classifier over single-copy marker genes, p	low
+RUN_PLASMIDHUNTER	flag	0|1	PlasmidHunter: a Diamond+Prodigal gene-content classifier over a singl	low
+RUN_PLASMER	flag	0|1	Plasmer: a heavy multi-tool ensemble classifier	low
+RUN_PLASCOPE	flag	0|1	PlaScope: Centrifuge classification	low
+RUN_FLYE_MOB_RECON	flag	0|1	run flye mob recon	low
+RUN_PLASSEMBLER	flag	0|1	Plassembler assembles plasmids from HYBRID input: the short reads stag	low
+RUN_HYBRACTER_LONG	flag	0|1	Hybracter (long-only and/or hybrid modes)	low
+RUN_HYBRACTER_HYBRID	flag	0|1	run hybracter hybrid	low
+RUN_TRYCYCLER_MOB_RECON	flag	0|1	Trycycler -> MOB-Recon: a second long-read-only assembly path alongsid	low
+RUN_RECOMMENDATION_MODEL	flag	0|1	A hand-rolled, pure-stdlib ridge regression predicting a tool's F1/ pl	low
+RUN_SCORABLE_TRUTH	flag	0|1	Recall-ceiling diagnostic: tile each truth plasmid into windows	low
+RUN_REFERENCE_ANNOTATION	flag	0|1	Largest primary alignment blocks retained per tool in the offline expl	low
+ANNOTATE_WITH_MOB_TYPER	flag	0|1	One switch per annotation caller (each default 1 = on; 0 = off)	low
+ANNOTATE_WITH_ABRICATE	flag	0|1	AMR genes and replicons by BLAST (abricate)	low
+ANNOTATE_WITH_AMRFINDER	flag	0|1	AMR genes (AMRFinderPlus; needs its database)	low
+ANNOTATE_WITH_ISESCAN	flag	0|1	insertion sequences (ISEScan; the slowest caller)	low
+ANNOTATE_WITH_BARRNAP	flag	0|1	rRNA genes (barrnap)	low
+RUN_DIMENSION_ANALYSES	flag	0|1	Further benchmark dimensions, computed per sample and tool in stage 5	low
+RUN_DIFFICULTY_FEATURES	flag	0|1	Truth-derived DIFFICULTY descriptors: how intrinsi	low
+RUN_QUAST_DIAGNOSTICS	flag	0|1	Optional QUAST supplementary diagnostics: three	low
+RUN_PLASMID_NOVELTY_CLASSIFICATION	flag	0|1	Optional operational-mode	low
+RUN_CONTIG_CLASSIFICATION	flag	0|1	Trivial baselines: reference points every tool sh	low
+RUN_CONTIG_CROSSCHECK	flag	0|1	Independent second scorer for the contig layer: alignment-fr	low
+RUN_DATABASE_CONTAINMENT	flag	0|1	Sequence-level leakage check: a truth plasmid is	low
+RUN_PROTEIN_ANNOTATION	flag	0|1	Optional standardized CDS/product annotation for truth and every predi	low
+RUN_PLSMD	flag	0|1	plsMD	low
+RUN_BIN_AGREEMENT	flag	0|1	Evaluation additions learned from PlasEval, plsMD and GAEMR	low
+RUN_CANDIDATE_MULTIPLICITY	flag	0|1	RUN_CANDIDATE_MULTIPLICITY  account for EVERY predicted record: per tr	low
+RUN_REFERENCE_EVIDENCE_AUDIT	flag	0|1	per-isolate reference evidence audit	low
+RUN_RANKING_STABILITY	flag	0|1	leave-one-study/species-out ranking stability	low
+RUN_PLASEVAL_GATE	flag	0|1	run plaseval gate	low
+RUN_COPY_NUMBER	flag	0|1	run copy number	low
+RUN_ASSEMBLY_ADEQUACY	flag	0|1	run assembly adequacy	low
+RUN_REPEAT_CONTENT	flag	0|1	run repeat content	low
+RUN_TRUTH_DEPTH_ANOMALIES	flag	0|1	run truth depth anomalies	low
+RUN_PLASBIN_FLOW	flag	0|1	PlasBin-flow	low
+RUN_STATS_VALIDATION	flag	0|1	1 runs the statistics simulation in stage 6 and shows it i	low
+RUN_RANK_SENSITIVITY	flag	0|1	1 (default) runs the ranking-robustness sweeps in stage 6; 0	low
+RUN_PUBLISHED_COMPARISON	flag	0|1	RUN_PUBLISHED_COMPARISON: auto (default) or off	low
+RUN_PLASMIDEC	flag	0|1	PlasmidEC	low
+RUN_PERFORMANCE_DRIVERS	flag	0|1	RUN_PERFORMANCE_DRIVERS: 1 (default) or 0	low
+RUN_PLSDB_NOVELTY	flag	0|1	PLSDB novelty: each truth plasmid is aligned to PLSDB and called	low
+AUTO_RESOURCES	flag	0|1	AUTO_RESOURCES	low
+DOWNLOAD_CONFIRM	flag	0|1	Show the estimated download size and ask before stage 1 fetches anythi	low
+ENA_SIZE_LOOKUP	flag	0|1	Before stage 1 downloads, PlasBench asks ENA for the exact compressed	low
+PRESERVE_DOWNLOADS	flag	0|1	Keep downloads for future runs: SHA-256 manifest per sample	low
+KEEP_REPORT_INPUTS	flag	0|1	Keep the small per-sample inputs the report needs INSIDE the results f	low
+REPORT_EMBED_DASHBOARD	flag	0|1	1 embeds the interactive cohort dashboard in the HTML report	low
+LOCAL_INPUTS_ONLY	flag	0|1	When enabled, stage 1 accepts only already staged local inputs and nev	low
+INSTALL_MISSING_TOOLS	flag	0|1	INSTALL_MISSING_TOOLS=1: stage 0 installs any enabled tool that is not	low
+ASSEMBLER_AUTO_RETRY	flag	0|1	1	low
+CAP_THREADS_TO_CPUS	flag	0|1	1	low
+READ_SOURCE	choice	auto|sra|ena	Where reads are downloaded from (auto, sra, ena)	low
+MULTIQC_REPORT	choice	auto|0|1	Build the optional MultiQC companion (auto, 0, 1)	low
+UPDATE_CHECK	choice	auto|off	Look for a newer PlasBench release (auto or off)	low
+ASSEMBLER	choice	spades|unicycler	Short-read assembler (spades or unicycler)	low
+SHORT_READ_QC_MODE	choice	report|off	Short-read QC gate: report or off	low
+ASSEMBLY_SELECTION_MODE	choice	report|off	Assembly selection: report or off	low
+THREADS	int	1..256	Thread budget for the run	medium
+MEMORY_GB	int	1..4096	Memory budget in GB	medium
+MAX_PARALLEL_SAMPLES	int	1..64	Samples processed at the same time	medium
+MAX_PARALLEL_TOOLS	int	1..64	Tools run at the same time within one sample	medium
+STAGE6_PARALLEL_JOBS	int	1..64	Parallel jobs in the stage 6 analyses	medium
+ENA_DOWNLOAD_CONNECTIONS	int	1..16	Parallel connections per ENA file	medium
+NETWORK_RETRIES	int	0..20	Times a failed network fetch is retried	low
+WARN_RUN_DOWNLOAD_GB	int	0..1000	Warn when one isolate's reads are larger than this many GB	low
+MIN_FREE_DISK_GB	int	0..100000	Warn before stage 1 when less than this many GB is free	low
+MULTIQC_TIMEOUT_SECONDS	int	10..86400	Seconds allowed for the MultiQC companion	low
