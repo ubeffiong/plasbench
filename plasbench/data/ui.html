@@ -21,7 +21,7 @@
  --ok:#1e7a3c;--ok-soft:#e5f2e9;--warn:#8a5a00;--warn-soft:#fbf1dc;--bad:#b3261e;--bad-soft:#f9e6e4;--info:#1d5fa7;--info-soft:#e6eef8;
  --bar-bg:#fff;--bar-line:#cfd5dd;--rail:#f6f7f9;--select:#dde8f5;
  --radius:3px;--radius-sm:3px;--shadow:none;--shadow-lg:0 10px 40px rgba(16,24,40,.22);
- --hdr:48px;--railw:248px;--cons:0px;--mono:"Cascadia Mono",Consolas,"SF Mono",Menlo,"DejaVu Sans Mono",monospace;
+ --hdr:48px;--mtabh:44px;--railw:248px;--cons:0px;--mono:"Cascadia Mono",Consolas,"SF Mono",Menlo,"DejaVu Sans Mono",monospace;
  --term-bg:#1f2329;--term-fg:#d7dce2;--term-line:#323840;--term-head:#272c33;
  --lg-ring:#1d5fa7;--lg-arc:#123f72;--lg-b1:#9dbbe0;--lg-b2:#4f86c2;--lg-b3:#1d5fa7;
  color-scheme:light;
@@ -328,7 +328,7 @@ h1 .tipi,h3 .tipi,h4 .tipi,.hd .tipi{margin-left:8px;vertical-align:middle}[data
 
 /* ---------- command reference ---------- */
 .cmdgrid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:12px;align-items:start}
-.cmdlist{position:sticky;top:calc(var(--hdr) + 16px);max-height:calc(100vh - var(--hdr) - var(--cons) - 36px);overflow:auto;padding:6px 0}
+.cmdlist{position:sticky;top:calc(var(--hdr) + var(--mtabh) + 16px);max-height:calc(100vh - var(--hdr) - var(--mtabh) - var(--cons) - 36px);overflow:auto;padding:6px 0}
 .cmdlist>input{margin:2px 8px 4px;width:calc(100% - 16px)}
 .cmdlist h6{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);margin:10px 12px 2px;font-weight:600}
 .cmdlist button{display:block;width:100%;text-align:left;background:transparent;border:0;border-left:3px solid transparent;padding:4px 12px 4px 9px;cursor:pointer;font:inherit;color:var(--fg-2)}
@@ -511,7 +511,7 @@ dialog.pbdlg .stopsw{display:flex;gap:8px;align-items:center;margin:6px 0;font-w
 @media (max-width:1180px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.split,.cmdgrid{grid-template-columns:minmax(0,1fr)}.cmdlist{position:static;max-height:300px}
  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stats>div:nth-child(3){border-left:0}.stats>div:nth-child(n+3){border-top:1px solid var(--line-2)}.top .where{display:none}}
 @media (max-width:900px){:root{--railw:0px}.rail{position:fixed;left:0;top:var(--hdr);width:260px;z-index:65;transform:translateX(-102%);transition:transform .15s;box-shadow:var(--shadow-lg)}
- .rail.open{transform:none}.shell{grid-template-columns:minmax(0,1fr)}#navtoggle{display:inline-flex!important}main{padding:14px 12px 28px}.g3,.g2{grid-template-columns:minmax(0,1fr)}
+ .rail.open{transform:none}.shell{grid-template-columns:minmax(0,1fr)}#navtoggle{display:inline-flex!important}main{padding:14px 12px 28px}.mtabs{margin:-14px -12px 14px;padding:8px 12px 0}:root{--mtabh:40px}.g3,.g2{grid-template-columns:minmax(0,1fr)}
  .top .search{display:none}.field{grid-template-columns:minmax(0,1fr)}.field .help{grid-column:1}.wsteps small{display:none}.vhead{flex-direction:column;align-items:flex-start}}
 @media (max-width:640px){
  .g4{grid-template-columns:minmax(0,1fr)}.top{gap:8px;padding:0 8px}.brand{padding-right:8px}.brand small,.brand .prod,#consbtn span,#jobpilltx,#gdbtn span:not(.badge),.netind .nl,.top .quit span{display:none}.top .tbtn{min-height:40px;min-width:40px;justify-content:center}.where{display:none}
@@ -562,7 +562,8 @@ body.gd-open #gdrawer{transform:none}
 .rtag{font:10.5px var(--mono);padding:0 4px;border:1px solid var(--line);border-radius:2px;color:var(--primary-ink);background:var(--primary-soft);white-space:nowrap}
 .rtag.tag{color:var(--warn);background:var(--warn-soft)}.rtag.remote{color:var(--ok);background:var(--ok-soft)}
 /* main-area tabs: the page, plus documents opened from it (diffs, commits) */
-.mtabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:-6px 0 14px;overflow-x:auto;scrollbar-width:thin}
+/* Fixed under the application bar: the page tabs stay in view while the page scrolls (negative margins stretch the strip over the main area's padding so nothing shows above or beside it). */
+.mtabs{display:flex;gap:2px;border-bottom:1px solid var(--line);position:sticky;top:var(--hdr);z-index:55;background:var(--bg);margin:-18px -24px 14px;padding:12px 24px 0;min-height:var(--mtabh);box-sizing:border-box;overflow-x:auto;scrollbar-width:thin}
 .mtab{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid transparent;border-bottom:0;border-radius:3px 3px 0 0;background:transparent;color:var(--mut);font:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap;max-width:280px;flex:none}
 .mtab>span{overflow:hidden;text-overflow:ellipsis}.mtab:hover{color:var(--fg);background:var(--surface-2)}
 .mtab.on{background:var(--surface);border-color:var(--line);color:var(--fg);margin-bottom:-1px;font-weight:600}
@@ -905,7 +906,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
      <button class="btn danger sm" id="ut_remove" disabled title="Delete the tool chosen on the left: its manifest, scripts and downloaded source">Remove</button></div></div>
    <div class="split">
     <div class="card" id="utform"><div class="hd"><h3>Manifest</h3><button class="btn ghost icon sm" data-uthelp title="How this form works, with an example" aria-label="Help: how this form works"><svg class="ico sm"><use href="#i-help"/></svg></button><span class="sub" id="ut_where"></span></div><div id="utsections"></div></div>
-    <div class="stack" style="position:sticky;top:calc(var(--hdr) + 18px)">
+    <div class="stack" style="position:sticky;top:calc(var(--hdr) + var(--mtabh) + 18px)">
      <div class="card"><div class="hd"><h3>Check</h3><span class="sub">updates as you type</span></div><div class="bd" id="utcheck"><div class="mut">Fill in the form.</div></div></div>
      <div class="card"><div class="hd"><h3>plasbench-tool.ini</h3><button class="btn ghost sm" id="ut_copy"><svg class="ico sm"><use href="#i-copy"/></svg>Copy</button><button class="btn ghost sm" id="ut_dl"><svg class="ico sm"><use href="#i-down"/></svg>Download</button></div>
       <div class="bd"><textarea id="ut_text" rows="16" spellcheck="false" aria-label="Manifest text"></textarea><span data-tipid="ut_text" class="mut"></span></div>
