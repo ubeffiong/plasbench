@@ -264,14 +264,6 @@ def main():
     r = pr.run_checks(ctx(tmp, data_dir="C:/Users/x/OneDrive/study/data"), probes())
     check("a cloud-synced folder gets a note", "cloud-synced" in texts(r, "warn"), r)
 
-    # ---- the retry plan ----------------------------------------------------------------------------------------------------------------
-    check("retry plan: threads are halved, the budget never exceeds 80% of what is available",
-          pr.memory_retry_plan(20, 5, 7) == (10, 5) and pr.memory_retry_plan(20, 12, 7) == (10, 5), (pr.memory_retry_plan(20, 5, 7), pr.memory_retry_plan(20, 12, 7)))
-    check("retry plan: when SPAdes hit its own limit and more is free, the budget rises, up to the cap and never above the free memory",
-          pr.memory_retry_plan(8, 4, 16, own_limit=True) == (4, 12) and pr.memory_retry_plan(8, 4, 5, own_limit=True) == (4, 4), (pr.memory_retry_plan(8, 4, 16, True), pr.memory_retry_plan(8, 4, 5, True)))
-    check("retry plan: nothing smaller to try gives None", pr.memory_retry_plan(1, 2, 2) is None, pr.memory_retry_plan(1, 2, 2))
-    check("retry plan never goes above the available memory", all(pr.memory_retry_plan(t, m, a)[1] <= max(2, int(a)) for t in (2, 8) for m in (3, 30) for a in (2.5, 7, 64) if pr.memory_retry_plan(t, m, a)))
-
     # ---- the command line ----------------------------------------------------------------------------------------------------------------
     sheet = tmp / "sheet.tsv"
     sheet.write_text("sample_id\tassembly_accession\tsra_run\ns1\tNA\tSRR1\ns2\tNA\tSRR2\n", encoding="utf-8")
@@ -286,8 +278,6 @@ def main():
     out = subprocess.run(base + ["guard", "--stage", "3", "--sample", "s1", "--sra", "SRR1", "--results-dir", str(tmp / "results"), "--data-dir", str(tmp / "data"), "--tmp-dir", str(tmp / "tmp")],
                          capture_output=True, text=True, env={**os.environ, "PLASBENCH_DISK_RESERVE_GB": "99999999", "PLASBENCH_SKIP_DISK_CHECK": "1"})
     check("... and PLASBENCH_SKIP_DISK_CHECK=1 lets it through", out.returncode == 0, out.stdout + out.stderr)
-    out = subprocess.run(base + ["retry-plan", "--threads", "20", "--memory-gb", "5", "--available-gb", "7"], capture_output=True, text=True)
-    check("retry-plan prints 'threads memory available'", out.stdout.split()[:2] == ["10", "5"], out.stdout + out.stderr)
     print(f"\n{'FAILED: ' + ', '.join(FAILED) if FAILED else 'all preflight-resource checks passed'}")
     return 1 if FAILED else 0
 

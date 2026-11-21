@@ -93,6 +93,9 @@ def resolve(mode, data_dir, study, home=None, need_bytes=0, mounts=None):
     else:
         target = Path(mode)
         why = "WORK_DIR=%s" % mode
+    if fs_type(target, mounts).lower() in ("tmpfs", "ramfs"):   # memory-backed (a container's tmpfs home): it would take RAM from the assembler and count against a container's memory limit
+        out["reason"] = "%s is on %s (memory-backed, it would take RAM from the assembler): working in the data folder instead" % (target, fs_type(target, mounts))
+        return out
     free = free_bytes(target)
     if free is not None and need_bytes and free < need_bytes:
         out["reason"] = "not enough free space in %s (%.1f GB free, about %.1f GB needed): working in the data folder instead" % (target, free / 1e9, need_bytes / 1e9)

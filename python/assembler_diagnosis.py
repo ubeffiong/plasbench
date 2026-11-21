@@ -150,21 +150,6 @@ def memory_need_gb(log_text):
     return found
 
 
-def memory_need_plan(need_gb, available_gb, margin=1.15, max_fraction=0.85, tight_fraction=0.92):
-    """The ONE retry for 'SPAdes needs X GB': (memory_gb, note) or (None, reason).
-    -m = ceil(need * 1.15 + 0.5 GB) when that is at most 85% of the memory available now; when only the bare need (rounded up) fits within 92% of it, that is used and the note
-    says it is tight; otherwise None with the exact need against what is free. The budget is never lowered: SPAdes asked for MORE."""
-    wanted = int(math.ceil(need_gb * margin + 0.5))
-    bare = int(math.ceil(need_gb))
-    if available_gb is None:
-        return wanted, "memory available now is unknown; using the size SPAdes asked for plus 15%"
-    if wanted <= available_gb * max_fraction:
-        return wanted, "needs %.2f GB, %.1f GB available: -m %d (need + 15%% + 0.5 GB)" % (need_gb, available_gb, wanted)
-    if bare <= available_gb * tight_fraction:
-        return bare, "needs %.2f GB, %.1f GB available: -m %d (exactly what SPAdes asked for, rounded up; tight, so other programs should be closed)" % (need_gb, available_gb, bare)
-    return None, "needs %.1f GB, %.1f GB are free" % (need_gb, available_gb)
-
-
 def _fill(text, context):
     values = {"free": "%s GB free" % context["free_gb"] if context.get("free_gb") is not None else "check df -h",
               "tmp": context.get("tmpdir") or "$TMPDIR", "threads": context.get("threads") or "?",
@@ -269,8 +254,7 @@ def main(argv=None):
     ap.add_argument("--available-gb")
     ap.add_argument("--free-gb", type=float)
     ap.add_argument("--tmpdir", default="")
-    ap.add_argument("--format", choices=("tsv", "json", "text", "need", "need-plan"), default="text")
-    ap.add_argument("--min-fraction", type=float, default=0.85, help=argparse.SUPPRESS)
+    ap.add_argument("--format", choices=("tsv", "json", "text", "need"), default="text")
     args = ap.parse_args(argv)
     context = {"exit_code": args.exit_code, "tool": args.tool, "sample": args.sample, "threads": args.threads, "memory_gb": args.memory_gb,
                "available_gb": args.available_gb, "free_gb": args.free_gb, "tmpdir": args.tmpdir, "log": args.logfile}
@@ -278,15 +262,6 @@ def main(argv=None):
     if args.format == "need":
         need = memory_need_gb(text)
         print("-" if need is None else "%.3f" % need)
-        return 0
-    if args.format == "need-plan":      # "<memory_gb> <note>" or "none <reason>": the one retry for a log that says how much memory it needs
-        need = memory_need_gb(text)
-        if need is None:
-            print("none the log does not say how much memory is needed")
-            return 0
-        avail = float(args.available_gb) if args.available_gb not in (None, "", "-") else None
-        mem, note = memory_need_plan(need, avail)
-        print("none %s" % note if mem is None else "%d %s" % (mem, note))
         return 0
     result = diagnose(text, context)
     if args.format == "json":

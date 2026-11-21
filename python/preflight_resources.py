@@ -4,7 +4,6 @@
   python3 -I python/preflight_resources.py check --stage 0|2|3 --results-dir D --data-dir D --tmp-dir D [--sheet S] --threads N --memory-gb N [--parallel N]
   python3 -I python/preflight_resources.py guard --stage 1|3 --sample S --sra R --results-dir D --data-dir D --tmp-dir D [--in-flight N]   (the rolling guard, exit 3 = stop)
   python3 -I python/preflight_resources.py vdisk                     (where Ubuntu's virtual disk is and how much room its Windows drive has, with the evidence)
-  python3 -I python/preflight_resources.py retry-plan --threads N --memory-gb N [--own-limit]
 
 A run used to find out that the disk was full or the memory short only when SPAdes died minutes into an isolate. This looks first, in milliseconds.
 
@@ -583,22 +582,6 @@ def _cached_vdisk_free(ctx, max_age=300):
     return free
 
 
-def memory_retry_plan(threads, memory_gb, available_gb, own_limit=False):
-    """New (threads, memory_gb) for ONE retry after an out-of-memory failure, or None when there is nothing smaller to try.
-    Threads are halved (never below 1). The budget never goes above 80% of the memory available now; when SPAdes stopped at its OWN limit and more is
-    available, the budget rises to that cap, otherwise it only falls."""
-    threads, memory_gb = int(threads), int(memory_gb)
-    cap = int(available_gb * 0.8) if available_gb is not None else memory_gb
-    cap = max(2, cap)
-    new_mem = max(cap, memory_gb) if (own_limit and cap > memory_gb) else min(memory_gb, cap)
-    new_threads = max(1, threads // 2)
-    if available_gb is not None:
-        new_mem = min(new_mem, max(2, int(available_gb)))
-    if new_threads == threads and new_mem >= memory_gb:
-        return None
-    return new_threads, new_mem
-
-
 def _available_gb():
     forced = os.environ.get("PLASBENCH_TEST_AVAILABLE_MB")      # lets a test pretend to be a smaller or larger machine
     if forced and forced.isdigit():
@@ -657,20 +640,10 @@ def main(argv=None):
     g.add_argument("--in-flight", type=int, default=1)
     sub.add_parser("vdisk")
     sub.add_parser("available", help="memory available now in GB (cgroup and WSL aware), one decimal; empty when unknown")
-    r = sub.add_parser("retry-plan")
-    r.add_argument("--threads", type=int, required=True)
-    r.add_argument("--memory-gb", type=int, required=True)
-    r.add_argument("--own-limit", action="store_true")
-    r.add_argument("--available-gb", type=float)
     args = ap.parse_args(argv)
     if args.cmd == "available":
         avail = _available_gb()
         print("" if avail is None else "%.1f" % avail)
-        return 0
-    if args.cmd == "retry-plan":
-        avail = args.available_gb if args.available_gb is not None else _available_gb()
-        plan = memory_retry_plan(args.threads, args.memory_gb, avail, args.own_limit)
-        print("none" if plan is None else f"{plan[0]} {plan[1]} {'-' if avail is None else '%.1f' % avail}")
         return 0
     wsl = _is_wsl()
     skip = os.environ.get("PLASBENCH_SKIP_DISK_CHECK") == "1"
