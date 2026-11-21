@@ -137,7 +137,7 @@ assembly_scratch_finish() {   # assembly_scratch_finish SCRATCH OUT ASMDIR: move
 # Sets ASM_MEM_USED, ASM_NEEDED_GB, ASM_ATTEMPTS and ASM_MODE for assembly_status.tsv.
 run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SDIR
     local sample="$1" t1="$2" t2="$3" asmdir="$4" start="$5" r1="$6" r2="$7" sdir="$8"
-    local log="$LOG_DIR/${sample}.spades.log" threads="$THREADS" mem="$ASSEMBLY_MEMORY_GB" rc attempt=1 plan="" note="" first="" own="" nt nm av avail
+    local log="$LOG_DIR/${sample}.spades.log" threads="$THREADS" mem="$ASSEMBLY_MEMORY_GB" rc attempt=1 plan="" note="" first="" own="" nm avail
     local verdict vact vmem vmsg STOP_EARLY=0 MEMORY_REFUSAL="" out="$asmdir" scratch="" sig="" known="" needed="" mode="spades" opt=() auto="${AUTO_RESOURCES:-1}" memdir="$RESULTS_DIR" free_now=""
     ASM_RETRY_NOTE=""
     rm -f "$RESULTS_DIR/resource_state.d/spades.$sample.txt"

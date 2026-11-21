@@ -227,7 +227,7 @@ echo "rc=$rc after: THREADS=$THREADS MEMORY_GB=$MEMORY_GB TMPDIR=${TMPDIR:-unset
         check("... the line is plain and a resource_adjust event is written", "raising memory from 4 to 7 GB" in r.stderr + r.stdout and "resource_adjust" in (tmp / "res" / "run_events.jsonl").read_text(), (r.stderr, r.stdout))
         check("... the changes were for that command only (the caller's settings are restored)", "THREADS=6 MEMORY_GB=4" in r.stdout, r.stdout)
         r, calls = drive("oomkill", "mob_recon")
-        check("run_adaptive: exit 137 -> memory budget raised first (1.5 x), still killed, then threads halved: succeeds on the 2nd adjustment", "rc=0" in r.stdout and len(calls) == 3, (r.stdout, calls))
+        check("run_adaptive: exit 137 -> a bigger budget cannot help a kill, so the threads are halved (6 -> 3) with the budget unchanged, and it succeeds on the 1st adjustment", "rc=0" in r.stdout and len(calls) == 2 and "mem=4 threads=6" in calls[0] and "mem=4 threads=3" in calls[1], (r.stdout, calls))
         r, calls = drive("tmp", "platon")
         check("run_adaptive: temp space -> TMPDIR moved to the roomier folder", "rc=0" in r.stdout and any("tmp=" + str(tmp / "bigger") in c for c in calls[1:]), (r.stdout, calls))
         r, calls = drive("files", "abricate", SOFT_NOFILE="512")
