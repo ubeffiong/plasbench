@@ -465,3 +465,4 @@ test_workspace_studies.py	1.7
 test_workspace_tree_ui.py	0.3
 test_zero_plasmid_bin_scoring.py	0.3
 test_zero_plasmid_isolate_scoring.py	0.3
+test_stop_all.py	40.0

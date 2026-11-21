@@ -415,6 +415,10 @@ dialog.dkdlg ul.dknotes{margin:6px 0 0 18px;padding:0}.dkerr{color:var(--bad);ma
 .updsteps{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px}.updstep{display:flex;gap:8px;align-items:center;min-height:28px;color:var(--fg-2)}.updstep.done{color:var(--fg)}.updstep.done .ico{color:var(--ok)}.updstep.current{color:var(--primary);font-weight:600}.updstep.failed{color:var(--bad);font-weight:600}
 .updjob{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)}.updjob details{margin-top:10px}.updjob pre{max-height:240px;overflow:auto;white-space:pre-wrap;margin:6px 0 0;padding:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px}
 .updnotes{margin:4px 0 6px;padding-left:18px}.updbad{color:var(--bad)}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* BEGIN stop all */
+dialog.pbdlg .stoplist{margin:0 0 10px;padding-left:20px;font-size:13px}dialog.pbdlg .stoplist li{margin:2px 0;overflow-wrap:anywhere}
+dialog.pbdlg .stopsw{display:flex;gap:8px;align-items:center;margin:6px 0;font-weight:500}dialog.pbdlg .stopsw.danger{color:var(--bad)}dialog.pbdlg .stopsw input{accent-color:var(--bad)}
+/* END stop all */
 /* BEGIN server state (stale window server) */
 #stalebar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:140;width:min(760px,calc(100vw - 32px));background:var(--warn-soft,#fff4d6);color:var(--fg);border:1px solid var(--warn,#b7791f);border-left-width:5px;border-radius:8px;padding:10px 14px;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.22)}
 #stalebar[hidden]{display:none}
@@ -1404,6 +1408,7 @@ async function api(path, body) {
     }
   }
   if (S.conn) connBack(true);
+  if (r.headers.get("X-PlasBench-Stopping") && !S.quit) { setTimeout(() => showStopped({other: true}), 0); }   // Stop all ends this server: one final state, never the reconnect pop-up
   if (r.status === 403 && !/request refused/.test(await r.clone().text())) {
     sessionEnded();
     throw new Error("session ended");
@@ -1513,7 +1518,7 @@ function showRefused() {
   const bar = document.getElementById("oldsession"); if (!bar) return;
   setIfChanged(bar, `<div class="ss-row">${icon("alert", "ico")}<div class="ss-msg"><b id="os_t">This window belongs to an older PlasBench session</b>
       <span>${esc(LOST_EXPIRED)}</span><span id="os_status" class="mut small" role="status"></span></div>
-    <div class="ss-btns"><button class="btn" id="os_close">Close this window</button><button class="btn sec" id="os_open">Open the current window</button><button class="btn sec" id="os_check">Check again</button></div></div>`);
+    <div class="ss-btns"><button class="btn" id="os_close">Close this window</button><button class="btn sec" id="os_open">Open the current window</button><button class="btn sec" id="os_check">Check again</button><button class="btn sec" id="os_stop">Stop all…</button></div></div>`);
   bar.hidden = false;
   const say = t => { const e = document.getElementById("os_status"); if (e) e.textContent = t; };
   document.getElementById("os_close").onclick = () => { try { window.close(); } catch (e) { /* refused */ } setTimeout(() => say("This browser did not let the page close itself: close this window from the taskbar."), 400); };
@@ -1523,6 +1528,7 @@ function showRefused() {
     catch (e) { say("PlasBench did not answer. Start it again from its desktop icon."); }
   };
   document.getElementById("os_check").onclick = retryNow;
+  document.getElementById("os_stop").onclick = () => stopAllCommandDialog();   // this window cannot talk to its server, so it points to the command
 }
 async function retryNow() {
   const btn = document.getElementById("lost_retry") || document.getElementById("os_check"); if (btn) { btn.disabled = true; btn.textContent = "Trying…"; }
@@ -2393,27 +2399,139 @@ async function askQuit(running) {
       <p><b>In one sentence:</b> Quit and keep running closes this window and PlasBench but leaves the run going in the background, while plain Quit (Stop and quit) cancels the run first and then closes PlasBench.</p>
       <p><b>Quit and keep running</b> closes the window and PlasBench but leaves the run going in the background. Start PlasBench again to follow it; it is listed under Runs &amp; reports.</p>
       <p><b>Stop and quit</b> cancels it. Finished work is kept, and you can resume the run later.</p>`,
-    buttons: [{id: "", label: "Cancel"}, {id: "stop", label: "Stop and quit", danger: true}, {id: "keep", label: "Quit and keep running", primary: true}]});
+    buttons: [{id: "", label: "Cancel"}, {id: "all", label: "Stop all PlasBench on this computer…"}, {id: "stop", label: "Stop and quit", danger: true}, {id: "keep", label: "Quit and keep running", primary: true}]});
   return r.id;
 }
+/* BEGIN stop all (a safety net for stale windows and servers). Pure functions first: node runs this block in test/test_stop_all.py. */
+/* ==STOP-PURE-BEGIN== */
+const stopPlural = (n, one) => n + " " + one + (n === 1 ? "" : "s");
+function stopCounts(plan) {
+  const servers = (plan.servers || []).filter(x => x.action === "stop"), runs = (plan.runs || []).filter(x => x.action !== "skip");
+  return {servers: servers.length, runs: runs.length, windows: (plan.windows || []).length, others: servers.filter(x => !x.self).length};
+}
+/* The label of the confirm button follows the choices: "Stop 2 servers", "Stop 2 servers and 3 runs", "Stop 2 servers and restart WSL". */
+function stopLabel(plan, o) {
+  const c = stopCounts(plan), parts = [stopPlural(c.servers, "server")];
+  if (o.runs && c.runs) parts.push(stopPlural(c.runs, "run"));
+  let text = "Stop " + parts.join(" and ");
+  if (o.wsl) text += " and restart WSL";
+  return text;
+}
+/* One plain line per thing that will end, and per thing that keeps going or is left alone. */
+function stopSummary(plan, o) {
+  const ends = [], keeps = [], skips = [];
+  for (const t of plan.servers || []) {
+    if (t.action === "stop") ends.push(`PlasBench server on port ${t.port} (pid ${t.pid}${t.version ? ", version " + t.version : ""}${t.self ? ", this window's" : ""})` + (t.windows_alive ? `: ${stopPlural(t.windows_alive, "window")} open` : ""));
+    else skips.push(`port ${t.port}: ${t.reason}`);
+  }
+  for (const s of plan.skipped || []) skips.push(s.reason);
+  for (const r of plan.runs || []) {
+    if (r.action === "skip") { skips.push(`${r.label}: ${r.reason}`); continue; }
+    const line = `${r.label}, running for ${r.elapsed_seconds != null ? Math.max(1, Math.round(r.elapsed_seconds / 60)) + " min" : "unknown time"}${r.step ? ", last step: " + r.step : ""}`;
+    (o.runs ? ends : keeps).push(line);
+  }
+  return {ends, keeps, skips};
+}
+/* wsl --shutdown: offered only inside WSL; disabled with the reason when Windows interop is off; blocked while runs are active unless the runs switch is on. */
+function wslState(plan, o) {
+  const w = plan.wsl || {}, c = stopCounts(plan);
+  if (!w.offered) return {show: false, enabled: false, reason: ""};
+  if (!w.available) return {show: true, enabled: false, reason: (w.reason || "Windows interop is not available") + ". Run this yourself in Windows PowerShell: " + (w.manual || "wsl --shutdown")};
+  if (c.runs && !o.runs) return {show: true, enabled: false, reason: `Blocked while ${stopPlural(c.runs, "run")} ${c.runs === 1 ? "is" : "are"} active: switch on "Also stop the running runs/jobs" first, because wsl --shutdown ends them.`};
+  return {show: true, enabled: true, reason: ""};
+}
+/* Everything wsl --shutdown ends, in plain words. */
+function wslEnds(plan) {
+  const w = plan.wsl || {}, c = stopCounts(plan), list = [];
+  list.push("all WSL distributions" + ((w.distributions || []).length ? ": " + w.distributions.join(", ") : (w.distributions_note ? " (" + w.distributions_note + ")" : "")));
+  list.push("the Docker Desktop engine (Docker Desktop restarts its WSL backend)");
+  list.push("every terminal open in WSL, and anything unsaved there");
+  if (c.runs) list.push(stopPlural(c.runs, "PlasBench run") + " or job");
+  list.push("this window and every PlasBench server");
+  return list;
+}
+/* ==STOP-PURE-END== */
+function stopFinalHTML(o) {
+  o = o || {};
+  const kept = o.keptRuns ? "Your run keeps going in the background. " : "";
+  if (o.wsl) return `<h2 style="font-weight:600;margin:12px 0 6px">WSL is shutting down</h2><p>Reopen Ubuntu, or run <code>plasbench ui</code>, to start again. The next WSL start takes a few seconds, and PlasBench windows need to be reopened. Finished work and files are kept.</p>`;
+  return `<h2 style="font-weight:600;margin:12px 0 6px">PlasBench has stopped</h2><p>${kept}${o.stopped ? "Every PlasBench server on this computer has been stopped. " : ""}You can close this window. Start PlasBench again from its desktop icon or with <code>plasbench ui</code>${o.keptRuns ? " to follow it" : ""}.</p>`;
+}
+function showStopped(o) {
+  S.quit = true; TOKEN = "";
+  const old = document.getElementById("ended"); if (old) old.remove();
+  const sprite = document.querySelector("svg[aria-hidden]");
+  document.body.innerHTML = `<div style="display:grid;place-items:center;height:100vh;font-family:system-ui;color:#3c4650;text-align:center" role="status">
+    <div><svg viewBox="0 0 64 64" width="56" height="56"><use href="#pb-mark"/></svg>${stopFinalHTML(o)}</div></div>` + (sprite ? sprite.outerHTML : "");
+  setTimeout(() => { try { window.close(); } catch (e) { /* the browser may refuse; the text above says to close it */ } }, 600);
+}
+/* The window cannot talk to its server (its key is refused): it can only point to the command. */
+function stopAllCommandDialog() {
+  return modalDialog({title: "Stop all PlasBench on this computer", cancelId: "ok", copy: "plasbench stop --all", buttons: [{id: "ok", label: "Close", primary: true}],
+    bodyHTML: `<p>This window cannot reach its server, so it cannot stop anything itself. In a terminal run:</p><div class="cmdline"><span class="p">$</span><code>plasbench stop --all</code></div>
+      <p class="mut small">Add <code>--dry-run</code> to preview, or <code>--runs</code> to stop runs too.</p>`});
+}
+async function stopAllFlow() {
+  let plan;
+  try { plan = await api("stop/plan", {}); } catch (e) { toast(e.message, "bad"); return; }
+  const o = {runs: false, wsl: false}, c = stopCounts(plan);
+  const body = () => {
+    const sm = stopSummary(plan, o), w = wslState(plan, o);
+    const list = (items, none) => items.length ? `<ul class="stoplist">${items.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="mut small">${none}</p>`;
+    return `<p><b>This will end</b></p>${list(sm.ends, "Nothing is running that PlasBench started.")}
+      ${sm.keeps.length ? `<p><b>These keep going in the background</b></p>${list(sm.keeps, "")}` : ""}
+      ${c.runs ? `<label class="stopsw danger"><input type="checkbox" id="sa_runs" ${o.runs ? "checked" : ""}> Also stop ${stopPlural(c.runs, "running run")}/jobs ${pageTip("stop_runs")}</label>
+        ${o.runs ? `<p class="mut small">Finished work is kept; the current step is lost; you can resume with the same command.</p>` : ""}` : ""}
+      ${sm.skips.length ? `<details><summary>Left alone (${sm.skips.length})</summary>${list(sm.skips, "")}</details>` : ""}
+      ${w.show ? `<hr><label class="stopsw danger"><input type="checkbox" id="sa_wsl" ${o.wsl ? "checked" : ""} ${w.enabled ? "" : "disabled"}> Quit and restart WSL (wsl --shutdown) ${pageTip("stop_wsl")}</label>
+        ${w.enabled ? "" : `<p class="mut small">${esc(w.reason)}</p>`}` : ""}`;
+  };
+  for (;;) {   // re-drawn when a switch changes; the WSL choice has a second, danger-styled step before anything is sent
+    const r = await modalDialog({title: "Stop all PlasBench on this computer", danger: true, cancelId: "cancel", defaultId: "cancel", wide: true,
+      bodyHTML: `<div id="sa_body">${body()}</div>`,
+      buttons: [{id: "cancel", label: "Cancel"}, {id: "go", label: stopLabel(plan, o), danger: true}],
+      onclick: (e, d) => {
+        const t = e.target;
+        if (t.id === "sa_runs") { o.runs = t.checked; if (!o.runs) o.wsl = false; }
+        else if (t.id === "sa_wsl") { o.wsl = t.checked; }
+        else return;
+        d.querySelector("#sa_body").innerHTML = body();
+        d.querySelector('[data-dlg="go"]').textContent = stopLabel(plan, o);
+        const f = d.querySelector("#" + t.id); if (f) f.focus();
+      }});
+    if (r.id !== "go") return;
+    if (o.wsl) {
+      const ok = await modalDialog({title: "Shut down WSL?", danger: true, cancelId: "cancel", defaultId: "cancel", typeToConfirm: plan.confirm_word || "SHUT DOWN WSL",
+        bodyHTML: `<p><b>wsl --shutdown ends:</b></p><ul class="stoplist">${wslEnds(plan).map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+          <p>It is typically needed after changing <code>.wslconfig</code> (memory, processors, swap), after being added to the docker group, or to recover a stuck WSL. All finished work and files are kept; runs can be resumed with the same command.</p>`,
+        buttons: [{id: "cancel", label: "Back"}, {id: "ok", label: "Shut down WSL now", danger: true}]});
+      if (ok.id !== "ok") continue;
+    }
+    break;
+  }
+  try { await api("stop/run", {plan_id: plan.plan_id, runs: o.runs, wsl: o.wsl, windows: false, confirm: o.wsl ? (plan.confirm_word || "SHUT DOWN WSL") : ""}); }
+  catch (e) { toast(e.message, "bad"); return; }
+  showStopped({stopped: true, wsl: o.wsl, keptRuns: !o.runs && c.runs});
+}
+/* END stop all */
 /* ---- Quit: stop PlasBench (the server) and close the window ---- */
 $("#quitbtn").onclick = async () => {
-  if (!await askConfirm({title: "Quit PlasBench?", danger: true, confirmLabel: "Quit", cancelLabel: "Stay open",
-    body: "This stops PlasBench and closes the window. Your studies, results and settings are kept. Start it again from the desktop icon or with: plasbench ui"})) return;
+  const first = await modalDialog({title: "Quit PlasBench?", danger: true, cancelId: "cancel", defaultId: "cancel",
+    body: "This stops PlasBench and closes the window. Your studies, results and settings are kept. Start it again from the desktop icon or with: plasbench ui",
+    buttons: [{id: "cancel", label: "Stay open"}, {id: "all", label: "Stop all PlasBench on this computer…"}, {id: "ok", label: "Quit", danger: true}]});
+  if (first.id === "all") return stopAllFlow();
+  if (first.id !== "ok") return;
   try {
     let r = await api("shutdown", {});
     if (!r.ok) {
       const choice = await askQuit(r.running);
+      if (choice === "all") return stopAllFlow();
       if (!choice) return;
       r = await api("shutdown", choice === "keep" ? {keep: true} : {force: true});
       S.keptRuns = choice === "keep" ? r.running ? r.running.length : 1 : 0;
     }
   } catch (e) { toast(e.message, "bad"); return; }
-  S.quit = true;
-  document.body.innerHTML = `<div style="display:grid;place-items:center;height:100vh;font-family:system-ui;color:#3c4650;text-align:center">
-    <div><svg viewBox="0 0 64 64" width="56" height="56"><use href="#pb-mark"/></svg><h2 style="font-weight:600;margin:12px 0 6px">PlasBench has stopped</h2>
-    <p>${S.keptRuns ? "Your run keeps going in the background. " : ""}You can close this window. Start PlasBench again from its desktop icon or with <code>plasbench ui</code>${S.keptRuns ? " to follow it" : ""}.</p></div></div>` + document.querySelector("svg[aria-hidden]").outerHTML;
-  setTimeout(() => window.close(), 600);
+  showStopped({keptRuns: S.keptRuns});
 };
 
 /* ===================================================================================================
