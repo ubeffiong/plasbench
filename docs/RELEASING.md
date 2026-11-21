@@ -11,8 +11,9 @@ base image; update it only through `env/lock_environment.sh`.
 1. The canonical source repository is `ubeffiong/plasbench`.
 2. Create a Quay repository or use the GitHub Container Registry image published by the
    release workflow; replace `YOUR_QUAY_NAMESPACE` in `galaxy/plasbench_score.xml`.
-3. Fork `bioconda-recipes`, fill the source URL and SHA256 in
-   `recipes/bioconda/meta.yaml.template`, then open the Bioconda pull request.
+3. Fork `bioconda-recipes`, copy `recipes/bioconda/` to `recipes/plasbench/` there, set the version and the SHA256 of the release archive
+   (the value in `plasbench-<version>.tar.gz.sha256` on the GitHub Release), then open the Bioconda pull request.
+   BioContainers builds and publishes the container (quay.io/biocontainers/plasbench) from that recipe automatically once it is merged.
 4. Create a Galaxy Tool Shed account, copy `galaxy/.shed.yml.example` to `.shed.yml`,
    replace all placeholders, and publish after Planemo tests pass.
 
@@ -23,6 +24,8 @@ The GitHub Release archive is the Python-package distribution.
 ## Release sequence
 
 1. Update `plasbench/__init__.py` and `pyproject.toml` to the same version.
+   Then run `python3 python/sync_publishing_versions.py` (bio.tools entry and the CWL workflow's image tags) and bump the Galaxy token in `galaxy/macros.xml`;
+   `test/test_publishing.py` fails if any of them names another version.
 2. When dependencies change, regenerate and review the committed explicit lock:
    `bash env/lock_environment.sh`. Docker builds consume this lock and do not
    solve `environment.yml` at build time.
@@ -31,6 +34,9 @@ The GitHub Release archive is the Python-package distribution.
 5. Commit, tag `v<version>`, and push the tag. The GitHub release workflow builds and
    pushes the GHCR image, then publishes the GitHub Release.
 6. Create or update the Bioconda and Galaxy Tool Shed submissions from that immutable tag.
+   Put the release archive's SHA-256 (`plasbench-<version>.tar.gz.sha256` on the GitHub Release) into `recipes/bioconda/meta.yaml`, rebuild the WorkflowHub package with
+   `python3 python/make_workflow_crate.py` (writes `dist/plasbench-score.crate.zip`) and update the bio.tools entry from `docs/publishing/biotools.json`.
+   Each platform, what is ready and what only the maintainer can do: `docs/publishing/README.md`.
 7. Connect this GitHub repository to Zenodo, create a GitHub release from the
    verified cohort tag, and archive it. Zenodo reads `.zenodo.json` and mints
    the DOI; record that DOI in the release notes and cohort README. Do not add

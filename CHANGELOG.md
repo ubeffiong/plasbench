@@ -13,6 +13,15 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- publishing files for Galaxy, bio.tools, Bioconda / BioContainers, WorkflowHub and F1000Research (21 November 2026)
+- **What each platform needs, checked.** `docs/publishing/README.md` says per platform what is ready, what was verified and what only the maintainer can do (an account, a token, a submission, a DOI); nothing was submitted. BioBuntu documents no way to add a third-party tool, so nothing was prepared for it.
+- **bio.tools.** `docs/publishing/biotools.json`, validated against the official biotoolsSchema; its EDAM terms were looked up in the current EDAM release.
+- **WorkflowHub.** A CWL workflow of the align, score and aggregate steps (`workflows/cwl/`) that ran end to end in containers on the synthetic isolate, and `python/make_workflow_crate.py`, which builds the Workflow RO-Crate (`dist/plasbench-score.crate.zip`).
+- **Bioconda.** `recipes/bioconda/meta.yaml` is now v0.5.6 with the release archive's real SHA-256 (it was at 0.1.5 with a placeholder); the out-of-date template was removed.
+- **F1000Research.** A draft Software Tool Article (`docs/publishing/f1000research-software-tool-article.md`) with every claim traced to the repository and the author-only items marked.
+- **Fixed: the container's entry points could not find the pipeline** unless started in `/opt/plasbench` (found by running the CWL workflow in the v0.5.6 image): the `Dockerfile` now sets `PLASBENCH_HOME`. **Fixed: `.zenodo.json`** named the licence `GPL-3.0-only`, which Zenodo's vocabulary does not know (its id is `gpl-3.0-only`); the cohort deposit workflow's `CC-BY-4.0` became `cc-by-4.0` likewise.
+- **Kept in step.** `test/test_publishing.py` and `python/sync_publishing_versions.py` keep the versions in these files in step with each release; `docs/RELEASING.md` lists the steps.
+
 ### Added -- the annotation tools in the tools setup (21 November 2026)
 - **Tools page.** The window's Tools page listed only the core tools, so abricate, AMRFinderPlus, ISEScan, barrnap and MOB-typer (all called by the default reference-annotation stage) could not be installed from it. They now appear under *Annotation tools* with an Install button (`install-tools reference-annotation`, `utilities` or `mobsuite`); AMRFinderPlus shows "installed, but its database is missing" when `amrfinder` is on PATH without its database. samtools, and the optional QUAST, MultiQC, Bakta, Prokka and deadends (no package exists: the manual steps are in INSTALL.md) appear under *Optional tools*.
 
