@@ -201,7 +201,17 @@ ENVIRONMENT = {
     "extras": {"summary": "Tools and databases added in Docker mode live in this folder on your computer and are mounted into every container, so they stay between runs."},
 }
 
-ARGS = {"ui-state": _UI_STATE, "run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONSTRUCT, "intake": _INTAKE, "scan-isolates": _SCAN, "runtime": _RUNTIME}
+_ISSUE_REPORT = {
+    "study": {"summary": "The study whose run to describe. Empty uses the most recently updated study."},
+    "out": {"summary": "Also save the report to this file, so you can attach it to the issue."},
+    "include_logs": {"summary": "How many last lines of each log (the newest run log and every failed assembler or tool log) go into the report.", "when": "Raise it when the cause is further up; 0 leaves logs out."},
+    "net": {"summary": "Also test which online services can be reached. Without it the report makes no network calls."},
+    "hostname": {"summary": "Keep this computer's name in the report. It is removed by default."},
+    "open": {"summary": "Open the GitHub issue form in your browser with the version and a short summary filled in; paste the full report into its Diagnostics box.", "when": "Needs a browser on this computer."},
+    "title": {"summary": "With open: the issue title to fill in.", "when": "Use the form <command or page> fails with <short message> on <OS>."},
+}
+
+ARGS = {"issue-report": _ISSUE_REPORT, "ui-state": _UI_STATE, "run": _RUN, "report": dict(_RUN), "demo": _DEMO, "reconstruct": _RECONSTRUCT, "intake": _INTAKE, "scan-isolates": _SCAN, "runtime": _RUNTIME}
 _RUNTIME_ARG = {"summary": "Where this run's tools run: conda (the plasbench environment on this computer) or docker (a container of the PlasBench image, started for this run with your folders mounted). Empty uses the setting from Set up this computer. The choice is recorded in the study and the run manifest.",
                 "choices": {"conda": "Tools from the plasbench conda environment on this computer.", "docker": "Tools from a container of the PlasBench image; needs Docker (Set up this computer, Environment)."},
                 "when": "Leave empty unless this study should differ from the setting."}
@@ -477,6 +487,8 @@ NATIVE_PICKER = {
 # Rule: text that explains what a control means or how it works is a tooltip (this dict); text that reports a state, a problem or a decision the person must
 # make stays visible. Entries: title (bold first line), summary, bullets (a short list), when (a closing line). test_ui_cleanup keeps the pages inside a word budget.
 PAGE = {
+    "report_issue": {"title": "Report an issue", "summary": "Open GitHub's issue form, or prepare a diagnostics block with the version, the computer and the last lines of your run's logs to paste into it.",
+                     "bullets": ["Secrets, e-mail and IP addresses and your user name are removed before you see the text; read it once before posting.", "Nothing is sent from here: you paste it into GitHub yourself."]},
     "term_shell": {"title": "Which shells appear", "summary": "The list depends on where this window runs. A greyed entry says why it is off when you hover it.",
                    "bullets": ["Windows: each Ubuntu (WSL), Git Bash, PowerShell, Command Prompt (cmd).", "Ubuntu (WSL): your Ubuntu shell, plus Windows PowerShell, Command Prompt (cmd) and Git Bash (Windows) through WSL interop.", "Linux and Mac: your login shell, and PowerShell if pwsh is installed.", "plasbench works in every shell and runs this PlasBench folder."],
                    "when": "Windows shells started from Ubuntu cannot see the Ubuntu tools; Command Prompt cannot start in an Ubuntu folder, so it uses a temporary drive letter."},

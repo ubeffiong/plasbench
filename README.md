@@ -1181,6 +1181,7 @@ plasbench test && plasbench demo
   command, from a bare machine to a leaderboard, with what to do when a step fails.
 - **[Section 4](#4-cohort-studies--every-manipulation-end-to-end)** — running and
   building cohort studies, and every option available.
+- [Reporting an issue](#reporting-an-issue) — what to send when something fails (and `plasbench issue-report`, one paste of diagnostics).
 - `plasbench --help`, `plasbench run --help` — the full option list.
 - `plasbench docs --topic outputs`, `plasbench docs --topic troubleshooting` — the same
   guide in the terminal.
@@ -1197,6 +1198,264 @@ plasbench test && plasbench demo
 - [`CHANGELOG.md`](CHANGELOG.md) and [`docs/RELEASES.md`](docs/RELEASES.md) —
   what changed in each release, which distribution to use, verification,
   upgrades, rollbacks, and release limits.
+
+---
+
+## Reporting an issue
+
+**[Open a New issue](https://github.com/ubeffiong/plasbench/issues/new/choose)** and choose a form: **Bug report**, **Feature request** or **Question**. The Bug report form asks for
+everything in this section, so you can fill it in as you read. Issues are enabled on <https://github.com/ubeffiong/plasbench/issues>, and the fastest way to get a fix is a report that a
+maintainer can understand and reproduce **without asking you anything back**. That takes ten minutes of care from you and saves days of messages.
+
+In one line: *say what you did, paste the complete error text, and paste the output of* `plasbench issue-report`.
+
+### Before you write
+
+1. **Search first.** Open the [existing issues](https://github.com/ubeffiong/plasbench/issues?q=is%3Aissue) (closed ones too) and search for a word from your error message. If the
+   problem is already reported, add your details there (your version, your system, and anything new) instead of opening a second issue. Also read the troubleshooting tables in
+   this README (section 3A) and the [User Guide](docs/USER_GUIDE.md#troubleshooting).
+2. **One problem per issue.** Two different failures are two issues, even when they happened in the same run. A bug, a feature idea and a question are three different forms.
+3. **Use a title that says what failed.** The formula is `<command or page> fails with <short message> on <OS or environment>`:
+   - Good: `plasbench run fails at stage 3 with "spades-hammer ... err code: -9" on WSL2 Ubuntu 24.04`
+   - Good: `Window shows "older than the page" banner after plasbench upgrade on Ubuntu 22.04`
+   - Poor: `it doesn't work`, `error`, `help please`
+
+### What to send (the checklist)
+
+**(a) What you were trying to do, what you expected, what happened.** Three plain sentences are enough:
+
+```
+I was trying to: run cohort 1 with 12 isolates.
+I expected: all 12 isolates to be assembled and a report at the end.
+Instead: stage 3 stopped for isolate SRR1234567 and the run ended with exit code 4.
+```
+
+**(b) The exact command, or the exact buttons you clicked, in order.** Copy the command from your terminal; do not retype it from memory. In the window, list the buttons:
+*New benchmark > Cohort 1 > Run*. Say which of these you used: the `plasbench` command in a terminal, or the PlasBench window.
+
+**(c) The COMPLETE error output.** This is the most useful single thing you can send. Copy the whole message, from the command you typed to the last line, as **text**:
+not a screenshot of part of it, and not your own summary of it ("it said something about memory"). A screenshot cannot be searched, and the line that matters is often above
+the part that fits on the screen.
+
+*How to copy from each place:*
+
+| Where you ran PlasBench | How to copy the text |
+|---|---|
+| Ubuntu or any Linux terminal, and the Ubuntu (WSL) window | Select the text with the mouse, then **Ctrl+Shift+C** (plain Ctrl+C stops the program). Paste with **Ctrl+Shift+V**. |
+| Windows Terminal (WSL, PowerShell, cmd) | Select with the mouse, then **Ctrl+Shift+C** or **right-click** (with a selection, right-click copies). Paste with **Ctrl+Shift+V** or right-click. |
+| Windows PowerShell or Command Prompt (the old console window) | Select with the mouse and press **Enter** (or right-click), or turn on Quick Edit mode in the window's Properties. Paste with right-click. |
+| macOS Terminal or iTerm2 | Select, then **Cmd+C**. Paste with **Cmd+V**. |
+| The PlasBench window | The console at the bottom has a **Copy** button that copies the tab you are looking at: the job's output (open it from the **Jobs** list) or the **Terminal** tab. Click it, then paste. |
+| Docker mode | Copy from the terminal that started the container as above; for a run, the log files are still written in your study folder (see (f)). |
+
+*Long output: save it to a file as it happens.* Add `2>&1 | tee plasbench-error.log` to the command, so everything (normal output and error messages) is shown **and** saved:
+
+```bash
+plasbench run --cohort public-v1 2>&1 | tee plasbench-error.log
+```
+
+PowerShell:
+
+```powershell
+plasbench run --cohort public-v1 2>&1 | Tee-Object -FilePath plasbench-error.log
+```
+
+Pitfalls of `| tee`:
+- The exit status you see afterwards is `tee`'s (0), not PlasBench's. In bash run `set -o pipefail` first, or read `${PIPESTATUS[0]}` right after the command, and report that number.
+- A program that is piped can behave differently: colours and progress bars switch off, and a question that waits for your answer may not be visible. Use `--yes` only if you
+  already read what it will do. If the problem is the question itself, use `script -q plasbench-session.log` (Linux and macOS) instead, which records the whole terminal session;
+  type `exit` to stop recording.
+- If the program already ran and you did not use `tee`, the study folder still has the log files (see (f)): attach those.
+
+*Paste or attach?* Paste inline when it is shorter than about 100 lines. For anything longer, **attach the file** (drag it into the issue box) **and** paste the last 40 to 60
+lines inline, so the reader sees the failure at once. Always put pasted output inside a fenced code block so GitHub keeps its line breaks. Type three backticks on a line, paste, and
+type three backticks on a line again:
+
+````
+```
+[2026-11-21 10:14:03] ERROR: the run stopped in stage 3 (scripts/03_assemble.sh): exit 4
+== Error ==  system call for: "['.../spades-hammer', '.../corrected/configs/config.info']" finished abnormally, err code: -9
+```
+````
+
+**(d) Screenshots are an addition, never a replacement.** For a problem in the window (a banner, a button that does nothing, a layout problem) a screenshot of the **whole window**,
+including the banner and the page name, helps. Mark the problem with an arrow or a box if you can. Paste the text of any message in the screenshot as well, and say which page you were on.
+
+**(e) Versions: what you run it on.** Copy these into the issue (each is one line; skip those that do not apply):
+
+```bash
+plasbench --version                       # the PlasBench version
+uname -a                                  # Linux, WSL and macOS: the kernel
+cat /etc/os-release                       # Linux and WSL: the distribution and its version
+python --version                          # the Python that runs plasbench
+conda --version                           # or: mamba --version
+docker version                            # Docker mode only: client and server
+docker info                               # Docker mode only: engine, storage driver, root directory
+```
+
+```powershell
+ver                                       # Windows version (winver opens a window with the same)
+wsl.exe -l -v                             # which WSL distributions exist, running, and WSL 1 or 2
+python --version
+docker version
+```
+
+Also say **how PlasBench was installed**: the installer script (`install.sh`), a release archive you unpacked, a source checkout (`git clone`), or the Docker image (give its tag
+and digest: `docker image inspect ghcr.io/ubeffiong/plasbench:<tag> --format '{{.Id}}'`); where it is installed (the folder `plasbench ui-state` prints); and whether you used the
+window or the command line.
+
+**(f) PlasBench's own diagnostics.** These commands only read; none of them starts a run or changes anything unless it says so.
+
+| Command | When to run it | What it tells us |
+|---|---|---|
+| `plasbench issue-report` | **Always.** One paste does most of the work below | Version, install, computer, WSL/Docker kind, Python/conda/Docker versions, disk space, the latest run's status, the last 60 lines of its newest log and of each failed assembler or tool log, with secrets removed. `--out report.md` saves it to a file; `--include-logs 120` adds lines; `--study NAME` picks a study |
+| `plasbench status` and `plasbench diagnose` | A run failed, stopped or looks stuck | Stage, isolate and step, how long, CPU and memory, plain hints (add `--study NAME` if it is not the newest study) |
+| `plasbench check` | A tool or database is missing or will not start | Tool and database checks. **It offers to install what is missing**, so answer **n** if you only want to report |
+| `plasbench ui-state` | The window says it is older than the page, or shows the wrong version | Which program and which folder the window runs, every installed copy |
+| `plasbench picker-check` | **Browse** does not open the folder window | PASS or FAIL for each step |
+| `plasbench runtime check` | Docker mode: the image or a container does not work | Step-by-step Docker test (`plasbench runtime status` shows the setting; a more detailed Docker health check is in preparation for a later release) |
+| `plasbench net` | A download or an install cannot reach the internet | Which services (NCBI, ENA, GitHub, conda, ...) answer, and why not |
+
+*Files to attach from the study folder.* A study is a folder in the workspace (the window's **Workspace** page shows where). Attach what exists:
+
+| File | What it is |
+|---|---|
+| `logs/run_<date>-<time>.log` (`logs/run.latest.log` points at the newest) | Everything the run printed |
+| `logs/run_errors.log` | One line per failure, with a plain-words cause |
+| `logs/<sample>.<tool>.log` (for example `logs/SRR1234567.spades.log`) | One tool on one isolate: this holds the real error of a failed step |
+| `results/assembly_status.tsv` | Stage 3: one line per isolate with its status, reason and PlasBench's diagnosis |
+| `results/tool_status.tsv` | Stage 4: one line per isolate and tool with its status and reason |
+| `results/run_events.jsonl` | The run's step-by-step events (what `plasbench status` reads) |
+| `results/run_manifest.json` | The settings, versions and inputs of the run |
+
+*Do not share* (and remove from anything you attach): **tokens, passwords and API keys**: your NCBI key (kept in `.ncbi.env` and `config/local.env`), GitHub tokens
+(`ghp_...`, `github_pat_...`), personal access tokens, cookies and `Authorization` headers; **private or patient data**: patient identifiers, sample names that identify a person,
+and the read files themselves (FASTQ/FASTA are large and may be private: describe them, do not attach them). PlasBench removes tokens from its own logs and from
+`plasbench issue-report`, but **read what you paste once before you post it**: you are the last check. To remove tokens and your home folder from a log file yourself (Linux, WSL):
+
+```bash
+sed -E -e "s#$HOME#~#g" \
+       -e 's/(ghp_|gho_|github_pat_|sk-)[A-Za-z0-9_-]{16,}/<removed>/g' \
+       -e 's/((api_key|API_KEY|token|TOKEN|password|PASSWORD)=)[^& ]+/\1<removed>/g' \
+       plasbench-error.log > plasbench-error.redacted.log
+```
+
+**(g) About your data.** Say which cohort or sample sheet (for example `public-v1`, or "my own sheet with 8 isolates"), how many isolates, whether you used `--max-isolates`, the
+accession numbers that fail (for example `SRR1234567`), and whether the input is public or your own. Do not attach your own reads.
+
+**(h) How often, and what you tried.** Does it happen every time or sometimes? Did it work before, and with which PlasBench version? What did you already try (re-running,
+`plasbench upgrade`, a different folder, `--yes`, restarting the window)? A failure that happens on one isolate only, or only the first time, points to different causes.
+
+**(i) Security problems: do not post them.** If you found something that could expose a computer or credentials (for example the window reachable from another machine, or a token
+written into a log), do **not** open a public issue. Follow [SECURITY.md](SECURITY.md). A report of a failing tool, a wrong result, or a crash is an ordinary issue.
+
+**(j) Feature requests and questions are not bugs.** *Feature request*: say what you cannot do today, what you would like, and what you do instead. *Question* ("how do I ...",
+"what does this metric mean"): use the Question form after looking in the [FAQ](FAQ.md), this README and the [User Guide](docs/USER_GUIDE.md). If something *fails with an error*,
+it is a bug report even when you are not sure it is a bug.
+
+**(k) What happens next.** The form adds the label `bug`, `enhancement` or `question`. Issues are read by the maintainer; a change that fixes one is a pull request that names it
+(`Fixes #N`), and every pull request needs the maintainer's review. Security reports follow [SECURITY.md](SECURITY.md) (acknowledged within 7 days). The project promises
+no other response time, and nothing is sent or collected by PlasBench itself: a report exists only when you post it.
+
+### The one-paste way: `plasbench issue-report`
+
+```bash
+plasbench issue-report                      # print the block; select it and copy
+plasbench issue-report --out report.md      # also save it, to attach
+plasbench issue-report | clip.exe           # WSL: straight to the Windows clipboard   (macOS: | pbcopy ; Linux: | xclip -selection clipboard)
+plasbench issue-report --open               # also open the GitHub form in your browser (version and a short summary are filled in)
+```
+
+In the window: **More (top right) > Report an issue > Prepare diagnostics > Copy diagnostics**, then **Open the GitHub issue form** and paste. It is read-only (no install, no
+download, no network unless you add `--net`), removes tokens, passwords, e-mail and IP addresses, your user name (shown as `~` or `<user>`) and this computer's name, never
+prints environment variables beyond an allow-list (`PLASBENCH_*`, `READ_SOURCE`, `WSL_DISTRO_NAME`, the scheme of `DOCKER_HOST`), never includes the contents of reads or sample sheets,
+and stops at 200 KB with a note. It does not replace (a) to (c): the error text and what you did still come from you.
+
+### Fillable template
+
+Copy this into the Bug report form (the form has a box for each part), or into any place that takes text:
+
+````markdown
+### What happened
+I was trying to ... and instead ...
+
+### What you expected
+I expected ...
+
+### Steps to reproduce
+1.
+2.
+3.
+
+### The exact command or buttons
+```
+plasbench ...
+```
+
+### Complete error output
+```
+(paste the whole text here; attach the file if it is longer than about 100 lines)
+```
+
+### PlasBench version
+plasbench --version prints:
+
+### Environment
+Ubuntu / Linux, WSL2, Windows native, macOS or Docker mode:
+
+### Install method
+Installer script, release archive, source checkout or Docker image (tag):
+
+### Diagnostics
+(paste the output of `plasbench issue-report`)
+
+### Logs and attachments
+plasbench-error.log, logs/run_*.log, results/assembly_status.tsv, ...
+Did it work before (which version)? Every time or sometimes? What I already tried:
+````
+
+### Three examples: good and poor reports
+
+**1. A stage 3 (SPAdes) failure.**
+
+*Poor:* title `SPAdes error`; text: "The run failed at assembly, please help." There is nothing to act on: no command, no version, no message.
+
+*Good:* title `plasbench run fails at stage 3 with "spades-hammer ... err code: -9" on WSL2 Ubuntu 24.04`. It includes:
+- the command: `plasbench run --cohort public-v1 --max-isolates 12`;
+- the version, `plasbench --version`, and that it is WSL2 with 8 GB of memory (from `plasbench issue-report`);
+- the tail of the log of the failed isolate, pasted in a code block, with the line PlasBench wrote about it:
+
+```
+$ tail -n 20 logs/SRR1234567.spades.log
+...
+== Error ==  system call for: "['/home/<user>/miniforge3/envs/plasbench/bin/spades-hammer', '.../corrected/configs/config.info']" finished abnormally, err code: -9
+$ cat results/assembly_status.tsv
+sample       status  contigs  reason                                  runtime_seconds  cause          advice
+SRR1234567   failed           spades: out_of_memory (exit status -9)  412              out_of_memory  ...
+```
+
+- the files `logs/run_20261121-101403.log` and `results/assembly_status.tsv` attached; "it works for the other 11 isolates; this one has 6 GB of reads".
+
+**2. A window banner problem.**
+
+*Poor:* "The window shows a red banner." (Which banner? Which page? Which version?)
+
+*Good:* title `Window shows "older than the page" banner after plasbench upgrade on Ubuntu 22.04`. It includes: a screenshot of the **whole window** with the banner, the banner's text
+pasted, the page you were on, the output of `plasbench ui-state` (it lists the version of every installed copy, which is the usual cause), how you started the window (desktop icon
+or `plasbench ui`) and the output of `plasbench issue-report`.
+
+**3. A Docker install permission error.**
+
+*Poor:* "Docker doesn't install, permission problem."
+
+*Good:* title `Docker mode: "permission denied ... /var/run/docker.sock" on Ubuntu 24.04 after plasbench install-tools --profile docker`. It includes the command, the **whole** error:
+
+```
+permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Get "http://%2Fvar%2Frun%2Fdocker.sock/v1.47/containers/json": dial unix /var/run/docker.sock: connect: permission denied
+```
+
+and the output of `docker version`, `id` (are you in the `docker` group?), `ls -l /var/run/docker.sock`, `plasbench runtime check`, and `plasbench issue-report`, and whether you restarted the
+session after being added to the group (a new login is needed).
 
 ---
 
@@ -2007,6 +2266,8 @@ None of these actions are required for a successful ordinary benchmark run.
 
 ### Troubleshooting a specific message
 
+Not listed? See [Reporting an issue](#reporting-an-issue): copy the whole error and run `plasbench issue-report`.
+
 | What you see | What it means | What to do |
 |---|---|---|
 | `plasbench: command not found` | Environment not active | `conda activate plasbench` |
@@ -2521,6 +2782,7 @@ ones you'll actually reach for most often; every command has more than shown her
 | `test` | The full offline regression suite (what CI runs). | none |
 | `check` | Check configured tools/databases; offers to install what's missing. | `--yes` |
 | `ui-state` | Say which PlasBench the window runs and whether the installed program matches your PlasBench folder: running version and folder, every copy of `plasbench` visible to this Python and the conda environments next to it, the PlasBench folder and how it was found, and the running window's own state. Paste it when the window says it is older than the page. | `--json` |
+| `issue-report` | Print one ready-to-paste Markdown block for a GitHub issue: PlasBench version and install, computer, WSL or Docker, Python/conda/Docker versions, free disk, the latest study's run status and the last lines of its newest run log and of each failed assembler or tool log. Read-only; tokens, passwords, e-mail and IP addresses, your user name and the computer's name are removed; capped at 200 KB. See [Reporting an issue](#reporting-an-issue). | `--study`, `--out FILE`, `--include-logs N`, `--net`, `--hostname`, `--open`, `--title` |
 | `install-conda` | Detect (or install) a conda-family manager. | `--yes`, `--prefix` |
 | `net` | Which online services this computer can reach (NCBI, ENA, GitHub, conda, ...), and what to do when one is not; exit 0 online, 3 otherwise. `PLASBENCH_OFFLINE=1` switches every online-only action off. | `--service`, `--json` |
 | `install-tools` | Install one dependency profile (`core`, `reconstruction`, `long-read`, `docker`, `all`, ...). `docker` installs Docker Desktop through winget or Homebrew with `--yes`, else prints the exact steps (exit 20); never sudo. | *`profile`* (positional) |

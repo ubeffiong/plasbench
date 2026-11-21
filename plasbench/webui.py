@@ -1657,6 +1657,31 @@ def native_picker_extras(caps: dict) -> dict:
     return out
 
 
+_issue_report_lock = threading.Lock()
+
+
+def issue_report_state(root, q) -> dict:
+    """GET /api/issue-report: the same redacted Markdown as `plasbench issue-report`, one at a time, at most 200 lines of each log, never any network probe. {markdown, truncated, study, new_issue}."""
+    from . import issue_report
+    if not _issue_report_lock.acquire(blocking=False):
+        return {"error": "the diagnostics are already being prepared", "markdown": ""}
+    try:
+        try:
+            lines = max(0, min(200, int(q.get("lines", issue_report.DEFAULT_LOG_LINES))))
+        except ValueError:
+            lines = issue_report.DEFAULT_LOG_LINES
+        study = (q.get("study") or "").strip() or None
+        try:
+            out = issue_report.collect(root, "this window", study, lines, False, True, False)
+        except issue_report.StudyNotFound as exc:
+            return {"error": str(exc), "markdown": ""}
+        out["new_issue"] = issue_report.NEW_ISSUE_URL + "/choose"
+        out.pop("summary", None)
+        return out
+    finally:
+        _issue_report_lock.release()
+
+
 def native_picker_selftest() -> dict:
     """The same checks as `plasbench picker-check`, for the Settings button: one at a time, bounded (the window it opens closes itself after 2 s)."""
     from . import picker_check
@@ -2128,6 +2153,12 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, info)
             if route == "schema":   # built from the argparse parser once (at start-up, in the background), then served as ready-made bytes
                 return self.send(200, schema_bytes())
+            # ---- Report an issue (plasbench/issue_report.py): the redacted diagnostics block, in-process and bounded ----
+            if route == "issue-report":
+                if not self.loopback():
+                    raise PermissionError("the diagnostics can only be prepared from the computer this window runs on")
+                return self.jsend(200, issue_report_state(project.root, q))
+            # ---- end Report an issue ----
             if route == "update-check":
                 from . import updatecheck
                 netgate.require("github", "check for updates")

@@ -203,6 +203,7 @@ test_performance_per_run_threads.py	0.3
 test_performance_summary.py	0.3
 test_permutation_reporting.py	0.3
 test_picker_diagnostics.py	7.0
+test_issue_report.py	4.0
 test_picker_ui_browser.py	0.3
 test_plasbench_common.py	0.3
 test_plasbin_flow_adapter.py	0.3

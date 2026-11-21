@@ -25,6 +25,14 @@ never drops a test that has no weight. Register every test in `test/run_tests.sh
 The CI checks `test (3.9)`, `test (3.11)`, `test (3.13)` and `container` are the names to
 require; `test (3.x)` is an aggregate of that version's shards.
 
+## Reporting issues
+
+Found a bug, want a feature, or stuck? Open **[New issue](https://github.com/ubeffiong/plasbench/issues/new/choose)** and choose a form (Bug report, Feature request or Question);
+the forms ask for what a maintainer needs. The full guide, with a copy-paste template and worked examples, is the README section
+[Reporting an issue](README.md#reporting-an-issue); the short version is [SUPPORT.md](SUPPORT.md). In short: search first, one problem per issue, paste the **complete** error
+text (not a screenshot), and run `plasbench issue-report` for a ready-to-paste diagnostics block with secrets already removed. Never post a security problem publicly: see
+[SECURITY.md](SECURITY.md). When you fix a reported issue, name it in the pull request (`Fixes #N`).
+
 ## Contributing a new isolate to a public cohort
 
 PlasBench's public cohorts (`cohorts/public-v1.tsv`, `cohorts/public-v2.tsv`)

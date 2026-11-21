@@ -1396,6 +1396,11 @@ and `results/tool_status.tsv` to monitor progress.
 
 ## Troubleshooting
 
+**Reporting an issue.** When a step fails and nothing below fits: copy the complete error text (Ctrl+Shift+C in a Linux or Windows Terminal, Cmd+C on a Mac, or the **Copy** button of the
+console in the window), run `plasbench issue-report` (or **More > Report an issue > Prepare diagnostics** in the window), and open a
+[New issue](https://github.com/ubeffiong/plasbench/issues/new/choose). The README section [Reporting an issue](../README.md#reporting-an-issue) lists exactly what to send, with a
+template and three worked examples; [SUPPORT.md](../SUPPORT.md) is the short version.
+
 ```text
 The banner says "This window is running an older version of PlasBench than the page"
     Open Details in the banner: it lists what the window runs (version and folder), the PlasBench folder, the window's

@@ -496,6 +496,16 @@ def build_parser():
         "ui-state",
         help="Say which PlasBench the window runs: version and folder of the running program, every installed copy, the PlasBench folder, and the running window's state (paste it when asking for help).")
     state_parser.add_argument("--json", action="store_true", help="Print the evidence as JSON.")
+    report_issue_parser = sub.add_parser(
+        "issue-report",
+        help="Print one ready-to-paste block for a GitHub issue: versions, computer, Docker, the study's run status and the last lines of its logs, with secrets, e-mail and IP addresses and your user name removed.")
+    report_issue_parser.add_argument("--study", help="The study to describe (default: the most recently updated study).")
+    report_issue_parser.add_argument("--out", metavar="FILE", help="Also write the report to this file (to attach or paste).")
+    report_issue_parser.add_argument("--include-logs", type=int, default=60, metavar="N", help="How many last lines of each log to include (default 60; 0 leaves logs out).")
+    report_issue_parser.add_argument("--net", action="store_true", help="Also test which online services can be reached (the only part that uses the network).")
+    report_issue_parser.add_argument("--hostname", action="store_true", help="Keep this computer's name in the report (it is removed by default).")
+    report_issue_parser.add_argument("--open", action="store_true", help="Open the GitHub new-issue form in your browser with the version and a short summary filled in.")
+    report_issue_parser.add_argument("--title", help="With --open: the issue title to fill in (default: a template sentence to complete).")
     icon_parser = sub.add_parser(
         "desktop-icon",
         help="Put a PlasBench icon on the desktop and in the applications/Start menu; clicking it starts PlasBench.")
@@ -1218,6 +1228,9 @@ def main(argv=None):
     root, how, tried = roots.resolve(args.project_root)
     if args.command == "ui-state":
         raise SystemExit(ui_state_command(args, root, how))
+    if args.command == "issue-report":
+        from . import issue_report
+        raise SystemExit(issue_report.command(args, root, how))
     if args.command != "open-report":
         if root is None:
             print("[plasbench] ERROR: " + roots.not_found_message(tried), file=sys.stderr)

@@ -119,5 +119,8 @@ check("the hit area of a (?) grows on touch screens (pointer: coarse)", "@media 
 check("the installing toast region and its top-bar chip are in the page", 'id="insttoast"' in html and 'id="instchip"' in html and 'data-tipid="install_chip"' in html)
 check("the toast's actions are all there: View log, Cancel, Hide, Re-check, Dismiss, Show list, Open Jobs", all(f'data-it="{k}"' in html for k in ("view", "cancel", "hide", "recheck", "dismiss", "expand", "jobs")))
 
+# ---- 6. Report an issue: deliberate additions (More menu item, Guides page button; not in the before-fixture) ------------------------------------------------------------
+check("Report an issue is in the More menu and on the Guides page, with a tooltip id", 'id="reportbtn"' in html and 'id="reportbtn2"' in html and 'data-tipid="report_issue"' in html)
+
 print("ALL UI CLEANUP TESTS PASSED" if OK else "UI CLEANUP TESTS FAILED")
 sys.exit(0 if OK else 1)

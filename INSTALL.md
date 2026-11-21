@@ -510,6 +510,11 @@ Set `PLASBENCH_NO_LAUNCHER=1` to skip it. After an upgrade, `plasbench` checks t
 
 ## Troubleshooting
 
+Something failed and it is not listed here? See [Reporting an issue](README.md#reporting-an-issue) (or [SUPPORT.md](SUPPORT.md)): copy the **complete** error text, then run
+`plasbench issue-report` for one paste of your versions, computer and the last lines of the run's logs, with secrets removed, and open a
+[New issue](https://github.com/ubeffiong/plasbench/issues/new/choose). If `plasbench` itself will not start, paste the output of `python -m plasbench --version`, your operating
+system (`uname -a` or `ver`) and the installer's last 40 lines.
+
 - **The window says it is older than the page** -> run `plasbench ui-state`. If it reports two installs, run
   `conda activate plasbench && cd ~/PlasBench && python -m pip install --no-deps .`, then restart the window.
 - **`datasets: command not found`** → you didn't `conda activate plasbench`.

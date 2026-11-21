@@ -1,0 +1,113 @@
+name: Bug report
+description: "Something failed, crashed, or gave a wrong result. Fill in every required box: the more exact you are, the faster it is fixed."
+title: "<command or page> fails with <short message> on <OS>"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting. Before you start: **search the [existing issues](https://github.com/ubeffiong/plasbench/issues?q=is%3Aissue)**, and read
+        [Reporting an issue](https://github.com/ubeffiong/plasbench/blob/main/README.md#reporting-an-issue) for how to copy the error from each terminal.
+        One problem per issue. **Security problems: do not post them here** (see the [security policy](https://github.com/ubeffiong/plasbench/blob/main/SECURITY.md)).
+        Never paste tokens, passwords, API keys or patient data. `plasbench issue-report` prints a ready-to-paste block with secrets already removed.
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+      description: "In your own words: what were you trying to do, and what did PlasBench do instead? Start with: I was trying to ... and instead ..."
+      placeholder: "I was trying to run cohort 1 (12 isolates) and instead stage 3 stopped for isolate SRR123 with a SPAdes error."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: "What should have happened? Start with: I expected ..."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: "Numbered steps, in order, from a fresh terminal or the window. Include the cohort or sheet name, the number of isolates, and whether it happens every time."
+      placeholder: |
+        1. Open Ubuntu (WSL) and run `conda activate plasbench`
+        2. Run the command below
+        3. Wait for stage 3
+        4. See the error
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: The exact command or buttons
+      description: "The command exactly as you typed it, or the buttons you clicked in order (for example: New benchmark > Cohort 1 > Run). Not a paraphrase."
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: error_output
+    attributes:
+      label: Complete error output
+      description: "Copy the WHOLE message from the terminal or the window's console (not a screenshot, not a part, not a paraphrase) and paste it here. For very long output attach the file below instead. See the README section Reporting an issue for how to copy and save it with tee."
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PlasBench version
+      description: "The output of `plasbench --version`."
+      placeholder: "plasbench 0.5.5"
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Where were you running PlasBench?
+      options:
+        - Ubuntu / Linux
+        - WSL2 (Windows Subsystem for Linux)
+        - Windows native (PowerShell)
+        - macOS
+        - Docker mode
+        - Other (say which below)
+    validations:
+      required: true
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Install method
+      description: How did you install PlasBench?
+      options:
+        - Installer script (install.sh)
+        - Release archive (tar.gz)
+        - Source checkout (git clone)
+        - Docker image
+        - plasbench upgrade from an older version
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: "Paste the output of `plasbench issue-report` (secrets, e-mail and IP addresses and your user name are removed; read it once before posting). In the window: More > Report an issue > Prepare diagnostics > Copy. If the command itself fails, paste the output of `plasbench --version`, `plasbench ui-state` and `plasbench status` instead."
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Logs and attachments
+      description: "Drag files into this box: your plasbench-error.log, and from the study folder logs/run_*.log, results/run_events.jsonl, results/assembly_status.tsv, results/tool_status.tsv, logs/<sample>.<tool>.log. A screenshot of the window may be added, but never instead of the pasted text. Anything else we should know: did it work before (which version), what you already tried."
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and this problem is not already reported.
+          required: true
+        - label: I removed secrets (tokens, passwords, API keys, patient identifiers) from everything I pasted or attached.
+          required: true
