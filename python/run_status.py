@@ -272,30 +272,72 @@ def summarize(results_dir, log_dir=None, data_dir=None, now=None, procs=None, ma
     summary["last_event"] = last_event
 
     # --- where it is -------------------------------------------------------------------------------------------------------------
-    stage = step = sample = None
-    since = None
-    for e in reversed(events):
-        if stage is None and e.get("stage"):
-            stage = e["stage"]
-        if sample is None and e.get("sample"):
-            sample = e["sample"]
-        if step is None and e.get("step"):
-            step = e["step"]
-        if e["event"] in ("command_start",) and since is None:
-            since = event_time(e)
-        if stage and sample and step and since:
+    # The LATEST event of any kind decides; an older stage's sample or step never answers for the current one (it used to: during stage 2 the status said
+    # "stage 1, step download" because only stage 1 wrote sample events). Events written by a stage that did not mark its start (older logs) belong to the stage
+    # after the last stage that did.
+    stage_list = (started or {}).get("stages", "").split()
+    last_stage_idx, stage = None, None
+    for i in range(len(events) - 1, -1, -1):
+        if events[i].get("stage"):
+            last_stage_idx, stage = i, str(events[i]["stage"])
             break
-    open_command = None
+    scope_from = 0 if last_stage_idx is None else last_stage_idx
+    if last_stage_idx is not None:
+        later = [e for e in events[last_stage_idx + 1:] if e["event"] not in ("run_end",)]
+        if events[last_stage_idx]["event"] == "stage_end" and later:
+            if stage in stage_list and stage_list.index(stage) + 1 < len(stage_list):
+                stage = stage_list[stage_list.index(stage) + 1]
+            scope_from = last_stage_idx + 1
+        elif events[last_stage_idx]["event"] == "stage_start":
+            scope_from = last_stage_idx
+        else:   # an event inside the stage: the stage began at its stage_start
+            for j in range(last_stage_idx, -1, -1):
+                if events[j]["event"] == "stage_start" and str(events[j].get("stage")) == stage:
+                    scope_from = j
+                    break
+    elif stage_list and events:
+        stage = None
+    scoped = events[scope_from:]
+    sample = step = None
+    sample_t = None
+    for e in reversed(scoped):
+        if e["event"] == "sample_start":
+            sample, step, sample_t = e.get("sample"), e.get("step"), event_time(e)
+            break
     starts = {}
     for e in events:
         if e["event"] == "command_start":
             starts[e.get("what", "")] = e
         elif e["event"] == "command_end":
             starts.pop(e.get("what", ""), None)
-    if starts:
-        open_command = list(starts.values())[-1]
-        since = event_time(open_command)
-    summary.update(stage=stage, sample=sample, step=step, command=(open_command or {}).get("what"), step_seconds=(now - since) if since else None)
+    open_command = list(starts.values())[-1] if starts else None
+    since = sample_t
+    typical = None
+    if open_command is not None:
+        cmd_t = event_time(open_command)
+        what = open_command.get("what", "")
+        prefix, sep, label = what.partition(" / ")
+        if sample_t is None or (cmd_t or 0) >= sample_t:
+            # the command is the more specific (and newer) answer: "<isolate> / ISEScan-style label"
+            if sep:
+                sample, step = sample or prefix, label
+                if sample_t is not None and sample != prefix:
+                    sample = prefix
+            else:
+                step = step or what
+        since = cmd_t or since
+        try:
+            typical = float(open_command.get("typical")) if open_command.get("typical") else None
+        except ValueError:
+            typical = None
+    last_beat_any = next((e for e in reversed(scoped) if e["event"] == "heartbeat"), None)
+    if step is None and last_beat_any:
+        step = (last_beat_any.get("what") or "").partition(" / ")[2] or last_beat_any.get("what")
+        sample = sample or (last_beat_any.get("what") or "").partition(" / ")[0] or None
+    summary.update(stage=stage, sample=sample, step=step, command=(open_command or {}).get("what"), step_seconds=(now - since) if since else None,
+                   step_typical_seconds=typical)
+    slow = [e for e in events if e["event"] == "slow_step" and (not open_command or e.get("what") == open_command.get("what"))]
+    summary["slow_step"] = slow[-1] if (slow and open_command) else None
     beats = [e for e in events if e["event"] == "heartbeat" and (not open_command or e.get("what") == open_command.get("what"))]
     summary["last_heartbeat"] = beats[-1] if beats else None
     summary["seconds_since_event"] = (now - event_time(last_event)) if last_event and event_time(last_event) else None
@@ -327,6 +369,8 @@ def summarize(results_dir, log_dir=None, data_dir=None, now=None, procs=None, ma
             except OSError:
                 pass
     summary["assembly_failures"] = assembly_failures(results_dir, log_dir)
+    asm = (summary.get("progress") or {}).get("assembly")
+    summary["assembly_partial"] = {"assembled": asm["ok"], "total": asm["rows"], "failed": asm["failed"]} if asm and 0 < asm["ok"] < asm["rows"] else None
     summary["hints"] = hints(summary)
     return summary
 
@@ -361,6 +405,15 @@ def hints(s):
         out.append(f"Only {avail} MB of memory is available on this computer: a tool may be killed (exit 137) or crawl. Lower THREADS or ASSEMBLY_MEMORY_GB.")
     if m.get("swap_used_mb", 0) > 1000 and (avail is None or avail < 2000):
         out.append(f"{m['swap_used_mb']} MB of swap is in use while little memory is free: the machine is swapping, which makes everything very slow.")
+    part = s.get("assembly_partial")
+    if part:
+        causes = sorted({i["cause"] for i in (s.get("assembly_failures") or {}).get("items", []) if i.get("cause")})
+        out.append(f"Partial assembly: {part['assembled']} of {part['total']} isolates assembled; {part['failed']} failed" + (f" ({', '.join(causes)})" if causes else "")
+                   + ". The isolates that assembled go on to the tools; the failed ones are listed with their cause in assembly_status.tsv.")
+    slow = s.get("slow_step")
+    if slow:
+        out.append(f"Slow step: {slow.get('what')} has run for {human_seconds(float(slow.get('elapsed') or 0))}, more than {slow.get('factor', 3)}x its typical {human_seconds(float(slow.get('typical') or 0))}. "
+                   "If its log has not changed and the CPU is near 0% it may be stuck; otherwise it may just be a big isolate.")
     asm = s.get("assembly_failures") or {}
     if asm.get("same_cause"):
         first = asm["items"][0]
@@ -389,7 +442,7 @@ def render(s, diagnose=False):
             where += f", isolate {s['sample']}"
         if s.get("step"):
             where += f", step {s['step']}"
-        lines.append(f"  now: {where}" + (f" (this command has run {human_seconds(s['step_seconds'])})" if s.get("command") and s.get("step_seconds") is not None else ""))
+        lines.append(f"  now: {where}" + (f" (running for {human_seconds(s['step_seconds'])}" + (f", typical {human_seconds(s['step_typical_seconds'])}" if s.get("step_typical_seconds") else "") + ")" if s.get("step_seconds") is not None else ""))
     if s.get("command"):
         lines.append(f"  command: {s['command']}")
     beat = s.get("last_heartbeat")

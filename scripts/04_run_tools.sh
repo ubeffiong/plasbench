@@ -1027,6 +1027,7 @@ run_user_tool() {
 
 process_sample() {
     local SAMPLE="$1" ASM="$2" SRA="$3"
+    run_event sample_start "sample=$SAMPLE" "step=tools"
     local SDIR="$DATA_DIR/$SAMPLE"
     local RDIR="$RESULTS_DIR/$SAMPLE"; mkdir -p "$RDIR"
     local CONTIGS="$SDIR/contigs.fasta"

@@ -7,6 +7,7 @@ source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 need python3
 preflight_resources 2 quiet
+stage_timing_begin 2        # stage_start/stage_end events, so `plasbench status` knows this is stage 2
 
 # --- per-step timing: every sample's stage-2 steps are timed into data/<sample>/stage2_timing.tsv, and the log
 # names the slow ones, so a long stage 2 says where its time went.
@@ -31,6 +32,7 @@ step_report() {
 truth_sample() {
     local SAMPLE="$1" SRA="$2"
     step_reset
+    run_event sample_start "sample=$SAMPLE" "step=truth"
     SDIR="$DATA_DIR/$SAMPLE"
     REF="$SDIR/reference.fna"
     REPORT="$SDIR/sequence_report.jsonl"
@@ -62,7 +64,7 @@ truth_sample() {
             log "  truth -> $TRUTH (self-assembled hybrid; see $SDIR/truth_provenance.json)"
         fi
     else
-        [[ -s "$REF" ]] || { warn "missing reference for $SAMPLE; run 01_download.sh first"; return 0; }
+        [[ -s "$REF" ]] || { note_missing reference "$SAMPLE"; return 0; }
         if [[ ! -s "$TRUTH" ]]; then
             [[ -s "$REPORT" ]] || { warn "missing sequence report and truth.tsv for $SAMPLE"; return 0; }
             log "=== Truth for $SAMPLE ==="
@@ -143,6 +145,7 @@ truth_sample() {
     # caller yields "not evaluated" for its class rather than a false absence.
     FEATURES="$SDIR/truth_features.tsv"
     if [[ "${RUN_REFERENCE_ANNOTATION:-0}" -eq 1 ]]; then
+        run_event sample_start "sample=$SAMPLE" "step=reference annotation"
         if [[ -s "$FEATURES" && "$FEATURES" -nt "$REF" ]]; then
             log "  reference annotation already present for $SAMPLE"
         else
@@ -235,6 +238,7 @@ truth_sample() {
     fi
     step_mark amr_draft
     step_report "$SAMPLE" "$SDIR"
+    run_event sample_end "sample=$SAMPLE" "step=truth"
 }
 
 # Samples are independent, so MAX_PARALLEL_SAMPLES of them run at once (the same setting as stages 1, 3, 4 and 5;
@@ -257,5 +261,6 @@ if [[ "${MAX_PARALLEL_SAMPLES:-1}" -gt 1 ]]; then
     done
     [[ ${#aborted[@]} -eq 0 ]] || die "stage 2 stopped for: ${aborted[*]} (see the messages above and logs/<sample>.truth.log)"
 fi
+report_missing reference "have no downloaded reference yet (stage 1 has not fetched them)" "Run a smaller selection with --max-isolates N, or let stage 1 finish."
 
 log "Stage 2 (truth) complete."

@@ -53,6 +53,23 @@ run_event() {
     printf '%s}\n' "$line" >> "$file" 2>/dev/null || true
 }
 
+# ---- one aggregated warning instead of one per isolate ----------------------------------------------------------------------------------
+# A stage that loops over a sheet of hundreds of rows used to print "missing reference for X" for each row that stage 1 had not fetched (a 134-isolate cohort with 3
+# downloaded gave 131 lines). note_missing KIND SAMPLE records the name (safe from parallel jobs: one short append); report_missing KIND "what" prints ONE warning with
+# the count and the first few names, and a run_event, then forgets them.
+note_missing() { printf '%s\n' "$2" >> "${TMP_DIR:-${TMPDIR:-/tmp}}/.pb_missing.$1.$PPID_FOR_MISSING" 2>/dev/null || true; }
+PPID_FOR_MISSING="${PPID_FOR_MISSING:-$$}"
+report_missing() {   # report_missing KIND DESCRIPTION [HOW-TO-FIX]
+    local f="${TMP_DIR:-${TMPDIR:-/tmp}}/.pb_missing.$1.$PPID_FOR_MISSING" n names total
+    [[ -s "$f" ]] || { rm -f "$f"; return 0; }
+    n="$(wc -l < "$f" | tr -d '[:space:]')"
+    names="$(head -n 3 "$f" | paste -sd, - | sed 's/,/, /g')"
+    total="$(read_samples "${SAMPLE_SHEET:-/nonexistent}" 2>/dev/null | wc -l | tr -d '[:space:]')"
+    warn "$n of ${total:-?} isolates in the sheet $2 (for example $names${n:+$([[ "$n" -gt 3 ]] && printf ', and %s more' $((n - 3)))}). They are skipped.${3:+ $3}"
+    run_event warning "kind=$1" "count=$n"
+    rm -f "$f"
+}
+
 # proc_stats PID: "cpu=NN% rss=NNNMB procs=N" for PID and everything it started (Linux and macOS ps). Empty when ps cannot say.
 proc_stats() {
     # A heartbeat only observes: it must never fail the command it watches. `ps` is missing from minimal images (the PlasBench container had none), and under
@@ -97,7 +114,7 @@ sys_stats() {
 # One heartbeat: elapsed time, CPU and memory of the command and what it started, memory/swap/disk of the machine, how long ago its log (WATCH_LOG, set by
 # the caller) last changed and that log's last line, plus a plain warning when memory is nearly gone or the command is idle. Also written to the event log.
 heartbeat_report() {
-    local pid="$1" description="$2" elapsed="$3" stats sysstats idle="" tail_line="" now mtime avail cpu
+    local pid="$1" description="$2" elapsed="$3" stats sysstats idle="" tail_line="" now mtime avail cpu phase=""
     stats="$(proc_stats "$pid" || true)"
     sysstats="$(sys_stats "${RESULTS_DIR:-.}" || true)"
     if [[ -n "${WATCH_LOG:-}" && -f "$WATCH_LOG" ]]; then
@@ -106,8 +123,12 @@ heartbeat_report() {
         [[ "$mtime" =~ ^[0-9]+$ ]] && idle=$(( now - mtime ))
         tail_line="$(grep -v '^[[:space:]]*$' "$WATCH_LOG" 2>/dev/null | tail -n 1 | tr -d '\r' | cut -c1-110 || true)"
     fi
-    heartbeat_log "still working: $description (${elapsed}s elapsed; ${stats:-process figures unavailable}${sysstats:+; $sysstats}${idle:+; its log last changed ${idle}s ago}${tail_line:+: \"$tail_line\"})"
-    run_event heartbeat "what=$description" "elapsed=$elapsed" "stats=${stats}" "system=${sysstats}" "log_idle=${idle}"
+    # SPAdes prints its own phases ("== Running read error correction", "== Running assembler: K77"): name the current one, so a 20-minute quiet step shows where it is.
+    if [[ "${WATCH_LOG:-}" == *spades.log && -f "$WATCH_LOG" ]]; then
+        phase="$(grep -E '== Running|K=[0-9]+|Read error correction|Repeat resolution|Assembling|Mismatch correction' "$WATCH_LOG" 2>/dev/null | tail -n 1 | tr -d '\r' | cut -c1-100 || true)"
+    fi
+    heartbeat_log "still working: $description (${elapsed}s elapsed;${phase:+ SPAdes phase: ${phase##*  };} ${stats:-process figures unavailable}${sysstats:+; $sysstats}${idle:+; its log last changed ${idle}s ago}${tail_line:+: \"$tail_line\"})"
+    run_event heartbeat "what=$description" "elapsed=$elapsed" "stats=${stats}" "system=${sysstats}" "log_idle=${idle}" "phase=${phase}"
     avail="$(sed -n 's/.*mem_avail=\([0-9]*\)MB.*/\1/p' <<< "$sysstats")"
     if [[ "$avail" =~ ^[0-9]+$ && "$avail" -lt 300 ]]; then
         heartbeat_log "WARNING: only ${avail} MB of memory is available: $description may be killed (exit 137) or crawl in swap. Lower THREADS or ASSEMBLY_MEMORY_GB, or skip isolates with very large read sets (MAX_RUN_DOWNLOAD_GB)."
@@ -120,18 +141,39 @@ heartbeat_report() {
     fi
 }
 
+# step_typical_seconds DESCRIPTION: the typical duration of a long command from config/step_typical.tsv (first row whose pattern occurs in the description; empty
+# when none). The figures are labelled there as measured once or assumed: they are the base of the slow-step note, never of a decision to stop anything.
+step_typical_seconds() {
+    local file="${PROJECT_ROOT:-${HERE:-.}/..}/config/step_typical.tsv"
+    [[ -r "$file" ]] || return 0
+    awk -F'\t' -v d="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" 'NR > 1 && $1 != "" && index(d, tolower($1)) { print $2; exit }' "$file"
+}
+
+# Slow-step watchdog: once a command has run STEP_SLOW_FACTOR times (default 3; 0 turns it off) its typical time, say so ONCE and record a slow_step event.
+# Nothing is stopped: a slow step is often just a big isolate. The note says how to tell a stuck one from a slow one.
+slow_step_note() {   # slow_step_note DESCRIPTION ELAPSED TYPICAL
+    local what="$1" elapsed="$2" typical="$3"
+    heartbeat_log "NOTE: $what is still running after $(( elapsed / 60 )) min (typical about $(( typical / 60 )) min here, ${STEP_SLOW_FACTOR:-3}x or more). If its log has not changed and the CPU is near 0% it may be stuck: run 'plasbench diagnose'. A big isolate can simply take this long."
+    run_event slow_step "what=$what" "elapsed=$elapsed" "typical=$typical" "factor=${STEP_SLOW_FACTOR:-3}"
+}
+
 run_with_heartbeat() {
     local description="$1"; shift
     local delay="${HEARTBEAT_DELAY_SECONDS:-180}" interval="${HEARTBEAT_INTERVAL_SECONDS:-60}"
-    local started elapsed=0 last_notice=0 pid rc=0
+    local started elapsed=0 last_notice=0 pid rc=0 typical slow_after=0 slow_noted=0 factor="${STEP_SLOW_FACTOR:-3}"
     started="$(date +%s)"
-    run_event command_start "what=$description"
+    typical="$(step_typical_seconds "$description" || true)"
+    [[ "$typical" =~ ^[0-9]+$ && "$factor" =~ ^[0-9]+$ && "$factor" -gt 0 ]] && slow_after=$(( typical * factor )) || typical=""
+    run_event command_start "what=$description" "typical=${typical}"
     "$@" & pid=$!
     while kill -0 "$pid" 2>/dev/null; do
         # Poll cheaply so a fast command returns promptly; only print at the
         # much less frequent configured interval once the quiet-delay passes.
         sleep 1
         elapsed=$(( $(date +%s) - started ))
+        if [[ "$slow_noted" -eq 0 && "$slow_after" -gt 0 && "$elapsed" -ge "$slow_after" ]]; then
+            slow_noted=1; slow_step_note "$description" "$elapsed" "$typical"
+        fi
         if [[ "$elapsed" -ge "$delay" && $(( elapsed - last_notice )) -ge "$interval" ]] && kill -0 "$pid" 2>/dev/null; then
             heartbeat_report "$pid" "$description" "$elapsed"
             last_notice="$elapsed"

@@ -79,7 +79,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
     # --- a run deep in an assembly, short of memory ------------------------------------------------------------------------------------
     check("a lock with a fresh heartbeat and live processes is RUNNING", s["state"] == "running", s["state"])
-    check("it reads the stage, isolate and step from the events", s["stage"] == "3" and s["sample"] == "streptomyces_sp" and s["step"] == "spades", (s["stage"], s["sample"], s["step"]))
+    check("it reads the stage, isolate and step from the events", s["stage"] == "3" and s["sample"] == "streptomyces_sp" and s["step"] == "SPAdes assembly", (s["stage"], s["sample"], s["step"]))
     check("it knows the open command and how long it has run (about 83 minutes)", s["command"] == "streptomyces_sp / SPAdes assembly" and 4900 < s["step_seconds"] < 5000, (s["command"], s["step_seconds"]))
     check("only the run's own processes are counted (not the unrelated one)", s["processes"]["count"] == 3 and s["processes"]["cpu_percent"] == 1850, s["processes"])
     check("progress comes from the status tables", s["progress"]["download"]["ok"] == 2 and s["progress"]["assembly"]["ok"] == 1, s["progress"])
@@ -91,7 +91,7 @@ with tempfile.TemporaryDirectory() as tmp:
     check("a busy run is said to be working, with the CPU figure", "using 1850% CPU" in text or "1850% CPU" in text, text)
     check("the newest log of the isolate and its age are shown", s["newest_log"]["idle_seconds"] == 2400 and "General" in s["newest_log"]["last_line"], s.get("newest_log"))
     out = rs.render(s, diagnose=True)
-    check("the text names stage, isolate, step and the heartbeat figures", "stage 3, isolate streptomyces_sp, step spades" in out and "cpu=1850%" in out, out)
+    check("the text names stage, isolate, step and the heartbeat figures", "stage 3, isolate streptomyces_sp, step SPAdes assembly" in out and "cpu=1850%" in out, out)
     check("diagnose lists the busiest process", "spades.py" in out and "pid    4400" in out, out)
     check("status (without diagnose) does not list processes", "spades.py" not in rs.render(s, diagnose=False))
 

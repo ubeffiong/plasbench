@@ -80,6 +80,7 @@ filter_to_scored_plasmids() {
 
 score_sample() {
     local SAMPLE="$1" ASM="$2" SRA="$3"
+    run_event sample_start "sample=$SAMPLE" "step=scoring"
     local SDIR="$DATA_DIR/$SAMPLE"
     local RDIR="$RESULTS_DIR/$SAMPLE"
     local REF="$SDIR/reference.fna"

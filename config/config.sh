@@ -334,6 +334,18 @@ PLASBENCH_DEFAULT_MEMORY_GB="$(plasbench_default_budget_gb "$PLASBENCH_AVAILABLE
 export PLASBENCH_AVAILABLE_GB PLASBENCH_AVAILABLE_MB
 export MEMORY_GB="${MEMORY_GB:-$PLASBENCH_DEFAULT_MEMORY_GB}"   # assembler memory budget (GB)
 
+# --- Work folder, annotation time limits and the slow-step note ------------------------------------
+# WORK_DIR: where assemblies run. auto (default) = a scratch folder under ~/.plasbench/scratch/<study> when the data folder is on a slow mount (a Windows drive seen from WSL,
+# NTFS/exFAT, a network share, a cloud-synced folder), else the data folder itself; data = always the data folder; any other value = that folder. Finished results are
+# always moved back to the isolate's folder. Takes effect at the next stage 3 start.
+export WORK_DIR="${WORK_DIR:-auto}"
+# ANNOTATION_TIMEOUT_SECONDS: per annotation caller (mob_typer, abricate, AMRFinder, ISEScan, barrnap). Blank = max(300, 150 s per Mbp of the reference), ISEScan three times that;
+# a number = that many seconds; 0 or off = no limit. A caller that hits the limit is stopped and recorded as timed_out (never cached); the others are kept.
+export ANNOTATION_TIMEOUT_SECONDS="${ANNOTATION_TIMEOUT_SECONDS:-}"
+# STEP_SLOW_FACTOR: a long command that has run this many times its typical time (config/step_typical.tsv) gets ONE "still running, typical N min" note and a slow_step event.
+# Nothing is stopped by it. 0 turns it off.
+export STEP_SLOW_FACTOR="${STEP_SLOW_FACTOR:-3}"
+
 # --- Parallelism ---------------------------------------------------------
 # Every default below (1) is exactly today's fully sequential behavior: one
 # sample at a time, one tool at a time. Raise them only after checking your

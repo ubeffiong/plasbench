@@ -296,6 +296,20 @@ if [[ "${RUN_REFERENCE_ANNOTATION:-0}" -eq 1 ]]; then
     check_tool amrfinder reference-annotation 0
     check_tool isescan.py reference-annotation 0
     check_tool mob_typer reference-annotation 0
+    # Present is not ready: ask each caller what it needs (python/tool_readiness.py), so a missing AMRFinder database or an ISEScan that fails after its long search is
+    # reported here, in a second, not after an 11-minute run. Advisory (the callers are optional), but the fix is offered like any other (install-tools reference-annotation).
+    for ready_tool in amrfinder abricate isescan; do
+        have "$ready_tool" || { [[ "$ready_tool" == "isescan" ]] && have isescan.py || continue; }
+        ready_args=(); [[ "$ready_tool" == "abricate" ]] && ready_args=(--db "${ANNOTATION_AMR_DB:-ncbi}" --db "${ANNOTATION_REPLICON_DB:-plasmidfinder}")
+        ready_out="$(python3 -I "$HERE/../python/tool_readiness.py" "$ready_tool" ${ready_args[@]+"${ready_args[@]}"} 2>/dev/null </dev/null)" && ready_rc=0 || ready_rc=$?
+        if [[ "$ready_rc" -eq 1 ]]; then
+            IFS=$'\t' read -r _ ready_what ready_fix <<< "$ready_out"
+            warn "  [MISS] $ready_tool is installed but not ready: $ready_what. Fix: $ready_fix"
+            NEEDED_PROFILES["reference-annotation"]=1
+        elif [[ "$ready_rc" -eq 0 ]]; then
+            log "  [ok]   $ready_tool is ready ($(cut -f2 <<< "$ready_out"))"
+        fi
+    done
 fi
 if [[ "${RUN_DIFFICULTY_FEATURES:-0}" -eq 1 ]]; then
     # Each of the three difficulty fields is independently optional by

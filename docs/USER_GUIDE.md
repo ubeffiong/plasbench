@@ -1398,6 +1398,36 @@ sample/tool execution, warnings, output locations, and the final leaderboard.
 Long-running runs do not yet estimate total completion time; use log timestamps
 and `results/tool_status.tsv` to monitor progress.
 
+## My run looks stuck
+
+First look, in a second terminal: `plasbench status` (add `--study NAME` for another study) says the state (RUNNING, FINISHED, STOPPED), the stage, the isolate and the step it is in
+("now: stage 2, isolate X, step reference annotation (running for 11 min, typical 11 min)"), the CPU and memory of the run's processes, and a hint when something is off.
+`plasbench diagnose` adds the busiest processes. The window's Run panel shows the same fields.
+
+What is normal, and how long it can take (the figures are estimates for a 6-CPU laptop, from config/step_typical.tsv; measured where the table says so):
+
+- Stage 1 download: minutes per isolate (a 400 MB read set took about 5 minutes); the log shows percentages. It resumes if interrupted.
+- Stage 2 reference annotation: about 11 minutes per isolate on a 4 Mbp genome, almost all of it ISEScan. The log lists which callers are still running and, past twice the usual time, says so.
+- Stage 3 fastp: seconds to a couple of minutes. SPAdes: 10 to 30 minutes for a 4 Mbp isolate; the heartbeat names SPAdes's own phase (read error correction, then K=21 ... K=77, then repeat resolution).
+- A step that runs 3 times its typical time (`STEP_SLOW_FACTOR`, 0 turns it off) gets one "still running" note and a `slow_step` event; nothing is stopped. If its log has not changed and the CPU is near 0% it may be stuck: `plasbench diagnose`.
+
+The SPAdes memory message. `ERROR K-mer Counting ... The reads contain too many k-mers to fit into available memory. You need approx. 5.24277GB of free RAM` means SPAdes was given a
+smaller memory budget (`-m`) than this read set needs. PlasBench now reads the number, and retries ONCE with -m = need + 15% when that fits in 85% of the memory free now (or the need rounded up when
+that fits in 92%); otherwise it stops that isolate, says the exact need and what is free, and goes on with the other isolates. To raise it yourself: `plasbench run ... --memory-gb 7` (or MEMORY_GB), close other
+programs, or give Ubuntu more memory (WSL: `memory=` in `C:\Users\<you>\.wslconfig`, then `wsl --shutdown`). The default budget is 80% of the memory available now, rounded down to whole GB (6.9 GB free gives 5 GB); the setup output prints the rule.
+
+One failed isolate does not stop the others: a failure of memory, reads or one tool is recorded for that isolate and the stage goes on ("complete WITH WARNINGS: 2 of 3 assembled"). Only causes that belong to the
+computer (disk full, broken Python environment, unsupported CPU, an unwritable folder) stop the stage, and every isolate not reached is recorded as `not attempted (stopped early: <cause>)`.
+
+Annotation tools that are present but not ready. `plasbench check` now asks AMRFinderPlus for its database (`amrfinder --database_version`), abricate for its database list and ISEScan whether its clustering step works,
+and says `[MISS] ... installed but not ready` with the fix: `amrfinder -u` (once, about 100 MB), or `plasbench install-tools reference-annotation --yes`, which also pins `fastcluster<1.3` (1.3.0 breaks ISEScan beside NumPy 1.x). A caller that
+is not ready is skipped in seconds and recorded as not evaluated. A caller that hangs is stopped at its limit (`ANNOTATION_TIMEOUT_SECONDS`: blank = max(300 s, 150 s per Mbp), ISEScan three times that; a number; 0 or off = no limit) and recorded
+as `timed_out`; failed and timed-out annotations are never cached.
+
+Slow data folder. When the data folder is on a Windows drive seen from WSL (`/mnt/c`, `/mnt/f`), NTFS/exFAT, a network share or a cloud-synced folder, SPAdes runs in a scratch folder under `~/.plasbench/scratch/<study>` and the finished results are moved back
+(`WORK_DIR=auto`, the default; `WORK_DIR=data` turns it off; `WORK_DIR=<folder>` picks one). The log says `assembly work folder: <path> (fast local disk ...)`. A crash leaves a scratch folder behind; the next run removes it and says so.
+The stage 2 and 3 loops print one summary line for isolates whose reference or reads are not downloaded yet, not one warning per row.
+
 ## Troubleshooting
 
 ```text

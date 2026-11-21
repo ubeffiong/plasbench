@@ -29,6 +29,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 need fastp
+stage_timing_begin 3        # stage_start/stage_end events, so `plasbench status` knows this is stage 3
 preflight_resources 3 quiet
 warn_resource_oversubscription "stage 3 (assembly)" "$MAX_PARALLEL_SAMPLES" "$THREADS" "$ASSEMBLY_MEMORY_GB"
 
@@ -56,6 +57,7 @@ record_assembly_status() {
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "${5:-}" "${6:-}" "${7:-}" \
         > "$STATUS_SHARDS/${sample}.tsv"
     run_event assembly_end "sample=$1" "status=$2" "reason=${4:-}" "cause=${6:-}"
+    run_event sample_end "sample=$1" "step=assembly" "status=$2"
 }
 
 # --- why a step failed, what was tried, and when to stop ------------------------------------------------------------------------------
@@ -93,20 +95,63 @@ verify_reads() {   # verify_reads SDIR R1 R2 T1 T2
     fi
 }
 
+# ---- assembly work folder (WORK_DIR, python/work_dir.py) -----------------------------------------------------------------------------------
+# SPAdes writes tens of thousands of small files; on a Windows drive seen from WSL (9p), NTFS/exFAT, a network share or a cloud-synced folder that is hundreds of times
+# slower than on a local disk. When the data folder is on such a mount the assembler works in a scratch folder (~/.plasbench/scratch/<study>/<sample>.<pid>) and only the
+# finished results are moved back, atomically. WORK_DIR=data turns it off; WORK_DIR=<folder> chooses one. Prints the scratch folder, or nothing (and returns 1) when the
+# assembly runs in the data folder. Leftovers of runs that died are removed here, with a log line.
+assembly_scratch_dir() {   # assembly_scratch_dir SAMPLE T1 T2
+    local sample="$1" t1="$2" t2="$3" study line dir reason fs kind need name bytes=0 f
+    have python3 || return 1
+    for f in "$t1" "$t2"; do bytes=$(( bytes + $(stat -c %s "$f" 2>/dev/null || stat -f %z "$f" 2>/dev/null || echo 0) )); done
+    need="$(awk -v b="$bytes" 'BEGIN { printf "%.1f", b * 8 / 1e9 + 2 }')"
+    study="$(basename "$(dirname "${RESULTS_DIR:-./results}")")"
+    line="$(python3 -I "${PROJECT_ROOT:-.}/python/work_dir.py" resolve --data-dir "$DATA_DIR" --study "$study" --mode "${WORK_DIR:-auto}" --need-gb "$need" 2>/dev/null </dev/null)" || return 1
+    IFS=$'\t' read -r dir reason fs kind <<< "$line"
+    if [[ "$kind" != "scratch" ]]; then
+        heartbeat_log "  assembly work folder: $DATA_DIR/$sample ($reason)"
+        return 1
+    fi
+    mkdir -p "$dir" 2>/dev/null || { heartbeat_log "  assembly work folder: $dir cannot be created; working in the data folder"; return 1; }
+    while IFS= read -r name; do
+        [[ -n "$name" ]] && heartbeat_log "  removed a leftover scratch folder from an earlier run: $dir/$name"
+    done < <(python3 -I "${PROJECT_ROOT:-.}/python/work_dir.py" clean --root "$dir" 2>/dev/null </dev/null)
+    mkdir -p "$dir/$sample.$$" || return 1
+    heartbeat_log "  assembly work folder: $dir/$sample.$$ (fast local disk; $reason; results are copied back to $DATA_DIR/$sample when done)"
+    run_event work_dir "sample=$sample" "dir=$dir" "fs=$fs"
+    printf '%s' "$dir/$sample.$$"
+}
+
+assembly_scratch_finish() {   # assembly_scratch_finish SCRATCH OUT ASMDIR: move the results back (atomic), say how much
+    local scratch="$1" out="$2" asmdir="$3" moved
+    moved="$(python3 -I "${PROJECT_ROOT:-.}/python/work_dir.py" finish --src "$out" --dst "$asmdir" 2>&1 </dev/null)" || { warn "could not move the assembly back from $scratch to $asmdir: $moved"; return 1; }
+    heartbeat_log "  assembly results moved back from the scratch folder: $moved"
+    return 0
+}
+
 # SPAdes with diagnosis and at most ONE retry. Returns 0 when it assembled (ASM_RETRY_NOTE says what was changed), 1 when it failed (recorded).
 run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SDIR
     local sample="$1" t1="$2" t2="$3" asmdir="$4" start="$5" r1="$6" r2="$7" sdir="$8"
     local log="$LOG_DIR/${sample}.spades.log" threads="$THREADS" mem="$ASSEMBLY_MEMORY_GB" rc attempt=1 plan="" note="" first="" own="" nt nm av avail
-    local STOP_EARLY=0 MEMORY_REFUSAL=""
+    local STOP_EARLY=0 MEMORY_REFUSAL="" out="$asmdir" scratch=""
     ASM_RETRY_NOTE=""
+    scratch="$(assembly_scratch_dir "$sample" "$t1" "$t2")" || scratch=""
+    [[ -n "$scratch" ]] && out="$scratch/asm"
     while :; do
         rc=0
-        WATCH_LOG="$log" run_with_heartbeat "$SAMPLE / SPAdes assembly" spades.py -1 "$t1" -2 "$t2" -o "$asmdir" \
+        WATCH_LOG="$log" run_with_heartbeat "$SAMPLE / SPAdes assembly" spades.py -1 "$t1" -2 "$t2" -o "$out" \
             --threads "$threads" --memory "$mem" > "$log" 2>&1 || rc=$?
         if [[ "$rc" -eq 0 ]]; then
             [[ -n "$note" ]] && ASM_RETRY_NOTE="retried once after $first: $note"
+            if [[ -n "$scratch" ]] && ! assembly_scratch_finish "$scratch" "$out" "$asmdir"; then
+                record_assembly_status "$sample" "failed" "" "SPAdes: the finished assembly could not be moved back from the scratch folder $scratch (see the message above; the scratch folder is kept)" "$(( $(date +%s) - start ))" "scratch_move_failed" "Free space where the data folder is, or set WORK_DIR=data, then run the same plasbench run command again."
+                return 1
+            fi
+            [[ -n "$scratch" ]] && rm -rf "$scratch"
             return 0
         fi
+        # keep what the failed attempt left (spades.log, params.txt) in the isolate's folder for inspection, as before, then clear the scratch folder
+        if [[ -n "$scratch" ]]; then assembly_scratch_finish "$scratch" "$out" "$asmdir" > /dev/null 2>&1 || true; fi
         THREADS="$threads" ASSEMBLY_MEMORY_GB="$mem" diagnose_failed_step "$log" "$rc" "$sample"
         if [[ "$attempt" -ge 2 || "${ASSEMBLER_AUTO_RETRY:-1}" != "1" ]]; then break; fi
         case "$DIAG_RETRY" in
@@ -135,9 +180,10 @@ run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SD
         warn "SPAdes failed for $sample ($DIAG_TITLE); trying once more: $note"
         run_event assembly_retry "sample=$sample" "cause=$first" "change=$note"
         cp "$log" "$LOG_DIR/${sample}.spades.attempt${attempt}.log" 2>/dev/null || true
-        rm -rf "$asmdir"
+        rm -rf "$asmdir" "$out"
         attempt=$((attempt + 1))
     done
+    [[ -n "$scratch" ]] && rm -rf "$scratch"
     local extra=""
     if [[ "$attempt" -ge 2 ]]; then
         extra="PlasBench already retried once ($note) and it failed again."
@@ -269,7 +315,7 @@ assemble_sample() {
     local SDIR="$DATA_DIR/$SAMPLE"
     local R1="$SDIR/${SRA}_1.fastq.gz" R2="$SDIR/${SRA}_2.fastq.gz"
     if [[ ! -s "$R1" || ! -s "$R2" ]]; then
-        warn "no reads for $SAMPLE; run 01_download.sh"
+        note_missing reads "$SAMPLE"
         record_assembly_status "$SAMPLE" "skipped" "" "reads unavailable"
         return 0
     fi
@@ -436,6 +482,7 @@ if [[ "$MAX_PARALLEL_SAMPLES" -gt 1 ]]; then
     fi
 fi
 
+report_missing reads "have no downloaded reads yet (stage 1 has not fetched them)" "Each is recorded as skipped in assembly_status.tsv."
 # Assemble the final status file once, in the order a sequential run produced it.
 STOP_INFO=""
 [[ -e "$STATUS_SHARDS/.stop" ]] && STOP_INFO="$(cat "$STATUS_SHARDS/.stop")"
