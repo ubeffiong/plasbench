@@ -10,11 +10,11 @@ explain your reasoning in the PR description to make review quick.
 
 ### Running one shard of the test suite
 
-CI runs the suite as four parallel shards per Python version. The same split works locally,
-for example to reproduce a failure from the CI job `shard (3.11, 2/4)`:
+CI runs the suite as five parallel shards per Python version. The same split works locally,
+for example to reproduce a failure from the CI job `shard (3.11, 2/5)`:
 
 ```bash
-PB_SHARD=2 PB_SHARDS=4 bash test/run_tests.sh      # shard 2 of 4 (builds the demo results first if the shard needs them)
+PB_SHARD=2 PB_SHARDS=5 bash test/run_tests.sh      # shard 2 of 5 (builds the demo results first if the shard needs them)
 PB_LIST=1 bash test/run_tests.sh                   # only print the registered tests
 ```
 
