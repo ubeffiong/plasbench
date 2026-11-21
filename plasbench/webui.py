@@ -1702,7 +1702,7 @@ def runtime_state(project) -> dict:
         if ds.get("pending"):
             docker = {"pending": True, "state": "pending", "installed": False, "running": False, "version": "", "image": {}, "hint": "Checking Docker..."}
         else:
-            state = {"permission_denied": "permission_needed", "desktop_not_running": "daemon_stopped", "in_container": "inside_docker", "unknown": "daemon_stopped",
+            state = {"permission_denied": "permission_needed", "permission_group_not_applied": "permission_needed", "desktop_not_running": "daemon_stopped", "in_container": "inside_docker", "unknown": "daemon_stopped",
                      "installed_windows_not_running": "daemon_stopped", "desktop_running_engine_down": "daemon_stopped", "engine_up_wsl_integration_off": "wsl_integration_off"}.get(ds["state"], ds["state"])
             image = {}
             if state == "ready":

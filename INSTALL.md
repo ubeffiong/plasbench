@@ -213,6 +213,7 @@ PlasBench never runs `sudo`, never asks for or stores an administrator password 
 | --- | --- | --- |
 | Not installed | no `docker` program | the install route for your computer (below) |
 | Installed, daemon stopped | `Cannot connect to the Docker daemon` | start the service (`sudo systemctl start docker`) or Docker Desktop |
+| Restart needed (docker group not applied) | you ARE in the docker group now (`/etc/group`), but this window (or terminal) started before that, and a running program keeps the groups it started with, so it still gets `permission denied` on `/var/run/docker.sock` | **Restart window** (PlasBench restarts itself through `sg docker` when available), or `newgrp docker` then `plasbench ui`, or `wsl --shutdown` in Windows PowerShell and reopen Ubuntu |
 | Permission needed | `permission denied ... /var/run/docker.sock` | `sudo usermod -aG docker "$USER"`, then log out and in (or `newgrp docker`) |
 | WSL integration off | Docker Desktop is on Windows but this Ubuntu cannot use it | Docker Desktop > Settings > Resources > WSL integration > turn on your distro |
 | Docker Desktop not running | macOS, engine unreachable | start Docker Desktop and wait until it says it is running |

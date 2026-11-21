@@ -364,5 +364,103 @@ src = (ROOT / "python" / "docker_setup.py").read_text(encoding="utf-8")
 check("never edits Docker's settings files: the only open() of a settings path is a read", "open(path" in src and not re.search(r"settings[^\n]*\.write|write\([^\n]*settings", src))
 check("Python 3.9 compatible source (annotations future import, no write_text/read_text(newline=))", "from __future__ import annotations" in src and "newline=" not in re.sub(r"open\([^)]*newline=", "", src))
 
+# ---- 7. docker.sock 'permission denied' when the account IS in the docker group but this process started before that
+import types  # noqa: E402
+PERM_DENIED = (1, "", "permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Get \"http://%2Fvar%2Frun%2Fdocker.sock/v1.47/info\": dial unix /var/run/docker.sock: connect: permission denied")
+LINUX = dict(WSL, kind="linux", wsl=False, interop=None, winget=None, powershell=None, wsl_distro="")
+
+
+def fake_group(members=(), gid=998, user="me", process_gids=(1000, 4), primary_gid=1000):
+    grnam = lambda name: types.SimpleNamespace(gr_gid=gid, gr_mem=list(members), gr_name=name) if name == "docker" else (_ for _ in ()).throw(KeyError(name))      # noqa: E731
+    pwnam = lambda u: types.SimpleNamespace(pw_gid=primary_gid)      # noqa: E731
+    return lambda: ds.group_membership("docker", user, getgroups=lambda: list(process_gids), grnam=grnam, pwnam=pwnam)
+
+
+def linux_probe(groups):
+    runs = {("--version",): (0, "Docker version 28.0.1\n", ""), ("info",): PERM_DENIED}
+
+    def run(argv, timeout=20):
+        return runs.get(tuple(argv[1:]))
+    return ds.probe(LINUX, run=run, which=lambda n: "/usr/bin/docker" if n == "docker" else None, exists=lambda p_: False, env={}, groups=groups)
+
+
+m = fake_group(members=["me"])()
+check("group_membership: listed in /etc/group but the process lacks the gid (usermod ran after the window started)", m["in_group"] is True and m["process_has"] is False and m["known"], m)
+m = fake_group(members=["me"], process_gids=(1000, 998))()
+check("group_membership: the process has the group too", m["in_group"] and m["process_has"], m)
+m = fake_group(members=["someone"])()
+check("group_membership: not a member", m["in_group"] is False and m["process_has"] is False, m)
+m = fake_group(members=[], primary_gid=998, process_gids=(998,))()
+check("group_membership: docker as the primary group counts", m["in_group"] and m["process_has"], m)
+check("group_membership: no docker group at all", ds.group_membership("docker", "me", getgroups=lambda: [], grnam=lambda n: (_ for _ in ()).throw(KeyError(n)), pwnam=lambda u: None)["exists"] is False)
+
+p = linux_probe(fake_group(members=["me"]))
+check("in the group now, process started before: the distinct state permission_group_not_applied", p["state"] == "permission_group_not_applied" and p["chip"] == "Restart needed" and p["action"] == "restart", p)
+d = ds.diagnose(p, LINUX)
+check("... the exact message and the way out", d["title"].startswith("You are in the docker group, but this window started before that, so it cannot use it yet.") and "newgrp docker, then plasbench ui" in d["title"] and "usermod" not in " ".join(d["steps"]), d)
+d = ds.diagnose(p, WSL)
+check("... in WSL it also names wsl --shutdown in Windows PowerShell", "run wsl --shutdown in Windows PowerShell and reopen Ubuntu." in d["title"], d["title"])
+check("... it is exit 20 for install-tools docker, with no polling", ds.install(LINUX, p, yes=True, run=lambda a, timeout=20: None, sleep=lambda s_: (_ for _ in ()).throw(AssertionError("slept")), log=[].append, env={"PLASBENCH_STATE_DIR": tempfile.mkdtemp()}) == 20)
+p = linux_probe(fake_group(members=["someone"]))
+check("not a member: the plain 'permission_denied' state with the usermod step stays", p["state"] == "permission_denied" and "usermod -aG docker" in " ".join(ds.diagnose(p, LINUX)["steps"]) and p["action"] == "recheck", p)
+p = linux_probe(fake_group(members=["me"], process_gids=(1000, 998)))
+check("in the group and the process has it, still denied: stays permission_denied (a different problem)", p["state"] == "permission_denied", p["state"])
+check("the new state is waited out by nobody: polling stops at once", "permission_group_not_applied" in ds.HUMAN_STATES and "permission_group_not_applied" in ds.STATES and "permission_group_not_applied" in ds.CHIPS)
+
+# the restart of the window relaunches under the group, only when needed
+sys.path.insert(0, str(ROOT))
+from plasbench import server_state  # noqa: E402
+CMD = [sys.executable, "-c", "boot", "--project-root", "/home/me/it's here; rm -rf ~", "ui"]
+argv, wrapped, problem = server_state.group_launch(CMD, membership={"in_group": True, "process_has": False, "group": "docker"}, which=lambda n: "/usr/bin/sg")
+check("restart: in the group but the process is not -> sg docker -c 'exec <argv>' (argument list, every word shell-quoted)", wrapped and argv[:3] == ["/usr/bin/sg", "docker", "-c"] and len(argv) == 4 and argv[3].startswith("exec "), argv)
+import shlex  # noqa: E402
+check("restart: the quoted command round-trips to the exact argv, hostile path included", shlex.split(argv[3][len("exec "):]) == CMD, argv[3])
+argv2, wrapped2, problem2 = server_state.group_launch(CMD, membership={"in_group": True, "process_has": False, "group": "docker"}, which=lambda n: None)
+check("restart: without sg the plain command is not used: manual instructions (newgrp docker, plasbench ui)", not wrapped2 and argv2 == CMD and "newgrp docker, then plasbench ui" in problem2, problem2)
+for label, mem in {"already applied": {"in_group": True, "process_has": True}, "not a member": {"in_group": False, "process_has": False}, "unknown": {}}.items():
+    a3, w3, p3 = server_state.group_launch(CMD, membership=mem, which=lambda n: "/usr/bin/sg")
+    check(f"restart: {label} -> the ordinary command, untouched", a3 == CMD and not w3 and not p3)
+
+
+class Child:
+    pid = 4242
+
+    def poll(self):
+        return None
+
+
+rec = Path(tempfile.mkdtemp()) / "instance.json"
+spawned = []
+
+
+def fake_spawn(cmd, cwd):
+    spawned.append(list(cmd))
+    rec.write_text(json.dumps({"pid": 9999, "url": "http://127.0.0.1:8123/?k=1"}), encoding="utf-8")      # the new server's own pid, not the sg wrapper's
+    return Child()
+
+
+res = server_state.restart(ROOT, 8000, rec, spawn=fake_spawn, healthy=lambda info: True, wait=5, membership={"in_group": True, "process_has": False, "group": "docker"}, which=lambda n: "/usr/bin/sg")
+check("restart route with a fake launcher: started through sg, answers ok with the new address (the sg child's pid is not the server's)", res.get("ok") and res["url"].startswith("http://127.0.0.1:8123") and spawned and spawned[0][0] == "/usr/bin/sg", (res, spawned))
+spawned.clear()
+res = server_state.restart(ROOT, 8000, rec, spawn=fake_spawn, healthy=lambda info: True, wait=5, membership={"in_group": True, "process_has": False, "group": "docker"}, which=lambda n: None)
+check("restart route without sg: not started, manual instructions returned", res.get("ok") is False and res.get("manual") and "newgrp docker" in res["message"] and not spawned, res)
+spawned.clear()
+rec.write_text("{}", encoding="utf-8")
+
+
+def plain_spawn(cmd, cwd):
+    spawned.append(list(cmd))
+    rec.write_text(json.dumps({"pid": Child.pid, "url": "http://127.0.0.1:8124/"}), encoding="utf-8")
+    return Child()
+
+
+res = server_state.restart(ROOT, 8000, rec, spawn=plain_spawn, healthy=lambda info: True, wait=5, membership={"in_group": False, "process_has": False})
+check("restart route when no group is involved: the ordinary replacement command, unchanged behaviour", res.get("ok") and spawned[0][0] == sys.executable, (res, spawned))
+
+html = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
+check("window: Restart window is the primary action for that state and reuses restartWindow()", 'id: "restart", label: "Restart window"' in html and 'a === "restart") restartWindow()' in html and 'data-dk="restart"' in html)
+check("tooltips: docker_restart and restart_window exist and say why a running program lacks the group", "keeps the groups it started with" in ui_help.NATIVE_PICKER["docker_restart"]["summary"] and ui_help.ENVIRONMENT["restart_window"]["summary"])
+check("server: the Environment card treats the new state as 'permission needed'", '"permission_group_not_applied": "permission_needed"' in web)
+
 print("ALL DOCKER POST-INSTALL TESTS PASSED" if not FAILED else f"DOCKER POST-INSTALL TESTS FAILED: {FAILED}")
 sys.exit(1 if FAILED else 0)

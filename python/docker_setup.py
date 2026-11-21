@@ -48,13 +48,13 @@ DOCKER_KEY_FPR_RPM = "060A61C51B558A7F742B77AAC52FEB6B621E9F35"
 SERVICES = {"winget": ["winget", "docker"], "brew": ["brew", "docker"]}
 # The Windows-side states (Windows, and WSL 2 where Docker Desktop lives on the Windows side): told apart so that "installed but not started" is never reported as "not installed".
 WIN_STATES = ("installed_windows_not_running", "desktop_running_engine_down", "engine_up_wsl_integration_off")
-HUMAN_STATES = ("engine_up_wsl_integration_off", "permission_denied")      # waiting longer cannot fix these: a person has to act
-STATES = ("ready", "not_installed", "daemon_stopped", "permission_denied", "wsl_integration_off", "desktop_not_running", "in_container", "unknown") + WIN_STATES
+HUMAN_STATES = ("engine_up_wsl_integration_off", "permission_denied", "permission_group_not_applied")      # waiting longer cannot fix these: a person has to act
+STATES = ("ready", "not_installed", "daemon_stopped", "permission_denied", "permission_group_not_applied", "wsl_integration_off", "desktop_not_running", "in_container", "unknown") + WIN_STATES
 STAGES = (("installed", "Installed"), ("running", "Running"), ("engine", "Engine answering (licence accepted)"), ("integration", "WSL integration"))
 DESKTOP_EXE = "Docker Desktop.exe"
 SETTINGS_FILES = ("settings-store.json", "settings.json")      # newer Docker Desktop versions write settings-store.json; settings.json is the older name
 INTEGRATION_URI = "docker-desktop://dashboard/settings/resources/wsl-integration"
-CHIPS = {"installed_windows_not_running": ("Docker Desktop not started", "warn"), "desktop_running_engine_down": ("Docker Desktop starting", "warn"),
+CHIPS = {"permission_group_not_applied": ("Restart needed", "warn"), "installed_windows_not_running": ("Docker Desktop not started", "warn"), "desktop_running_engine_down": ("Docker Desktop starting", "warn"),
          "engine_up_wsl_integration_off": ("WSL integration off", "warn"),
          "ready": ("Ready", "ok"), "not_installed": ("Not installed", "bad"), "daemon_stopped": ("Installed, daemon stopped", "warn"),
          "permission_denied": ("Permission needed", "warn"), "wsl_integration_off": ("WSL integration off", "warn"),
@@ -442,6 +442,8 @@ def next_action(state, environment, ev=None):
         return ""
     if state == "not_installed":
         return "install"
+    if state == "permission_group_not_applied":
+        return "restart"
     if state in ("installed_windows_not_running", "desktop_not_running"):
         return "start" if (ev.get("desktop_exe") or environment.get("kind") == "macos") else "recheck"
     if state in ("engine_up_wsl_integration_off", "wsl_integration_off"):
@@ -511,6 +513,41 @@ def open_integration(environment, ev, run=default_run, log=print):
     return False, "Could not open Docker Desktop: open it yourself and go to Settings > Resources > WSL integration."
 
 
+def group_membership(group="docker", user=None, getgroups=None, grnam=None, pwnam=None, uid_name=None):
+    """Is the account in `group` NOW (the account database: /etc/group members, or the primary group), and does THIS process have it? A process keeps the groups it was started
+    with, so `sudo usermod -aG docker $USER` helps new logins only: {'known', 'exists', 'group', 'user', 'in_group', 'process_has'}. Every system fact is an argument for tests."""
+    out = {"known": False, "exists": False, "group": group, "user": user or "", "in_group": False, "process_has": False}
+    try:
+        import grp
+        import pwd
+    except ImportError:
+        grp = pwd = None                             # Windows has no POSIX groups: only injected facts can be used
+    if (grp is None and not (grnam and pwnam)) or (not user and pwd is None and not uid_name):
+        return out
+    getgroups = getgroups or os.getgroups
+    grnam = grnam or grp.getgrnam
+    pwnam = pwnam or pwd.getpwnam
+    try:
+        user = user or (uid_name or (lambda: pwd.getpwuid(os.getuid()).pw_name))()
+    except (KeyError, OSError):
+        return out
+    out.update(known=True, user=user)
+    try:
+        entry = grnam(group)
+    except KeyError:
+        return out
+    try:
+        primary = pwnam(user).pw_gid == entry.gr_gid
+    except KeyError:
+        primary = False
+    out.update(exists=True, in_group=bool(user in list(entry.gr_mem) or primary))
+    try:
+        out["process_has"] = entry.gr_gid in list(getgroups())
+    except OSError:
+        pass
+    return out
+
+
 def classify(version, info, environment=None):
     """The Docker state from the outputs of `docker --version` and `docker info`: each a (returncode, stdout, stderr) tuple, or None when the program could not be started.
     -> {'state', 'detail': the line that decided it, 'version': client version text}"""
@@ -541,7 +578,7 @@ def classify(version, info, environment=None):
     return {"state": "unknown", "detail": first or "docker info did not succeed", "version": ver}
 
 
-def probe(environment=None, run=default_run, which=shutil.which, exists=os.path.exists, env=None, timeout=20, deep=False, read=_read, globber=glob.glob):
+def probe(environment=None, run=default_run, which=shutil.which, exists=os.path.exists, env=None, timeout=20, deep=False, read=_read, globber=glob.glob, groups=None):
     """Ask Docker: {'state', 'detail', 'version', 'server_version', 'context', 'exe', 'chip', 'chip_tone', 'evidence', 'stages', 'action'}. Runs `docker --version`, `docker info` and
     `docker context show`; on Windows and WSL 2 also looks, read-only, at Docker Desktop on the Windows side (files, tasklist, docker.exe info, its settings file; `deep`: winget list)."""
     environment = environment if environment is not None else detect_environment(env, which, exists)
@@ -559,6 +596,12 @@ def probe(environment=None, run=default_run, which=shutil.which, exists=os.path.
         ctx = run([exe or "docker", "context", "show"], timeout)
         res["context"] = ctx[1].strip() if ctx and ctx[0] == 0 else ""
     ev = {}
+    if res["state"] == "permission_denied" and (groups or os.name == "posix"):
+        member = (groups or group_membership)()
+        ev["group"] = member
+        if member.get("in_group") and not member.get("process_has"):
+            res["state"] = "permission_group_not_applied"
+            res["detail"] = "%s is in the %s group, but this process was started before that and does not have it" % (member.get("user") or "the account", member.get("group", "docker"))
     if environment.get("kind") in ("windows", "wsl2") and res["state"] not in ("ready", "in_container", "permission_denied"):
         ev = windows_evidence(environment, run, which, exists, env, read, globber, timeout, deep)
         refined = windows_state(res["state"], ev, environment)
@@ -759,8 +802,14 @@ def diagnose(st, environment=None):
         title, place = "Docker is installed but Docker Desktop is not running.", "Docker Desktop"
         steps = ["Start Docker Desktop (Start menu on Windows, `open -a Docker` on macOS) and wait until it says it is running.", "Accept the licence if Docker Desktop asks (PlasBench cannot accept it for you).", "Press Re-check."]
     elif state == "permission_denied":
-        title, place = "Docker is running, but your user may not use it (permission denied on /var/run/docker.sock).", "a terminal"
+        title, place = "Docker is running, but your user may not use it (permission denied on /var/run/docker.sock; you are not in the docker group yet).", "a terminal"
         steps = ['Add yourself to the docker group: `sudo usermod -aG docker "$USER"`.', "Log out and back in (or run `newgrp docker` in this terminal) so the group applies.", "Press Re-check. Rootless Docker avoids this: " + ROOTLESS_URL]
+    elif state == "permission_group_not_applied":
+        wsl = kind == "wsl2"
+        title, place = ("You are in the docker group, but this window started before that, so it cannot use it yet. Restart the window from a terminal where the group applies (newgrp docker, then plasbench ui) "
+                        + ("or run wsl --shutdown in Windows PowerShell and reopen Ubuntu." if wsl else "or log out and back in.")), "this window"
+        steps = ["Press Restart window: PlasBench starts itself again with `sg docker` so the group applies (when `sg` is not available it tells you to do the next step instead).",
+                 "Or, in a terminal: `newgrp docker`, then `plasbench ui`" + ("; or in Windows PowerShell `wsl --shutdown`, then reopen Ubuntu." if wsl else "; or log out and back in."), "Press Re-check."]
     elif state == "installed_windows_not_running":
         ver = (st.get("evidence") or {}).get("desktop_version")
         wsl = kind == "wsl2"

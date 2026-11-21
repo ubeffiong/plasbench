@@ -2817,7 +2817,7 @@ function renderRuntime(r) {
     <button class="btn sec sm" id="rt_build" data-needs="docker" ${d.state !== "ready" ? "disabled" : ""}>Build the image${rtTip("build_image")}</button>
     <button class="btn sec sm" id="rt_test_btn" ${d.state !== "ready" ? "disabled" : ""}>Test Docker setup${rtTip("test_docker")}</button>
     ${cur === "docker" && d.state === "ready" ? `<button class="btn sm" id="rt_ready" data-needs="conda">Make everything ready${rtTip("make_ready")}</button>` : ""}
-    ${d.action === "start" ? `<button class="btn sec sm" data-dk="start">Start Docker Desktop${rtTip("start_docker")}</button>` : d.action === "integration" ? `<button class="btn sec sm" data-dk="integration">Open WSL integration settings${rtTip("open_integration")}</button>` : d.state === "not_installed" || d.state === "wsl_integration_off" ? `<button class="btn sec sm" data-run='["install-tools","docker"]' data-label="Install Docker" title="Installs Docker on this computer (asks first)">Install Docker first${rtTip("install_docker")}</button>` : ""}`;
+    ${d.action === "restart" ? `<button class="btn sec sm" data-dk="restart">Restart window${rtTip("restart_window")}</button>` : d.action === "start" ? `<button class="btn sec sm" data-dk="start">Start Docker Desktop${rtTip("start_docker")}</button>` : d.action === "integration" ? `<button class="btn sec sm" data-dk="integration">Open WSL integration settings${rtTip("open_integration")}</button>` : d.state === "not_installed" || d.state === "wsl_integration_off" ? `<button class="btn sec sm" data-run='["install-tools","docker"]' data-label="Install Docker" title="Installs Docker on this computer (asks first)">Install Docker first${rtTip("install_docker")}</button>` : ""}`;
   setIfChanged($("#rt_ft"), ft);
   if (typeof applyNetGating === "function") applyNetGating();
 }
@@ -2918,6 +2918,7 @@ function dockerAction(st) {        // the single next action of the detected sta
   if (a === "install") return {id: "install", label: st.plan && st.plan.runs ? "Install Docker" : "Show how to install Docker", tip: "docker_install"};
   if (a === "start") return {id: "start", label: "Start Docker Desktop", tip: "docker_start"};
   if (a === "integration") return {id: "integration", label: "Open WSL integration settings", tip: "docker_integration"};
+  if (a === "restart") return {id: "restart", label: "Restart window", tip: "docker_restart"};
   return {id: "recheck", label: "Re-check", tip: "docker_recheck"};
 }
 function dockerActionHTML(st) { const a = dockerAction(st); return a.id === "recheck" ? "" : `<button class="btn sec sm" data-dk="${a.id}" title="${esc(npHelp(a.tip) || a.label)}">${esc(a.label)}</button>`; }
@@ -2977,7 +2978,7 @@ async function dockerInstall() {
   else if (x.id === "recheck") dockerRecheck();
   return null;
 }
-document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-dk]"); if (!b) return; const a = b.dataset.dk; if (a === "install") dockerInstall(); else if (a === "start") dockerStart(); else if (a === "integration") dockerIntegration(); else if (a === "enabled") dockerEnabled(); else if (a === "recheck") dockerRecheck(); else if (a === "guide") dockerGuide(); });
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-dk]"); if (!b) return; const a = b.dataset.dk; if (a === "install") dockerInstall(); else if (a === "start") dockerStart(); else if (a === "integration") dockerIntegration(); else if (a === "enabled") dockerEnabled(); else if (a === "restart") restartWindow(); else if (a === "recheck") dockerRecheck(); else if (a === "guide") dockerGuide(); });
 /* ==DOCKER-UI-END== */
 
 /* ===================================================================================================
