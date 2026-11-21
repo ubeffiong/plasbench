@@ -465,17 +465,17 @@ def environment(platform_name=None, meminfo=None, cpuinfo=None, cgroups=None, af
 
 
 def benchmark_defaults(env: dict, overrides: dict | None = None) -> dict:
-    """What a benchmark will use here, mirroring config/config.sh: THREADS = the usable CPUs (nproc; one job slot) and MEMORY_GB = 80% of the memory
-    available now, never below 2. An explicit THREADS / MEMORY_GB setting always wins. config.sh's nproc does not see a cgroup CPU or memory limit; this
-    estimate does, so it can be lower than what a run on a limited container would actually try (it says so in `notes`)."""
+    """What a benchmark will use here, mirroring config/config.sh: THREADS = the usable CPUs (nproc; one job slot) and MEMORY_GB = 85% of the memory available now
+    (already reduced by a container/cgroup memory limit, as config.sh does) minus 512 MB, rounded down to whole GB, between 2 and 64 (plasbench_default_budget_gb).
+    An explicit THREADS / MEMORY_GB setting always wins. config.sh's nproc sees CPU affinity but not a cgroup CPU quota; this estimate does, so the thread figure
+    can be lower than what a run on a CPU-limited container would actually try (it says so in `notes`)."""
     overrides = overrides or {}
     notes = []
     threads = _int(overrides.get("THREADS")) or env.get("usable_cpus")
     avail = env.get("memory_available")
-    mem = _int(overrides.get("MEMORY_GB")) or (max(2, int(avail * 0.8 / GB)) if avail else None)
-    if any(limit["by"].startswith("cgroup") for limit in env.get("limits", [])):
-        notes.append("a cgroup limit is in force; config.sh sizes threads and assembler memory from nproc and /proc/meminfo, which do not see it, "
-                     "so set THREADS and MEMORY_GB yourself if runs are killed (exit 137)")
+    mem = _int(overrides.get("MEMORY_GB")) or (min(64, max(2, int((avail * 85 // 100 - 512 * 1024 * 1024) // GB))) if avail else None)
+    if any(limit.get("what") == "cpu" and str(limit.get("by", "")).startswith("cgroup") for limit in env.get("limits", [])):
+        notes.append("a cgroup CPU limit is in force; config.sh sizes threads from nproc, which does not see it, so set THREADS yourself if runs are slow or killed")
     return {"threads": threads, "memory_gb": mem, "threads_set": bool(_int(overrides.get("THREADS"))), "memory_set": bool(_int(overrides.get("MEMORY_GB"))), "notes": notes}
 
 

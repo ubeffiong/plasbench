@@ -62,11 +62,13 @@ check("environment under WSL says these are the VM's numbers", any("virtual mach
 env = ci.environment("linux", meminfo=MEMINFO, cpuinfo=CPU_X86, cgroups={"memory": None, "cpus": None, "source": None}, affinity=6)
 check("environment, nothing limited: all 6 CPUs, 7.0 GB available, no limits", env["usable_cpus"] == 6 and not env["limits"] and abs(env["memory_available"] - 7342000 * 1024) < 1, env)
 b = ci.benchmark_defaults(env)
-check("a benchmark uses the usable CPUs and 80% of the available memory (config.sh), min 2 GB", b["threads"] == 6 and b["memory_gb"] == int(7342000 * 1024 * 0.8 / GB), b)
+check("a benchmark uses the usable CPUs and 85% of the available memory minus 512 MB, 2 to 64 GB (config.sh)", b["threads"] == 6 and b["memory_gb"] == min(64, max(2, (7342000 * 1024 * 85 // 100 - 512 * 1024 * 1024) // GB)), b)
 b = ci.benchmark_defaults(env, {"THREADS": "3", "MEMORY_GB": "20"})
 check("explicit THREADS / MEMORY_GB win and are marked as yours", b["threads"] == 3 and b["memory_gb"] == 20 and b["threads_set"] and b["memory_set"], b)
 env_cg = ci.environment("linux", meminfo=MEMINFO, cpuinfo=CPU_X86, cgroups={"memory": GB, "cpus": None, "source": "cgroup v1"}, affinity=6)
-check("with a cgroup limit the card warns that config.sh does not see it", ci.benchmark_defaults(env_cg)["notes"])
+check("a cgroup MEMORY limit needs no warning: config.sh sees it and the budget follows it", not ci.benchmark_defaults(env_cg)["notes"] and ci.benchmark_defaults(env_cg)["memory_gb"] == 2, ci.benchmark_defaults(env_cg))
+env_cpu = ci.environment("linux", meminfo=MEMINFO, cpuinfo=CPU_X86, cgroups={"memory": None, "cpus": 2.0, "source": "cgroup v2"}, affinity=6)
+check("a cgroup CPU limit warns that config.sh (nproc) does not see it", ci.benchmark_defaults(env_cpu)["notes"], ci.benchmark_defaults(env_cpu))
 check("environment never raises on garbage", ci.environment("linux", meminfo="\x00junk", cpuinfo="", cgroups={}, affinity=None)["memory_total"] is None)
 
 # macOS

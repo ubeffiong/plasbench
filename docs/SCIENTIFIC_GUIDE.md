@@ -759,7 +759,7 @@ All settings are environment variables read by `config/config.sh` (override them
 | Variable | Default | Meaning |
 |---|---|---|
 | `THREADS` | CPU count | Threads per tool. A `<TOOL>_THREADS` variable exists per tool and defaults to this. |
-| `MEMORY_GB` | 80% of available | Memory for assembly. |
+| `MEMORY_GB` | 85% of available minus 512 MB (2 to 64 GB) | Memory for assembly; raised for one isolate when SPAdes states a larger need that fits (`AUTO_RESOURCES`). |
 | `MAX_PARALLEL_SAMPLES`, `MAX_PARALLEL_TOOLS` | 1, 1 | Fully sequential by default. |
 
 **Tools**

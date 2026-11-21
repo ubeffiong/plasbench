@@ -681,7 +681,7 @@ already saved is never rejected on a later save, and clearing a setting to its d
 ### Q65. The "This computer" card showed fewer CPUs and less memory than my machine has. Which numbers are right?
 **Answer.** Both, for different things. Inside WSL2 the card now shows the Linux virtual machine's CPUs, memory (total and **available now**) and swap, then the Windows host (read through
 PowerShell) and the `.wslconfig` limits, and says plainly that the VM's numbers are set by `C:\Users\<you>\.wslconfig` and change only after `wsl --shutdown`. It also reports a cgroup limit
-or a CPU affinity when one is in force, and what a benchmark will use (threads = usable CPUs; assembler memory = 80% of what is available, as `config/config.sh` computes it). Units are GB = 2^30 bytes.
+or a CPU affinity when one is in force, and what a benchmark will use (threads = usable CPUs; assembler memory = 85% of what is available now minus 512 MB, rounded down to whole GB, between 2 and 64, as `config/config.sh` computes it). Units are GB = 2^30 bytes.
 The **Drives** table lists every mounted drive with label, mount point (and the Windows letter under WSL), filesystem, used and free space, type (internal, removable, network, optical,
 cloud-synced; "guess" where it can only be inferred from the mount point), read-only flag, which drive holds the data folder, the workspace and the current study, and the slow-drive and
 cloud-sync warnings. **Refresh** looks again and marks drives plugged in since the last look as new and lists the ones removed. A Windows drive that is plugged in but not mounted in Ubuntu shows the
