@@ -25,7 +25,7 @@ test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an o
 
 **What "tested" does and does not mean.** A test shows the code does what its author intended on the cases the test builds. It does not show that the
 scientific claim holds on real data. The one thing that has been checked against an independent reference implementation is the PlasEval-style binning
-dissimilarity (section 3.8). No real-data run of the whole tool set has been made yet; that is the largest open item and it is stated again in section 11.
+dissimilarity (section 3.8). Only a small real-data run exists (10 isolates, PlasBench 0.2.3, three real tools and a baseline: too small to rank tools, FAQ Q22); a run large enough to rank is the largest open item and it is stated again in section 11.
 
 **Descriptive versus scoring.** Many analyses here are *descriptive*: they add a table or a figure and never change a score or a ranking. Where that is
 true the section says so. The scores and rankings come from a small, fixed core (sections 3.2 to 3.4).
