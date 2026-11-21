@@ -16,6 +16,9 @@ history is lost, only the numbering is cleaner. See
 ### Fixed -- compiled Python cache files were tracked in git (21 November 2026)
 - 14 `__pycache__/*.pyc` files were committed although `.gitignore` lists them, so every test run modified tracked files. They are untracked (nothing else changes).
 
+### Fixed -- finished tools were re-run because the memory budget changed (21 November 2026)
+- **Stage 4 reuse.** The check that decides whether a tool's earlier result can be reused counted every `<TOOL>_*` setting except `_THREADS`, including `<TOOL>_MEMORY_GB`, whose default is computed from the memory that is free when the run starts. On a resume the budget could differ by a gigabyte, the tool was judged "changed" and run again, for no scientific reason (and `test_tool_result_fingerprint.sh` failed now and then on CI for the same reason). `_MEMORY_GB` is now left out like `_THREADS`; any other changed setting, a new tool version, new inputs or new reads still re-run the tool.
+
 ### Changed -- AI help: declaration, questions, general knowledge, no usage cap (21 November 2026)
 - **Declaration.** The first-use notice, a line that stays under the chat, `plasbench ask` and the model's own instructions now say that the assistant cannot see your files (FASTQ, FASTA, sheets, results, logs, databases, settings), only the documentation and what you send.
 - **It asks.** When a missing fact decides the answer it asks one short question with quick-reply buttons (a button only sends text; nothing runs). The question is kept in the chat history it is sent next.
