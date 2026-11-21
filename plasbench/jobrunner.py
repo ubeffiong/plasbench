@@ -159,6 +159,8 @@ def kill_group(pgid, grace=KILL_GRACE_SECONDS):
         return True
     if pgid <= 0:
         return True
+    if pgid == os.getpid() or (hasattr(os, "getpgrp") and pgid == os.getpgrp()):
+        return True   # this process's own group: never signal it (a recycled or wrong pgid must not terminate the caller)
     if os.name == "nt":
         subprocess.run(["taskkill", "/T", "/F", "/PID", str(pgid)], capture_output=True)
         return not pid_alive(pgid)

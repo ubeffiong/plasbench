@@ -815,6 +815,17 @@ INTERRUPTED_WATCH_SECONDS = 6 * 3600   # how long an "interrupted" run is still 
 SERVER_STARTED = time.time()
 
 
+def _is_own_process(pid) -> bool:
+    """True when `pid` is this process or the leader of this process's group (a signal to it would stop the window itself)."""
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid == os.getpid():
+        return True
+    return hasattr(os, "getpgrp") and pid == os.getpgrp()
+
+
 class Jobs:
     """Each job is one `plasbench` command, started through the detached runner (plasbench/jobrunner.py), so it outlives this server.
 
@@ -1339,8 +1350,8 @@ class Jobs:
         info = jobrunner.read_json(self._paths(job_id)["pid"]) or {}
         pid = int(info.get("runner") or job.get("pid") or 0)
         threading.Thread(target=jobrunner.stop_job_container, args=(str(self.dir), job_id), daemon=True).start()   # a Docker run: stop its container too
-        if not pid:
-            return
+        if not pid or _is_own_process(pid):
+            return   # never signal this very process (or its group): a stale or foreign record that names our own pid must not make a window kill itself
         if info.get("pgid") and os.name != "nt":
             # the command is in its own process group: stop it (and everything it started) even if the runner is already gone
             threading.Thread(target=jobrunner.kill_group, args=(info["pgid"],), daemon=True).start()

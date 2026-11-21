@@ -140,9 +140,12 @@ def main():
     wait(lambda: sixth.jobs[resumed["id"]]["state"] != "running", 60)
 
     print("a runner that is slow to start, and a falsely interrupted run")
-    slow_start = {"id": "20261116-000000-slowst", "label": "slow start", "argv": ["demo"], "command": "plasbench demo", "env": {}, "kind": "plasbench", "state": "running",
-                  "started": time.time(), "ended": None, "exit": None, "pid": os.getpid(), "results": ""}
     # The runner's pid must be a process that really exists: the test used pid 1, which is alive on Linux but not openable on Windows, so it passed in one place and failed in another.
+    # It is a helper process of its own, NOT this test's pid: this record is written to the shared index by any server's background save, and a later window then holds it as
+    # a running job; the final tidy-up cancels running jobs, and a record naming the test's own pid made the test signal (and terminate) itself, once in a while.
+    helper = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"], **({"start_new_session": True} if os.name != "nt" else {}))
+    slow_start = {"id": "20261116-000000-slowst", "label": "slow start", "argv": ["demo"], "command": "plasbench demo", "env": {}, "kind": "plasbench", "state": "running",
+                  "started": time.time(), "ended": None, "exit": None, "pid": helper.pid, "results": ""}
     sixth.jobs[slow_start["id"]] = slow_start
     check("a run whose runner has not written a heartbeat yet is not called lost for the first minute", sixth._alive(slow_start))
     check("...and a run with no pid recorded yet is still starting", sixth._alive(dict(slow_start, pid=None)))
@@ -189,6 +192,26 @@ def main():
     src = (ROOT / "plasbench" / "webui.py").read_text(encoding="utf-8")
     check("shutdown has a keep option that skips the cancel", 'keep = bool(data.get("keep"))' in src and "for job in ([] if keep else running)" in src)
 
+    # A window never signals itself: a job record that names this very process (or its group) is skipped, whatever wrote it.
+    sent = []
+    real = (os.kill, getattr(os, "killpg", None), subprocess.run)
+    os.kill = lambda pid, sig: sent.append(("kill", pid))
+    if real[1]:
+        os.killpg = lambda pg, sig: sent.append(("killpg", pg))
+    subprocess.run = lambda *a, **k: sent.append(("run", a))
+    try:
+        selfish = dict(slow_start, pid=os.getpid())
+        first._kill(selfish["id"], selfish)
+        if hasattr(os, "getpgrp"):
+            first._kill(selfish["id"], dict(selfish, pid=os.getpgrp()))
+        own_group_killed = jobrunner.kill_group(os.getpgrp()) if hasattr(os, "getpgrp") else True
+    finally:
+        os.kill, subprocess.run = real[0], real[2]
+        if real[1]:
+            os.killpg = real[1]
+    check("cancelling a job record that names this process (or its group) signals nothing", not sent and own_group_killed, sent)
+    helper.kill()
+    helper.wait()
     for j in list(first.jobs.values()):   # tidy: nothing left running
         if j["state"] in ("running", "cancelling"):
             first._kill(j["id"], j)
