@@ -11,8 +11,9 @@ Please do **not** open a public issue for a security problem, and do not paste t
 Report it privately through GitHub: open the **Security** tab of <https://github.com/ubeffiong/plasbench>, choose **Report a vulnerability**, and describe the problem there.
 Only you and the maintainer can see the report. It can later become a public advisory, with credit to you if you want it.
 
-If the button is not shown to you (for example you are not signed in to GitHub), open a **Question** issue titled "Security: please contact me" and **no details at all**
-(no steps, no output, no file names), so that the maintainer can arrange a private channel with you. The repository lists no e-mail address for security reports.
+If the button is not shown to you (for example you are not signed in to GitHub), send an e-mail to **ubokobongokon@gmail.com** with the subject "PlasBench security".
+Describe the problem in general terms in the first message and leave out tokens, passwords and private data; details can follow once the maintainer has replied.
+Please do not open a public issue for it.
 
 Include what you found, the version (`plasbench --version`), and the steps to reproduce it once a private channel exists. You can expect an acknowledgement within 7 days
 and a fix or a written assessment within 30 days.
