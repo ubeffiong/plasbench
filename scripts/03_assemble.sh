@@ -193,7 +193,7 @@ run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SD
             needed="$(python3 -I "${PROJECT_ROOT:-.}/python/assembler_diagnosis.py" "$log" --format need 2>/dev/null </dev/null || true)"
             [[ "$needed" == "-" ]] && needed=""
         fi
-        if [[ "$attempt" -ge 2 || "${ASSEMBLER_AUTO_RETRY:-1}" != "1" || "$auto" != "1" ]]; then break; fi
+        if [[ "$attempt" -ge 3 || "${ASSEMBLER_AUTO_RETRY:-1}" != "1" || "$auto" != "1" ]]; then break; fi
         case "$DIAG_RETRY" in
             memory_need)
                 # SPAdes said exactly how much memory it needs: raise the budget to that (never lower it), once, only when it fits in what is free now.
@@ -211,13 +211,18 @@ run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SD
                 [[ -n "$sig" ]] && python3 -I "${PROJECT_ROOT:-.}/python/resource_adapt.py" record --dir "$memdir" --sample "$sample" --sig "$sig" --needed "${needed:-0}" --budget "$nm" --attempts 1 --mode "$mode" --status started 2>/dev/null </dev/null || true
                 mem="$nm" ;;
             memory)
-                own=""; [[ "$DIAG_CAUSE" == "memory_limit_exceeded" ]] && own="--own-limit"
-                plan="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" retry-plan --threads "$threads" --memory-gb "$mem" ${own:+$own} 2>/dev/null </dev/null || true)"
-                if [[ -z "$plan" || "$plan" == "none" ]]; then break; fi
-                read -r nt nm av <<< "$plan"
-                note="threads $threads -> $nt, memory budget $mem -> $nm GB (memory available now: $av GB)"
-                threads="$nt"; mem="$nm" ;;
+                # killed or refused for memory with no stated need: the same response engine decides (lower a budget larger than the free memory, halve threads, or raise
+                # SPAdes' own -m limit when SPAdes stopped at it), once per response, at most two adjustments for this isolate
+                avail="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" available 2>/dev/null </dev/null || true)"
+                verdict="$(python3 -I "${PROJECT_ROOT:-.}/python/resource_adapt.py" decide --tool spades --isolate "$sample" --exit-code "$rc" --log "$log" --threads "$threads" --memory-gb "$mem"                     ${avail:+--available-gb "$avail"} --state "$RESULTS_DIR/resource_state.d/spades.$sample.txt" 2>/dev/null </dev/null || true)"
+                IFS=$'	' read -r vact _ vmem vthr _ _ _ _ vmsg <<< "$verdict"
+                [[ "$vact" == "retry" ]] || break
+                [[ "$vmem" =~ ^[0-9]+$ ]] && mem="$vmem"
+                [[ "$vthr" =~ ^[0-9]+$ ]] && threads="$vthr"
+                note="$vmsg (memory available now: ${avail:-unknown} GB)"
+                run_event resource_adjust "tool=spades" "sample=$sample" "what=memory" "to=$mem" "threads=$threads" "message=$vmsg" ;;
             stale)
+                [[ "$attempt" -ge 2 ]] && break    # a stale folder is cleared once; a second retry is only for the memory responses
                 note="removed this isolate's own unfinished assembly folder and started it again" ;;
             *) break ;;
         esac
@@ -254,7 +259,7 @@ run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SD
     fi
     local extra=""
     if [[ "$attempt" -ge 2 ]]; then
-        extra="PlasBench already retried once ($note) and it failed again."
+        extra="PlasBench already retried $((attempt - 1)) time(s) (last change: $note) and it failed again."
     elif [[ "$DIAG_RETRY" == "memory" ]]; then
         extra="Memory and threads are already at the smallest setting PlasBench will try; this isolate is skipped and the others continue."
     fi

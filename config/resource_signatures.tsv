@@ -1,10 +1,10 @@
 id	tool	message_regex	exit_codes	cause	need_unit	scales_with_threads	ladder	label	note
 spades_hammer_need	spades|unicycler|plasmidspades	You need approx\.?\s*(?P<need>[0-9]+(?:\.[0-9]+)?)\s*(?P<unit>TB|GB|GiB|MB|MiB|KB)?	-	memory	GB	1	raise_memory,skip	real	spades.log of the incident run: "ERROR K-mer Counting (kmer_data.cpp : 350) The reads contain too many k-mers to fit into available memory. You need approx. 5.24277GB of free RAM."
 spades_m_limit	spades|unicycler|plasmidspades	(memory limit|[Mm]emory).{0,40}(exceed|reached|too low)|not enough memory	-	memory	GB	1	raise_memory,halve_threads,skip	sample	SPAdes stopping at its own -m limit; wording from SPAdes documentation, not captured
-bad_alloc	.*	std::bad_alloc|bad_alloc	134	memory	GB	1	raise_memory,halve_threads,skip	real	C++ runtime text used by test/test_stage3_failure_diagnosis.sh (a sample of the format, exit 134 = SIGABRT)
-cannot_allocate	.*	[Cc]annot allocate memory|unable to allocate (os )?memory|memory allocation (failed|error)	-	memory	GB	1	raise_memory,halve_threads,skip	real	C library ENOMEM text
-python_memoryerror	.*	MemoryError	-	memory	GB	1	raise_memory,halve_threads,skip	real	Python exception name
-oom_kill	.*	-	137,-9	memory	GB	1	raise_memory,halve_threads,skip	real	exit status of a SIGKILL, the usual OOM-killer outcome (the log is often empty)
+bad_alloc	.*	std::bad_alloc|bad_alloc	134	memory	GB	1	fit_memory,halve_threads,skip	real	C++ runtime text used by test/test_stage3_failure_diagnosis.sh (a sample of the format, exit 134 = SIGABRT)
+cannot_allocate	.*	[Cc]annot allocate memory|unable to allocate (os )?memory|memory allocation (failed|error)	-	memory	GB	1	fit_memory,halve_threads,skip	real	C library ENOMEM text
+python_memoryerror	.*	(?<![A-Za-z])MemoryError	-	memory	GB	1	fit_memory,halve_threads,skip	real	Python exception name
+oom_kill	.*	-	137,-9	memory	GB	1	fit_memory,halve_threads,skip	real	exit status of a SIGKILL, the usual OOM-killer outcome (the log is often empty)
 samtools_sort_memory	samtools|minimap2	(samtools sort|bam_sort).{0,40}couldn't allocate memory|\[bam_sort_core\].{0,40}memory	-	memory	GB	1	raise_memory,halve_threads,skip	sample	samtools sort -m budget; wording from samtools source, not captured
 java_heap	.*	OutOfMemoryError: Java heap space|GC overhead limit exceeded	-	memory	GB	0	raise_memory,skip	sample	JVM tools (Nextflow, plassembler helpers); retry sets JAVA_TOOL_OPTIONS=-Xmx
 open_files	.*	Too many open files|\[Errno 24\]|EMFILE	-	open_files	-	0	raise_ulimit,skip	real	Linux errno 24 text

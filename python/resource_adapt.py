@@ -7,6 +7,8 @@ has right now:
 
   raise_memory   budget = ceil(need * 1.15 + 0.5 GB) when that fits in 85% of the free memory (else the need rounded up when it fits in 92%); with no stated need, 1.5x the
                  budget when that fits. Never lowers a budget.
+  fit_memory     the budget is more than this computer has free (the kernel or allocator stopped the tool, not its own limit): lower it to 85% of what is free, min 2 GB.
+                 The only response that lowers a budget; used for kills (137), bad_alloc, ENOMEM and Python MemoryError, where a bigger budget cannot help.
   halve_threads  only for tools whose memory or thread count scales with threads (table flag); threads = max(1, threads // 2).
   move_tmp       work in the roomiest folder that is not the current one (PLASBENCH_TMP_CANDIDATES, ~/.plasbench/scratch, the system temp, the data folder) with enough free space.
   raise_ulimit   `ulimit -n` for the child up to the HARD limit (never beyond it, never a system setting).
@@ -40,7 +42,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TABLE = ROOT / "config" / "resource_signatures.tsv"
 CAUSES = ("memory", "disk", "tmp_space", "open_files", "thread_limit", "timeout_slow", "db_missing", "gpu_missing", "network", "permission", "unknown")
-RESPONSES = ("raise_memory", "halve_threads", "move_tmp", "raise_ulimit", "extend_timeout", "skip")
+RESPONSES = ("raise_memory", "fit_memory", "halve_threads", "move_tmp", "raise_ulimit", "extend_timeout", "skip")
 UNITS = {"TB": 1024.0, "TIB": 1024.0, "GB": 1.0, "GIB": 1.0, "G": 1.0, "MB": 1 / 1024.0, "MIB": 1 / 1024.0, "M": 1 / 1024.0, "KB": 1 / 1048576.0, "KIB": 1 / 1048576.0}
 MAX_TIMEOUT = 7 * 24 * 3600
 
@@ -230,6 +232,17 @@ def decide(tool, isolate, exit_code, log_text, ctx, rows=None, state_file=None, 
             out.update(action="retry", response=response, memory_gb=str(new),
                        message="%s needs about %s for this isolate; raising memory from %d to %d GB (%s GB are free) and retrying"
                        % (tool, ("%.1f GB" % hit["needed_gb"]) if hit["needed_gb"] else "more memory", mem, new, ("%.1f" % avail) if avail is not None else "?"))
+        elif response == "fit_memory":
+            # the budget itself is more than this computer has free: lower it to 85% of what is free (never below 2 GB), the one case where the budget goes DOWN
+            if avail is None:
+                reasons.append("memory available now is unknown")
+                continue
+            cap = max(2, int(avail * 0.85))
+            if mem <= cap:
+                reasons.append("the budget (%d GB) already fits in the %.1f GB free" % (mem, avail))
+                continue
+            out.update(action="retry", response=response, memory_gb=str(cap),
+                       message="%s stopped for memory with a budget of %d GB but only %.1f GB are free; lowering the budget to %d GB and retrying" % (tool, mem, avail, cap))
         elif response == "halve_threads":
             if not hit["scales"] or threads <= 1:
                 reasons.append("threads do not apply (%s)" % ("this tool's memory does not scale with threads" if not hit["scales"] else "already 1 thread"))
@@ -415,6 +428,7 @@ def docs(rows):
         out.append("| %s | `%s` | %s | `%s` | %s | %s | %s |" % (r["id"], r["tool"], r["cause"], (r["message_regex"] if r["message_regex"] != "-" else "-").replace("|", "\\|"), r["exit_codes"], r["ladder"].replace(",", " > "), r["label"]))
     out += ["", "## What each response does", ""]
     for name, text in (("raise_memory", "budget = ceil(need x 1.15 + 0.5 GB) when it fits in 85% of the memory free now (else the need rounded up when it fits in 92%); with no stated need 1.5 x the budget when it fits. Never lowers a budget."),
+                       ("fit_memory", "lowers the budget to 85% of the memory free now (min 2 GB) when the budget is larger than that; for kernel kills, bad_alloc, ENOMEM and MemoryError, where a bigger budget cannot help."),
                        ("halve_threads", "threads = max(1, threads / 2), only for tools flagged `scales_with_threads`."),
                        ("move_tmp", "moves the tool's work folder (TMPDIR) to the roomiest other folder with enough free space (scratch on the local disk, the system temp, the data folder)."),
                        ("raise_ulimit", "`ulimit -n` for the tool up to the hard limit; never beyond it, never a system setting; says so when the hard limit is the problem."),

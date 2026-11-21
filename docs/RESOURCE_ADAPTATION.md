@@ -7,10 +7,10 @@ Generated from `config/resource_signatures.tsv` by `python3 python/resource_adap
 |---|---|---|---|---|---|---|
 | spades_hammer_need | `spades|unicycler|plasmidspades` | memory | `You need approx\.?\s*(?P<need>[0-9]+(?:\.[0-9]+)?)\s*(?P<unit>TB\|GB\|GiB\|MB\|MiB\|KB)?` | - | raise_memory > skip | real |
 | spades_m_limit | `spades|unicycler|plasmidspades` | memory | `(memory limit\|[Mm]emory).{0,40}(exceed\|reached\|too low)\|not enough memory` | - | raise_memory > halve_threads > skip | sample |
-| bad_alloc | `.*` | memory | `std::bad_alloc\|bad_alloc` | 134 | raise_memory > halve_threads > skip | real |
-| cannot_allocate | `.*` | memory | `[Cc]annot allocate memory\|unable to allocate (os )?memory\|memory allocation (failed\|error)` | - | raise_memory > halve_threads > skip | real |
-| python_memoryerror | `.*` | memory | `MemoryError` | - | raise_memory > halve_threads > skip | real |
-| oom_kill | `.*` | memory | `-` | 137,-9 | raise_memory > halve_threads > skip | real |
+| bad_alloc | `.*` | memory | `std::bad_alloc\|bad_alloc` | 134 | fit_memory > halve_threads > skip | real |
+| cannot_allocate | `.*` | memory | `[Cc]annot allocate memory\|unable to allocate (os )?memory\|memory allocation (failed\|error)` | - | fit_memory > halve_threads > skip | real |
+| python_memoryerror | `.*` | memory | `(?<![A-Za-z])MemoryError` | - | fit_memory > halve_threads > skip | real |
+| oom_kill | `.*` | memory | `-` | 137,-9 | fit_memory > halve_threads > skip | real |
 | samtools_sort_memory | `samtools|minimap2` | memory | `(samtools sort\|bam_sort).{0,40}couldn't allocate memory\|\[bam_sort_core\].{0,40}memory` | - | raise_memory > halve_threads > skip | sample |
 | java_heap | `.*` | memory | `OutOfMemoryError: Java heap space\|GC overhead limit exceeded` | - | raise_memory > skip | sample |
 | open_files | `.*` | open_files | `Too many open files\|\[Errno 24\]\|EMFILE` | - | raise_ulimit > skip | real |
@@ -26,6 +26,7 @@ Generated from `config/resource_signatures.tsv` by `python3 python/resource_adap
 ## What each response does
 
 - **raise_memory**: budget = ceil(need x 1.15 + 0.5 GB) when it fits in 85% of the memory free now (else the need rounded up when it fits in 92%); with no stated need 1.5 x the budget when it fits. Never lowers a budget.
+- **fit_memory**: lowers the budget to 85% of the memory free now (min 2 GB) when the budget is larger than that; for kernel kills, bad_alloc, ENOMEM and MemoryError, where a bigger budget cannot help.
 - **halve_threads**: threads = max(1, threads / 2), only for tools flagged `scales_with_threads`.
 - **move_tmp**: moves the tool's work folder (TMPDIR) to the roomiest other folder with enough free space (scratch on the local disk, the system temp, the data folder).
 - **raise_ulimit**: `ulimit -n` for the tool up to the hard limit; never beyond it, never a system setting; says so when the hard limit is the problem.
