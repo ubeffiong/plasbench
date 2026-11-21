@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""No tracked text file holds an unresolved merge-conflict marker (a line that starts with <<<<<<< or >>>>>>> followed by a space). One slipped into test/run_tests.sh once and
+"""Also: no compiled Python cache file (__pycache__/*.pyc) is tracked (they are in .gitignore, and 14 then 25 of them were committed by mistake).
+
+No tracked text file holds an unresolved merge-conflict marker (a line that starts with <<<<<<< or >>>>>>> followed by a space). One slipped into test/run_tests.sh once and
 every CI shard died on a syntax error; the test list itself cannot report that, so this guard reads the files directly."""
 import subprocess
 import sys
@@ -19,6 +21,10 @@ for name in files:
     for number, line in enumerate(text.splitlines(), 1):
         if line.startswith(("<<<<<<< ", ">>>>>>> ")) or line == "<<<<<<<":
             bad.append(f"{name}:{number}")
+tracked_pyc = [n for n in files if n.endswith(".pyc") or "/__pycache__/" in n]
+for item in tracked_pyc:
+    print("TRACKED COMPILED FILE (git rm --cached it):", item)
+bad += tracked_pyc
 print("files scanned:", len(files))
 for item in bad:
     print("CONFLICT MARKER:", item)
