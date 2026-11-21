@@ -27,9 +27,10 @@ def check(label, good, detail=""):
 
 
 print("freshness and determinism")
-fresh = build_ai_kb.build_bytes()
-check("the shipped index is exactly what the sources give now (run python python/build_ai_kb.py)", build_ai_kb.OUT.is_file() and build_ai_kb.OUT.read_bytes() == fresh)
-check("building twice gives the same bytes", build_ai_kb.build_bytes() == fresh)
+raw = build_ai_kb.build_raw()
+fresh = build_ai_kb.build_bytes(raw)
+check("the shipped index has exactly the content the sources give now (run python python/build_ai_kb.py)", build_ai_kb.is_current(raw=raw))
+check("building twice gives the same content, and the compressed file is stable on this system", build_ai_kb.build_raw() == raw and build_ai_kb.build_bytes(raw) == fresh)
 data = json.loads(gzip.decompress(fresh).decode("utf-8"))
 chunks = data["chunks"]
 check("an index of several hundred chunks", len(chunks) > 500, len(chunks))

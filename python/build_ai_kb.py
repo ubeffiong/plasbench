@@ -254,7 +254,7 @@ def cli_chunks() -> list:
             if a.get("choices"):
                 extra.append("choices " + "/".join(str(c) for c in a["choices"]))
             if a.get("default") not in (None, "", False, []):
-                extra.append(f"default {a['default']}")
+                extra.append("default " + str(a["default"]).replace("\\", "/"))    # a Path default prints with the platform's separator: the index must not depend on the OS
             lines.append(f"  {flags}: {(a.get('help') or '').strip()} {'(' + '; '.join(extra) + ')' if extra else ''}".rstrip())
         subs = [s["name"] for s in cmd["subcommands"]]
         if subs:
@@ -368,9 +368,22 @@ def version() -> str:
     return m.group(1) if m else ""
 
 
-def build_bytes() -> bytes:
+def build_raw() -> bytes:
+    """The index as JSON bytes: identical on every system. (The compressed file can differ between zlib builds, so freshness is judged on this, not on the .gz bytes.)"""
     payload = {"schema": SCHEMA, "chunks": build_chunks()}
-    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def is_current(path=None, raw: bytes = None) -> bool:
+    path = Path(path or OUT)
+    try:
+        return path.is_file() and gzip.decompress(path.read_bytes()) == (raw if raw is not None else build_raw())
+    except (OSError, EOFError, gzip.BadGzipFile):
+        return False
+
+
+def build_bytes(raw: bytes = None) -> bytes:
+    raw = raw if raw is not None else build_raw()
     buf = io.BytesIO()
     with gzip.GzipFile(filename="", mode="wb", fileobj=buf, mtime=0, compresslevel=9) as gz:
         gz.write(raw)
@@ -385,7 +398,7 @@ def main(argv=None) -> int:
     data = build_bytes()
     out = Path(args.out)
     if args.check:
-        same = out.is_file() and out.read_bytes() == data
+        same = is_current(out)
         print("ai_kb.json.gz is current" if same else "ai_kb.json.gz is out of date: run python python/build_ai_kb.py")
         return 0 if same else 1
     with open(out, "wb") as fh:
