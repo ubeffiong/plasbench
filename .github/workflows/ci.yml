@@ -53,18 +53,18 @@ jobs:
       - run: python -m build
       # Only distributions: a stray release-archive .sha256 in dist/ is rejected by twine as an unknown distribution format.
       - run: python -m twine check dist/*.whl dist/*.tar.gz
-  # The test suite, split into parallel shards per Python version (test/run_tests.sh, PB_SHARD/PB_SHARDS; weights in test/shard_weights.tsv).
+  # The test suite, split into 5 parallel shards per Python version (test/run_tests.sh, PB_SHARD/PB_SHARDS; weights in test/shard_weights.tsv).
   # The shards together run exactly the tests an unsharded `plasbench test` runs (test/test_shard_selection.py proves the partition).
   shard:
-    name: shard (${{ matrix.python-version }}, ${{ matrix.shard }}/4)
+    name: shard (${{ matrix.python-version }}, ${{ matrix.shard }}/5)
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         python-version: ['3.9', '3.11', '3.13']
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5]
     env:
-      PB_SHARDS: 4
+      PB_SHARDS: 5
       PB_SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
@@ -104,7 +104,7 @@ jobs:
           # needs.<matrix job>.result covers every Python version; the jobs API says which version failed.
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" --jq '.jobs[] | [.name, .conclusion // .status] | @tsv' > jobs.tsv
           cat jobs.tsv
-          expected_shards=4
+          expected_shards=5
           good_shards="$(grep -F -e "shard ($VERSION, " jobs.tsv | awk -F'	' '$2 == "success"' | wc -l)"
           good_checks="$(awk -F'	' -v n="checks ($VERSION)" '$1 == n && $2 == "success"' jobs.tsv | wc -l)"
           echo "Python $VERSION: $good_shards/$expected_shards shards succeeded, checks succeeded: $good_checks"

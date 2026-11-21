@@ -44,7 +44,7 @@ run_stage() {   # run_stage ENV=... : one fresh stage-1 run against the fake ENA
     : > "$TMP/prefetch_calls.log"
     PATH="$TMP/bin:$PATH" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" SAMPLE_SHEET="$TMP/sheet.tsv" \
         REQUIRE_CURATED_METADATA=0 LOCAL_INPUTS_ONLY=0 DOWNLOAD_CONFIRM=0 ENA_USE_ARIA2=0 ENA_PORTAL_URL="http://127.0.0.1:$PORT/filereport" \
-        NETWORK_RETRIES=1 NETWORK_RETRY_DELAY_SECONDS=0 ENA_SIZE_TIMEOUT=10 "$@" bash "$ROOT/scripts/01_download.sh" > "$TMP/stage.log" 2>&1
+        NETWORK_RETRIES=1 NETWORK_RETRY_DELAY_SECONDS=0 PLASBENCH_RETRY_SLEEP=0 ENA_RETRY_DELAY_SECONDS=0 ENA_SIZE_TIMEOUT=10 "$@" bash "$ROOT/scripts/01_download.sh" > "$TMP/stage.log" 2>&1
 }
 
 printf 'sample_id\tassembly_accession\tsra_run\ns1\tNA\tSRR1\ns2\tNA\tSRR2\ns3\tNA\tSRR3\ns4\tNA\tSRR4\n' > "$TMP/sheet.tsv"
