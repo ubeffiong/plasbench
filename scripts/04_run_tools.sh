@@ -256,7 +256,9 @@ tool_fingerprint() {
     esac
     # `|| true`: a tool with no <TOOL>_* settings makes grep exit 1, which under
     # `set -euo pipefail` must not abort the stage.
-    params="$( { env | grep "^${upper}_" | grep -v "^${upper}_THREADS=" | LC_ALL=C sort | tr '\n' ';'; } || true)"
+    # THREADS and MEMORY_GB are left out: they decide whether and how fast a tool finishes, not what it predicts, and the memory budget defaults to a figure computed from the
+    # memory that is free when the run starts, so it differs between two runs on the same machine; counting it re-ran finished tools for no scientific reason.
+    params="$( { env | grep "^${upper}_" | grep -v -e "^${upper}_THREADS=" -e "^${upper}_MEMORY_GB=" | LC_ALL=C sort | tr '\n' ';'; } || true)"
     printf 'plasbench_fingerprint=1\n'
     printf 'tool=%s\n' "$TOOL"
     printf 'plasbench=%s\n' "$(sed -n 's/^__version__ *= *["'"'"']\([^"'"'"']*\).*/\1/p' "$PROJECT_ROOT/plasbench/__init__.py" 2>/dev/null)"

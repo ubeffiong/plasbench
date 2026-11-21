@@ -58,6 +58,13 @@ expect reused "and is reused once recorded"
 export PLASMIDSPADES_THREADS=3
 expect reused "a thread-count change alone still reuses the result"
 
+# The memory budget defaults to a figure computed from the memory free at the start of a run, so it differs between two runs on one machine (and made this test fail now and
+# then on CI runners): it must not make a finished tool run again.
+export PLASMIDSPADES_MEMORY_GB=11
+expect reused "a memory-budget change alone still reuses the result"
+export PLASMIDSPADES_MEMORY_GB=2
+expect reused "and so does another one"
+
 export PLASMIDSPADES_EXTRA_PARAMETER=strict
 expect completed "a changed PLASMIDSPADES_* setting re-runs the tool"
 expect reused "and is reused once recorded"
