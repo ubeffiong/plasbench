@@ -425,7 +425,7 @@ run_trycycler_mob_recon_for_sample() {
     fi
 }
 
-while IFS=$'\t' read -r SAMPLE _; do
+while IFS=$'\t' read -r -u 3 SAMPLE _; do
     [[ -z "${SAMPLE:-}" ]] && continue
     [[ "${RUN_FLYE_MOB_RECON:-0}" -eq 1 ]] && for_sample "$SAMPLE"
     [[ "${RUN_PLASSEMBLER:-0}" -eq 1 ]] && run_plassembler_for_sample "$SAMPLE"
@@ -433,7 +433,7 @@ while IFS=$'\t' read -r SAMPLE _; do
     [[ "${RUN_HYBRACTER_HYBRID:-0}" -eq 1 ]] && run_hybracter_for_sample hybrid "$SAMPLE"
     [[ "${RUN_TRYCYCLER_MOB_RECON:-0}" -eq 1 ]] && run_trycycler_mob_recon_for_sample "$SAMPLE"
     true
-done < <(read_samples "$SAMPLE_SHEET")
+done 3< <(read_samples "$SAMPLE_SHEET")
 
 log "Stage 7 complete."
 # Each tool's analysis_track (config/tool_capabilities.tsv) is read per-tool

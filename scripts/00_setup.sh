@@ -84,6 +84,13 @@ check_tool() {
 # whether the assembler is about to be promised memory the machine does not
 # have -- the failure that turns a 12-minute assembly into a two-hour one.
 log "Resources: ${THREADS} thread(s), ${MEMORY_GB}GB assembler budget (detected ${PLASBENCH_AVAILABLE_GB:-?}GB available)"
+if [[ -n "${PLASBENCH_AVAILABLE_MB:-}" ]]; then
+    if [[ "${MEMORY_GB}" == "$(plasbench_default_budget_gb "$PLASBENCH_AVAILABLE_MB")" ]]; then
+        log "  assembler budget rule: 80% of the memory available now (${PLASBENCH_AVAILABLE_MB} MB), rounded down to whole GB, at least 2 GB. Override: MEMORY_GB or --memory-gb. If SPAdes says it needs more, PlasBench retries once with the size it asks for when that fits in free memory."
+    else
+        log "  assembler budget set by you (MEMORY_GB / --memory-gb); the default rule would have given $(plasbench_default_budget_gb "$PLASBENCH_AVAILABLE_MB") GB."
+    fi
+fi
 if [[ -n "${PLASBENCH_AVAILABLE_GB:-}" && "$MEMORY_GB" -gt "$PLASBENCH_AVAILABLE_GB" ]]; then
     warn "  MEMORY_GB=${MEMORY_GB} exceeds the ${PLASBENCH_AVAILABLE_GB}GB currently available."
     warn "  The assembler will be told it has memory the machine cannot give it, and may swap"

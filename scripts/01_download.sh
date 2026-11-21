@@ -443,7 +443,7 @@ fi
 require_downloads_online() {
     local sample asm sra sdir truth long_run has_ref need_ref=0 need_reads=0 need_long=0 lacking=""
     [[ "$LOCAL_INPUTS_ONLY" == "1" ]] && return 0
-    while IFS=$'\t' read -r sample asm sra; do
+    while IFS=$'\t' read -r -u 3 sample asm sra; do
         [[ -z "${sample:-}" ]] && continue
         sdir="$DATA_DIR/$sample"
         has_ref=1; [[ -z "$asm" || "$asm" == "NA" ]] && has_ref=0
@@ -458,7 +458,7 @@ require_downloads_online() {
         if [[ "$truth" == "self_assembled_hybrid" && -n "$long_run" && ! -s "$sdir/${LONG_READS_FILE:-long_reads.fastq.gz}" ]]; then
             need_long=1; lacking+=" $sample:long-reads"
         fi
-    done < <(read_samples "$SAMPLE_SHEET")
+    done 3< <(read_samples "$SAMPLE_SHEET")
     [[ "$need_ref$need_reads$need_long" == "000" ]] && return 0
     local hint="Connect, or place the lacking files in $DATA_DIR/<sample>/ and run with --local-inputs. Missing:${lacking:0:240}"
     [[ "$need_ref" -eq 1 ]] && require_internet --action "Stage 1 (download the reference assemblies)" --hint "$hint" ncbi_datasets
@@ -479,7 +479,7 @@ confirm_download
 declare -A PIDS
 DISK_STOP=""
 DISK_STOP_AT=""
-while IFS=$'\t' read -r SAMPLE ASM SRA; do
+while IFS=$'\t' read -r -u 3 SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     if ! disk_guard 1 "$SAMPLE" "$SRA"; then      # the next isolate no longer fits (plus the reserve): stop cleanly BEFORE it starts downloading
         DISK_STOP=1; DISK_STOP_AT="$SAMPLE"
@@ -494,7 +494,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         download_sample "$SAMPLE" "$ASM" "$SRA" &
         PIDS["$SAMPLE"]=$!
     fi
-done < <(read_samples "$SAMPLE_SHEET")
+done 3< <(read_samples "$SAMPLE_SHEET")
 
 if [[ "$MAX_PARALLEL_SAMPLES" -gt 1 ]]; then
     for sample in "${!PIDS[@]}"; do
@@ -511,10 +511,10 @@ fi
 # Assemble the status table in sample-sheet order, so its rows read the same
 # however the parallel jobs happened to interleave.
 shards=()
-while IFS=$'\t' read -r SAMPLE _ _; do
+while IFS=$'\t' read -r -u 3 SAMPLE _ _; do
     [[ -z "${SAMPLE:-}" ]] && continue
     shards+=("$STATUS_SHARDS/$SAMPLE.tsv")
-done < <(read_samples "$SAMPLE_SHEET")
+done 3< <(read_samples "$SAMPLE_SHEET")
 merge_shards "$STATUS" "$(printf 'sample\tstatus\treason')" "${shards[@]}"
 
 DOWNLOADED=$(awk -F'\t' 'NR>1 && $2=="ok"' "$STATUS" | wc -l)

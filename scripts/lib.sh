@@ -537,7 +537,7 @@ disk_guard() {
     [[ "${PLASBENCH_SKIP_RESOURCE_CHECK:-0}" == "1" || "${PLASBENCH_SKIP_DISK_CHECK:-0}" == "1" ]] && return 0
     have python3 || return 0
     out="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" guard --stage "$stage" --sample "$sample" --sra "$sra" --results-dir "${RESULTS_DIR:-.}" \
-        --data-dir "${DATA_DIR:-.}" --tmp-dir "${TMPDIR:-/tmp}" --in-flight "${MAX_PARALLEL_SAMPLES:-1}" 2>/dev/null)" || rc=$?
+        --data-dir "${DATA_DIR:-.}" --tmp-dir "${TMPDIR:-/tmp}" --in-flight "${MAX_PARALLEL_SAMPLES:-1}" 2>/dev/null </dev/null)" || rc=$?
     if [[ "$rc" -eq 3 ]]; then
         while IFS= read -r line; do
             [[ -n "$line" ]] && warn "$line"
@@ -557,7 +557,7 @@ diagnose_failed_step() {
     have python3 || return 0
     free_gb="$(df -Pk "${DATA_DIR:-.}" 2>/dev/null | awk 'NR == 2 && $4 ~ /^[0-9]+$/ { printf "%.2f", $4 / 1048576 }')"
     line="$(python3 -I "${PROJECT_ROOT:-.}/python/assembler_diagnosis.py" "$logfile" --format tsv --exit-code "$code" --sample "$sample" \
-        --threads "${THREADS:-}" --memory-gb "${ASSEMBLY_MEMORY_GB:-}" --tmpdir "${TMPDIR:-/tmp}" ${free_gb:+--free-gb "$free_gb"} 2>/dev/null)" || return 0
+        --threads "${THREADS:-}" --memory-gb "${ASSEMBLY_MEMORY_GB:-}" --tmpdir "${TMPDIR:-/tmp}" ${free_gb:+--free-gb "$free_gb"} 2>/dev/null </dev/null)" || return 0
     [[ -n "$line" ]] || return 0
     # shellcheck disable=SC2034  # the DIAG_* variables are read by the stage scripts that source this file
     IFS=$'\t' read -r DIAG_CAUSE DIAG_CONFIDENCE DIAG_RETRY DIAG_ENV DIAG_TITLE DIAG_EVIDENCE DIAG_ADVICE <<< "$line"

@@ -265,7 +265,7 @@ def usable_cpus(env):
 
 def _run(argv, timeout=8):
     try:
-        done = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        done = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL)   # never read the caller's stdin (powershell.exe does)
         return done.stdout if done.returncode == 0 else None
     except (OSError, subprocess.SubprocessError):
         return None
@@ -600,6 +600,9 @@ def memory_retry_plan(threads, memory_gb, available_gb, own_limit=False):
 
 
 def _available_gb():
+    forced = os.environ.get("PLASBENCH_TEST_AVAILABLE_MB")      # lets a test pretend to be a smaller or larger machine
+    if forced and forced.isdigit():
+        return int(forced) / 1024.0
     try:
         sys.path.insert(0, str(ROOT))
         from plasbench import computer_info
@@ -653,12 +656,17 @@ def main(argv=None):
     g.add_argument("--tmp-dir")
     g.add_argument("--in-flight", type=int, default=1)
     sub.add_parser("vdisk")
+    sub.add_parser("available", help="memory available now in GB (cgroup and WSL aware), one decimal; empty when unknown")
     r = sub.add_parser("retry-plan")
     r.add_argument("--threads", type=int, required=True)
     r.add_argument("--memory-gb", type=int, required=True)
     r.add_argument("--own-limit", action="store_true")
     r.add_argument("--available-gb", type=float)
     args = ap.parse_args(argv)
+    if args.cmd == "available":
+        avail = _available_gb()
+        print("" if avail is None else "%.1f" % avail)
+        return 0
     if args.cmd == "retry-plan":
         avail = args.available_gb if args.available_gb is not None else _available_gb()
         plan = memory_retry_plan(args.threads, args.memory_gb, avail, args.own_limit)

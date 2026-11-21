@@ -280,6 +280,38 @@ plasbench_detect_memory_gb() {
     echo $(( kb / 1024 / 1024 ))
 }
 
+# Same figure in MB, so a 6.9 GB machine is not treated as a 6 GB one (the integer GB figure above rounds DOWN, which cut the default budget from 5 GB to 4 GB). Memory
+# available to this process: MemAvailable, or what a container/cgroup limit leaves when that is smaller (cgroup v2 memory.max/current, v1 limit/usage).
+plasbench_detect_memory_mb() {
+    local kb="" limit="" used="" mb=""
+    if [[ -r /proc/meminfo ]]; then
+        kb="$(awk '/^MemAvailable:/ {print $2; exit}' /proc/meminfo)"
+        [[ -z "$kb" ]] && kb="$(awk '/^MemTotal:/ {print $2; exit}' /proc/meminfo)"
+    elif command -v sysctl >/dev/null 2>&1; then
+        kb="$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1024 ))"
+    fi
+    [[ "$kb" =~ ^[0-9]+$ && "$kb" -gt 0 ]] || { echo 8192; return; }
+    mb=$(( kb / 1024 ))
+    if [[ -r /sys/fs/cgroup/memory.max ]]; then
+        limit="$(cat /sys/fs/cgroup/memory.max 2>/dev/null || true)"; used="$(cat /sys/fs/cgroup/memory.current 2>/dev/null || true)"
+    elif [[ -r /sys/fs/cgroup/memory/memory.limit_in_bytes ]]; then
+        limit="$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || true)"; used="$(cat /sys/fs/cgroup/memory/memory.usage_in_bytes 2>/dev/null || true)"
+    fi
+    if [[ "$limit" =~ ^[0-9]+$ && "$used" =~ ^[0-9]+$ && "$limit" -lt 1125899906842624 ]]; then
+        local room=$(( (limit - used) / 1048576 ))
+        [[ "$room" -ge 0 && "$room" -lt "$mb" ]] && mb="$room"
+    fi
+    echo "$mb"
+}
+
+# plasbench_default_budget_gb AVAILABLE_MB: the default assembler memory budget, in whole GB: 80% of what is available, rounded down, never below 2 and never above what is free.
+plasbench_default_budget_gb() {
+    local mb="$1" gb
+    gb=$(( mb * 80 / 100 / 1024 ))
+    [[ "$gb" -lt 2 ]] && gb=2
+    echo "$gb"
+}
+
 # Thread budget. When THREADS is not set, the detected cores are divided across the
 # concurrent job slots (MAX_PARALLEL_SAMPLES x MAX_PARALLEL_TOOLS, below), so raising
 # the slots cannot make every job ask for every core at once (oversubscription:
@@ -296,10 +328,10 @@ export THREADS
 # Keep headroom: the OS, the other tools in the stage, and SPAdes overshooting
 # its own budget all need room. 80% of what is actually available, never below
 # 2GB (SPAdes fails outright under that) and never silently capped above.
-PLASBENCH_AVAILABLE_GB="$(plasbench_detect_memory_gb)"
-PLASBENCH_DEFAULT_MEMORY_GB=$(( PLASBENCH_AVAILABLE_GB * 80 / 100 ))
-[[ "$PLASBENCH_DEFAULT_MEMORY_GB" -lt 2 ]] && PLASBENCH_DEFAULT_MEMORY_GB=2
-export PLASBENCH_AVAILABLE_GB
+PLASBENCH_AVAILABLE_MB="${PLASBENCH_TEST_AVAILABLE_MB:-$(plasbench_detect_memory_mb)}"   # (the TEST variable only lets a test pretend to be a smaller or larger machine)
+PLASBENCH_AVAILABLE_GB="$(( PLASBENCH_AVAILABLE_MB / 1024 ))"
+PLASBENCH_DEFAULT_MEMORY_GB="$(plasbench_default_budget_gb "$PLASBENCH_AVAILABLE_MB")"
+export PLASBENCH_AVAILABLE_GB PLASBENCH_AVAILABLE_MB
 export MEMORY_GB="${MEMORY_GB:-$PLASBENCH_DEFAULT_MEMORY_GB}"   # assembler memory budget (GB)
 
 # --- Parallelism ---------------------------------------------------------

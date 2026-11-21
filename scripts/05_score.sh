@@ -508,11 +508,11 @@ score_sample() {
 
 reset_shard_dir "score_crashed"
 CRASHED_DIR="$(shard_dir "score_crashed")"
-while IFS=$'\t' read -r SAMPLE ASM SRA; do
+while IFS=$'\t' read -r -u 3 SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     job_slot_wait "$MAX_PARALLEL_SAMPLES"
     start_sample_job "$CRASHED_DIR" "$SAMPLE" score_sample "$SAMPLE" "$ASM" "$SRA"
-done < <(read_samples "$SAMPLE_SHEET")
+done 3< <(read_samples "$SAMPLE_SHEET")
 wait
 
 # Merge per-sample score shards. Each carries its own header (written by the
@@ -522,7 +522,7 @@ wait
 SCORES_NEW="$SCORES.new"
 : > "$SCORES_NEW"
 header_written=0
-while IFS=$'\t' read -r SAMPLE ASM SRA; do
+while IFS=$'\t' read -r -u 3 SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     shard="$SCORE_SHARDS/${SAMPLE}.tsv"
     if [[ -s "$shard" ]]; then
@@ -532,14 +532,14 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
             tail -n +2 "$shard" >> "$SCORES_NEW"
         fi
     fi
-done < <(read_samples "$SAMPLE_SHEET")
+done 3< <(read_samples "$SAMPLE_SHEET")
 mv -f "$SCORES_NEW" "$SCORES"
 
 failure_shards=()
-while IFS=$'\t' read -r SAMPLE ASM SRA; do
+while IFS=$'\t' read -r -u 3 SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     failure_shards+=("$FAILURE_SHARDS/${SAMPLE}.tsv")
-done < <(read_samples "$SAMPLE_SHEET")
+done 3< <(read_samples "$SAMPLE_SHEET")
 merge_shards "$SCORE_FAILURES.tmp" "$(printf 'sample\ttool\tstage\treason')" "${failure_shards[@]}"
 mv -f "$SCORE_FAILURES.tmp" "$SCORE_FAILURES"
 rm -rf "$SCORE_SHARDS" "$FAILURE_SHARDS"

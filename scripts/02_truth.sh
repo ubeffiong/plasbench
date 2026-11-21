@@ -240,7 +240,7 @@ truth_sample() {
 # Samples are independent, so MAX_PARALLEL_SAMPLES of them run at once (the same setting as stages 1, 3, 4 and 5;
 # 1, the default, is sequential). A sample whose truth table is unusable stops the stage, as before.
 declare -A TRUTH_PIDS=()
-while IFS=$'\t' read -r SAMPLE _ SRA; do
+while IFS=$'\t' read -r -u 3 SAMPLE _ SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     if [[ "${MAX_PARALLEL_SAMPLES:-1}" -le 1 ]]; then
         truth_sample "$SAMPLE" "$SRA"
@@ -249,7 +249,7 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
         truth_sample "$SAMPLE" "$SRA" &
         TRUTH_PIDS["$SAMPLE"]=$!
     fi
-done < <(read_samples "$SAMPLE_SHEET")
+done 3< <(read_samples "$SAMPLE_SHEET")
 if [[ "${MAX_PARALLEL_SAMPLES:-1}" -gt 1 ]]; then
     aborted=()
     for sample in "${!TRUTH_PIDS[@]}"; do

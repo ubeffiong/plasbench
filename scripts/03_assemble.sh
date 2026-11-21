@@ -96,8 +96,8 @@ verify_reads() {   # verify_reads SDIR R1 R2 T1 T2
 # SPAdes with diagnosis and at most ONE retry. Returns 0 when it assembled (ASM_RETRY_NOTE says what was changed), 1 when it failed (recorded).
 run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SDIR
     local sample="$1" t1="$2" t2="$3" asmdir="$4" start="$5" r1="$6" r2="$7" sdir="$8"
-    local log="$LOG_DIR/${sample}.spades.log" threads="$THREADS" mem="$ASSEMBLY_MEMORY_GB" rc attempt=1 plan="" note="" first="" own="" nt nm av
-    local STOP_EARLY=0
+    local log="$LOG_DIR/${sample}.spades.log" threads="$THREADS" mem="$ASSEMBLY_MEMORY_GB" rc attempt=1 plan="" note="" first="" own="" nt nm av avail
+    local STOP_EARLY=0 MEMORY_REFUSAL=""
     ASM_RETRY_NOTE=""
     while :; do
         rc=0
@@ -110,10 +110,20 @@ run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SD
         THREADS="$threads" ASSEMBLY_MEMORY_GB="$mem" diagnose_failed_step "$log" "$rc" "$sample"
         if [[ "$attempt" -ge 2 || "${ASSEMBLER_AUTO_RETRY:-1}" != "1" ]]; then break; fi
         case "$DIAG_RETRY" in
+            memory_need)
+                # SPAdes said exactly how much memory it needs: raise the budget to that (never lower it), once, only when it fits in what is free now.
+                avail="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" available 2>/dev/null || true)"
+                plan="$(python3 -I "${PROJECT_ROOT:-.}/python/assembler_diagnosis.py" "$log" --format need-plan ${avail:+--available-gb "$avail"} 2>/dev/null || true)"
+                nm="${plan%% *}"; note="${plan#* }"
+                if [[ "$nm" == "none" || ! "$nm" =~ ^[0-9]+$ ]]; then
+                    MEMORY_REFUSAL="$note"; break
+                fi
+                note="memory budget $mem -> $nm GB ($note)"
+                mem="$nm" ;;
             memory)
                 own=""; [[ "$DIAG_CAUSE" == "memory_limit_exceeded" ]] && own="--own-limit"
                 plan="$(python3 -I "${PROJECT_ROOT:-.}/python/preflight_resources.py" retry-plan --threads "$threads" --memory-gb "$mem" ${own:+$own} 2>/dev/null || true)"
-                if [[ -z "$plan" || "$plan" == "none" ]]; then STOP_EARLY=1; break; fi
+                if [[ -z "$plan" || "$plan" == "none" ]]; then break; fi
                 read -r nt nm av <<< "$plan"
                 note="threads $threads -> $nt, memory budget $mem -> $nm GB (memory available now: $av GB)"
                 threads="$nt"; mem="$nm" ;;
@@ -131,10 +141,12 @@ run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SD
     local extra=""
     if [[ "$attempt" -ge 2 ]]; then
         extra="PlasBench already retried once ($note) and it failed again."
-        [[ "$DIAG_RETRY" == "memory" ]] && STOP_EARLY=1
-    elif [[ "$DIAG_RETRY" == "memory" && "$STOP_EARLY" == "1" ]]; then
-        extra="Memory and threads are already at the smallest setting PlasBench will try."
+    elif [[ -n "$MEMORY_REFUSAL" ]]; then
+        extra="Not retried: $MEMORY_REFUSAL. Options: raise MEMORY_GB (plasbench run --memory-gb N), close other programs, raise the memory the computer gives Ubuntu (WSL: memory= in .wslconfig, then wsl --shutdown), or use a smaller read set. The other isolates are still assembled."
+    elif [[ "$DIAG_RETRY" == "memory" ]]; then
+        extra="Memory and threads are already at the smallest setting PlasBench will try; this isolate is skipped and the others continue."
     fi
+    # Memory belongs to this isolate's read set, not to the computer: the stage goes on with the next isolate (only disk, Python, CPU or folder causes stop it).
     if [[ "$DIAG_RETRY" == "reads" ]]; then
         verify_reads "$sdir" "$r1" "$r2" "$t1" "$t2"
         extra="$READS_NOTE"
@@ -395,7 +407,7 @@ assemble_sample() {
 }
 
 declare -A PIDS
-while IFS=$'\t' read -r SAMPLE ASM SRA; do
+while IFS=$'\t' read -r -u 3 SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     [[ -e "$STATUS_SHARDS/.stop" ]] && break      # a cause that belongs to the computer was found: do not try the rest
     if ! disk_guard 3 "$SAMPLE" "$SRA"; then      # the next isolate no longer fits (plus the reserve): stop cleanly BEFORE SPAdes, not in the middle of it
@@ -409,7 +421,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         assemble_sample "$SAMPLE" "$ASM" "$SRA" &
         PIDS["$SAMPLE"]=$!
     fi
-done < <(read_samples "$SAMPLE_SHEET")
+done 3< <(read_samples "$SAMPLE_SHEET")
 
 if [[ "$MAX_PARALLEL_SAMPLES" -gt 1 ]]; then
     # assemble_sample returns 0 for a per-sample trim/assembly failure, having
@@ -429,14 +441,19 @@ STOP_INFO=""
 [[ -e "$STATUS_SHARDS/.stop" ]] && STOP_INFO="$(cat "$STATUS_SHARDS/.stop")"
 shards=()
 N_NOT_TRIED=0
-while IFS=$'\t' read -r SAMPLE ASM SRA; do
+while IFS=$'\t' read -r -u 3 SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     if [[ -n "$STOP_INFO" && ! -e "$STATUS_SHARDS/${SAMPLE}.tsv" ]]; then
-        record_assembly_status "$SAMPLE" "skipped" "" "not attempted: stage 3 stopped early (${STOP_INFO%%$'\t'*})" "" "${STOP_INFO%%$'\t'*}" "fix the cause above, then run the same plasbench run command again"
+        record_assembly_status "$SAMPLE" "skipped" "" "not attempted (stopped early: ${STOP_INFO%%$'\t'*})" "" "${STOP_INFO%%$'\t'*}" "fix the cause above, then run the same plasbench run command again"
         N_NOT_TRIED=$((N_NOT_TRIED + 1))
+    elif [[ ! -e "$STATUS_SHARDS/${SAMPLE}.tsv" ]]; then
+        # Never silent: an isolate of the sheet that no step recorded (the loop was cut short) is listed, so it cannot vanish from the table.
+        record_assembly_status "$SAMPLE" "skipped" "" "not attempted: stage 3 did not reach this isolate (the sample list ended early)" "" "not_attempted" "run the same plasbench run command again; finished isolates are reused"
+        N_NOT_TRIED=$((N_NOT_TRIED + 1))
+        warn "stage 3 did not reach $SAMPLE; it is recorded as not attempted"
     fi
     shards+=("$STATUS_SHARDS/${SAMPLE}.tsv")
-done < <(read_samples "$SAMPLE_SHEET")
+done 3< <(read_samples "$SAMPLE_SHEET")
 merge_shards "$STATUS" "$(printf 'sample\tstatus\tcontigs\treason\truntime_seconds\tcause\tadvice')" "${shards[@]}"
 rm -rf "$STATUS_SHARDS"
 if [[ "$ASSEMBLY_SELECTION_MODE" != "off" ]] && compgen -G "$ASM_SHARDS/*.tsv" > /dev/null; then
@@ -472,7 +489,14 @@ if [[ -n "$STOP_INFO" ]]; then
     exit 5
 fi
 if [[ "$USABLE" -eq 0 ]]; then
-    die "no sample produced an assembly; nothing to benchmark (see $STATUS)"
+    # The verdict is only reached after EVERY isolate of the sheet was attempted (or recorded as not attempted): each one is listed with its cause.
+    die "no sample produced an assembly; nothing to benchmark: $(awk -F'\t' 'NR>1 {printf "%s%s [%s: %s]", sep, $1, $2, ($6 != "" ? $6 : $4); sep="; "}' "$STATUS") (see $STATUS)"
 fi
-
-log "Stage 3 (assembly) complete: $USABLE assembled, $UNUSABLE unavailable. Status -> $STATUS"
+N_ROWS=$(( USABLE + UNUSABLE ))
+if [[ "$UNUSABLE" -gt 0 ]]; then
+    PARTIAL_WHY="$(awk -F'\t' 'NR>1 && ($2=="failed"||$2=="skipped"||$2=="rejected") {c[($6 != "" ? $6 : $4)]++} END {for (k in c) {printf "%s%s x%d", sep, k, c[k]; sep=", "}}' "$STATUS")"
+    log "Stage 3 (assembly) complete WITH WARNINGS: $USABLE of $N_ROWS assembled; $UNUSABLE unavailable ($PARTIAL_WHY). The isolates that assembled go on to the tools. Status -> $STATUS"
+    run_event stage_partial "assembled=$USABLE" "unavailable=$UNUSABLE" "total=$N_ROWS"
+else
+    log "Stage 3 (assembly) complete: $USABLE of $N_ROWS assembled. Status -> $STATUS"
+fi

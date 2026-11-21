@@ -107,12 +107,14 @@ grep -q '"event":"assembly_retry"' "$P/results/run_events.jsonl" || fail "run_ev
 [[ -s "$P/logs/s1.spades.attempt1.log" ]] || fail "the first attempt's log must be kept"
 echo "out of memory: success after the retry is recorded with what changed, in the status and run_events; the first log is kept -> PASS"
 
-# ---- 3. out of memory twice: stop, exactly two attempts -------------------------------------------------------------------------------
+# ---- 3. out of memory twice: each isolate gets exactly two attempts and the stage CONTINUES with the next one (memory is the isolate's, not the computer's) ----
+# (Before the run-stalls fix this stopped the whole stage at the first isolate, exit 5, and left the others unrecorded.)
 new_case
 rc="$(run_stage SPADES_MODE=oom)"
-[[ "$rc" == "5" && "$(calls_for s1)" == "2" && "$(calls_for s2)" == "0" ]] || fail "failing twice must stop (exit 5) after exactly 2 attempts, s2 untouched (exit $rc, calls $(tr '\n' ';' < "$CALLS"))"
+[[ "$rc" == "1" && "$(calls_for s1)" == "2" && "$(calls_for s2)" == "2" && "$(calls_for s3)" == "2" ]] || fail "each isolate must get exactly 2 attempts and the stage must go on (exit 1 only because NO isolate assembled; exit $rc, calls $(tr '
+' ';' < "$CALLS"))"
 grep -q "already retried once" "$P/results/assembly_status.tsv" || fail "the status must say the retry was made"
-echo "out of memory twice: never more than one retry, then the stage stops (exit 5) -> PASS"
+echo "out of memory twice: never more than one retry per isolate, the other isolates are still tried -> PASS"
 
 # ---- 3b. a bare kill (exit 137, empty log) is read as memory with medium confidence, and retried once ---------------------------------------
 new_case
