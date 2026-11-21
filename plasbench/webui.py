@@ -556,6 +556,22 @@ class Project:
         user_tools._CACHE.clear()
         return user_tools
 
+    def amrfinder_ready(self) -> tuple:
+        """(ready, reason): python/tool_readiness.py asks AMRFinderPlus whether its database is installed (about a second; remembered for a minute so the page does not run it on every refresh)."""
+        def probe():
+            script = self.root / "python" / "tool_readiness.py"
+            if not script.is_file():
+                return (True, "")
+            try:
+                done = subprocess.run([sys.executable, "-I", str(script), "amrfinder"], capture_output=True, text=True, timeout=20, stdin=subprocess.DEVNULL)
+            except (OSError, subprocess.SubprocessError):
+                return (True, "")           # cannot tell: never a false alarm
+            if done.returncode == 1:
+                fields = (done.stdout or "").strip().split("	")
+                return (False, fields[1] if len(fields) > 1 else "its database is not installed")
+            return (True, "")
+        return loadcache.ttl(("amrfinder-ready", str(self.root)), 60.0, probe)
+
     # -- environment ------------------------------------------------------------------------------------------
     def env_checks(self) -> list[dict]:
         from .cli import bash_command
@@ -592,6 +608,29 @@ class Project:
             path = loadcache.which_path(exe)
             add(exe, label, path, path or "not on PATH", "" if path else f"install-tools {profile}", group="Core tools",
                 optional=exe == "mash")
+        # The default reference-annotation stage (RUN_REFERENCE_ANNOTATION) calls these. Optional (an absent caller is recorded as not evaluated, never as "none found"), but listed
+        # here so they can be installed from the window like any other tool: the profile also fetches AMRFinderPlus's database and pins the fastcluster ISEScan needs.
+        for exe, label, profile in (("abricate", "abricate (AMR and replicon genes)", "reference-annotation"),
+                                    ("amrfinder", "AMRFinderPlus (AMR genes; needs its database)", "reference-annotation"),
+                                    ("isescan.py", "ISEScan (insertion sequences)", "reference-annotation"),
+                                    ("barrnap", "barrnap (rRNA genes)", "utilities"),
+                                    ("mob_typer", "MOB-typer (replicon typing)", "mobsuite"),
+                                    ("samtools", "samtools (alignment files)", "utilities")):
+            path = loadcache.which_path(exe)
+            detail, ok = path or "not on PATH", bool(path)
+            if path and exe == "amrfinder":
+                ready = self.amrfinder_ready()
+                if not ready[0]:
+                    ok, detail = False, f"{path}: installed, but {ready[1]}"
+            add(exe, label, ok, detail, "" if ok else f"install-tools {profile}", group="Annotation tools", optional=True)
+        # Tools of features that are off until you switch them on (RUN_QUAST_DIAGNOSTICS, MULTIQC_REPORT, the annotators, RUN_DIFFICULTY_FEATURES): listed so they can be installed ahead of time.
+        for exe, label, profile in (("quast.py", "QUAST (assembly diagnostics, optional)", "quast"), ("multiqc", "MultiQC (extra QC report, optional)", "multiqc"),
+                                    ("bakta", "Bakta (genome annotation, optional)", "annotation"), ("prokka", "Prokka (genome annotation, optional)", "annotation-prokka")):
+            path = loadcache.which_path(exe)
+            add(exe, label, path, path or "not on PATH", "" if path else f"install-tools {profile}", group="Optional tools", optional=True)
+        path = loadcache.which_path("deadends")
+        add("deadends", "deadends (assembly-graph dead ends, optional)", path, path or "not on PATH",
+            "" if path else "No package exists: INSTALL.md describes the manual binary install.", group="Optional tools", optional=True)
         db = Path(os.environ.get("PLASBENCH_DB_DIR") or self.local_env().get("PLASBENCH_DB_DIR") or Path.home() / ".plasbench" / "databases")
         present = sorted(p.name for p in db.iterdir() if p.is_dir()) if db.is_dir() else []
         add("databases", "Tool databases", bool(present), f"{db}: " + (", ".join(present) if present else "none yet"),

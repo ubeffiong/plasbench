@@ -113,6 +113,12 @@ def main():
     env = json.loads(call("/api/env")[1])["checks"]
     check("environment checks have id, label, ok, fix", all({"id", "label", "ok", "fix", "group"} <= set(c) for c in env)
           and {"python", "bash", "conda", "minimap2"} <= {c["id"] for c in env})
+    by_id = {c["id"]: c for c in env}
+    check("the tools setup lists the annotation callers (abricate, AMRFinderPlus, ISEScan, barrnap, MOB-typer) and the optional tools, each missing one with an install command",
+          {"abricate", "amrfinder", "isescan.py", "barrnap", "mob_typer", "samtools", "quast.py", "multiqc", "bakta", "prokka", "deadends"} <= set(by_id)
+          and all(by_id[i]["group"] == "Annotation tools" for i in ("abricate", "amrfinder", "isescan.py", "barrnap", "mob_typer"))
+          and all(by_id[i]["ok"] or by_id[i]["fix"] for i in by_id if i in {"abricate", "amrfinder", "isescan.py", "barrnap", "mob_typer", "quast.py", "multiqc", "bakta", "prokka", "deadends"})
+          and (by_id["amrfinder"]["ok"] or by_id["amrfinder"]["fix"] == "install-tools reference-annotation"), {i: (c["ok"], c["fix"]) for i, c in by_id.items() if c["group"] in ("Annotation tools", "Optional tools")})
     tools = json.loads(call("/api/tools")[1])["tools"]
     check("the tool catalogue lists the registry with task, track and install profile",
           any(t["tool"] == "mob_recon" and t["task"] == "binning_reconstruction" and t["profile"] for t in tools)
