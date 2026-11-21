@@ -2,6 +2,14 @@
 
 PlasBench has an assistant in the side panel of the window (the **AI help** tab, the **AI help** button in the top bar, or Alt+Shift+H) and on the command line (`plasbench ask`). It answers questions about PlasBench from PlasBench's own guides, suggests the exact command to run, tells you where to run it, and can run a safe command for you after you press a button and confirm it. It never runs anything by itself.
 
+## What the assistant can and cannot see
+
+**The assistant cannot see your files.** It has no access to your FASTQ or FASTA files, sample sheets, results, logs, reports, databases or settings, and it does not know what is on your computer. It knows PlasBench's documentation, a short non-personal setup line (version, system type, WSL or not, conda or Docker, the stage or failure the window knows about) and what you type or choose to send with **Send result** (redacted). It cannot check, open or analyse your data: to diagnose something it suggests a command, you run it, and you send the output. This is said in the first-use notice, in a line that stays under the chat, in `plasbench ask`, and to the model itself.
+
+**It can ask you questions.** When a missing fact decides the answer (your system, whether you use Docker or conda, the stage, the exact error text, which file) it asks one short question and shows quick-reply buttons; a button only sends that text as your next message, it never runs anything. You can also type your own answer.
+
+**General knowledge.** For questions closely related to PlasBench (plasmids, sequencing, resistance genes, conda, Docker, WSL, reading results) the assistant may use the knowledge of its model and its own judgement. Those parts begin with "General knowledge:" and can be wrong, so check anything important; facts about PlasBench itself (commands, options, settings, metrics) come only from the documentation, and it is told never to invent a PlasBench command or option. Unrelated topics are declined.
+
 ## What it knows, and how it answers
 
 The assistant does not answer from a model's memory. For every question PlasBench first searches a small index of its own material and sends only the best three to five excerpts (about 1,400 tokens) with the question:
@@ -13,7 +21,7 @@ The assistant does not answer from a model's memory. For every question PlasBenc
 
 The index is a single file shipped inside the package (`plasbench/data/ai_kb.json.gz`), built by `python python/build_ai_kb.py`; a test fails when it is out of date with its sources. Ranking is BM25 with small boosts for an exact command or option, an error message quoted from a log, a few synonyms ("stuck", "stalled", "hang") and a nearest-word match for misspellings. No service, embedding or network is involved in finding the excerpts.
 
-The answer cites the excerpts as small chips under it; a chip opens the guide section on the Guides page. If the excerpts do not answer the question the assistant is told to say "I don't know from the documentation" and point to `plasbench issue-report`, not to guess.
+The answer cites the excerpts as small chips under it; a chip opens the guide section on the Guides page. If the excerpts do not answer a question about PlasBench itself (its commands, options, settings, metrics) the assistant is told to say "not in the documentation" and point to `plasbench issue-report`, not to guess.
 
 Measured on the 51 realistic questions of `test/fixtures/ai_gold.tsv` (install, Docker, WSL, commands, inputs, metrics, workflow, troubleshooting, exit codes, misspellings and error strings such as "You need approx 5.2 GB of free RAM" and "Could not open lockfile"): the right source is among the top three excerpts for all of them (the set of acceptable sources per question was widened after reading the misses: before that, 29 of 51 had the first-choice source in the top three). The average prompt is about 1,570 tokens (largest 1,830) without conversation history; the fixed instructions are about 410 of them.
 
@@ -80,7 +88,7 @@ The key or token is stored in `~/.plasbench/ai/<provider>.json` (mode 0600, fold
 
 ## The tokens it uses
 
-The system prompt is about 410 tokens and identical on every call. The excerpts are cut at sentence ends to about 1,400 tokens, deduplicated, with at most two per section. Only the last six turns are kept and each long turn is cut. Answers are capped at 700 tokens (300 with **Brief**). The pane shows the tokens of the last answer (from the provider's `usage`), today's requests and tokens, and, on OpenRouter, how many free requests are left today. `AI_DAILY_TOKEN_CAP` (default 200000) stops questions at the limit with a clear message. Prompt caching: providers such as OpenAI and Gemini cache prefixes of 1,024 tokens or more automatically; this stable prefix is shorter than that, so expect little caching from it.
+The system prompt is about 480 tokens and identical on every call (it was 410 before it learned to say it cannot see files, to ask a clarifying question and to use marked general knowledge). The excerpts are cut at sentence ends to about 1,400 tokens, deduplicated, with at most two per section. Only the last six turns are kept and each long turn is cut. Answers may use up to 2,000 tokens (600 with **Brief**); the assistant is told to be terse, and an answer that still reaches the model's length limit shows a **Continue** button. The pane shows the tokens of the last answer (from the provider's `usage`), today's requests and tokens, and, on OpenRouter, how many free requests are left today. PlasBench puts no daily limit of its own on the AI help: `AI_DAILY_TOKEN_CAP` defaults to 0 (none) and is there only if you want to set one. The providers' own limits (for example OpenRouter's free-model requests per minute and per day) still apply and are reported in plain words. Prompt caching: providers such as OpenAI and Gemini cache prefixes of 1,024 tokens or more automatically; this stable prefix is shorter than that, so expect little caching from it.
 
 ## Commands the assistant suggests
 
@@ -108,7 +116,7 @@ The checks (`plasbench/ai_actions.py`): one plain `plasbench` command; no pipes,
 - *"Free models are rate-limited"*: wait, or pick another free model; with `AI_FREE_FALLBACK=1` the next free model is tried by itself.
 - *"No credits"*: Hugging Face free accounts have no credits; use a model marked free, or add credits. On OpenRouter a negative balance can block even free models.
 - *"Cannot load models"*: the provider's list could not be read (offline, proxy); the built-in list, if shown, may be out of date.
-- *"The daily token limit is reached"*: raise `AI_DAILY_TOKEN_CAP`.
+- *"The daily token limit is reached"*: you set `AI_DAILY_TOKEN_CAP` yourself; set it to 0 to remove it. (By default there is none.)
 - *Nothing is sent and the pane says it is off*: `AI_HELP_ENABLED` is 0.
 
 ## What was verified, and what was not

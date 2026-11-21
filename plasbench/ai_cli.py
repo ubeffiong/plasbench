@@ -59,7 +59,7 @@ def command(args, root) -> int:
     svc = ai_help.Service(project, args.provider or "")
     if not ai_help.consent_given(svc.p.id):
         d = ai_help.disclosure(svc.p)
-        print(d["headline"] + "\nSent: " + "; ".join(d["sent"]) + "\nNot sent: " + "; ".join(d["not_sent"]) + "\n" + d["free"] + "\n" + d["stored"] + " " + d["delete"], file=sys.stderr)
+        print(d["declaration"] + "\n" + d["headline"] + "\nSent: " + "; ".join(d["sent"]) + "\nNot sent: " + "; ".join(d["not_sent"]) + "\n" + d["free"] + "\n" + d["stored"] + " " + d["delete"], file=sys.stderr)
         if not args.accept_notice:
             print("[plasbench] Read the notice above, then run again with --accept-notice.", file=sys.stderr)
             return 2
