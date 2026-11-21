@@ -58,7 +58,7 @@ body:
     attributes:
       label: PlasBench version
       description: "The output of `plasbench --version`."
-      placeholder: "plasbench 0.5.5"
+      placeholder: "plasbench 0.5.6"
     validations:
       required: true
   - type: dropdown

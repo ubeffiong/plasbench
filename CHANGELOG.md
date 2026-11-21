@@ -13,6 +13,14 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-11-21
+Summary. Nothing in this release changes a score, a ranking or a threshold. Fixes and additions since 0.5.5, all described in the entries below:
+- **Window stability.** The false "older than the page" banner (the page's own check was rewritten by the server), the pop-up that repeated every few seconds, and duplicate app windows are fixed; a stale window with an old key no longer gets 403 while the cookie holds the new one.
+- **Docker and tools.** Docker engine health checks and error diagnosis; tool installs into the persistent extras with writable-prefix checks; the annotation callers (abricate, AMRFinderPlus and its database, ISEScan with `fastcluster<1.3`) are installed by the first-time setup.
+- **Runs.** One failed isolate no longer stops the others, a lost sample list in the stage loops is fixed, SPAdes memory messages are read and retried once at the stated need, and a general resource-adaptation layer (`AUTO_RESOURCES`, on by default) handles memory, threads, scratch space and open files. `plasbench status` shows the real stage and step.
+- **Stopping and reporting.** `plasbench stop` and a "Stop all PlasBench on this computer" choice in the Quit dialog (closing the window still changes nothing; `wsl --shutdown` is opt-in), issue reporting (`plasbench issue-report`, GitHub forms, SUPPORT.md) and a private security-reporting route.
+- **One memory-retry policy.** Stage 3 memory retries are decided by one engine (`fit_memory` lowers a budget larger than the free memory; kills no longer raise it); the scratch folder is never memory-backed; a Python `MemoryError` rule no longer matches Java's `OutOfMemoryError`.
+
 ### Changed -- one memory-retry policy for stage 3 (21 November 2026)
 - **One policy, not three.** Stage 3 had two memory-retry policies (an older generic one in `python/preflight_resources.py` that halved threads under an 80% cap, and the response engine) and a third unused copy of the same arithmetic in `python/assembler_diagnosis.py`. The older plan and the unused copy are removed; the response engine (`python/resource_adapt.py`) decides every stage 3 memory retry.
 - **New response `fit_memory`.** When a tool was killed or refused memory (exit 137, `bad_alloc`, ENOMEM, Python `MemoryError`) and its budget is larger than the memory free now, the budget is lowered to 85% of what is free (min 2 GB). For those causes the budget is no longer RAISED (a bigger budget cannot help a kill); a tool that stops at its own limit (SPAdes `-m`, samtools sort, Java heap) still gets a raise. One change per attempt, each at most once, at most two adjustments per isolate: an isolate that keeps running out of memory gets two or three attempts (first run, a lower budget only when the budget is above the free memory, then halved threads), then is skipped with the reason and the others continue.
