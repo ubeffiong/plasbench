@@ -173,6 +173,12 @@ class Stub:
                         if mode == "midstream_error" and i == 1:
                             ev({"error": {"code": 502, "message": "provider went away"}, "choices": [{"delta": {"content": ""}, "finish_reason": "error"}]})
                             return
+                    if mode == "cut":
+                        return                      # the connection just ends: no finish reason, no usage, no [DONE]
+                    if mode == "hugeline":
+                        w.write(b"data: " + b"x" * (3 << 20) + b"\n\n")
+                        w.flush()
+                        return
                     if mode != "no_usage":
                         ev({"choices": [{"delta": {}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 1200, "completion_tokens": 40, "total_tokens": 1240, "prompt_tokens_details": {"cached_tokens": 100}}})
                     w.write(b"data: [DONE]\n\n")

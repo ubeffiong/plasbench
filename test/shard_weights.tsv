@@ -487,3 +487,10 @@ test_ai_secrets_guard.py	2.0
 test_ai_ui_browser.py	0.3
 test_ai_ui.py	0.6
 test_ai_clarify.py	2.0
+test_ai_folder.py	3.0
+test_ai_files.py	6.0
+test_ai_window_actions.py	6.0
+test_ai_routes2.py	6.0
+test_ai_hardening.py	6.0
+test_ai_ui_review.py	0.3
+test_ai_pane_logic.py	1.5

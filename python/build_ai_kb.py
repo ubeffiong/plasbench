@@ -31,7 +31,7 @@ SCHEMA = 1
 
 GUIDES = ["README.md", "FAQ.md", "INSTALL.md", "SUPPORT.md", "docs/USER_GUIDE.md", "docs/METHODS.md", "docs/SCIENTIFIC_GUIDE.md", "docs/METAGENOMICS.md",
           "docs/ADDING_TOOLS.md", "docs/RESOURCE_ADAPTATION.md", "docs/TOOL_INSTALL_AUDIT.md", "docs/publishing/README.md", "docs/INPUT_GUIDE.md", "docs/FINDING_DATA.md",
-          "docs/COHORTS.md", "SECURITY.md", "docs/AI_HELP.md"]
+          "docs/COHORTS.md", "SECURITY.md", "docs/AI_HELP.md", "docs/AI_CAPABILITIES.md"]
 MIN_WORDS, MAX_WORDS = 70, 330
 
 sys.path.insert(0, str(ROOT))

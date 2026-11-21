@@ -1,0 +1,80 @@
+# Held-out questions: written before the retrieval changes of the hardening pass and never used to tune synonyms or thresholds.
+# question<TAB>acceptable sources (| separated; - means no PlasBench source should be needed: general knowledge, off topic or too vague)<TAB>tag (general|offtopic|vague or empty)
+What does PlasBench do and not do?	README.md|docs/SCIENTIFIC_GUIDE.md|docs/AI_CAPABILITIES.md|FAQ.md	
+Can PlasBench find the plasmids in my sample?	README.md|FAQ.md|docs/SCIENTIFIC_GUIDE.md|docs/AI_CAPABILITIES.md	
+Does PlasBench detect outbreaks or transmission?	README.md|docs/SCIENTIFIC_GUIDE.md|docs/AI_CAPABILITIES.md|FAQ.md	
+what can the AI assistant do for me	docs/AI_CAPABILITIES.md|docs/AI_HELP.md	
+can the assistant see my fastq files	docs/AI_HELP.md|docs/AI_CAPABILITIES.md	
+can the AI help change my settings or move my files	docs/AI_CAPABILITIES.md|docs/AI_HELP.md	
+how do I use the AI help without an account	docs/AI_HELP.md	
+which free models does the AI help use	docs/AI_HELP.md	
+where do I change a setting in the window	docs/AI_CAPABILITIES.md|docs/USER_GUIDE.md|config/config.sh|FAQ.md	
+take me to the page where I see my runs	docs/AI_CAPABILITIES.md|docs/USER_GUIDE.md	
+open the new benchmark wizard	docs/AI_CAPABILITIES.md|docs/USER_GUIDE.md|README.md	
+how do I set up a run from my own folder of reads	docs/INPUT_GUIDE.md|docs/AI_CAPABILITIES.md|docs/USER_GUIDE.md	
+my files are in one folder, rename them for plasbench	docs/INPUT_GUIDE.md|docs/AI_CAPABILITIES.md|docs/USER_GUIDE.md	
+how should my fastq files be named	docs/INPUT_GUIDE.md|README.md|FAQ.md	
+my sample sheet uses commas, what now	docs/INPUT_GUIDE.md|docs/AI_CAPABILITIES.md|FAQ.md	
+sample sheet is an excel file	docs/INPUT_GUIDE.md|FAQ.md	
+unsafe sample_id in row	docs/INPUT_GUIDE.md|scripts/lib.sh|FAQ.md|docs/USER_GUIDE.md|README.md	
+duplicate sample_id in sample sheet	docs/INPUT_GUIDE.md|FAQ.md|docs/USER_GUIDE.md|README.md	
+uncurated sample-sheet row require organism truth_technology	docs/INPUT_GUIDE.md|FAQ.md|docs/COHORTS.md|docs/USER_GUIDE.md|README.md	
+how do I write the truth table for my reference	docs/INPUT_GUIDE.md	
+what is assembly_accession LOCAL	docs/INPUT_GUIDE.md	
+How do I install the tools I need for a run	INSTALL.md|docs/TOOL_INSTALL_AUDIT.md|docs/USER_GUIDE.md|plasbench/cli.py	
+which tools are missing on my computer	plasbench/cli.py|INSTALL.md|docs/TOOL_INSTALL_AUDIT.md|docs/USER_GUIDE.md	
+how do I write a manifest for a new tool	docs/ADDING_TOOLS.md	
+plasbench tools validate says a problem	docs/ADDING_TOOLS.md	
+what task types can a custom tool have	docs/ADDING_TOOLS.md	
+how do I install a tool from a url or git	docs/ADDING_TOOLS.md	
+why did my last run fail	docs/USER_GUIDE.md|FAQ.md|plasbench/cli.py|python/assembler_diagnosis.py	
+the run failed at stage 3	docs/USER_GUIDE.md|FAQ.md|python/assembler_diagnosis.py|config/workflow_steps.tsv	
+SPAdes failed with exit code 255	python/assembler_diagnosis.py|FAQ.md|docs/USER_GUIDE.md	
+no space left on device during a run	FAQ.md|docs/USER_GUIDE.md|docs/RESOURCE_ADAPTATION.md|python/docker_diagnosis.py|README.md	
+how much disk do I need per isolate	README.md|config/workflow_steps.tsv|docs/RESOURCE_ADAPTATION.md|docs/USER_GUIDE.md	
+how much memory does plasmer need	config/workflow_steps.tsv|config/config.sh|README.md|docs/RESOURCE_ADAPTATION.md	
+how long does a run take	README.md|docs/USER_GUIDE.md|config/workflow_steps.tsv|FAQ.md	
+how do I resume a failed run	plasbench/cli.py|docs/USER_GUIDE.md|FAQ.md|README.md	
+how do I rerun only one tool	plasbench/cli.py|docs/USER_GUIDE.md|FAQ.md|README.md|config/workflow_steps.tsv	
+what is a truth tier	docs/COHORTS.md|README.md|docs/SCIENTIFIC_GUIDE.md|FAQ.md	
+what does independent evaluation independence mean	README.md|docs/SCIENTIFIC_GUIDE.md|FAQ.md|docs/METHODS.md	
+why are short and long read results not pooled	README.md|docs/SCIENTIFIC_GUIDE.md|FAQ.md|docs/METHODS.md	
+what counts as a false positive	docs/METHODS.md|README.md|docs/SCIENTIFIC_GUIDE.md|python/report_help_text.py|FAQ.md	
+how are repeats handled when scoring	README.md|docs/METHODS.md|docs/SCIENTIFIC_GUIDE.md|python/report_help_text.py	
+what happens when a tool crashes on an isolate	README.md|FAQ.md|docs/METHODS.md|docs/SCIENTIFIC_GUIDE.md|docs/USER_GUIDE.md	
+what is MCC	python/report_help_text.py|docs/METHODS.md|README.md|docs/SCIENTIFIC_GUIDE.md	
+what is the radar chart in the report	README.md|python/report_help_text.py|docs/USER_GUIDE.md|FAQ.md	
+how do I open the report	plasbench/cli.py|docs/USER_GUIDE.md|README.md|FAQ.md	
+how do I compare my results with a published paper	docs/PUBLICATION_COMPARISON.md|plasbench/cli.py|README.md|docs/COHORTS.md|FAQ.md	
+how do I find public data for a cohort	docs/FINDING_DATA.md|docs/COHORTS.md|README.md	
+how do I build my own cohort	docs/COHORTS.md|docs/FINDING_DATA.md|README.md|docs/USER_GUIDE.md	
+which bundled cohorts exist	docs/COHORTS.md|README.md	
+how do I run the offline demo	README.md|docs/USER_GUIDE.md|plasbench/cli.py|FAQ.md	
+how do I change the study folder location	docs/USER_GUIDE.md|README.md|FAQ.md|plasbench/cli.py	
+where are my results stored	docs/USER_GUIDE.md|README.md|FAQ.md	
+how do I delete a study	docs/USER_GUIDE.md|FAQ.md|plasbench/cli.py|README.md	
+how do I import a study bundle	docs/USER_GUIDE.md|plasbench/cli.py|FAQ.md|README.md	
+how do I freeze a pre-registration	docs/USER_GUIDE.md|README.md|plasbench/cli.py|FAQ.md	
+what is the headline analysis	README.md|docs/SCIENTIFIC_GUIDE.md|docs/METHODS.md	
+what ports does the window use	FAQ.md|SECURITY.md|docs/USER_GUIDE.md	
+is the window reachable from other computers	SECURITY.md|FAQ.md|docs/USER_GUIDE.md	
+docker permission denied on docker.sock	python/docker_diagnosis.py|INSTALL.md|FAQ.md	
+how do I enable WSL integration in docker desktop	INSTALL.md|python/docker_diagnosis.py|FAQ.md	
+wsl --shutdown what does it do	INSTALL.md|FAQ.md|docs/USER_GUIDE.md|python/docker_diagnosis.py	
+conda solve takes forever	INSTALL.md|FAQ.md|docs/TOOL_INSTALL_AUDIT.md	
+how do I update the conda lock file	INSTALL.md|README.md|FAQ.md	
+how do I run plasbench on a cluster	docs/RESOURCE_ADAPTATION.md|INSTALL.md|docs/USER_GUIDE.md|FAQ.md|README.md	
+how do I cite plasbench	README.md|FAQ.md|docs/publishing/README.md	
+what license is plasbench under	README.md|FAQ.md|SECURITY.md	
+how do I report a security problem	SECURITY.md|SUPPORT.md	
+What is the best way to learn about plasmid biology	-	
+what is a plasmid	-	general
+what is the difference between conjugative and mobilizable plasmids	-	general
+what is a beta-lactamase gene	-	general
+how does illumina sequencing work	-	general
+what is N50	-	general
+write me a poem about cats	-	offtopic
+what is the capital of france	-	offtopic
+it does not work	-	vague
+help	-	vague
+something is wrong with my files	-	vague

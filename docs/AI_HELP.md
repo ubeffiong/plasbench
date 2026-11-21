@@ -4,7 +4,7 @@ PlasBench has an assistant in the side panel of the window (the **AI help** tab,
 
 ## What the assistant can and cannot see
 
-**The assistant cannot see your files.** It has no access to your FASTQ or FASTA files, sample sheets, results, logs, reports, databases or settings, and it does not know what is on your computer. It knows PlasBench's documentation, a short non-personal setup line (version, system type, WSL or not, conda or Docker, the stage or failure the window knows about) and what you type or choose to send with **Send result** (redacted). It cannot check, open or analyse your data: to diagnose something it suggests a command, you run it, and you send the output. This is said in the first-use notice, in a line that stays under the chat, in `plasbench ask`, and to the model itself.
+**The assistant never opens your files.** If you choose a folder, PlasBench itself reads names, sizes and the first lines on your computer and shows you what it found; a summary goes to the assistant only when you press Share. Without that, it has no access to your FASTQ or FASTA files, sample sheets, results, logs, reports, databases or settings, and it does not know what is on your computer. It knows PlasBench's documentation, a short non-personal setup line (version, system type, WSL or not, conda or Docker, the stage or failure the window knows about) and what you type or choose to send (**Send result**, redacted; **Share**, a summary you have read). It cannot run anything without your click. This is said in the first-use notice, in a line that stays under the chat, in `plasbench ask`, and to the model itself.
 
 **It can ask you questions.** When a missing fact decides the answer (your system, whether you use Docker or conda, the stage, the exact error text, which file) it asks one short question and shows quick-reply buttons; a button only sends that text as your next message, it never runs anything. You can also type your own answer.
 
@@ -23,7 +23,7 @@ The index is a single file shipped inside the package (`plasbench/data/ai_kb.jso
 
 The answer cites the excerpts as small chips under it; a chip opens the guide section on the Guides page. If the excerpts do not answer a question about PlasBench itself (its commands, options, settings, metrics) the assistant is told to say "not in the documentation" and point to `plasbench issue-report`, not to guess.
 
-Measured on the 51 realistic questions of `test/fixtures/ai_gold.tsv` (install, Docker, WSL, commands, inputs, metrics, workflow, troubleshooting, exit codes, misspellings and error strings such as "You need approx 5.2 GB of free RAM" and "Could not open lockfile"): the right source is among the top three excerpts for all of them (the set of acceptable sources per question was widened after reading the misses: before that, 29 of 51 had the first-choice source in the top three). The average prompt is about 1,570 tokens (largest 1,830) without conversation history; the fixed instructions are about 410 of them.
+(Measured before the hardening pass.) Measured on the 51 realistic questions of `test/fixtures/ai_gold.tsv` (install, Docker, WSL, commands, inputs, metrics, workflow, troubleshooting, exit codes, misspellings and error strings such as "You need approx 5.2 GB of free RAM" and "Could not open lockfile"): the right source is among the top three excerpts for all of them (the set of acceptable sources per question was widened after reading the misses: before that, 29 of 51 had the first-choice source in the top three). The average prompt is about 1,570 tokens (largest 1,830) without conversation history; the fixed instructions are about 410 of them.
 
 ## Providers
 
@@ -88,7 +88,7 @@ The key or token is stored in `~/.plasbench/ai/<provider>.json` (mode 0600, fold
 
 ## The tokens it uses
 
-The system prompt is about 480 tokens and identical on every call (it was 410 before it learned to say it cannot see files, to ask a clarifying question and to use marked general knowledge). The excerpts are cut at sentence ends to about 1,400 tokens, deduplicated, with at most two per section. Only the last six turns are kept and each long turn is cut. Answers may use up to 2,000 tokens (600 with **Brief**); the assistant is told to be terse, and an answer that still reaches the model's length limit shows a **Continue** button. The pane shows the tokens of the last answer (from the provider's `usage`), today's requests and tokens, and, on OpenRouter, how many free requests are left today. PlasBench puts no daily limit of its own on the AI help: `AI_DAILY_TOKEN_CAP` defaults to 0 (none) and is there only if you want to set one. The providers' own limits (for example OpenRouter's free-model requests per minute and per day) still apply and are reported in plain words. Prompt caching: providers such as OpenAI and Gemini cache prefixes of 1,024 tokens or more automatically; this stable prefix is shorter than that, so expect little caching from it.
+The system prompt is about 540 tokens (budget: 560) and identical on every call (410 at first, 480 with the declaration and clarifying questions, 538 with the folder-summary rule and the limits rule). The action formats (window actions, file plans) are not in it: they come by retrieval from `docs/AI_CAPABILITIES.md`, as one extra excerpt, only when the question looks like navigation, setup, a file task or a question about what the assistant can do. The excerpts are cut at sentence ends to about 1,400 tokens, deduplicated, with at most two per section. Only the last six turns are kept and each long turn is cut. Answers may use up to 2,000 tokens (600 with **Brief**); the assistant is told to be terse, and an answer that still reaches the model's length limit shows a **Continue** button. The pane shows the tokens of the last answer (from the provider's `usage`), today's requests and tokens, and, on OpenRouter, how many free requests are left today. PlasBench puts no daily limit of its own on the AI help: `AI_DAILY_TOKEN_CAP` defaults to 0 (none) and is there only if you want to set one. The providers' own limits (for example OpenRouter's free-model requests per minute and per day) still apply and are reported in plain words. Prompt caching: providers such as OpenAI and Gemini cache prefixes of 1,024 tokens or more automatically; this stable prefix is shorter than that, so expect little caching from it.
 
 ## Commands the assistant suggests
 
@@ -122,3 +122,53 @@ The checks (`plasbench/ai_actions.py`): one plain `plasbench` command; no pipes,
 ## What was verified, and what was not
 
 Verified by tests against local stand-ins for OpenRouter, Hugging Face and an Ollama-style server (`test/ai_stub.py`): the PKCE vector of RFC 7636, the one-time state, the callback page, key storage and its absence from every response, log and report, the free-only rule (paid models, routers and a model that turned paid are never offered or called), streaming with usage, the error mapping, the fallback, abort, the routes' token, Host and origin checks, the command checks and the prompt-injection cases, redaction, the knowledge index, and the page in a real browser (Edge, headless: the pop-up that opens, redirects back and closes itself, a streamed answer, an action card, the consent dialog before a run, Send result, escaping, phone width). **Not verified here**: a real sign-in at OpenRouter or Hugging Face, a real model's answer, real free-tier limits and any cost; the provider documentation was read on 21 November 2026.
+
+## Threat model
+
+Assets: the provider key or token (`~/.plasbench/ai/*.json`); the window's session token; the person's files; the person's trust in what a card says it will do.
+
+Attackers and what stops them:
+
+| Attacker | What it can try | Guard | Test |
+| --- | --- | --- | --- |
+| A malicious or confused model | A command with shell text, a lookalike command (Cyrillic or zero-width letters), a plan that deletes or leaves the folder, a setting that raises its own privileges, a reply made to hang the parser | Commands are checked by `ai_actions.validate` (plain ASCII only, one `plasbench` command, real parser); window actions by an allowlist (`ai_ui.py`); plans by a closed operation set and the folder grant; `AI_*`, secret, path and scoring-decision settings are never settable; the block pattern is linear (it was quadratic: 60,000 spaces took 36 s); blocks over 60 KB stay plain text | `test_ai_window_actions.py`, `test_ai_files.py`, `test_ai_actions.py` |
+| Prompt injection through retrieved documents, command output or folder content | A pb-action fence in a document, a FASTA header or a sheet cell | Only the model's own reply is parsed for blocks; every quoted source is defused (`defuse`, `ai_folder.clean`) and wrapped as data (`<doc>`, `<out>`, `<dir>`); a proposal still needs validation and a click | `test_ai_actions.py`, `test_ai_folder.py`, `test_ai_files.py` (hostile names and cells) |
+| A hostile web page talking to localhost | Read status or usage, start a sign-in, call a folder route | Every `/api/ai/` route needs the session token (an HttpOnly, SameSite=Strict cookie or header), a loopback Host (DNS rebinding) and, for POST and now GET too, a same-origin Origin | `test_ai_routes.py`, `test_ai_routes2.py` |
+| Another local user | Read the key file | Files are created 0600 in a 0700 folder where the system supports it; on Windows the home folder's own ACL applies (not changed here) | `test_ai_providers.py` |
+| A malicious `AI_LOCAL_BASE` or other base address | Send the key or the questions to another host | Loopback only unless `AI_LOCAL_ALLOW_REMOTE=1`; the other base settings are documented as "set only to a service you trust" | `test_ai_providers.py` |
+| A hostile provider response | An endless line, a 3 MB event, an error inside a 200 stream, a stream that stops without finishing | Lines are capped at 1 MB and a stream at 8 MB; an error object becomes an error with the partial text kept; a stream that ends with no finish reason is marked cut and the pane offers Continue | `test_ai_hardening.py` |
+| Hostile folder content | Names or cells with control, bidi or zero-width characters, `..`, device names, links that point outside | `ai_folder.check_name` and `Grant.resolve` (realpath containment, no links or junctions, no hidden or system entries), `clean()` on everything shown or shared | `test_ai_folder.py`, `test_ai_files.py` |
+
+Not defended: a person who is tricked into pressing Apply on a plan whose dry run they did not read; a provider that logs prompts (see the notice); malware already running as the same user.
+
+## Window actions
+
+The model may write one fenced `pb-ui` block (up to 3 per reply). The server validates it (`plasbench/ai_ui.py`, route `ai/ui/validate`, again on every click); the page shows a card and calls the window's existing functions.
+
+| id | What it may do | Risk | Confirmation | Undo | Tests |
+| --- | --- | --- | --- | --- | --- |
+| `go` | Open a page (home, setup, tools, addtool, prereg, settings, workspace, git, wizard, isolates, cohorts, runs, jobs, commands, help) and a sub-page (runs tabs, a guide name) | safe | none | browser Back | `test_ai_window_actions.py` |
+| `setting` | Change one Settings key | changes files | dialog with old and new value | an Undo button restores the old value | same; refuses `AI_*`, key, token, e-mail, path and address settings, scoring decisions (thresholds, `HEADLINE_*`, `CPRR_*`, anything with a range in `config/setting_ranges.tsv`), a switch that is not 0 or 1, text over 80 characters or with shell characters |
+| `prefill` | Fill New benchmark fields (source, cohort, study, max isolates, order, local inputs, a sheet inside the chosen folder) | safe | none; nothing starts | edit the form | same |
+| `open` | Open the report, or type a validated command in the Terminal tab | safe | none; Enter still needed | none | same |
+| `install` | Start the install dialog for one tool profile | destructive | the existing install dialog | none (remove by hand) | same |
+| `runtime` | Switch conda or Docker | changes files | dialog | switch back | same |
+| `flow` | Start a guided flow | safe | each step asks | none | same |
+
+## A folder, and file plans
+
+Choose a folder with the pane's **Choose a folder** (the native Browse picker). The grant is per session; the **remember** tick stores it in `~/.plasbench/ai/grants.json`. A chip shows its name and a **Revoke** button. Reads and writes stay inside it (realpath containment; links and junctions, hidden and system entries, `..`, drive and absolute paths, Windows device names, trailing dots and spaces, bidi and zero-width characters are refused).
+
+**Look inside** (`ai_folder.scan`, read only, bounded to 4 levels, 3,000 entries, 12 s, 256 KB per sheet): file types, FASTQ pairs (`_R1/_R2`, `_1/_2`, Illumina lane names) with the first records checked, FASTA record counts and duplicate ids, sheets checked with the stage-0 rules of `scripts/lib.sh` (`validate_sample_sheet`) and the delimiter rule, Excel workbooks reported as unsupported. The result is shown first as a card with the exact text that **Share** would send (about 800 tokens at most, relative names only, nothing absolute, cleaned and marked as data). **Share this summary** shows that text again in a confirmation; only then does it go with your next message, once. The server makes the summary itself; text from the page is ignored.
+
+A file plan (`pb-files`, from the model, or made by the guided flows without one) holds operations from a closed set: `mkdir`, `copy`, `move` (also rename), `write_sheet`, `patch_sheet`. Never: delete, overwrite without a backup, write outside the folder, link, change permissions, run anything, hidden or system files, binary edits; compress and decompress are not offered. The dry run (`ai/files/plan`) lists every operation with its check box, bytes to copy, free space (a margin of 50 MB), collisions (also names that differ only in letter case) and a unified diff for sheets. A sheet repair is offered only when the repaired sheet passes the sheet check; a change to sample ids is flagged and needs a second confirmation. **Apply** re-validates, runs in the background with progress and Cancel, and writes a journal (`~/.plasbench/ai/journal/<id>/journal.json`, plus backups of replaced sheets); a failure or cancel rolls back what was done; **Undo** restores, leaving alone any file that changed since. Rate limits: 10 scans, 30 plan checks, 8 applies, 8 undos and 60 action checks a minute. The audit log `~/.plasbench/ui/ai.log` holds the action id, the outcome and counts, never a name or a path.
+
+## Guided flows (work without a model)
+
+Quick-action chips in the pane, also startable by a `pb-ui` `flow` card. *Set up a run from my folder*: scan, name the study, a plan that lays reads out as `data/<id>/<id>_1.fastq.gz` and writes `config/my_isolates.tsv` (reads only, `assembly_accession` NA), then a card that fills the New benchmark form (the command is reviewed on its last step). *Fix my sample sheet*: mechanical repairs only (tab separator, column names, unsafe ids). *Install the tools I need*: the existing install-enabled dialog. *Add my own tool*: questions, then the manifest that `plasbench tools new` would write (same builder) checked by `plasbench tools validate`'s checks, shown, and saved with the existing save route. *Why did my last run fail?*: the safe `plasbench diagnose` card, then Send result.
+
+## Hardening pass: measured results
+
+Retrieval (`python test/ai_gold_eval.py`): 51 in-sample questions (tuned on) 51/51 at top 3; 67 held-out questions with a source (written before the pass, never tuned on) 62/67 = 93% (61/67 before the pass); 11 more need no source (general knowledge, off topic, vague). A question whose best excerpt contains little of its words and scores low (a poem) now sends no excerpt; weak tails below 0.3 of the best score are dropped. The held-out misses are listed by the script. Real model behaviour with these actions was not measured.
+
+The UI review table is in `docs/qa/AI_UI_REVIEW.md`.

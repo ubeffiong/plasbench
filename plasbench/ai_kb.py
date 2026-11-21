@@ -168,6 +168,35 @@ class KB:
                 break
         return picked
 
+    def coverage(self, query: str, i: int) -> float:
+        """The share of the question's words (weighted by how rare each is; a word found nowhere in the index counts fully) that chunk i contains."""
+        toks = set(tokens(query))
+        if not toks:
+            return 0.0
+        top = math.log(1 + (self.n + 0.5) / 0.5)
+        w = {t: (self.idf(t) if t in self.df else top) for t in toks}
+        return sum(w[t] for t in toks if t in self.tf[i]) / sum(w.values())
+
+    def relevant(self, query: str, k: int = 5, hint: str = "", min_cover: float = 0.25, weak_score: float = 7.0, keep: float = 0.3, per_source: int = 2) -> list:
+        """search(), then only what is worth sending: none when even the best chunk contains little of the question and scores low (an off-topic or empty question: the model answers
+        from its own knowledge and the excerpts' tokens are saved), and otherwise only chunks that score at least `keep` times the best (a weak tail is noise)."""
+        scores = self.score_all(query, hint)
+        if not scores:
+            return []
+        best = max(scores, key=lambda i: (scores[i], -i))
+        if self.coverage(query, best) < min_cover and scores[best] < weak_score:
+            return []
+        hits = self.search(query, k, hint, per_source)
+        return [h for n, h in enumerate(hits) if n == 0 or h["score"] >= keep * hits[0]["score"]]
+
+    def from_source(self, query: str, src: str, k: int = 1, hint: str = "") -> list:
+        """The best k chunks of ONE source (by the same ranking), for material that is delivered by intent rather than by the permanent prompt."""
+        scores = self.score_all(query, hint)
+        ranked = [i for i in sorted(scores, key=lambda i: (-scores[i], i)) if self.chunks[i]["src"] == src]
+        if not ranked:
+            ranked = [i for i, c in enumerate(self.chunks) if c["src"] == src]
+        return [dict(self.chunks[i], score=round(scores.get(i, 0.0), 3)) for i in ranked[:k]]
+
 
 _LOCK = threading.Lock()
 _CACHE = {}

@@ -58,6 +58,9 @@ def parse_command(cmd: str):
         ch = bad.group(0)
         shown = {"\n": "a line break", "\r": "a line break", "\t": "a tab", "\\": "a backslash"}.get(ch, repr(ch))
         return None, f"it contains {shown}: only one plain plasbench command is run from here (no pipes, redirects, chained commands, variables or quoting tricks)"
+    odd = next((ch for ch in cmd if not (ch == " " or "!" <= ch <= "~")), None)
+    if odd is not None:     # a lookalike letter (Cyrillic a), a zero-width or direction-changing character, a non-breaking space: it can look like `plasbench status` and not be it
+        return None, "it contains a character that is not plain ASCII (U+%04X): a lookalike or invisible character can hide what a command really is" % ord(odd)
     if "&&" in cmd or "||" in cmd:
         return None, "it chains commands"
     try:
@@ -141,7 +144,10 @@ def validate(cmd: str, where: str = "window", risk: str = "") -> dict:
     return out
 
 
-_BLOCK = re.compile(r"```[ \t]*(pb[-_ ]?action|pb[-_ ]?ask|json|js|javascript)?[ \t]*\r?\n(.*?)(?:```|\Z)", re.S | re.I)
+# One run of blanks only: `[ \t]*(tag)?[ \t]*` was quadratic on a long run of spaces (60,000 spaces took 36 s), so a reply could freeze the window's thread.
+_BLOCK = re.compile(r"```(?:[ \t]*(pb[-_ ]?action|pb[-_ ]?ask|pb[-_ ]?ui|pb[-_ ]?files|json|js|javascript)[ \t]*)?\r?\n(.*?)(?:```|\Z)", re.S | re.I)
+MAX_BLOCK = 60000     # a block longer than this is never read as a proposal (it stays plain text)
+MAX_REPLY = 400000    # the part of a reply that is searched for blocks
 _TRAILING_COMMA = re.compile(r",(\s*[}\]])")
 
 
@@ -175,6 +181,8 @@ def lenient_json(text: str):
     """The object in a block that a small model wrote: smart quotes, trailing commas, text after the object, an unclosed fence are tolerated. Returns a dict or None.
 
     This only reads the SHAPE of the proposal. What the command may be is decided by validate(), which is not lenient at all."""
+    if len(text or "") > MAX_BLOCK:
+        return None
     raw = _first_object((text or "").replace("“", '"').replace("”", '"').replace("’", "'"))
     if raw is None:
         return None
@@ -182,7 +190,7 @@ def lenient_json(text: str):
         try:
             obj = json.loads(candidate)
             return obj if isinstance(obj, dict) else None
-        except ValueError:
+        except (ValueError, RecursionError):
             pass
     try:                                         # a Python-style object with single quotes
         import ast
@@ -207,35 +215,59 @@ def clean_ask(obj):
     return {"q": re.sub(r"\s+", " ", obj["q"]).strip()[:ASK_TEXT], "options": options}
 
 
-def parse_reply(reply: str) -> dict:
-    """{"text": the reply without the blocks that were read as actions, "actions": [validated actions]}.
+def clean_files(obj):
+    """A file plan the model proposes: {"ops": [...], "why": text} with at most 40 plain-JSON operations, or None. The plan is only SHAPED here; the folder grant, the closed
+    operation set and the sheet checks are applied by plasbench/ai_files.py when the person looks at it (the dry run), and again when the person presses Apply."""
+    if not isinstance(obj, dict) or not isinstance(obj.get("ops"), list) or not obj["ops"] or len(obj["ops"]) > 40:
+        return None
+    if not all(isinstance(o, dict) and isinstance(o.get("op"), str) for o in obj["ops"]):
+        return None
+    try:
+        if len(json.dumps(obj["ops"])) > 48000:
+            return None
+    except (TypeError, ValueError):
+        return None
+    return {"ops": obj["ops"], "why": re.sub(r"\s+", " ", str(obj.get("why") or "")).strip()[:240]}
+
+
+def parse_reply(reply: str, project=None) -> dict:
+    """{"text": the reply without the blocks that were read as proposals, "actions": [validated commands], "asks": [question], "ui": [window actions], "files": [file plans]}.
 
     A block is an action when it is a ```pb-action fence (or a ```json fence that has "cmd", "where" and "why") holding an object with a string "cmd". A block that cannot be read
-    stays in the text as a plain code block and never becomes an action. At most MAX_ACTIONS are taken. Only text the MODEL wrote is passed here: retrieved excerpts and command
-    output are never parsed for actions, and the prompt builder defuses any such fence in them."""
-    reply = reply or ""
-    actions, asks, pieces, last = [], [], [], 0
+    stays in the text as a plain code block and never becomes a proposal. At most MAX_ACTIONS commands, MAX_UI window actions and one file plan are taken. Only text the MODEL wrote
+    is passed here: retrieved excerpts, command output and folder content are never parsed for proposals, and the prompt builder defuses any such fence in them."""
+    from . import ai_ui
+    reply = (reply or "")[:MAX_REPLY]
+    actions, asks, uis, files, pieces, last = [], [], [], [], [], 0
     for m in _BLOCK.finditer(reply):
-        tag = (m.group(1) or "").lower()
+        tag = re.sub(r"[-_ ]", "", (m.group(1) or "").lower())
         obj = lenient_json(m.group(2)) if tag else None
-        if isinstance(obj, dict) and "q" in obj and "cmd" not in obj and (("ask" in tag and tag.startswith("pb")) or "options" in obj):
+        take = False
+        if tag == "pbui" and isinstance(obj, dict):
+            if len(uis) < ai_ui.MAX_UI:
+                uis.append(ai_ui.validate(obj, project))
+            take = True
+        elif tag == "pbfiles" and isinstance(obj, dict):
+            plan = clean_files(obj)
+            if plan and not files:
+                files.append(plan)
+            take = plan is not None
+        elif isinstance(obj, dict) and "q" in obj and "cmd" not in obj and (tag == "pbask" or "options" in obj):
             ask = clean_ask(obj)
             if ask:                      # a valid question is always taken out of the text; only the first one is kept
                 if len(asks) < MAX_ASKS:
                     asks.append(ask)
-                pieces.append(reply[last:m.start()])
-                last = m.end()
-            continue
-        is_action = isinstance(obj, dict) and isinstance(obj.get("cmd"), str) and (tag.startswith("pb") or ("where" in obj and "why" in obj))
-        if not is_action or len(actions) >= MAX_ACTIONS:
-            continue
-        v = validate(obj["cmd"], str(obj.get("where") or "terminal"), str(obj.get("risk") or ""))
-        v["why"] = str(obj.get("why") or "")[:240]
-        actions.append(v)
-        pieces.append(reply[last:m.start()])
-        last = m.end()
+                take = True
+        elif isinstance(obj, dict) and isinstance(obj.get("cmd"), str) and (tag.startswith("pb") or ("where" in obj and "why" in obj)) and len(actions) < MAX_ACTIONS:
+            v = validate(obj["cmd"], str(obj.get("where") or "terminal"), str(obj.get("risk") or ""))
+            v["why"] = str(obj.get("why") or "")[:240]
+            actions.append(v)
+            take = True
+        if take:
+            pieces.append(reply[last:m.start()])
+            last = m.end()
     pieces.append(reply[last:])
-    return {"text": re.sub(r"\n{3,}", "\n\n", "".join(pieces)).strip(), "actions": actions, "asks": asks}
+    return {"text": re.sub(r"\n{3,}", "\n\n", "".join(pieces)).strip(), "actions": actions, "asks": asks, "ui": uis, "files": files}
 
 
 def extract_actions(reply: str) -> list:
