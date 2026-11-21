@@ -1,0 +1,356 @@
+<script>
+/* PlasBench comparison summary, interface: a compact chart per question above the full table, hover tooltips, tool filter and order, a drill-down
+   drawer (cell, tool, metric) with the per-isolate values, keyboard use (Tab, arrow keys, Enter, Escape) and a link into the full table.
+   Reads the data block of each .ct (the same one the grid uses) through PBCT / PBCS; it computes no score. Without JavaScript the full table stays open. */
+(function () {
+'use strict';
+var P = window.PBCT, Q = window.PBCS; if (!P || !Q) return;
+var esc = P.esc;
+function $(root, sel) { return root.querySelector(sel); }
+function $$(root, sel) { return Array.prototype.slice.call(root.querySelectorAll(sel)); }
+function fmtNum(x) { if (x == null) return ''; var a = Math.abs(x); return String(a !== 0 && (a < 0.001 || a >= 1e7) ? Number(x.toPrecision(4)) : Math.round(x * 10000) / 10000); }
+function dirText(d) { return d === 'higher' ? 'higher is better' : d === 'lower' ? 'lower is better' : 'direction not defined'; }
+function arrow(d) { return d === 'higher' ? '▲' : d === 'lower' ? '▼' : ''; }
+function tcls(ci) { return 't' + (ci % 8); }
+function clip(t, n) { t = String(t || ''); return t.length > n ? t.slice(0, n - 1) + '…' : t; }
+
+function init(root) {
+  var host = $(root, '.cs'), blk = $(root, 'script.ct-data'), det = $(root, 'details.ct-all'); if (!host || !blk) return;
+  var D; try { D = JSON.parse(blk.textContent); } catch (e) { return; }
+  if (!D.cols || !D.cols.length) return;
+  var GQ = {}; try { GQ = JSON.parse(document.getElementById('cs-groups').textContent); } catch (e) { GQ = {}; }
+  var metrics = {}; D.groups.forEach(function (g) { var qh = GQ[g.t] || []; g.q = qh[0]; g.h = qh[1]; g.m.forEach(function (m) { m.g = g.t; metrics[m.id] = m; }); });
+  var tracks = []; D.cols.forEach(function (c) { if (c.track && tracks.indexOf(c.track) < 0) tracks.push(c.track); });
+  var S = {off: {}, order: D.cols.map(function (_, i) { return i; }), view: 'dots', sel: null, track: '', sortedBy: '', focus: ''};
+  var uid = D.id + '-cs';
+  host.innerHTML = '<div class="cs-body"></div><div class="cs-drawer" role="region" hidden tabindex="-1"></div><div class="cs-tip" role="tooltip" hidden></div><div class="cs-live" aria-live="polite"></div>';
+  var body = $(host, '.cs-body'), drawer = $(host, '.cs-drawer'), tip = $(host, '.cs-tip'), live = $(host, '.cs-live');
+  if (det) det.removeAttribute('open');
+  root.classList.add('cs-on');
+
+  function cols() { return S.order.filter(function (ci) { return !S.off[ci] && (!S.track || D.cols[ci].track === S.track); }); }
+  function cell(mid, ci) { return Q.cellOf(D, mid, ci); }
+  function label(ci) { return D.cols[ci].label; }
+  function ndot(ci) { return '<span class="cs-n ' + tcls(ci) + '" aria-hidden="true">' + (ci + 1) + '</span>'; }
+  function say(msg) { live.textContent = msg; }
+
+  /* ---- text of the tooltips (exact value, interval, n, rank, definition) */
+  function rankLine(R, k) {
+    var c = R.cells[k];
+    if (c.na) return 'not assessed: ' + c.na + ' (never shaded, never zero)';
+    if (c.rank == null) return Q.whyText(R.status) || 'not ranked';
+    return 'rank ' + c.rank + ' of ' + R.assessed + (c.best ? ', best' : '') + (R.status === 'all_tied' ? ' (all tied)' : '');
+  }
+  function cellTip(m, c, R, k) {
+    var t = label(c.ci) + ' – ' + m.name + ': ' + (c.na ? 'not assessed' : c.disp);
+    if (c.lo != null && c.hi != null) t += '\nInterval ' + fmtNum(c.lo) + ' to ' + fmtNum(c.hi);
+    if (c.n != null) t += '\nn = ' + c.n + ' isolates';
+    t += '\n' + rankLine(R, k) + '\n' + dirText(m.dir);
+    if (m.def) t += '\n' + clip(m.def, 170);
+    return t;
+  }
+
+  /* ---- rendering */
+  function chipsHtml(cs) {
+    var chips = Q.toolChips(D, cs), byCi = {}; chips.forEach(function (c) { byCi[c.ci] = c; });
+    var out = '<ul class="cs-chips" aria-label="Tools: tick to show or hide, open a profile">';
+    S.order.forEach(function (ci) {
+      if (S.track && D.cols[ci].track !== S.track) return;
+      var off = !!S.off[ci], c = byCi[ci], rk = '';
+      if (!off && cs.length > 1) {
+        rk = c.official ? '<span class="cs-rk" data-tip="Rank given by the source table (the Table below).">' + esc(c.official) + '</span>'
+          : (c.mean != null ? '<span class="cs-rk" data-tip="Average rank over the ' + c.n + ' rows that could be ranked among the tools shown (1 is best). A summary of the shaded rows, not a score.">avg ' + (Math.round(c.mean * 10) / 10) + '</span>' : '');
+      }
+      out += '<li class="cs-chip' + (off ? ' cs-off' : '') + (S.sel && S.sel.ci === ci && S.sel.kind === 'tool' ? ' cs-sel' : '') + '">' +
+        '<button type="button" role="checkbox" aria-checked="' + (off ? 'false' : 'true') + '" data-cs-toggle="' + ci + '" data-key="c:' + ci + '" aria-label="Show ' + esc(label(ci)) + ' in the charts">' + ndot(ci) + esc(label(ci)) + '</button>' + rk +
+        '<button type="button" data-cs-tool="' + ci + '" data-key="p:' + ci + '" aria-label="Open the profile of ' + esc(label(ci)) + '" data-tip="Profile of ' + esc(label(ci)) + ': every metric, with rank">›</button></li>';
+    });
+    return out + '</ul>';
+  }
+  function controlsHtml() {
+    var h = '<div class="cs-ctl"><span class="cs-seg" role="group" aria-label="View"><button type="button" data-cs-view="dots" aria-pressed="' + (S.view === 'dots') + '">Chart</button>' +
+      '<button type="button" data-cs-view="heat" aria-pressed="' + (S.view === 'heat') + '">Heatmap</button></span>';
+    if (tracks.length > 1) h += '<label>Track <select data-cs-track aria-label="Show tools of one track"><option value="">all</option>' + tracks.map(function (t) { return '<option' + (S.track === t ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select></label>';
+    return h + '</div>';
+  }
+  function whyIcon(R) {
+    var w = Q.whyText(R.status); return w ? '<span class="cs-why" tabindex="0" role="img" aria-label="' + esc(w) + '" data-tip="' + esc(w) + '">ⓘ</span>' : '';
+  }
+  function valueHtml(R, cs) {
+    var m = R.m, cells = R.cells, best = cells.filter(function (c) { return c.best; }), tipAll = cells.map(function (c) { return label(c.ci) + ': ' + (c.na ? 'not assessed' : c.disp); }).join('\n');
+    var t = '';
+    if (R.status === 'ok') {
+      t = '<span class="cs-star" aria-hidden="true">★</span> ' + ndot(best[0].ci) + ' <b>' + esc(Q.shortText(best[0].disp)) + '</b>' + (best.length > 1 ? ' +' + (best.length - 1) + ' tied' : '');
+    } else if (R.status === 'all_tied') {
+      var one = cells.filter(function (c) { return !c.na && c.v != null; })[0]; t = 'all tied · <b>' + esc(Q.shortText(one ? one.disp : '')) + '</b>';
+    } else if (R.status === 'too_few') {
+      var o = cells.filter(function (c) { return !c.na && c.v != null; })[0]; t = o ? ndot(o.ci) + ' <b>' + esc(Q.shortText(o.disp)) + '</b>' : 'not assessed';
+    } else {
+      t = cells.map(function (c) { return c.na ? '–' : esc(Q.shortText(c.disp, 12)); }).join(' · ');
+    }
+    return '<div class="cs-val" data-tip="' + esc(tipAll) + '">' + t + '</div>';
+  }
+  function rowHtml(m, cs) {
+    var R = Q.rowModel(D, m, cs), maxLane = 0, dots = '', cis = '', allNa = R.assessed === 0;
+    R.cells.forEach(function (c) { if (c.lane > maxLane) maxLane = c.lane; });
+    var H = maxLane > 1 ? 40 : (maxLane ? 32 : 22), offs = maxLane === 1 ? [-6, 6] : [0, -9, 9];
+    R.cells.forEach(function (c, k) {
+      if (c.na || c.v == null) return;
+      var y = 'top:calc(50% + ' + (offs[c.lane] || 0) + 'px)';
+      if (c.lop != null && c.hip != null) cis += '<span class="cs-ci ' + tcls(c.ci) + '" style="left:' + c.lop + '%;width:' + Math.max(0.5, c.hip - c.lop) + '%;' + y + '" aria-hidden="true"></span>';
+      var aria = label(c.ci) + ', ' + m.name + ': ' + c.disp + '; ' + rankLine(R, k);
+      dots += '<button type="button" class="cs-dot ' + tcls(c.ci) + (c.best ? ' cs-best' : '') + (R.status !== 'ok' && R.status !== 'all_tied' ? ' cs-plain' : '') + '" style="left:' + c.pos + '%;' + y + '" data-nav data-key="d:' + m.id + ':' + c.ci +
+        '" data-m="' + esc(m.id) + '" data-c="' + c.ci + '" aria-label="' + esc(aria) + '" data-tip="' + esc(cellTip(m, c, R, k)) + '">' + (c.ci + 1) + '</button>';
+    });
+    var sc = R.scale, ax = sc.kind === 'unit' ? '' : '<span class="cs-ax" style="left:0">' + esc(fmtNum(sc.lo)) + '</span><span class="cs-ax" style="right:0">' + esc(fmtNum(sc.hi)) + (sc.kind === 'percent' || (sc.kind === 'zoom' && sc.natural.kind === 'percent') ? '%' : '') + '</span>';
+    return '<div class="cs-row" data-m="' + esc(m.id) + '"><div class="cs-lab"><button type="button" class="cs-m" data-cs-metric="' + esc(m.id) + '" data-key="m:' + esc(m.id) + '" data-tip="' + esc(clip((m.def || 'No definition recorded.') + ' (' + dirText(m.dir) + ')', 200) + (sc.kind === 'zoom' ? '\nThe axis is zoomed to ' + fmtNum(sc.lo) + ' to ' + fmtNum(sc.hi) + ' because the tools are close together.' : '')) + '">' +
+      esc(m.name) + '<span class="cs-dir" aria-label="' + dirText(m.dir) + '">' + arrow(m.dir) + '</span></button>' + whyIcon(R) + '</div>' +
+      '<div class="cs-track' + (allNa ? ' cs-hatched' : '') + '" style="height:' + H + 'px" role="group" aria-label="' + esc(m.name) + ' by tool, axis ' + fmtNum(sc.lo) + ' to ' + fmtNum(sc.hi) + '">' + ax + cis + dots + '</div>' +
+      (allNa ? '<div class="cs-val">not assessed</div>' : valueHtml(R, cs)) + '</div>';
+  }
+  function factsHtml(ms, cs, shade, hint) {
+    var same = [];
+    if (!shade && cs.length > 1) {
+      ms = ms.filter(function (m) {
+        var cells = cs.map(function (ci) { return cell(m.id, ci); });
+        if (cells.some(function (c) { return c.na || c.v == null; }) || cells.some(function (c) { return c.disp !== cells[0].disp; })) return true;
+        same.push('<b>' + esc(m.name) + '</b> ' + esc(Q.shortText(cells[0].disp, 24))); return false;
+      });
+    }
+    var sameHtml = same.length ? '<p class="cs-same" data-tip="The same value for every tool shown.">Same for every tool: ' + same.join(' · ') + '</p>' : '';
+    if (!ms.length) return sameHtml;
+    if (!shade && ms.length > cs.length) return factsAcross(ms, cs) + sameHtml;
+    var h = '<table class="cs-facts"><thead><tr><th scope="col">Metric</th>' + cs.map(function (ci) { return '<th scope="col" title="' + esc(label(ci)) + '">' + ndot(ci) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    ms.forEach(function (m) {
+      var R = Q.rowModel(D, m, cs), shaded = shade && (R.status === 'ok');
+      h += '<tr><th scope="row"><button type="button" class="cs-m" data-cs-metric="' + esc(m.id) + '" data-key="m:' + esc(m.id) + '" data-tip="' + esc(clip((m.def || 'No definition recorded.') + ' (' + dirText(m.dir) + ')', 220)) + '">' + esc(clip(m.name, 34)) + '<span class="cs-dir">' + arrow(m.dir) + '</span></button>' + whyIcon(R) + '</th>';
+      R.cells.forEach(function (c, k) {
+        var cls = c.na ? 'cs-na' : (shaded && c.bucket != null ? 'ct-s' + c.bucket : ''), txt = c.na ? '–' : Q.shortText(c.disp, 30);
+        var aria = label(c.ci) + ', ' + m.name + ': ' + (c.na ? 'not assessed' : c.disp) + '; ' + rankLine(R, k);
+        h += '<td class="' + cls + '"><button type="button" data-nav data-key="f:' + esc(m.id) + ':' + c.ci + '" data-m="' + esc(m.id) + '" data-c="' + c.ci + '" aria-label="' + esc(aria) + '" data-tip="' + esc(cellTip(m, c, R, k)) + '">' +
+          (shaded && c.best ? '<span class="cs-star" aria-hidden="true">★</span> ' : '') + esc(txt) + '</button></td>';
+      });
+      h += '</tr>';
+    });
+    return h + '</tbody></table>' + sameHtml + (hint ? '<p class="cs-fh">' + hint + '</p>' : '');
+  }
+  /* the same values with the tools as rows and the metrics across: less height when a block has more metrics than tools */
+  function factsAcross(ms, cs) {
+    var rs = ms.map(function (m) { return Q.rowModel(D, m, cs); });
+    var h = '<table class="cs-facts cs-across"><thead><tr><th scope="col">Tool</th>' + ms.map(function (m, j) {
+      return '<th scope="col"><button type="button" class="cs-m" data-cs-metric="' + esc(m.id) + '" data-key="m:' + esc(m.id) + '" data-tip="' + esc(clip((m.def || 'No definition recorded.') + ' (' + dirText(m.dir) + ')', 220)) + '">' + esc(clip(m.name, 22)) + '</button>' + whyIcon(rs[j]) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    cs.forEach(function (ci, k) {
+      h += '<tr><th scope="row">' + ndot(ci) + ' ' + esc(label(ci)) + '</th>';
+      ms.forEach(function (m, j) {
+        var R = rs[j], c = R.cells[k], txt = c.na ? '–' : Q.shortText(c.disp, 24), aria = label(ci) + ', ' + m.name + ': ' + (c.na ? 'not assessed' : c.disp) + '; ' + rankLine(R, k);
+        h += '<td class="' + (c.na ? 'cs-na' : '') + '"><button type="button" data-nav data-key="f:' + esc(m.id) + ':' + ci + '" data-m="' + esc(m.id) + '" data-c="' + ci + '" aria-label="' + esc(aria) + '" data-tip="' + esc(cellTip(m, c, R, k)) + '">' + esc(txt) + '</button></td>';
+      });
+      h += '</tr>';
+    });
+    return h + '</tbody></table>';
+  }
+  function stackHtml(g, ids, cs) {
+    var ms = ids.map(function (id) { return metrics[id]; }), tot = {}, max = 0;
+    cs.forEach(function (ci) {
+      var ok = ms.every(function (m) { var c = cell(m.id, ci); return !c.na && c.v != null; }), s = 0;
+      if (ok) ms.forEach(function (m) { s += cell(m.id, ci).v; }); tot[ci] = ok ? s : null; if (ok && s > max) max = s;
+    });
+    var key = ms.map(function (m) { return '<span class="cs-key"><i class="cs-seg-' + m.id + '"></i>' + esc(m.name) + '</span>'; }).join('');
+    var h = '<div class="cs-fh">' + key + 'Shorter is better; one scale for all bars (0 to ' + esc(fmtNum(Q.nice(max))) + (ms[0].unit ? ' ' + esc(ms[0].unit.replace('% of aligned columns', '%')) : '') + ').</div>';
+    cs.forEach(function (ci) {
+      var segs = '', txt;
+      if (tot[ci] == null) { segs = ''; txt = 'not assessed'; }
+      else {
+        ms.forEach(function (m) {
+          var c = cell(m.id, ci), R = Q.rowModel(D, m, cs), k = cs.indexOf(ci);
+          segs += '<button type="button" class="cs-seg-' + m.id + '" style="width:' + (max ? c.v / Q.nice(max) * 100 : 0) + '%" data-nav data-key="f:' + m.id + ':' + ci + '" data-m="' + esc(m.id) + '" data-c="' + ci + '" aria-label="' + esc(label(ci) + ', ' + m.name + ': ' + c.disp) + '" data-tip="' + esc(cellTip(m, R.cells[k], R, k)) + '"></button>';
+        });
+        var ds = ms.map(function (m) { return Q.shortText(cell(m.id, ci).disp, 10); }), allPct = ds.every(function (d) { return /%$/.test(d); });
+        txt = ms.map(function (m, j) { return esc(m.name.toLowerCase().slice(0, 4)) + ' ' + esc(allPct ? ds[j].slice(0, -1) : ds[j]); }).join(' · ') + (allPct ? ' %' : '');
+      }
+      h += '<div class="cs-err"><div class="cs-lab"><span class="cs-m" style="cursor:default">' + ndot(ci) + ' ' + esc(label(ci)) + '</span></div><div class="cs-stack" role="group" aria-label="' + esc(label(ci)) + ' error composition">' + segs + '</div><div class="cs-val" data-tip="' + txt.replace(/<[^>]+>/g, '') + '">' + txt + '</div></div>';
+    });
+    return h;
+  }
+  function groupHtml(g, cs) {
+    var comp = S.view === 'dots' ? Q.compositionOf(g) : null, plot = [], facts = [];
+    g.m.forEach(function (m) {
+      if (comp && comp.indexOf(m.id) >= 0) return;
+      if (S.view === 'dots' && Q.plottable(D, m, cs)) plot.push(m); else facts.push(m);
+    });
+    var title = g.q || g.t, h = '<div class="cs-g" role="group" aria-label="' + esc(title) + '"><h4 class="cs-gh">' + esc(title) +
+      (g.q ? ' <span class="cs-dir" style="font-weight:400">' + esc(g.t) + '</span>' : '') +
+      (g.h ? ' <button type="button" class="cs-info" aria-label="How to read this: ' + esc(g.h) + '" data-tip="' + esc(g.h) + '">ⓘ</button>' : '') + '</h4>';
+    h += plot.map(function (m) { return rowHtml(m, cs); }).join('');
+    if (comp) h += stackHtml(g, comp, cs);
+    if (facts.length) h += factsHtml(facts, cs, S.view === 'heat', '');
+    return h + '</div>';
+  }
+  function keyHtml() {
+    return '<p class="cs-fh cs-keyline"><span class="cs-n t0" aria-hidden="true">1</span> tool · ring and <span class="cs-star">★</span> best · ▲ higher / ▼ lower is better · bars run 0 to 1 unless an axis end is shown · <span class="cs-hatchkey" aria-hidden="true"></span> – not assessed (never zero) · ⓘ why not ranked · click anything for the isolates behind it</p>';
+  }
+  function render() {
+    var cs = cols(), focusKey = S.focus;
+    var one = cs.length === 1 ? '<p class="cs-one">' + (D.cols.length === 1 ? 'Only one tool assessed, so no ranking.' : 'Only one tool shown, so no ranking among tools.') + ' Values are drawn on a fixed scale (the same for every row of its kind), not compared with other tools.</p>' : '';
+    var state = S.sortedBy ? '<p class="cs-one">Tools ordered by ' + esc(metrics[S.sortedBy].name) + ' (best first). <button type="button" class="ct-btn" data-cs-reset>Reset order</button></p>' : '';
+    if (!cs.length) { body.innerHTML = '<div class="cs-bar">' + chipsHtml(cs) + controlsHtml() + '</div><p class="cs-one">No tool is shown. Tick a tool above.</p>'; }
+    else {
+      body.innerHTML = '<div class="cs-bar">' + chipsHtml(cs) + controlsHtml() + '</div>' + one + state +
+        '<div class="cs-groups">' + D.groups.map(function (g) { return groupHtml(g, cs); }).join('') + '</div>' + keyHtml();
+    }
+    // roving tabindex: one stop per chart, arrow keys move between marks
+    var navs = $$(body, '[data-nav]'), keep = navs.filter(function (b) { return b.getAttribute('data-key') === focusKey; })[0] || navs[0];
+    navs.forEach(function (b) { b.tabIndex = b === keep ? 0 : -1; });
+    if (focusKey) { var again = $$(body, '[data-key]').filter(function (b) { return b.getAttribute('data-key') === focusKey; })[0]; if (again && document.activeElement !== again && S.refocus) again.focus(); }
+    S.refocus = false;
+    paintSel();
+  }
+
+  /* ---- the drawer */
+  function isoBlock(m, c) {
+    var pairs = c.iso.map(function (p) { return [D.samples[p[0]], p[1], D.links ? D.links[p[0]] : null]; });
+    if (!pairs.length) return '<p class="ct-note">Per-isolate values are not stored for this cell, so none are shown.</p>';
+    var vals = pairs.map(function (p) { return p[1]; }), sc = Q.scaleFor(vals, []), ex = {}; P.outliers(vals).forEach(function (i) { ex[pairs[i][0]] = true; });
+    var link = {}; pairs.forEach(function (p) { link[p[0]] = p[2]; });
+    var ranked = P.rankIsolates(pairs.map(function (p) { return [p[0], p[1]]; }), m.dir), more = ranked.length > 40;
+    return '<ol class="cs-iso" aria-label="Isolates, ' + (m.dir ? 'best to worst' : 'input order') + '">' + ranked.slice(0, 40).map(function (p) {
+      var nm = link[p[0]] ? '<a href="' + esc(link[p[0]]) + '">' + esc(p[0]) + '</a>' : esc(p[0]);
+      return '<li class="' + (ex[p[0]] ? 'cs-ex' : '') + '"><span>' + nm + (ex[p[0]] ? ' (outlier)' : '') + '</span><span class="cs-ib" aria-hidden="true"><span style="width:' + Q.pos(p[1], sc) + '%"></span></span><span>' + esc(fmtNum(p[1])) + '</span></li>';
+    }).join('') + '</ol>' + (more ? '<p class="ct-note">' + (ranked.length - 40) + ' more isolates are in the full table.</p>' : '') +
+      '<p class="ct-note">' + pairs.length + ' isolates' + (pairs.length < 4 ? '' : ', orange = outside 1.5 × IQR') + '.</p>';
+  }
+  function head(title, sub) { return '<div class="cs-dh"><div><h4 tabindex="-1" class="cs-dt">' + esc(title) + '</h4>' + (sub ? '<div class="ct-note">' + esc(sub) + '</div>' : '') + '</div><button type="button" class="ct-btn cs-x" data-cs-close>Close</button></div>'; }
+  function cellDrawer(mid, ci) {
+    var m = metrics[mid], cs = cols(), R = Q.rowModel(D, m, cs.indexOf(ci) >= 0 ? cs : cs.concat([ci])), k = R.cells.map(function (c) { return c.ci; }).indexOf(ci), c = R.cells[k], col = D.cols[ci];
+    var h = head(m.name + ' – ' + col.label, [D.title, col.track, col.task].filter(Boolean).join(' · '));
+    h += '<div class="cs-big">' + esc(c.na ? 'not assessed' : c.disp) + '</div>' + (c.na ? '<p>' + esc(c.na) + '. It is not shaded and is never read as zero.</p>' : '');
+    h += '<div class="cs-cols"><div><dl class="cs-kv"><dt>Rank</dt><dd>' + esc(rankLine(R, k)) + '</dd><dt>Direction</dt><dd>' + esc(dirText(m.dir)) + '</dd><dt>Isolates (n)</dt><dd>' + (c.n != null ? c.n : 'not recorded') + '</dd>' +
+      '<dt>Interval</dt><dd>' + (c.lo != null && c.hi != null ? esc(fmtNum(c.lo) + ' to ' + fmtNum(c.hi)) : 'none recorded for this value') + '</dd>' +
+      '<dt>Track / task</dt><dd>' + esc([col.track, col.task].filter(Boolean).join(' · ') || 'see the table title') + '</dd>' +
+      '<dt>Evidence tier</dt><dd>' + esc(m.ev ? m.ev.replace(/_/g, ' ') : 'not recorded') + '</dd>' + (m.src ? '<dt>Comes from</dt><dd>' + esc(m.src) + '</dd>' : '') + '</dl>' +
+      '<p class="ct-note">' + esc(m.def || 'No definition is recorded for this metric.') + '</p>' + (m.lim ? '<p class="ct-note"><strong>Limits.</strong> ' + esc(clip(m.lim, 300)) + '</p>' : '') + '</div>' +
+      '<div><h5>Isolates behind this value' + (m.dir ? ', best to worst' : '') + '</h5>' + isoBlock(m, c) + '</div>' +
+      '<div><h5>Same metric, every tool shown</h5><ul class="cs-iso">' + Q.orderBy(D, m, R.cells.map(function (x) { return x.ci; })).map(function (cj) {
+        var o = cell(mid, cj); return '<li style="grid-template-columns:1fr auto"><span>' + ndot(cj) + ' <button type="button" class="ct-btn" data-cs-cell="' + esc(mid) + ':' + cj + '" ' + (cj === ci ? 'aria-current="true"' : '') + '>' + esc(label(cj)) + '</button></span><span>' + esc(o.na ? 'not assessed' : Q.shortText(o.disp, 30)) + '</span></li>'; }).join('') + '</ul></div></div>';
+    h += '<div class="cs-acts"><button type="button" class="ct-btn" data-cs-table="' + esc(mid) + ':' + ci + '">Show in the full table</button><button type="button" class="ct-btn" data-cs-metric="' + esc(mid) + '">Compare all tools on this metric</button>' +
+      '<button type="button" class="ct-btn" data-cs-tool="' + ci + '">Profile of ' + esc(col.label) + '</button></div>';
+    return h;
+  }
+  function metricDrawer(mid) {
+    var m = metrics[mid], cs = cols(), R = Q.rowModel(D, m, cs), order = Q.orderBy(D, m, cs);
+    var h = head(m.name, m.g) + '<p>' + esc(m.def || 'No definition is recorded for this metric.') + '</p><div class="cs-cols"><div><dl class="cs-kv"><dt>Direction</dt><dd>' + esc(dirText(m.dir)) + '</dd>' +
+      (m.unit ? '<dt>Unit</dt><dd>' + esc(m.unit) + '</dd>' : '') + (m.src ? '<dt>Comes from</dt><dd>' + esc(m.src) + '</dd>' : '') + '<dt>Evidence tier</dt><dd>' + esc(m.ev ? m.ev.replace(/_/g, ' ') : 'not recorded') + '</dd></dl>' +
+      (Q.whyText(R.status) ? '<p class="ct-note">' + esc(Q.whyText(R.status)) + '</p>' : '') + (m.lim ? '<p class="ct-note"><strong>Limits.</strong> ' + esc(clip(m.lim, 300)) + '</p>' : '') + '</div>' +
+      '<div><h5>' + (m.dir ? 'Tools, best first' : 'Tools') + '</h5><ul class="cs-iso">' + order.map(function (ci) {
+        var o = cell(mid, ci), k = R.cells.map(function (x) { return x.ci; }).indexOf(ci);
+        return '<li style="grid-template-columns:1fr auto"><span>' + ndot(ci) + ' <button type="button" class="ct-btn" data-cs-cell="' + esc(mid) + ':' + ci + '">' + esc(label(ci)) + '</button> <span class="ct-note">' + esc(R.cells[k].rank != null ? 'rank ' + R.cells[k].rank : '') + '</span></span><span>' + esc(o.na ? 'not assessed' : Q.shortText(o.disp, 30)) + '</span></li>'; }).join('') + '</ul></div></div>';
+    h += '<div class="cs-acts">' + (m.dir ? '<button type="button" class="ct-btn" data-cs-sort="' + esc(mid) + '">Order the tools by this metric</button>' : '') + '<button type="button" class="ct-btn" data-cs-table="' + esc(mid) + ':">Show in the full table</button></div>';
+    return h;
+  }
+  function toolDrawer(ci) {
+    var cs = cols().indexOf(ci) >= 0 ? cols() : cols().concat([ci]), col = D.cols[ci], best = 0, ranked = 0, rows = '';
+    D.groups.forEach(function (g) {
+      rows += '<div><h5>' + esc(g.q || g.t) + '</h5><ul class="cs-iso">';
+      g.m.forEach(function (m) {
+        var R = Q.rowModel(D, m, cs), k = R.cells.map(function (x) { return x.ci; }).indexOf(ci), c = R.cells[k];
+        if (c.rank != null && R.status === 'ok') { ranked++; if (c.best) best++; }
+        rows += '<li style="grid-template-columns:1fr auto"><span><button type="button" class="ct-btn" data-cs-cell="' + esc(m.id) + ':' + ci + '">' + esc(m.name) + '</button> <span class="ct-note">' + esc(c.na ? 'not assessed' : (c.rank != null ? 'rank ' + c.rank + '/' + R.assessed : '')) + '</span></span><span>' + esc(c.na ? '–' : Q.shortText(c.disp, 30)) + '</span></li>';
+      });
+      rows += '</ul></div>';
+    });
+    return head(col.label, [D.title, col.track, col.task].filter(Boolean).join(' · ')) + '<p>Best in ' + best + ' of ' + ranked + ' ranked rows (ranks are among the tools shown; rows with no direction, one assessed tool or all tied are not ranked).</p><div class="cs-cols" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))">' + rows + '</div>' +
+      '<div class="cs-acts"><button type="button" class="ct-btn" data-cs-table=":' + ci + '">Show in the full table</button></div>';
+  }
+  function openDrawer(sel, fromKey) {
+    S.sel = sel; if (fromKey) S.from = fromKey;
+    drawer.innerHTML = sel.kind === 'cell' ? cellDrawer(sel.mid, sel.ci) : sel.kind === 'metric' ? metricDrawer(sel.mid) : toolDrawer(sel.ci);
+    drawer.setAttribute('aria-label', 'Details: ' + (sel.kind === 'cell' ? metrics[sel.mid].name + ', ' + label(sel.ci) : sel.kind === 'metric' ? metrics[sel.mid].name : label(sel.ci)));
+    drawer.hidden = false; paintSel(); hideTip();
+    var h = $(drawer, '.cs-dt'); if (h) h.focus({preventScroll: true});
+    if (drawer.scrollIntoView) drawer.scrollIntoView({block: 'nearest', behavior: 'auto'});
+  }
+  function closeDrawer() {
+    S.sel = null; drawer.hidden = true; paintSel();
+    var back = S.from && $$(host, '[data-key]').filter(function (b) { return b.getAttribute('data-key') === S.from; })[0]; if (back) back.focus();
+  }
+  function paintSel() {
+    $$(host, '[aria-pressed="true"][data-nav]').forEach(function (b) { b.removeAttribute('aria-pressed'); });
+    $$(host, '.cs-chip.cs-sel').forEach(function (b) { b.classList.remove('cs-sel'); });
+    if (!S.sel) return;
+    if (S.sel.kind === 'cell') { $$(host, '[data-nav]').forEach(function (b) { if (b.getAttribute('data-m') === S.sel.mid && +b.getAttribute('data-c') === S.sel.ci) b.setAttribute('aria-pressed', 'true'); }); }
+    if (S.sel.kind === 'tool') { var li = $$(host, '[data-cs-tool]').filter(function (b) { return +b.getAttribute('data-cs-tool') === S.sel.ci && b.closest('.cs-chip'); })[0]; if (li) li.closest('.cs-chip').classList.add('cs-sel'); }
+  }
+
+  /* ---- jump into the full table */
+  function showInTable(mid, ci) {
+    if (det) det.open = true;
+    var tr = mid ? $(root, 'tr.ct-row[data-m="' + mid + '"]') : null;
+    if (tr && tr.classList.contains('ct-hide')) { var gname = tr.getAttribute('data-g'), gb = $$(root, '.ct-gbtn').filter(function (x) { return x.getAttribute('data-ct-g') === gname; })[0]; if (gb) gb.click(); }
+    var target = tr ? (ci != null && !isNaN(ci) ? tr.querySelector('td[data-c="' + ci + '"]') || tr : tr) : $(root, 'th.ct-col[data-c="' + ci + '"] button');
+    if (!target) return;
+    if (tr) { tr.classList.add('ct-flash'); setTimeout(function () { tr.classList.remove('ct-flash'); }, 2200); }
+    if (target.scrollIntoView) target.scrollIntoView({block: 'center', behavior: 'auto'});
+    if (target.tabIndex < 0 || target.tagName === 'TD') { target.tabIndex = 0; } target.focus({preventScroll: true});
+  }
+
+  /* ---- tooltip */
+  function showTip(el) {
+    var t = el.getAttribute('data-tip'); if (!t) return;
+    tip.textContent = t; tip.style.whiteSpace = 'pre-line'; tip.hidden = false;
+    var hr = host.getBoundingClientRect(), r = el.getBoundingClientRect(), w = tip.offsetWidth;
+    var left = Math.max(4, Math.min(hr.width - w - 4, r.left - hr.left + r.width / 2 - w / 2)), top = r.bottom - hr.top + 6;
+    if (top + tip.offsetHeight > host.offsetHeight + 40 && r.top - hr.top > tip.offsetHeight + 8) top = r.top - hr.top - tip.offsetHeight - 6;
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+  }
+  function hideTip() { tip.hidden = true; }
+  host.addEventListener('mouseover', function (e) { var el = e.target.closest && e.target.closest('[data-tip]'); if (el && host.contains(el)) showTip(el); });
+  host.addEventListener('mouseout', function (e) { var el = e.target.closest && e.target.closest('[data-tip]'); if (el) hideTip(); });
+  host.addEventListener('focusin', function (e) { var el = e.target.closest && e.target.closest('[data-tip]'); if (el) showTip(el); else hideTip(); var k = e.target.getAttribute && e.target.getAttribute('data-key'); if (k) S.focus = k; });
+  host.addEventListener('focusout', hideTip);
+
+  /* ---- events */
+  host.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('button,a') : null; if (!t || !host.contains(t) || t.tagName === 'A') return;
+    var key = t.getAttribute('data-key') || S.from;
+    if (t.hasAttribute('data-cs-toggle')) {
+      var ci = +t.getAttribute('data-cs-toggle'), n = D.cols.filter(function (_, i) { return !S.off[i]; }).length;
+      if (!S.off[ci] && n <= 1) { say('At least one tool stays shown.'); return; }
+      S.off[ci] = !S.off[ci]; S.focus = key; S.refocus = true; render(); if (S.sel) openDrawer(S.sel); say(label(ci) + (S.off[ci] ? ' hidden' : ' shown')); return;
+    }
+    if (t.hasAttribute('data-cs-view')) { S.view = t.getAttribute('data-cs-view'); S.focus = key; S.refocus = true; render(); return; }
+    if (t.hasAttribute('data-cs-reset')) { S.order = D.cols.map(function (_, i) { return i; }); S.sortedBy = ''; render(); say('Tool order reset'); return; }
+    if (t.hasAttribute('data-cs-close')) return closeDrawer();
+    if (t.hasAttribute('data-cs-sort')) { var mid = t.getAttribute('data-cs-sort'); S.order = Q.orderBy(D, metrics[mid], D.cols.map(function (_, i) { return i; })); S.sortedBy = mid; render(); openDrawer(S.sel); say('Tools ordered by ' + metrics[mid].name); return; }
+    if (t.hasAttribute('data-cs-table')) { var pr = t.getAttribute('data-cs-table').split(':'); showInTable(pr[0], pr[1] === '' || pr[1] == null ? null : +pr[1]); return; }
+    if (t.hasAttribute('data-cs-cell')) { var q = t.getAttribute('data-cs-cell').split(':'); openDrawer({kind: 'cell', mid: q[0], ci: +q[1]}); return; }
+    if (t.hasAttribute('data-cs-metric')) { openDrawer({kind: 'metric', mid: t.getAttribute('data-cs-metric')}, key); return; }
+    if (t.hasAttribute('data-cs-tool')) { openDrawer({kind: 'tool', ci: +t.getAttribute('data-cs-tool')}, key); return; }
+    if (t.hasAttribute('data-nav')) { openDrawer({kind: 'cell', mid: t.getAttribute('data-m'), ci: +t.getAttribute('data-c')}, key); return; }
+  });
+  host.addEventListener('change', function (e) { if (e.target.hasAttribute && e.target.hasAttribute('data-cs-track')) { S.track = e.target.value; render(); } });
+  host.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { if (!tip.hidden) hideTip(); if (S.sel) { e.preventDefault(); closeDrawer(); } return; }
+    var el = e.target; if (!el.hasAttribute || !el.hasAttribute('data-nav')) return;
+    var rowEl = el.closest('.cs-row,.cs-err,tr'), here = $$(rowEl, '[data-nav]').sort(function (a, b) { return pos(a) - pos(b); }), i = here.indexOf(el), next = null;
+    function pos(x) { return x.style && x.style.left ? parseFloat(x.style.left) : (x.parentNode.cellIndex || x.getBoundingClientRect().left); }
+    if (e.key === 'ArrowRight') next = here[i + 1]; else if (e.key === 'ArrowLeft') next = here[i - 1];
+    else if (e.key === 'Home') next = here[0]; else if (e.key === 'End') next = here[here.length - 1];
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      var rows = $$(body, '.cs-row,.cs-err,.cs-facts tbody tr').filter(function (r) { return r.querySelector('[data-nav]'); }), ri = rows.indexOf(rowEl), r2 = rows[ri + (e.key === 'ArrowDown' ? 1 : -1)];
+      if (r2) { var cand = $$(r2, '[data-nav]'); next = cand.filter(function (b) { return b.getAttribute('data-c') === el.getAttribute('data-c'); })[0] || cand[0]; }
+    } else return;
+    e.preventDefault();
+    if (next) { $$(body, '[data-nav]').forEach(function (b) { b.tabIndex = -1; }); next.tabIndex = 0; next.focus(); S.focus = next.getAttribute('data-key'); }
+  });
+
+  /* ---- print: the table opens, the drawer is left out by the style sheet */
+  var wasOpen = false;
+  window.addEventListener('beforeprint', function () { if (det) { wasOpen = det.open; det.open = true; } });
+  window.addEventListener('afterprint', function () { if (det) det.open = wasOpen; });
+
+  render();
+}
+function boot() { Array.prototype.slice.call(document.querySelectorAll('.ct[data-ct]')).forEach(function (r) { if (!r.classList.contains('cs-on')) init(r); }); }
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>

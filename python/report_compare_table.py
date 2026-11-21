@@ -13,6 +13,7 @@ What the component adds to a table:
   * a "Show heatmap" checkbox, collapsible metric groups, a column filter, column sorting (by mean rank, or by one metric) and re-ordering
     (drag handle, or the arrow keys on the handle), a "best in row" mark, a CSV export;
   * metric names with a definition on hover or focus (what it is, which way is better, which table and column it comes from);
+  * a visual summary first (assets/report/compare_summary_*.html: one chart per question, with a drill-down drawer), this grid folded under "All N metrics";
   * a side panel (click a cell, a metric name or a tool name): the per-isolate values as a strip with quartiles, the interval, n, the isolates ranked
     best to worst with links to their rows, outliers, and the same metric for every other tool.
 
@@ -38,7 +39,8 @@ import re
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 STEPS = 10
-ASSETS = ("compare_table_style.html", "compare_table_core.html", "compare_table_ui.html")
+ASSETS = ("compare_table_style.html", "compare_table_core.html", "compare_table_ui.html", "compare_summary_style.html", "compare_summary_core.html",
+          "compare_summary_ui.html")
 HELP_KEY = "compare-table"
 
 # ------------------------------------------------------------------------------------------------ directions
@@ -56,6 +58,36 @@ REGISTRY_DIRECTION = {
     "feature_preservation": "higher", "success_rate": "higher", "runtime": "lower", "memory": "lower",
 }
 _REG = {}
+
+# The question each group of rows answers, in plain words, and one line on how to read it (shown above the chart of that group and as its tooltip).
+# A group that is not listed keeps its own title. Presentation only: nothing here changes a number, a direction or a rank.
+GROUP_QUESTIONS = {
+    "Run outcome": ("Did the runs finish?", "How many isolates were scored and how many runs completed, failed or were skipped. Counts, not quality measures."),
+    "Base-level accuracy": ("How accurate are the bases?", "Of the plasmid bases a tool called, how many are right (precision), and of the true plasmid bases, how many it found (recall); F1 combines both."),
+    "Plasmid recovery": ("How many plasmids come back whole?", "The share of reference plasmids recovered completely, at the strict and the lenient definitions (CPRR)."),
+    "Binning": ("How well are contigs grouped?", "Whether contigs of one plasmid are put together and contigs of different plasmids are kept apart."),
+    "Ranking": ("Where does each tool rank overall?", "The score this task is ranked by, with its 95% confidence interval."),
+    "Graded recovery": ("How completely is each plasmid recovered?", "Recall of plasmids recovered at least half, at least 90%, or completely and circularly."),
+    "Base-level F1": ("How accurate are the bases?", "F1 and related scores at the level of single bases; F2 favours recall, F0.5 favours precision."),
+    "Abstention": ("How often does the tool return nothing?", "The share of isolates on which the tool predicted no plasmid. Whether that is good depends on the isolate."),
+    "Base layer": ("How accurate are the bases?", "The base-level F1 against the reference, the layer the leaderboard uses."),
+    "Contig layer": ("How accurate are whole contigs?", "Scores that count each contig (weighted by its length) instead of each base. A different layer: do not compare its values with base F1."),
+    "Contigs left out": ("How much was left out of the contig score?", "Contigs that cannot be scored (ambiguous, unplaced, chimeric or too short)."),
+    "Outcome counts (summed over isolates)": ("What happened to each reference plasmid?", "Counts of reference plasmids that were recovered perfectly, split, merged, partly found or missed."),
+    "Agreement": ("Do the bins match the truth?", "Adjusted Rand index of the bins against the true grouping."),
+    "Alignment accuracy": ("How accurate is the aligned sequence?", "Of the aligned columns of recovered plasmids, the share that match, and where the rest go (mismatch, insertion, deletion)."),
+    "Missing regions": ("What is missing from the reference?", "Stretches of the reference no alignment covers."),
+    "Counts": ("How many were examined?", "Counts that put the other numbers in context."),
+    "Yield": ("How many good bins come back?", "The share of reference plasmids recovered as a high-quality bin, and as a medium-quality or better bin."),
+    "Agreement with the truth": ("Do the bins match the truth?", "Homogeneity (each bin holds one plasmid), completeness (each plasmid sits in one bin) and their mean, the V-measure."),
+    "Bins by tier (counts)": ("How good are the bins?", "How many bins fall in each quality tier, from high to spurious. Counts depend on the cohort."),
+    "Reliability": ("Does the tool finish its runs?", "The share of runs that completed, and why the others did not."),
+    "Speed and memory": ("How fast, and how much memory?", "Run time and peak memory per run, and the threads used. Lower is better."),
+    "Cost and scaling": ("What does a recovered plasmid cost?", "Compute per recovered plasmid, how well the tool uses its threads, and how run time and memory grow with input size."),
+    "Dimension scores (0-100)": ("How does each tool score on each dimension?", "Five dimension scores on a 0 to 100 scale."),
+    "Composite (not the benchmark ranking)": ("How do the dimensions combine?", "A composite of the five dimensions and how stable it is when the weights change. It is not the benchmark ranking."),
+    "Gene order": ("Is the gene order kept?", "Whether neighbouring genes of the reference stay neighbours in the recovered sequence (NGOC)."),
+}
 
 
 def _registry():
@@ -368,17 +400,19 @@ def build(cid, title, groups, columns, cells, table_html="", lead="", samples_li
             unit = f" <span class='ct-unit'>{esc(m['unit'])}</span>" if m["unit"] else ""
             arrow = {"higher": "▲", "lower": "▼"}.get(m["dir"], "")
             arrow_html = f"<span class='ct-dir' title='{esc(way)}'>{arrow}</span>" if arrow else ""
-            status = f"<span class='ct-rowstat' data-ct-stat>{esc(note)}</span>" if note else "<span class='ct-rowstat' data-ct-stat></span>"
+            status = (f"<span class='ct-rowstat' data-ct-stat tabindex='0' role='img' title='{esc(note)}' aria-label='{esc(note)}'>&#9432;</span>" if note
+                      else "<span class='ct-rowstat' data-ct-stat></span>")
             body.append(f"<tr class='ct-row' data-m='{esc(m['id'])}' data-g='{esc(g['title'])}' data-dir='{esc(m['dir'] or '')}'>"
                         f"<th scope='row' class='ct-m'><button type='button' class='ct-mname' data-ct-metric='{esc(m['id'])}'>{esc(m['name'])}</button>{unit}"
                         f"{arrow_html}{status}</th>"
                         + "".join(tds) + "</tr>")
     n_metrics = sum(len(g["metrics"]) for g in groups)
     summary = f"{n_metrics} metrics by {len(cols)} tools"
-    legend = ("<p class='ct-legend'><span class='ct-ramp' aria-hidden='true'></span> Worst &rarr; Median &rarr; Best <span class='ct-legend-x'>within each row. "
-              "Cells are shaded by their <strong>rank</strong> among the tools assessed in that row, not by raw value; tied tools share a rank. "
-              "<span class='ct-hatch' aria-hidden='true'></span> hatched: not assessed or missing, never shaded and never zero. A row with no defined direction, with fewer "
-              "than two assessed tools, or in which every tool ties is left unshaded and says why. &#9733; best in row. &#9650; higher is better, &#9660; lower is better."
+    legend = ("<p class='ct-legend'><span class='ct-ramp' aria-hidden='true'></span> Worst &rarr; Best <span class='ct-legend-x'>by rank within each row, not by raw value (tied tools share a rank) "
+              "<span class='ct-hatch' aria-hidden='true'></span> not assessed: never shaded, never zero &#9733; best in row &#9650; higher / &#9660; lower is better "
+              "<span class='ct-rowstat' tabindex='0' role='img' title='Rows with no defined direction, with fewer than two assessed tools, or in which every tool ties are not shaded; "
+              "the information mark on the row says which.' aria-label='Rows with no defined direction, with fewer than two assessed tools, or in which every tool ties are not shaded; "
+              "the information mark on the row says which.'>&#9432;</span>"
               f"{' ' + esc(assumptions) if assumptions else ''}</span></p>")
     fold = (f"<details class='ct-fold rpt-collapsible' data-closed='1'><summary>{esc(fold_title)}</summary>{table_html}</details>" if table_html else "")
     help_btn = (f"<span class='rpt-help'><button type='button' class='rpt-help-btn' data-help='{HELP_KEY}' aria-haspopup='dialog' "
@@ -386,11 +420,14 @@ def build(cid, title, groups, columns, cells, table_html="", lead="", samples_li
     page = (f"<div class='ct' id='ct-{esc(cid)}' data-ct='{esc(cid)}'>"
             f"<div class='ct-head'><strong class='ct-title'>{esc(title)}</strong> <span class='ct-count'>{esc(summary)}</span>{help_btn}</div>"
             f"{f'<p class=ct-lead>{lead}</p>' if lead else ''}"
+            f"<div class='cs' data-cs aria-label='{esc(title)}: visual summary'></div>"
+            f"<details class='ct-all rpt-collapsible' open><summary>All {n_metrics} metrics: table, heatmap, sort, filter, CSV</summary>"
+            f"<div class='ct-toolslot'></div>"
             f"<div class='ct-main'><div class='ct-scroll' tabindex='0' aria-label='{esc(title)}: scrollable comparison table'>"
             f"<table class='ct-grid' role='grid' aria-label='{esc(title)}: {esc(summary)}, shaded by rank within each row' aria-rowcount='{n_metrics + 1}' "
             f"aria-colcount='{len(cols) + 1}'><thead>{''.join(head)}</thead><tbody>{''.join(body)}</tbody></table></div>"
             f"<aside class='ct-panel' hidden aria-label='Details' tabindex='-1'></aside></div>"
-            f"{legend}{fold}"
+            f"{legend}</details>{fold}"
             f"<script type='application/json' class='ct-data'>{_json(payload)}</script></div>")
     return page
 
@@ -403,7 +440,8 @@ def finish(page):
     for name in ASSETS:
         with open(os.path.join(ROOT, "assets", "report", name), encoding="utf-8", newline="") as handle:
             parts.append(handle.read())
-    block = "<div id='ct-assets' hidden></div>" + "".join(parts)
+    questions = _json({k: list(v) for k, v in GROUP_QUESTIONS.items()})     # once per page: the summary looks a group up by its title
+    block = "<div id='ct-assets' hidden></div>" + "".join(parts) + f"<script type='application/json' id='cs-groups'>{questions}</script>"
     cut = page.rfind("</body>")
     return page[:cut] + block + page[cut:] if cut >= 0 else page + block
 

@@ -1,0 +1,121 @@
+<script>
+/* PlasBench comparison summary, core: pure functions that turn the data block of a comparison table into the view model of its visual summary
+   (axis scale, dot positions, lanes for overlapping dots, tool chips, short texts). No DOM. Mirrored nowhere: the numbers it shows are the
+   cells of the data block (the text of the source table) and it computes no score; ranks come from PBCT.rankShade (compare_table_core.html).
+   Tested by test/test_compare_summary.py (node). Vanilla JS, works from file://. */
+(function (root) {
+'use strict';
+var P = root.PBCT;
+function ok(v) { return typeof v === 'number' && isFinite(v); }
+
+/* The axis of one metric row: [lo, hi] and whether it is a fixed, natural scale. Shares in 0..1 use 0..1, a measure in -1..1 (MCC) uses -1..1,
+   a percentage uses 0..100, anything else 0 up to the next round tick above the largest value. The same scale is used for every tool of the row, never one per tool. */
+function scaleFor(values, disps, zoom) {
+  var v = values.filter(ok);
+  if (!v.length) return {lo: 0, hi: 1, fixed: true, kind: 'unit'};
+  var mn = Math.min.apply(null, v), mx = Math.max.apply(null, v), pct = (disps || []).some(function (d) { return typeof d === 'string' && d.indexOf('%') >= 0; });
+  var nat = null;
+  if (mn >= -1e-9 && mx <= 1 + 1e-9) nat = {lo: 0, hi: 1, fixed: true, kind: 'unit'};
+  else if (mn >= -1 - 1e-9 && mx <= 1 + 1e-9) nat = {lo: -1, hi: 1, fixed: true, kind: 'signed'};
+  else if (pct && mn >= -1e-9 && mx <= 100 + 1e-9) nat = {lo: 0, hi: 100, fixed: true, kind: 'percent'};
+  if (nat) {
+    /* several tools packed into under 8% of the natural axis: zoom to them (the ends are labelled), so the dots can be told apart */
+    var span = nat.hi - nat.lo;
+    if (zoom && v.length >= 2 && mx - mn > 0 && mx - mn < 0.08 * span) {
+      var pad = (mx - mn) * 0.25;
+      return {lo: Math.max(nat.lo, mn - pad), hi: Math.min(nat.hi, mx + pad), fixed: false, kind: 'zoom', natural: nat};
+    }
+    return nat;
+  }
+  var lo = Math.min(0, mn), hi = mx > lo ? nice(mx) : lo + 1;
+  return {lo: lo, hi: hi, fixed: false, kind: 'range'};
+}
+/* The next round number above x (1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10 times a power of ten), so an axis ends on a readable tick. */
+function nice(x) {
+  if (!(x > 0)) return 1;
+  var e = Math.pow(10, Math.floor(Math.log(x) / Math.LN10)), f = x / e, steps = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+  for (var i = 0; i < steps.length; i++) if (f <= steps[i] + 1e-9) return Number((steps[i] * e).toPrecision(12));
+  return 10 * e;
+}
+/* Position of a value on a scale in percent of the track, clamped to 0..100. */
+function pos(v, sc) { return Math.max(0, Math.min(100, (v - sc.lo) / (sc.hi - sc.lo) * 100)); }
+/* Lanes (0, 1, 2 ...) for dots whose positions are within `gap` percent of a neighbour, so overlapping dots are stacked vertically and none is hidden.
+   items: [{pos, i}] in any order; returns {i: lane}. */
+function lanes(items, gap) {
+  var s = items.slice().sort(function (a, b) { return a.pos - b.pos || a.i - b.i; }), out = {}, last = [];
+  s.forEach(function (it) {
+    var lane = 0;
+    while (last[lane] != null && it.pos - last[lane] < gap) lane++;
+    last[lane] = it.pos; out[it.i] = lane;
+  });
+  return out;
+}
+/* The text of a cell shortened for a row (63.6% (7/11); per isolate 69.4%; ... -> 63.6% (7/11)); the full text stays in the tooltip and the drawer. */
+function shortText(t, max) {
+  t = String(t == null ? '' : t); max = max || 26;
+  var cut = t.indexOf('; '); if (cut > 0) t = t.slice(0, cut);
+  return t.length > max ? t.slice(0, max - 1) + '…' : t;
+}
+function cellOf(D, mid, ci) {
+  var r = (D.cells[mid] || [])[ci] || [], pairs = r[5] || [];
+  return {disp: r[0] == null ? '' : String(r[0]), v: r[1] == null ? null : r[1], n: r[2], lo: r[3], hi: r[4], iso: pairs, na: r[6] || ''};
+}
+/* Metrics of a group are drawn as dots when their direction is defined and at least one tool has a number; the others are listed as plain values. */
+function plottable(D, m, cols) {
+  if (m.dir !== 'higher' && m.dir !== 'lower') return false;
+  return cols.some(function (ci) { var c = cellOf(D, m.id, ci); return !c.na && ok(c.v); });
+}
+/* View model of one metric over the tools `cols` (column indexes): per tool the cell, its rank and bucket, its position and lane. */
+function rowModel(D, m, cols) {
+  var cells = cols.map(function (ci) { return cellOf(D, m.id, ci); });
+  var vals = cells.map(function (c) { return c.na ? null : c.v; });
+  var res = P.rankShade(vals, m.dir), sc = scaleFor(vals, cells.map(function (c) { return c.disp; }), true);
+  var items = [];
+  cells.forEach(function (c, k) { if (ok(vals[k])) { c.pos = pos(vals[k], sc); items.push({pos: c.pos, i: k}); } });
+  var ln = lanes(items, 5);
+  cells.forEach(function (c, k) {
+    c.ci = cols[k]; c.rank = res.rank[k]; c.bucket = res.bucket[k]; c.best = res.best[k]; c.lane = ln[k] || 0;
+    if (ok(c.lo)) c.lop = pos(c.lo, sc); if (ok(c.hi)) c.hip = pos(c.hi, sc);
+  });
+  return {m: m, cells: cells, status: res.status, assessed: res.m, scale: sc, vals: vals};
+}
+var WHY = {no_direction: 'No direction is defined for this measure, so tools are not ranked or shaded.',
+  too_few: 'Fewer than two tools were assessed on this measure, so there is nothing to rank.',
+  all_tied: 'Every assessed tool has the same value, so nothing separates them.'};
+function whyText(status) { return WHY[status] || ''; }
+/* One chip per tool: the rank the source table gives it (rank 1, from the columns task field) or, when there is none, its mean rank over the rows
+   that could be ranked. The mean is a summary of the shaded rows only; it is not a score and is labelled as such. */
+function toolChips(D, cols) {
+  var ranks = [], metrics = [];
+  D.groups.forEach(function (g) { g.m.forEach(function (m) { metrics.push(m); }); });
+  metrics.forEach(function (m) {
+    var vals = cols.map(function (ci) { var c = cellOf(D, m.id, ci); return c.na ? null : c.v; }), r = P.rankShade(vals, m.dir);
+    ranks.push(r.status === 'ok' || r.status === 'all_tied' ? r.rank : cols.map(function () { return null; }));
+  });
+  return cols.map(function (ci, k) {
+    var s = 0, n = 0; ranks.forEach(function (r) { if (r[k] != null) { s += r[k]; n++; } });
+    var col = D.cols[ci], official = /^rank\s+\S+/i.test(col.task || '') ? col.task : '';
+    return {ci: ci, label: col.label, official: official, mean: n ? s / n : null, n: n};
+  });
+}
+/* Tools ordered by one metric (best first, ties keep the input order, tools without a value last). */
+function orderBy(D, m, cols) {
+  var vals = cols.map(function (ci) { var c = cellOf(D, m.id, ci); return c.na ? null : c.v; }), r = P.rankShade(vals, m.dir);
+  return cols.map(function (ci, k) { return {ci: ci, k: k, rank: r.rank[k], v: vals[k]}; }).sort(function (a, b) {
+    if (a.v == null || b.v == null) return a.v == null && b.v == null ? a.k - b.k : (a.v == null ? 1 : -1);
+    if (a.rank != null && b.rank != null && a.rank !== b.rank) return a.rank - b.rank;
+    return (m.dir === 'lower' ? a.v - b.v : b.v - a.v) || a.k - b.k;
+  }).map(function (x) { return x.ci; });
+}
+/* The metrics that make an error composition (the three error shares of an alignment): drawn as one stacked bar per tool. */
+var COMPOSITION = ['mismatch', 'insertion', 'deletion'];
+function compositionOf(g) {
+  var ids = g.m.map(function (m) { return m.id; });
+  return COMPOSITION.every(function (id) { return ids.indexOf(id) >= 0; }) ? COMPOSITION.slice() : null;
+}
+var api = {nice: nice, scaleFor: scaleFor, pos: pos, lanes: lanes, shortText: shortText, cellOf: cellOf, plottable: plottable, rowModel: rowModel, whyText: whyText,
+  toolChips: toolChips, orderBy: orderBy, compositionOf: compositionOf, COMPOSITION: COMPOSITION};
+root.PBCS = api;
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>

@@ -215,16 +215,17 @@ HELP = {
         "Shows how a tool behaves if you make it stricter or looser.",
         "If no tool wrote a curve file for a track, the figure says so and nothing is drawn."),
     "compare-table": H(
-        "A grid that compares tools metric by metric, with the best and worst tool of every row shaded. Click anything in it for the detail behind it.",
-        "The same numbers as the plain table folded under it (it is kept, under 'Table'), plus the per-isolate values from the scores table where the run has them.",
-        "Each row is one metric. Tools are ranked inside the row, using the direction in the metric registry (higher or lower is better). The shade comes from the rank "
-        "(worst red, median white, best blue), not from the raw value, so a single huge value cannot hide the differences between the others. Tied tools share a rank.",
-        "Tick 'Show heatmap' to shade, untick to see plain numbers. A star marks the best tool in a row. A hatched cell was not assessed or is missing; it is never shaded and never zero. "
-        "A row says why it is not shaded when its direction is not defined, when fewer than two tools were assessed, or when all tools tie. Click a cell for the isolates behind it, "
-        "a metric name for its definition and source, a tool name for its profile. Drag a column handle, or use the arrow keys on it, to re-order; 'Download CSV' saves what is shown.",
-        "It shows quickly which tool leads on which measure, and which of the isolates drive a value, without leaving the page.",
-        "Shading compares tools within one row of one table, so it is not comparable across rows, tracks or tasks. With few isolates a spread is a description, not evidence of a difference. "
-        "Rank hides how far apart two tools are: read the values. Filtering tools re-ranks the rows among the tools still shown."),
+        "A chart per question that compares the tools, with the full grid of every metric folded under it. Click any mark for the detail behind it.",
+        "The same numbers as the plain table folded under it (kept, under 'Table'), plus the per-isolate values from the scores table where the run has them.",
+        "Each chart row is one metric and each numbered dot is one tool, on one axis for the whole row (shares run from 0 to 1). A ring and a star mark the best tool, using the direction in the metric registry "
+        "(higher or lower is better); tied tools share a rank. A whisker is the interval where the run has one. 'Heatmap' shows the same rows as shaded cells (worst red, median white, best blue), shaded by rank and not by raw value.",
+        "Click a mark, a metric or a tool: a drawer opens under the chart with the exact value, the interval, n, the evidence tier and the isolates behind it, with a link to the full table row. "
+        "Tick or untick a tool chip to filter; arrow keys move between marks, Enter opens, Escape closes. 'All N metrics' opens the full grid with its sort, filter, heatmap, group and CSV controls. "
+        "A hatched cell or a dash was not assessed: it is never shaded and never zero. An information mark says why a row is not ranked (no direction defined, fewer than two tools assessed, or all tied); "
+        "with one tool the values are drawn on a fixed scale and not ranked.",
+        "It shows quickly which tool leads on which question, and which isolates drive a value, without leaving the page.",
+        "Position and rank compare tools within one row of one table, so they are not comparable across rows, tracks or tasks. With few isolates a spread is a description, not evidence of a difference. "
+        "Rank hides how far apart two tools are: read the values. Hiding a tool re-ranks the rows among the tools still shown."),
     "fig-ladder": H(
         "A map of how this benchmark scores a result, from raw contigs to a verified plasmid.",
         "No data; it explains the five scoring steps.",
@@ -506,7 +507,8 @@ HELP = {
         "What happens when a tool reports several sequences for one plasmid.",
         "Every predicted record and where it falls on each true plasmid.",
         "Combined coverage is the union of aligned stretches, never the sum of lengths. Each record is labelled primary, complementary fragment, redundant, chimeric, off-target or unmapped.",
-        "A reference covered once is clean; covered by several is overlap; not represented is missing.",
+        "Each tool is one row: a bar of where its predicted sequence went, a dot-and-diamond for the best single candidate against all candidates combined, and a bar of what happened to each reference plasmid. "
+        "Click a tool to open its plasmids and the tracks (one closed fold each). A reference covered once is clean; covered by several is overlap; not represented is missing.",
         "Stops a tool gaining credit by emitting many overlapping candidates.",
         "Alternative circular paths are not modelled."),
     "learn-stability": H(
