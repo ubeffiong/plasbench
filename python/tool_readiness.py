@@ -20,7 +20,7 @@ import shutil
 import subprocess
 import sys
 
-FASTCLUSTER_FIX = ('pip install "fastcluster<1.3"  (or: conda install -n plasbench "fastcluster<1.3"; plasbench install-tools reference-annotation does it). '
+FASTCLUSTER_FIX = ("install a fastcluster below 1.3 (fastcluster<1.3) into the plasbench environment with its package manager; plasbench install-tools reference-annotation --yes does it. "
                    "fastcluster 1.3.0 was built for NumPy 2 and fails with NumPy 1.x")
 
 

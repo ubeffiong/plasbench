@@ -21,6 +21,12 @@ import tool_readiness as tr  # noqa: E402
 ok = True
 
 
+def put(path, text):
+    """Write text with LF line endings (Path.write_text(newline=) needs Python 3.10)."""
+    with open(str(path), "w") as handle:
+        handle.write(text)
+
+
 def check(label, good, detail=""):
     global ok
     print(("  ok    " if good else "  FAIL  ") + label + ("" if good else f" -> {detail}"))
@@ -29,7 +35,7 @@ def check(label, good, detail=""):
 
 def fake(directory, name, body):
     path = Path(directory) / name
-    path.write_text("#!/usr/bin/env bash\n" + body + "\n", encoding="utf-8", newline="\n")
+    put(path, "#!/usr/bin/env bash\n" + body + "\n")
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
     return path
 
@@ -69,7 +75,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # ---- ISEScan: its interpreter cannot do the clustering step ---------------------------------------------------------------------
     badpy = fake(bin_, "badpython", 'echo "ValueError: NoneType copy mode not allowed." >&2; exit 1')
     path = bin_ / "isescan.py"
-    path.write_text(f"#!{badpy}\nprint('x')\n", encoding="utf-8", newline="\n")
+    put(path, f"#!{badpy}\nprint('x')\n")
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
     status, detail, fix = tr.isescan()
     check("ISEScan whose clustering step fails is MISS before any 11-minute run", status == "miss" and "NoneType copy mode" in detail and "fastcluster<1.3" in fix, (status, detail, fix))

@@ -22,6 +22,12 @@ import resource_adapt as ra  # noqa: E402
 ok = True
 
 
+def put(path, text):
+    """Write text with LF line endings (Path.write_text(newline=) needs Python 3.10)."""
+    with open(str(path), "w") as handle:
+        handle.write(text)
+
+
 def check(label, good, detail=""):
     global ok
     print(("  ok    " if good else "  FAIL  ") + label + ("" if good else f" -> {detail}"))
@@ -176,7 +182,7 @@ else:
         tmp = Path(tmp)
         (tmp / "res").mkdir()
         script = tmp / "fake.sh"
-        script.write_text("""#!/usr/bin/env bash
+        put(script, """#!/usr/bin/env bash
 # a fake tool: what it needs is chosen by the case; it records the environment it ran with
 echo "$CASE mem=${MEMORY_GB:-} threads=${THREADS:-} tmp=${TMPDIR:-} ulimit=$(ulimit -n) timeout=${TOOL_TIMEOUT_SECONDS:-} java=${JAVA_TOOL_OPTIONS:-}" >> "$CALLS"
 case "$CASE" in
@@ -188,9 +194,9 @@ case "$CASE" in
   never)   echo "ERROR You need approx. 50GB of free RAM." > "$ADAPT_LOG"; exit 255;;
 esac
 exit 0
-""", encoding="utf-8", newline="\n")
+""")
         driver = tmp / "drive.sh"
-        driver.write_text("""#!/usr/bin/env bash
+        put(driver, """#!/usr/bin/env bash
 set -uo pipefail
 [[ -n "${SOFT_NOFILE:-}" ]] && ulimit -Sn "$SOFT_NOFILE"
 export PROJECT_ROOT="$ROOT" RESULTS_DIR="$TMP/res" NO_COLOR=1
@@ -199,7 +205,7 @@ export THREADS="${THREADS:-6}" MEMORY_GB="${MEMORY_GB:-4}"
 rc=0
 ADAPT_LOG="$TMP/log_$CASE.txt" run_adaptive "$TOOLN" iso1 -- bash "$TMP/fake.sh" || rc=$?
 echo "rc=$rc after: THREADS=$THREADS MEMORY_GB=$MEMORY_GB TMPDIR=${TMPDIR:-unset}"
-""", encoding="utf-8", newline="\n")
+""")
 
         def drive(case, tool="spades", **env):
             (tmp / "calls.log").write_text("")
