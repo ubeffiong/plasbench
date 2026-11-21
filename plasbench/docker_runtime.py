@@ -833,10 +833,18 @@ def format_steps(rows) -> str:
 def extras_listing(root, environ=None) -> dict:
     """What the persistent storage holds, for the manifest and the window: {'home', 'tools': [name...], 'provenance': [{...}]} (names only, read from disk)."""
     home = extra_home(root, environ=environ)
-    tools, prov = [], []
+    tools, prov, packages = [], [], []
     try:
-        if (home / "bin").is_dir():
-            tools = sorted(p.name for p in (home / "bin").iterdir())
+        for folder in (home / "bin", home / "envs" / "extras" / "bin"):
+            if folder.is_dir():
+                tools += [p.name for p in folder.iterdir() if p.name not in tools]
+        tools.sort()
+        for meta in sorted((home / "envs" / "extras" / "conda-meta").glob("*.json"))[:2000]:
+            try:
+                rec = json.loads(meta.read_text(encoding="utf-8"))
+                packages.append(f"{rec.get('name')}={rec.get('version')}")
+            except (OSError, ValueError):
+                continue
         for path in sorted(home.glob("*/plasbench-install.json"))[:50] + sorted(home.glob("envs/*/plasbench-install.json"))[:50]:
             try:
                 prov.append(json.loads(path.read_text(encoding="utf-8")))
@@ -844,4 +852,4 @@ def extras_listing(root, environ=None) -> dict:
                 continue
     except OSError:
         pass
-    return {"home": str(home), "tools": tools, "provenance": prov}
+    return {"home": str(home), "tools": tools, "provenance": prov, "packages": packages}

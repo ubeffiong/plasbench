@@ -159,6 +159,7 @@ fi
 
 echo "== plasbench check --yes does not retry a profile that failed"
 FAILBIN="$TMP/failbin"; mkdir -p "$FAILBIN"
+mkdir -p "$PLASBENCH_DB_DIR/platon/db" "$TMP/results" "$TMP/logs" "$TMP/tmp"; : > "$PLASBENCH_DB_DIR/platon/db/marker"   # the database step is not what this scenario is about
 for t in datasets prefetch fasterq-dump fastp minimap2 unzip spades.py plasmidspades.py; do printf '#!/usr/bin/env bash\ntrue\n' > "$FAILBIN/$t"; chmod +x "$FAILBIN/$t"; done
 printf '#!/usr/bin/env bash\necho "conda $*" >> "%s/conda_calls.log"\nexit 1\n' "$TMP" > "$FAILBIN/conda"; chmod +x "$FAILBIN/conda"
 : > "$TMP/conda_calls.log"

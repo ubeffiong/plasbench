@@ -144,7 +144,8 @@ def main():
         path = (res / "path.txt").read_text().strip().split(":") if (res / "path.txt").exists() else []
         check("PATH order: extras/bin, the image, then the extras environment", str(extras / "bin") in path and str(extras / "envs" / "extras" / "bin") in path
               and path.index("/opt/conda/envs/plasbench/bin") < path.index(str(extras / "envs" / "extras" / "bin")), path)
-        check("the extras listing for the manifest names the tool", "jq" in dr.extras_listing(proj, environ).get("tools", []) or any("jq" in str(v) for v in dr.extras_listing(proj, environ).values()), dr.extras_listing(proj, environ))
+        listing_now = dr.extras_listing(proj, environ)
+        check("the extras listing for the manifest names the tool and the package version", "jq" in listing_now["tools"] and any(p.startswith("jq=") for p in listing_now["packages"]), listing_now)
         wrong = [str(p) for p in list((extras).rglob("*"))[:5000] if p.lstat().st_uid != uid]
         check("every file in the extras folder belongs to the host user", not wrong, wrong[:5])
         check("the image's conda-meta and file listing are byte-identical after the install", listing() == before)
