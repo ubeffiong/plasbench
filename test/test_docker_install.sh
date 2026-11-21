@@ -55,6 +55,8 @@ EOF
 chmod +x "$TMP"/bin/*
 
 ok=1
+# the fake programs' calls, without the read-only `winget.exe list` look-ups that detection makes (version, install fallback)
+logn() { grep -vc '^winget.exe list' "$LOG" || true; }
 check() { if [[ "$2" == "yes" ]]; then echo "  ok    $1"; else echo "  FAIL  $1"; ok=0; fi; }
 yn() { if "$@"; then echo yes; else echo no; fi; }
 
@@ -62,29 +64,29 @@ yn() { if "$@"; then echo yes; else echo no; fi; }
 docker_cmd() {
     local platform="$1" mode="$2"; shift 2
     : > "$LOG"
-    env -u PLASBENCH_OFFLINE HOME="$TMP/home" PATH="$TMP/bin:/usr/bin:/bin" PLASBENCH_ASSUME_ONLINE=1 PLASBENCH_STATE_DIR="$TMP/state" PLASBENCH_DOCKER_WAIT=0 \
+    env -u PLASBENCH_OFFLINE HOME="$TMP/home" PATH="$TMP/bin:/usr/bin:/bin" PLASBENCH_ASSUME_ONLINE=1 PLASBENCH_STATE_DIR="$TMP/state" PLASBENCH_DOCKER_WAIT=0 PLASBENCH_DOCKER_SETTLE=0 \
         PLASBENCH_DOCKER_PLATFORM="$platform" FAKE_DOCKER_MODE="$mode" bash "$ROOT/env/install_tools.sh" "$@" docker > "$TMP/out" 2>&1
     code=$?
 }
 
 docker_cmd linux ready;
-check "Docker working: exit 0, and nothing was installed" "$(yn test "$code" -eq 0 -a ! -s "$LOG")"
+check "Docker working: exit 0, and nothing was installed" "$(yn test "$code" -eq 0 -a "$(logn)" -eq 0)"
 check "the verified version and context are recorded for plasbench check and the manifest" "$(yn grep -q '"version": "27.3.1"' "$TMP/state/docker_status.json")"
 check "plasbench check line says ready (optional)" "$(PATH="$TMP/bin:/usr/bin:/bin" FAKE_DOCKER_MODE=ready PLASBENCH_DOCKER_PLATFORM=linux python3 "$ROOT/python/docker_setup.py" check-line | grep -q 'docker (optional): ready' && echo yes || echo no)"
 
 docker_cmd wsl2 absent
 check "WSL2, not installed, no --yes: exit 21 (consent needed)" "$(yn test "$code" -eq 21)"
-check "  ... winget was not started" "$(yn test ! -s "$LOG")"
+check "  ... winget was not started" "$(yn test "$(logn)" -eq 0)"
 check "  ... the plan names winget, who approves (UAC) and the licence" "$(yn grep -q 'Windows asks you to approve' "$TMP/out" && grep -q 'cannot accept the licence for you' "$TMP/out")"
 
 docker_cmd wsl2 absent --yes
 check "WSL2 with --yes: winget.exe runs with the exact argument list" "$(yn grep -qx 'winget.exe install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements' "$LOG")"
 check "  ... Docker is not ready yet, so exit 20 (waiting for you)" "$(yn test "$code" -eq 20)"
 check "  ... 'Waiting for you to finish in Docker Desktop' and the WSL integration step" "$(yn grep -q 'Waiting for you to finish in Docker Desktop' "$TMP/out" && grep -q 'WSL integration' "$TMP/out")"
-check "  ... only winget was started (one line in the log)" "$(yn test "$(wc -l < "$LOG")" -eq 1)"
+check "  ... only winget was started (one line in the log)" "$(yn test "$(logn)" -eq 1)"
 
 : > "$LOG"
-env -u PLASBENCH_OFFLINE HOME="$TMP/home" PATH="$TMP/bin:/usr/bin:/bin" PLASBENCH_ASSUME_ONLINE=1 PLASBENCH_STATE_DIR="$TMP/state" PLASBENCH_DOCKER_WAIT=0 PLASBENCH_DOCKER_PLATFORM=wsl2 \
+env -u PLASBENCH_OFFLINE HOME="$TMP/home" PATH="$TMP/bin:/usr/bin:/bin" PLASBENCH_ASSUME_ONLINE=1 PLASBENCH_STATE_DIR="$TMP/state" PLASBENCH_DOCKER_WAIT=0 PLASBENCH_DOCKER_SETTLE=0 PLASBENCH_DOCKER_PLATFORM=wsl2 \
     FAKE_DOCKER_MODE=absent FAKE_INSTALLER_EXIT=1602 bash "$ROOT/env/install_tools.sh" --yes docker > "$TMP/out" 2>&1; code=$?
 check "UAC declined (winget exit 1602): exit 1 with a plain sentence" "$(yn test "$code" -eq 1 && grep -q 'declined or closed' "$TMP/out")"
 
@@ -94,7 +96,7 @@ check "  ... exit 20 and the open -a Docker step" "$(yn test "$code" -eq 20 && g
 
 docker_cmd linux absent --yes
 check "Linux: exit 20 even with --yes (a sudo script is handed over, never run)" "$(yn test "$code" -eq 20)"
-check "  ... the script is printed, sudo was never called" "$(yn grep -q 'script: official' "$TMP/out" && ! grep -q 'SUDO WAS CALLED' "$LOG" && test ! -s "$LOG")"
+check "  ... the script is printed, sudo was never called" "$(yn grep -q 'script: official' "$TMP/out" && ! grep -q 'SUDO WAS CALLED' "$LOG" && test "$(logn)" -eq 0)"
 check "  ... no piped shell installer anywhere in the output" "$(yn bash -c '! grep -E "\| *(sudo )?(ba)?sh|get\.docker\.com" "$0"' "$TMP/out")"
 
 docker_cmd linux perm
@@ -102,17 +104,17 @@ check "permission denied: exit 20 with the docker group step" "$(yn test "$code"
 docker_cmd linux down
 check "daemon stopped: exit 20 with the start command" "$(yn test "$code" -eq 20 && grep -q 'systemctl start docker' "$TMP/out")"
 docker_cmd wsl2 wslstub
-check "WSL integration off: exit 20 with the Docker Desktop setting to turn on" "$(yn test "$code" -eq 20 && grep -q 'WSL integration' "$TMP/out" && test ! -s "$LOG")"
+check "WSL integration off: exit 20 with the Docker Desktop setting to turn on" "$(yn test "$code" -eq 20 && grep -q 'WSL integration' "$TMP/out" && test "$(logn)" -eq 0)"
 docker_cmd container absent --yes
 check "inside a container: exit 20, Docker-in-Docker said to be out of scope" "$(yn test "$code" -eq 20 && grep -q 'out of scope' "$TMP/out")"
 
 PLASBENCH_INSTALL_DRY_RUN=1 docker_cmd wsl2 absent --yes
-check "dry run: exit 0, the plan is printed, nothing is started" "$(yn test "$code" -eq 0 -a ! -s "$LOG" && grep -q 'dry run' "$TMP/out")"
+check "dry run: exit 0, the plan is printed, nothing is started" "$(yn test "$code" -eq 0 -a "$(logn)" -eq 0 && grep -q 'dry run' "$TMP/out")"
 
 : > "$LOG"
 env -u PLASBENCH_ASSUME_ONLINE HOME="$TMP/home" PATH="$TMP/bin:/usr/bin:/bin" PLASBENCH_OFFLINE=1 PLASBENCH_STATE_DIR="$TMP/state" PLASBENCH_DOCKER_PLATFORM=wsl2 FAKE_DOCKER_MODE=absent \
     bash "$ROOT/env/install_tools.sh" --yes docker > "$TMP/out" 2>&1; code=$?
-check "offline: the winget route is refused before anything runs (netcheck services winget, docker)" "$(yn test "$code" -ne 0 -a "$code" -ne 20 -a ! -s "$LOG" && grep -qi 'internet' "$TMP/out")"
+check "offline: the winget route is refused before anything runs (netcheck services winget, docker)" "$(yn test "$code" -ne 0 -a "$code" -ne 20 -a "$(logn)" -eq 0 && grep -qi 'internet' "$TMP/out")"
 env -u PLASBENCH_ASSUME_ONLINE HOME="$TMP/home" PATH="$TMP/bin:/usr/bin:/bin" PLASBENCH_OFFLINE=1 PLASBENCH_STATE_DIR="$TMP/state" PLASBENCH_DOCKER_PLATFORM=linux FAKE_DOCKER_MODE=absent \
     bash "$ROOT/env/install_tools.sh" --yes docker > "$TMP/out" 2>&1; code=$?
 check "offline: a hand-off route needs no internet (exit 20)" "$(yn test "$code" -eq 20)"
