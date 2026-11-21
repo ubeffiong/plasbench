@@ -65,5 +65,6 @@ echo "re-running the mobsuite profile keeps a working environment (no rebuild) -
 grep -qE '^\s*-\s*mob_suite' "$ROOT/env/environment.yml" && { echo "FAIL: environment.yml still installs mob_suite" >&2; exit 1; }
 grep -q '/mob_suite-' "$ROOT/env/environment.lock.yml" && { echo "FAIL: the lock still pins mob_suite" >&2; exit 1; }
 grep -q 'install_tools.sh" --env "$ENV_NAME" mobsuite' "$ROOT/env/setup_conda.sh" || { echo "FAIL: setup_conda.sh does not install the MOB-suite env" >&2; exit 1; }
+grep -q 'install_tools.sh" --env "$ENV_NAME" reference-annotation' "$ROOT/env/setup_conda.sh" || { echo "FAIL: setup_conda.sh does not install the annotation callers (AMRFinder database, ISEScan pin)" >&2; exit 1; }
 echo "environment.yml and the lock no longer carry mob_suite; setup_conda.sh installs its own env -> PASS"
 echo "ALL MOB-SUITE ENVIRONMENT TESTS PASSED"

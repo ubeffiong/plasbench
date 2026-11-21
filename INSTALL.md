@@ -115,7 +115,7 @@ missing), two install profiles supply the rest:
 ```bash
 plasbench install-tools utilities             # mash, samtools, barrnap
 plasbench install-tools reference-annotation  # abricate, ncbi-amrfinderplus, isescan; mob_suite in its own env
-amrfinder -u                                  # once, after reference-annotation
+amrfinder -u                                  # only if the database fetch was skipped: the profile (and env/setup_conda.sh) already fetches it
 ```
 
 `mash` matters more than it looks: stage 6 uses it for clonal grouping, and without it the
