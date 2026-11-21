@@ -576,7 +576,7 @@ body.gd-ai{--gdw:min(430px,92vw)}
 .aicard2 .cmdbox{font-family:var(--mono);font-size:12px;background:var(--term-bg);color:var(--term-fg);padding:5px 8px;border-radius:3px;overflow-x:auto;white-space:pre}
 .aicard2 .where{margin:5px 0;font-weight:600}
 .aicard2 .why{color:var(--mut);margin:2px 0 6px}
-.aicard2 .btns{display:flex;gap:6px;flex-wrap:wrap}
+.aicard2 .acts{display:flex;gap:6px;flex-wrap:wrap}
 .aicard2 .no{color:var(--warn);margin:4px 0}
 .aicard2 .risk{font-size:10.5px;border-radius:9px;padding:0 7px;border:1px solid var(--line)}
 .aicard2 .risk.changes_files{border-color:var(--warn);color:var(--warn)}.aicard2 .risk.destructive{border-color:var(--bad);color:var(--bad)}.aicard2 .risk.safe{border-color:var(--ok);color:var(--ok)}
@@ -6330,7 +6330,7 @@ function aiActionCard(a, mi, i) {
   return `<div class="aicard2" data-m="${mi}" data-i="${i}"><div class="ch"><b>Suggested command</b><span class="risk ${esc(a.risk)}">${esc(String(a.risk).replace("_", " "))}</span></div><div class="cb">
     <div class="cmdbox">${esc(a.cmd)}</div><div class="where">Run it here: ${esc(where)}</div>${a.why ? `<div class="why">${esc(a.why)}</div>` : ""}
     ${a.runnable ? "" : `<div class="no">Not runnable here: ${esc(a.reason)}</div>`}
-    <div class="btns">${a.runnable ? `<button class="btn sm" data-aiact="run">${icon("play")}Run in PlasBench</button>` : ""}<button class="btn sec sm" data-aiact="copy">${icon("copy")}Copy</button>${termOk ? `<button class="btn sec sm" data-aiact="term">${icon("term")}Open Terminal tab</button>` : ""}</div>
+    <div class="acts">${a.runnable ? `<button class="btn sm" data-aiact="run">${icon("play")}Run in PlasBench</button>` : ""}<button class="btn sec sm" data-aiact="copy">${icon("copy")}Copy</button>${termOk ? `<button class="btn sec sm" data-aiact="term">${icon("term")}Open Terminal tab</button>` : ""}</div>
     <div class="runstate" aria-live="polite"></div></div></div>`;
 }
 function aiMsgHtml(m, mi) {
@@ -6438,7 +6438,7 @@ addEventListener("message", e => {
 function aiRunNote(el, text) { const r = el && el.querySelector(".runstate"); if (r) r.innerHTML = text; }
 async function aiAct(card, kind) {
   const mi = +card.dataset.m, i = +card.dataset.i, a = mi < 0 ? AI.pre : (AI.msgs[mi].actions || [])[i]; if (!a) return;
-  if (kind === "copy") { try { await navigator.clipboard.writeText(a.cmd); toast("Copied", "ok"); } catch { toast("Copy failed: select the text and copy it", "bad"); } return; }
+  if (kind === "copy") { await copyText(a.cmd); return; }
   if (kind === "term") { setCTab("term"); $("#tcmd").value = a.cmd; tFit(); $("#tcmd").focus(); aiRunNote(card, "Typed into the Terminal tab. Press Enter there to run it."); return; }
   let v; try { v = await api("ai/validate", {cmd: a.cmd, where: a.where, risk: a.risk}); } catch (e) { return toast(e.message, "bad"); }
   if (!v.runnable) { aiRunNote(card, `Not runnable here: ${esc(v.reason)}`); return; }
@@ -6493,7 +6493,7 @@ $("#gdp_ai").addEventListener("click", async e => {
   const src = t.closest("[data-aisrc]"); if (src) return aiOpenSource(src.dataset.aisrc, src.dataset.anchor);
   const act = t.closest("[data-aiact]"); if (act) return aiAct(act.closest(".aicard2"), act.dataset.aiact);
   const snd = t.closest("[data-aisend]"); if (snd) return aiSendResult(snd.dataset.aisend, snd.dataset.cmd);
-  const cp = t.closest("[data-aicopy]"); if (cp) { const pre = cp.closest(".aipre-hd").nextElementSibling; try { await navigator.clipboard.writeText(pre.textContent); toast("Copied", "ok"); } catch { toast("Copy failed", "bad"); } return; }
+  const cp = t.closest("[data-aicopy]"); if (cp) { const pre = cp.closest(".aipre-hd").nextElementSibling; await copyText(pre.textContent); return; }
   const vote = t.closest("[data-aivote]"); if (vote) {
     const mi = +vote.closest(".aimsg").dataset.m, m = AI.msgs[mi]; m.vote = +vote.dataset.aivote;
     try { const v = JSON.parse(aiLS("votes") || "[]"); v.push({t: Date.now(), up: m.vote}); aiLS("votes", JSON.stringify(v.slice(-200))); } catch {}   // kept only in this browser, used for nothing else
