@@ -19,7 +19,7 @@ A passing test is not scientific validation (section 1). The independent evidenc
 
 Stated plainly so no one has to find it by looking. Full detail and a status for every reviewer question: [`REVIEWER_ASSESSMENT_MATRIX.md`](REVIEWER_ASSESSMENT_MATRIX.md).
 
-- **A real-data run of the whole tool set.** Nothing about ranking or generalisation is demonstrated on real data until one exists. This is the largest open item.
+- **A real-data run of the whole tool set that is large enough to rank.** A 10-isolate run exists (`results_real_cohort1`, FAQ Q22); nothing about ranking or generalisation is demonstrated until a larger one is published. This is the largest open item.
 - **Independent third-party re-run** and an **external validation cohort**.
 - **Frozen, platform-specific thresholds** for QC, assembly eligibility, candidate relationships and the CPRR limits, set from pilot data.
 - **Evidence beyond NCBI metadata** for most references, and plasmid-free, hard-structure and taxonomically broader isolates in the released cohorts.
