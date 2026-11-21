@@ -127,6 +127,17 @@ def typical_seconds(name, total_bp):
     return base * max(0.25, (total_bp / 1e6) / TYPICAL_GENOME_MBP)
 
 
+# One switch per caller (config/config.sh, shown in the window's Workflow and Settings): a caller switched off is not run and is recorded as not evaluated with the reason, never as
+# "no such feature found". All default to on.
+CALLER_SWITCHES = {"mob_typer": "ANNOTATE_WITH_MOB_TYPER", "abricate": "ANNOTATE_WITH_ABRICATE", "amrfinder": "ANNOTATE_WITH_AMRFINDER",
+                   "isescan": "ANNOTATE_WITH_ISESCAN", "barrnap": "ANNOTATE_WITH_BARRNAP"}
+
+
+def callers_switched_off(environ=None):
+    environ = os.environ if environ is None else environ
+    return sorted(name for name, key in CALLER_SWITCHES.items() if str(environ.get(key, "1")).strip().lower() in ("0", "no", "off", "false"))
+
+
 def annotation_timeouts(total_bp, environ=None):
     """{caller: seconds or None}. ANNOTATION_TIMEOUT_SECONDS: a number = that many seconds for every caller; 0, off or none = no limit. Default: max(300, 150 s per Mbp)
     per caller, ISEScan three times that (it is the slow one), never below 900 s."""
@@ -471,10 +482,21 @@ def main():
         ("isfinder", lambda: call_isfinder(args.reference, args.isfinder_fasta, timeout_for(timeouts, "isfinder"), sequences)),
         ("barrnap", lambda: call_barrnap(args.reference, timeout_for(timeouts, "barrnap"), sequences, small)),
     )
+    off = callers_switched_off()
+
+    def gated(name, call):
+        base = "abricate" if name.startswith("abricate") else name
+        if base in off:
+            return lambda: ([], {"status": "not_evaluated", "reason": "switched off (%s=0)" % CALLER_SWITCHES[base]})
+        return call
+
+    calls = tuple((name, gated(name, call)) for name, call in calls)
     cache_id = fingerprint = None
     if args.cache_dir:
         try:
             fingerprint = caller_fingerprint(args.amr_database, args.replicon_database, args.isfinder_fasta)
+            if off:                      # a different set of callers is a different annotation: never reuse one made with all of them
+                fingerprint = dict(fingerprint, switched_off=",".join(off))
             cache_id = cache_key(args.reference, fingerprint)
         except OSError:
             cache_id = None
