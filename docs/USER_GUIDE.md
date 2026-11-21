@@ -276,6 +276,8 @@ The top bar keeps the few things you need all the time: the folder tree and job 
 
 **Where did the explanation text go?** Pages show a title, one line saying what they are for, and the controls. What a control means, what an option does and how a page works is in the small green **?** next to the label: hover it, tab to it with the keyboard, or tap it on a phone; press **Escape** to close it. The same text is kept in one place, `plasbench/ui_help.py`. Anything you must act on or know before a costly step stays on the page: warnings, errors, offline or blocked reasons, disk-space notes, and the reminder that closing the window does not stop runs.
 
+**The installing toast.** While any install, pull, build or update is running (a tool or a profile, Docker, conda, the PlasBench image, tool databases, or **Upgrade PlasBench**) a small card stays at the bottom right of every page, so you can move around and still see that it is going. It shows what is being installed, how long it has been running and the latest line of its log. **View log** opens the live log in the console; **Cancel** stops that install after you confirm (what is already installed is kept); **Hide** folds the card into a small **Installing** chip with a spinner and a count in the top bar, and clicking the chip brings the card back. Several installs at once share one card with a count and a list. The card follows the job, not the page: it is still there after a reload or in a second window, and an install started from the terminal appears too. It turns to **Waiting for you to finish in Docker Desktop** (with **Re-check**), **Consent needed**, **Manual step needed** or **Stalled?** when that is true, **Failed** (red, with the reason, until you dismiss it), or **Done** (green, gone after about eight seconds). If installs finished while the window was closed, one **Finished while you were away** note lists them once.
+
 ## Inputs
 
 The default sample sheet is `config/accessions.tsv`. It is a tab-separated file
@@ -857,6 +859,30 @@ The same card covers the everyday GitHub work: **Create repository on GitHub** (
 ### Offline
 
 The top bar shows **Online**, **Limited**, **DNS problem** or **Offline** (and "Offline (forced)" when `PLASBENCH_OFFLINE=1`). Hover for each service's state and the advice, click to check again; it re-checks every 30 s while the window is visible. A control that needs the internet (sign in, push, pull, clone, check for updates, installs, discovery, downloading runs) looks disabled with the reason when its service is unreachable, and clicking it checks again at that moment before it says no. The server refuses such a job with a clear message instead of starting it. A run whose reads and references are already on disk (or `--local-inputs`, or the metagenomics track) still starts offline. Scoring, reports, studies, the folder tree, settings and documents never need the internet.
+
+### Updating PlasBench from the window
+
+**Set up this computer, Updates** is the window's version of `plasbench upgrade`. It runs that very command (one implementation) as a job, so what you see there is what a terminal would print.
+
+- **Check for updates** asks GitHub's public release list whether a newer release exists and shows the installed version, the latest release, its date, the first lines of its release notes (plain text) and a link to the full notes. The answer is
+  remembered, with the time it was checked. A newer release is never mistaken for an older one: if your installation is ahead of the latest published release the card says so and offers nothing. While the window is open it also looks by itself when it
+  starts and then at most once a day, only to put a small dot on the top bar's **More** button when a newer release exists. Set `UPDATE_CHECK=off` in Settings to stop that; **Check for updates** still works. `PLASBENCH_OFFLINE=1` stops every check, and with
+  no internet the card says why. Only GitHub's public release list is asked; nothing about you or this computer is sent.
+- **Download and install** opens a dialog that lists exactly what will happen: the version change, the file and its size, where it comes from (github.com, https only), that its checksum is verified against the release's `.sha256` file **before anything is replaced**,
+  the folder it installs into, that your studies, settings, databases and tools are kept, and that the window needs a restart afterwards. The card then shows the phases (check, download, verify, replace the program files, update the environment, finished) and the log.
+- **A run is going?** An update replaces the program files, so while any job or any benchmark started in a terminal is running the update does not start. The dialog lists what is running; **Wait** is the default, and **Update anyway** (shown in red) starts it knowing that
+  a stage that starts or a report that is written during the update can fail or mix versions.
+- **Install from a file I already downloaded** takes a release file `plasbench-<version>.tar.gz` (choose it with **Browse** or paste its path). It needs no internet; the `.sha256` beside the file is used when it is there (otherwise the log prints the file's SHA-256 for you to
+  compare with the release page). It runs `plasbench upgrade --archive FILE` and has the same dialog, phases and restart. A file older than the installed version is a downgrade and asks you to confirm it.
+- **Restart window.** When the update has finished the card says so and shows **Restart window** (the same machinery as the stale-window banner: runs keep going, the window opens again at its new address). Where PlasBench cannot restart itself the dialog gives the manual steps
+  (Quit, then start PlasBench again).
+- **When an update fails** the card names the reason and the next step: no internet, a checksum that does not match, a full disk, a program folder it cannot write to, no conda, a file that is not a PlasBench release, or another update already running. A failure before the
+  "replace the program files" phase changed nothing; a failure after it says so.
+- **Rollback.** Before replacing anything an update saves the release it is about to replace, as a file of its own release files, in `.plasbench-rollback/` inside the PlasBench folder (only the latest one is kept). **Roll back** (or `plasbench upgrade --rollback`) installs it again, announced as a
+  downgrade; your studies, settings, databases and tools are untouched either way. A rollback does not undo changes a newer release made to your data folders. Without a saved copy you can still install an older release file with **Install from a file**.
+
+From a terminal: `plasbench upgrade --check-only` (only look), `plasbench upgrade` (latest), `plasbench upgrade --version X.Y.Z`, `plasbench upgrade --archive FILE`, `plasbench upgrade --rollback`; add `--yes` to skip questions. Only one update can run in a folder at a time.
+The README's section "I already downloaded the release file" covers the first installation from a downloaded file.
 
 ### Choosing where tools run: Conda or Docker
 

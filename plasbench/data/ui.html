@@ -411,6 +411,10 @@ dialog.dkdlg ul.dknotes{margin:6px 0 0 18px;padding:0}.dkerr{color:var(--bad);ma
 .sess .stg{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0}.sess .stg span{padding:1px 8px;border:1px solid var(--line);border-radius:10px;font-size:11.5px;color:var(--muted)}
 .sess .stg span.d{border-color:var(--ok);color:var(--ok)}.sess .stg span.c{border-color:var(--primary);color:var(--primary);font-weight:600}
 #connbar{position:fixed;top:0;left:0;right:0;z-index:150;background:var(--warn-soft,#fff4d6);color:var(--fg);border-bottom:2px solid var(--warn,#b7791f);padding:8px 16px;font-size:13px;display:flex;gap:10px;align-items:center;justify-content:center}
+#morebtn{position:relative}.updot{position:absolute;top:5px;right:5px;width:9px;height:9px;border-radius:50%;background:var(--warn);border:2px solid var(--surface,#fff)}.updot[hidden]{display:none}
+.updsteps{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px}.updstep{display:flex;gap:8px;align-items:center;min-height:28px;color:var(--fg-2)}.updstep.done{color:var(--fg)}.updstep.done .ico{color:var(--ok)}.updstep.current{color:var(--primary);font-weight:600}.updstep.failed{color:var(--bad);font-weight:600}
+.updjob{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)}.updjob details{margin-top:10px}.updjob pre{max-height:240px;overflow:auto;white-space:pre-wrap;margin:6px 0 0;padding:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px}
+.updnotes{margin:4px 0 6px;padding-left:18px}.updbad{color:var(--bad)}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* BEGIN server state (stale window server) */
 #stalebar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:140;width:min(760px,calc(100vw - 32px));background:var(--warn-soft,#fff4d6);color:var(--fg);border:1px solid var(--warn,#b7791f);border-left-width:5px;border-radius:8px;padding:10px 14px;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.22)}
 #stalebar[hidden]{display:none}
@@ -421,6 +425,19 @@ dialog.dkdlg ul.dknotes{margin:6px 0 0 18px;padding:0}.dkerr{color:var(--bad);ma
 .runtoast.attn{border-left-color:var(--bad)}.runtoast.attn .rt-bar{display:none}.runtoast .rt-x{position:absolute;top:4px;right:6px;border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
 .runtoast .rt-act{margin-top:6px;display:flex;gap:6px}
 @media (prefers-reduced-motion:reduce){#connbar .rt-spin{animation:none}.sess .sbar.ind i{animation:none;width:100%;opacity:.4}}
+/* ==INSTALL-TOAST-CSS== the installing toast: a region in the toast area, one card per thing to say; at phone width a full-width bar with 40 px targets */
+.insttoast{display:flex;flex-direction:column;gap:6px;width:360px;max-width:calc(100vw - 32px)}.insttoast[hidden]{display:none}
+.it-card{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-left:3px solid var(--primary);padding:10px 12px;border-radius:var(--radius);box-shadow:var(--shadow-lg);font-size:13px}
+.it-card.ok{border-left-color:var(--ok)}.it-card.bad{border-left-color:var(--bad)}.it-card.warn{border-left-color:var(--warn)}
+.it-h{display:flex;align-items:center;gap:8px}.it-h .it-t{flex:1;min-width:0}.it-h .rt-spin{margin:0}.it-el{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
+.it-sub{color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.it-sub.it-wrap{white-space:normal;overflow-wrap:anywhere}
+.it-act{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.it-list{margin:6px 0 0;padding:0;list-style:none}.it-list li{padding:4px 0;border-top:1px solid var(--line-2)}.it-rowact{display:flex;gap:6px;margin-top:2px}
+#instchipwrap{display:inline-flex;align-items:center;gap:2px}#instchipwrap[hidden]{display:none}
+.instchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:2px 10px;font-size:12px;cursor:pointer;min-height:28px}
+.instchip .rt-spin{width:12px;height:12px;border-width:2px;margin:0}
+@media (max-width:640px){#toasts{left:8px;right:8px}.insttoast{width:100%;max-width:none}.it-act .btn{min-height:40px;flex:1 1 auto}.instchip{min-height:40px}}
+@media (prefers-reduced-motion:reduce){.it-card .rt-spin,.instchip .rt-spin{animation:none;border-top-color:var(--line);border-right-color:var(--primary)}}
+/* ==INSTALL-TOAST-CSS-END== */
 .toast .ico{margin-top:2px;color:var(--primary)}.toast.bad{border-left-color:var(--bad)}.toast.bad .ico{color:var(--bad)}.toast.ok{border-left-color:var(--ok)}.toast.ok .ico{color:var(--ok)}
 
 /* ---------- job console ---------- */
@@ -730,11 +747,13 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
   <kbd>/</kbd>
   <div class="results" id="qres" role="listbox"></div>
  </div>
+ <span id="instchipwrap" hidden><button class="instchip" id="instchip" type="button" aria-controls="insttoast"><span class="rt-spin" aria-hidden="true"></span><span id="instchiptx">Installing</span></button><span data-tipid="install_chip"></span></span>
  <span class="pill" id="jobpill" hidden><span class="pulse"></span><span id="jobpilltx">1 job running</span></span>
  <button class="tbtn" id="gdbtn" aria-pressed="false" title="Side panel: Studies, Jobs and Git (Ctrl+Shift+G opens Git)"><svg class="ico sm"><use href="#i-sidebar"/></svg><span>Panel</span><span class="badge" id="gdbadge" hidden></span></button>
  <button class="tbtn netind" id="netind" title="Checking the internet connection…" aria-label="Internet status: checking"><span class="nd" aria-hidden="true"></span><span class="nl">Checking…</span></button>
- <div class="menuwrap" id="morewrap"><button class="tbtn" id="morebtn" aria-haspopup="true" aria-expanded="false" aria-controls="moremenu" title="More: help, reload the page, light or dark theme" aria-label="More"><svg class="ico sm"><use href="#i-more"/></svg></button>
+ <div class="menuwrap" id="morewrap"><button class="tbtn" id="morebtn" aria-haspopup="true" aria-expanded="false" aria-controls="moremenu" title="More: updates, help, reload the page, light or dark theme" aria-label="More"><svg class="ico sm"><use href="#i-more"/></svg><span class="updot" id="upd_dot" hidden title="A newer PlasBench release is available"></span></button>
   <div class="menu" id="moremenu" hidden>
+   <button type="button" class="mi" id="updmenu" hidden title="A newer release is published: open the Updates card"><svg class="ico sm"><use href="#i-refresh"/></svg><span class="mt">Update available</span></button>
    <button type="button" class="mi" id="helpbtn" title="Help for this page (F1)"><svg class="ico sm"><use href="#i-help"/></svg>Help for this page (F1)</button>
    <button type="button" class="mi" id="reloadbtn" title="Reload page (clear cache)"><svg class="ico sm"><use href="#i-refresh"/></svg>Reload page (clear cache)</button>
    <button type="button" class="mi" id="theme" title="Switch between light and dark"><svg class="ico sm"><use href="#i-moon"/></svg>Light / dark theme</button></div></div>
@@ -836,11 +855,19 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
       <ul class="small dksteps" id="dk_steps" style="margin:8px 0 0;padding-left:18px"></ul>
       <div class="row wrap" style="margin-top:12px;gap:8px"><button class="btn" id="dk_install" data-dk="install" title="Install Docker">Install Docker</button><button class="btn sec" id="dk_enabled" data-dk="enabled" hidden title="I enabled WSL integration">I enabled it</button><button class="btn sec" id="dk_recheck" data-dk="recheck" title="Check Docker again">Re-check</button><button class="btn ghost" id="dk_guide" data-dk="guide" title="Open the official Docker guide">Open the Docker guide</button></div>
      </div></div>
+     <div class="card" id="updcard"><div class="hd"><svg class="ico"><use href="#i-refresh"/></svg><h3>Updates<span data-tipid="upd_card"></span></h3><span class="sub" id="upd_sub">this version</span></div><div class="bd">
+      <div id="updresult" role="status" aria-live="polite"></div>
+      <div class="row wrap" style="margin-top:12px;gap:8px"><button class="btn" id="updcheck" data-needs="github" title="Ask GitHub whether a newer release exists">Check for updates</button><button class="btn" id="updgo" data-needs="github" hidden>Download and install</button><button class="btn sec" id="updrollback" hidden>Roll back</button></div>
+      <div id="upd_job" class="updjob" hidden><div class="row wrap" style="gap:8px"><b id="upd_jobtitle"></b><span class="tag" id="upd_jobstate"></span></div>
+       <ol class="updsteps" id="upd_steps" aria-label="Update progress"></ol>
+       <div id="upd_res" role="status" aria-live="polite"></div>
+       <div class="row wrap" style="gap:8px;margin-top:8px"><button class="btn" id="upd_restart" hidden>Restart window</button></div>
+       <details id="upd_logbox"><summary>Log</summary><pre id="upd_log" class="mono small" tabindex="0"></pre></details></div>
+      <div class="field" style="margin-top:14px"><label for="upd_file">Install from a file I already downloaded<span data-tipid="upd_file_help"></span></label><div class="ctl"><input type="text" id="upd_file" placeholder="~/Downloads/plasbench-0.5.6.tar.gz" aria-label="Release file, plasbench-version.tar.gz" autocomplete="off" spellcheck="false"><button class="btn sec sm" data-browse="upd_file">Browse</button><button class="btn sec" id="upd_filego">Install from this file</button></div></div>
+      <div class="small" id="upd_filemsg" role="status" aria-live="polite"></div>
+     </div></div>
      <div class="card"><div class="hd"><svg class="ico"><use href="#i-refresh"/></svg><h3>Maintenance</h3></div><div class="bd grid" style="gap:10px">
       <div class="actrow"><button class="action" data-run='["install-conda","--yes"]' data-label="Install conda (Miniforge)"><span class="aico"><svg class="ico"><use href="#i-down"/></svg></span><span><b>Install conda</b></span></button><span data-tipid="m_conda"></span></div>
-      <div class="actrow"><button class="action" id="updcheck" data-needs="github" title="Asks GitHub whether a newer release exists"><span class="aico"><svg class="ico"><use href="#i-search"/></svg></span><span><b>Check for updates</b></span></button><span data-tipid="m_update"></span></div>
-      <div id="updresult" class="small" aria-live="polite" style="display:none"></div>
-      <div class="actrow"><button class="action" data-run='["upgrade","--yes"]' data-label="Upgrade PlasBench"><span class="aico"><svg class="ico"><use href="#i-refresh"/></svg></span><span><b>Upgrade PlasBench</b></span></button><span data-tipid="m_upgrade"></span></div>
       <div class="actrow"><button class="action" data-run='["test"]' data-label="Run the offline test suite"><span class="aico"><svg class="ico"><use href="#i-check"/></svg></span><span><b>Run the test suite</b></span></button><span data-tipid="m_test"></span></div>
      </div></div>
     </div>
@@ -1329,7 +1356,7 @@ plasmid_values = plasmid
 
 <div id="connbar" hidden role="status"><span class="rt-spin" aria-hidden="true"></span><span id="connmsg">Connection to PlasBench lost. Retrying… Your runs keep going in the background.</span></div>
 <div id="stalebar" hidden role="alert" aria-labelledby="ss_t"></div>
-<div id="toasts" aria-live="polite"></div>
+<div id="toasts" aria-live="polite"><div id="insttoast" class="insttoast" role="region" aria-label="Installations" aria-live="polite" aria-busy="false" hidden></div></div>
 <div id="tipbox" role="tooltip" hidden></div>
 
 <script>
@@ -1506,7 +1533,7 @@ function renderStale() {
       ${det.length ? `<details><summary>Details</summary><pre>${esc(det.join("\n"))}</pre></details>` : ""}</div>
     <div class="ss-btns">${two ? `<button class="btn" id="ss_copy">Copy command</button>` : `<button class="btn" id="ss_restart">${icon("refresh")}Restart window</button><button class="btn sec" id="ss_reload">Reload page (clear cache)</button>`}<button class="btn sec" id="ss_why">Why?</button><button class="btn sec" id="ss_dismiss">Dismiss for this server run</button></div></div>`);
   bar.hidden = false;
-  const rb = document.getElementById("ss_restart"); if (rb) rb.onclick = restartWindow;
+  const rb = document.getElementById("ss_restart"); if (rb) rb.onclick = () => restartWindow();
   const rl = document.getElementById("ss_reload"); if (rl) rl.onclick = hardReload;
   const cp = document.getElementById("ss_copy"); if (cp) cp.onclick = () => copyText(fix, "Command copied");
   document.getElementById("ss_dismiss").onclick = () => { try { sessionStorage.setItem("pb_ss_dismiss", dismissKey(SS.stale)); } catch (e) { /* kept for this view only */ } bar.hidden = true; };
@@ -1521,9 +1548,9 @@ function raiseStale(p) {
   if (p.detail && !SS.details.includes(p.detail) && SS.details.length < 6) SS.details.push(p.detail);
   renderStale();
 }
-async function restartWindow() {
+async function restartWindow(manualOnly) {
   if (SS.restarting) return;
-  const supported = !SS.stale || SS.stale.restart_supported !== false;
+  const supported = !manualOnly && (!SS.stale || SS.stale.restart_supported !== false);
   const manual = why => modalDialog({title: "Restart PlasBench yourself", cancelId: "ok", buttons: [{id: "ok", label: "Close", primary: true}],
     bodyHTML: `<p>${why ? esc(why) + " " : ""}PlasBench cannot restart this window by itself here. Do this instead:</p><ol><li>Use <b>Quit</b> at the top of this window and choose <b>Quit and keep running</b> if a run is going.</li><li>Start PlasBench again from its desktop icon, or run <code>plasbench ui</code>.</li></ol><p>Your runs keep going and are listed under Runs &amp; reports.</p>`});
   if (!supported) return manual("");
@@ -1650,12 +1677,13 @@ async function startJob(argv, label, env) {
     if (answer === "install") env = Object.assign({}, env, {INSTALL_MISSING_TOOLS: "1"});
   }
   if (bench) { S.pendingBench = {label: label || cmdText(argv), t0: Date.now()}; renderRunToast(); }   // the toast appears the moment the button is clicked
+  const inst = itIsInstallArgv(argv); if (inst) itPend(label || cmdText(argv));   // so does the installing toast
   try {
     const job = await api("jobs", {argv, label, env});
     toast(`Started: ${label || cmdText(argv)}`, "ok");
     await refreshJobs(); showConsole(job.id, true); return job;
   } catch (e) { toast(e.message, "bad"); }
-  finally { S.pendingBench = null; renderRunToast(); }
+  finally { S.pendingBench = null; renderRunToast(); if (inst) itPendClear(); }
 }
 
 /* ---- the persistent "benchmarking is running" toast ----
@@ -1799,10 +1827,171 @@ function renderRunToast() {
   el.querySelector(".rt-sub").textContent = `${first ? first.label : pending.label} · ${fmtElapsed((Date.now() - started) / 1000)}`;
 }
 setInterval(renderRunToast, 1000);
+/* ==INSTALL-TOAST-BEGIN== The installing toast (docs: USER_GUIDE "The window at a glance"). Which jobs are installs, and their labels, come from the server (plasbench/jobs_labels.py:
+   is_install, install_label, install_tools, last_line, installed_version in every /api/jobs entry), so this block only renders. It is driven by refreshJobs (the one job poll) and a
+   one-second tick for the clock; nothing here runs on the page-load path beyond reading the job list that is already fetched. Pure state and markup functions first (tested in node). */
+/* ==INSTALL-TOAST-PURE-BEGIN== */
+const IT_DONE_MS = 8000, IT_CAP = 4, IT_RECENT_S = 86400;
+const itLive = j => !!j.is_install && (j.state === "running" || j.state === "cancelling");
+function itKind(j) {   // what the toast says about one install job; "" = nothing (cancelled on purpose)
+  const ds = j.display_state || j.state;
+  if (j.state === "cancelling") return "cancelling";
+  if (ds === "waiting_for_you") return "waiting";
+  if (ds === "consent_needed") return "consent";
+  if (ds === "manual_step") return "manual";
+  if (ds === "stalled") return "stalled";
+  if (j.state === "running") return "running";
+  if (j.state === "done") return "done";
+  if (j.state === "failed" || j.state === "interrupted") return "failed";
+  return "";
+}
+function itIsInstallArgv(argv) {   // the click-time guess for the optimistic toast; the job record (server: jobs_labels.describe) confirms it. Kept equal to the server by a shared test table.
+  if (!Array.isArray(argv) || !argv.length) return false;
+  const c = argv[0], r = argv.slice(1), pos = r.filter((a, i) => !a.startsWith("-") && r[i - 1] !== "--env" && r[i - 1] !== "--prefix");
+  if (c === "install-tools") return !r.includes("--dry-run") && !["plan", "list", "validate", "locked"].includes(pos[0] || "core");
+  if (c === "tools") return r[0] === "install";
+  if (c === "upgrade") return !r.includes("--check-only");
+  if (c === "install-conda") return true;
+  if (c === "runtime") return ["pull", "build"].includes(pos[0]);
+  return c === "check" && r.includes("--yes");
+}
+const itBase = j => String(j.install_label || j.label || "").replace(/^(Installing|Updating|Pulling|Building|Rolling back) /, "").replace(/…$/, "");
+function itDoneTitle(j) {
+  const v = j.installed_version ? ` (version ${j.installed_version})` : "";
+  return ({upgrade: "PlasBench updated", rollback: "PlasBench rolled back", "runtime-pull": "Image pulled", "runtime-build": "Image built", "check-yes": "Tools and databases ready"})[j.install_kind] || `${itBase(j)} installed${v}`;
+}
+function itLiveTitle(live) {
+  if (live.length === 1) return live[0].state === "cancelling" ? `Cancelling: ${itBase(live[0])}` : live[0].install_label || "Installing…";
+  const names = [...new Set(live.flatMap(j => j.install_tools || []))];
+  return live.every(j => (j.install_tools || []).length && ["install-tools", "tools-install"].includes(j.install_kind)) && names.length > 1 ? `Installing ${names.length} tools…` : `${live.length} installations running…`;
+}
+function itAway(jobs, seenT, dismissed) {   // once, on the first look at the list: installs that ended after the last time this browser saw it
+  if (!seenT) return [];
+  return (jobs || []).filter(j => j.is_install && !itLive(j) && j.ended && j.ended > seenT && !dismissed.has(j.id) && ["done", "failed", "cancelled", "interrupted"].includes(j.state)).map(j => j.id);
+}
+function itModel(jobs, ctx) {   // ctx: {now (s), dismissed:Set, hidden:Set, away:[ids], doneUntil:{id: s}, pending:{label,t0}|null}
+  const inst = (jobs || []).filter(j => j.is_install);
+  const live = inst.filter(itLive).sort((a, b) => a.started - b.started);
+  const attn = [], done = [];
+  for (const j of inst) {
+    if (itLive(j) || ctx.dismissed.has(j.id)) continue;
+    const k = itKind(j), age = ctx.now - (j.ended || j.started);
+    if (age > IT_RECENT_S) continue;
+    if (k === "done") { if (age * 1000 <= IT_DONE_MS || (ctx.doneUntil && ctx.doneUntil[j.id] > ctx.now)) done.push(j); }
+    else if (["waiting", "consent", "manual", "failed"].includes(k)) {
+      if (inst.some(o => o.id !== j.id && o.started > j.started && o.install_label === j.install_label && (itLive(o) || itKind(o) === "done"))) continue;   // a newer try replaced it
+      attn.push(j);
+    }
+  }
+  attn.sort((a, b) => (b.ended || 0) - (a.ended || 0));
+  const shown = new Set(attn.concat(done).map(j => j.id));
+  const away = inst.filter(j => (ctx.away || []).includes(j.id) && !ctx.dismissed.has(j.id) && !shown.has(j.id));
+  const pending = ctx.pending && !live.some(j => j.started * 1000 >= ctx.pending.t0 - 2000) ? ctx.pending : null;
+  return {live, attn, done, away, pending, hidden: live.length > 0 && live.every(j => ctx.hidden.has(j.id)) && !pending};
+}
+function itStateWord(j) { return ({running: "running", cancelling: "cancelling", stalled: "no output for a while"})[itKind(j)] || ""; }
+function itLiveCard(live, ui) {
+  const one = live.length === 1, j = live[0], k = one ? itKind(j) : "", stalled = live.filter(x => itKind(x) === "stalled").length;
+  const title = one && k === "stalled" ? `Stalled? ${itLiveTitle(live)}` : itLiveTitle(live);
+  const sub = one ? (k === "stalled" ? "No output for a while. It may still be working." : j.last_line || "Starting…") : live.map(itBase).join(", ").slice(0, 120) + (stalled ? ` · ${stalled} may be stalled` : "");
+  const rows = ui.open && !one ? `<ul class="it-list">${live.slice(0, IT_CAP).map(x => `<li><span class="it-n">${esc(itBase(x))}</span> <span class="mut small">${esc(itStateWord(x))} · <span class="it-el" data-s="${x.started}"></span></span>
+      ${x.last_line ? `<div class="it-sub">${esc(x.last_line)}</div>` : ""}<span class="it-rowact"><button class="btn ghost sm" data-it="view" data-id="${esc(x.id)}">View log</button>${x.state === "running" ? `<button class="btn ghost sm" data-it="cancel" data-id="${esc(x.id)}">Cancel</button>` : ""}</span></li>`).join("")}
+    ${live.length > IT_CAP ? `<li class="mut small">and ${live.length - IT_CAP} more (see Jobs)</li>` : ""}</ul>` : "";
+  return `<section class="it-card${k === "stalled" || stalled ? " warn" : ""}" data-k="live" aria-label="Installing">
+    <div class="it-h"><span class="rt-spin" aria-hidden="true"></span><b class="it-t">${esc(title)}</b><span class="it-el" data-s="${Math.min(...live.map(x => x.started))}"></span><span data-tipid="install_toast"></span></div>
+    <div class="it-sub" title="${esc(sub)}">${esc(sub)}</div>${rows}
+    <div class="it-act"><button class="btn sec sm" data-it="view" data-id="${esc(j.id)}">View log</button>${one ? (j.state === "running" ? `<button class="btn ghost sm" data-it="cancel" data-id="${esc(j.id)}">Cancel</button>` : "")
+      : `<button class="btn ghost sm" data-it="expand" aria-expanded="${!!ui.open}">${ui.open ? "Hide list" : `Show ${live.length}`}</button>`}<button class="btn ghost sm" data-it="hide">Hide</button></div></section>`;
+}
+function itAttnCard(j) {
+  const k = itKind(j), base = itBase(j), place = j.waiting_place || "Docker";
+  const [cls, title, sub] = k === "waiting" ? ["warn", `Waiting for you to finish in ${place}`, "Nothing failed. Do the steps in the log, then Re-check."]
+    : k === "consent" ? ["warn", "Consent needed", `${base}: nothing was changed. Confirm the install to go ahead.`]
+    : k === "manual" ? ["warn", "Manual step needed", `${base}: nothing failed. The log lists the steps.`]
+    : ["bad", `${base} failed`, j.last_line || (j.exit != null ? `Exit ${j.exit}` : "Stopped before it finished")];
+  const re = k === "waiting" && (j.install_tools || []).includes("docker") ? `<button class="btn sm" data-it="recheck" data-id="${esc(j.id)}">Re-check</button>` : "";
+  return `<section class="it-card ${cls}" data-k="${esc(j.id)}" role="${cls === "bad" ? "alert" : "status"}"><div class="it-h"><b class="it-t">${esc(title)}</b></div>
+    <div class="it-sub it-wrap">${esc(sub)}</div><div class="it-act">${re}<button class="btn sec sm" data-it="view" data-id="${esc(j.id)}">View log</button><button class="btn ghost sm" data-it="dismiss" data-id="${esc(j.id)}">Dismiss</button></div></section>`;
+}
+const itDoneCard = j => `<section class="it-card ok" data-k="${esc(j.id)}" role="status"><div class="it-h"><b class="it-t">${esc(itDoneTitle(j))}</b></div>
+  <div class="it-act"><button class="btn sec sm" data-it="view" data-id="${esc(j.id)}">View log</button><button class="btn ghost sm" data-it="dismiss" data-id="${esc(j.id)}">Dismiss</button></div></section>`;
+const itAwayCard = away => `<section class="it-card" data-k="away" role="status"><div class="it-h"><b class="it-t">Finished while you were away</b></div>
+  <ul class="it-list">${away.slice(0, IT_CAP).map(j => `<li><span class="it-n">${esc(itBase(j))}</span> <span class="mut small">${j.state === "done" ? "done" : j.state === "cancelled" ? "cancelled" : "failed"}</span></li>`).join("")}${away.length > IT_CAP ? `<li class="mut small">and ${away.length - IT_CAP} more</li>` : ""}</ul>
+  <div class="it-act"><button class="btn sec sm" data-it="jobs">Open Jobs</button><button class="btn ghost sm" data-it="dismiss" data-id="away">Dismiss</button></div></section>`;
+const itPendCard = p => `<section class="it-card" data-k="pending"><div class="it-h"><span class="rt-spin" aria-hidden="true"></span><b class="it-t">Starting: ${esc(p.label)}…</b></div></section>`;
+function itHTML(m, ui) {   // the toast's markup (no clock text: the tick fills the .it-el spans, so a poll that changes nothing leaves the DOM alone)
+  const parts = [];
+  if (m.live.length && !m.hidden) parts.push(itLiveCard(m.live, ui));
+  if (m.pending) parts.push(itPendCard(m.pending));
+  m.attn.slice(0, IT_CAP).forEach(j => parts.push(itAttnCard(j)));
+  if (m.attn.length > IT_CAP) parts.push(`<div class="it-more mut small">and ${m.attn.length - IT_CAP} more in Jobs</div>`);
+  m.done.slice(0, IT_CAP).forEach(j => parts.push(itDoneCard(j)));
+  if (m.away.length) parts.push(itAwayCard(m.away));
+  return parts.join("");
+}
+/* ==INSTALL-TOAST-PURE-END== */
+const IT_KEYS = {dismissed: "plasbench.instDismissed", hidden: "plasbench.instHidden", seen: "plasbench.instSeen"};
+const itGet = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; } };
+const itSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+S.itDismissed = new Set(itGet(IT_KEYS.dismissed, [])); S.itHidden = new Set(itGet(IT_KEYS.hidden, [])); S.itOpen = false; S.itPending = null; S.itAway = []; S.itDoneUntil = {}; S.itPrevLive = new Set();
+function itPend(label) { S.itPending = {label, t0: Date.now()}; renderInstallToast(); }
+function itPendClear() { S.itPending = null; renderInstallToast(); }
+function itDismiss(ids) { ids.forEach(i => S.itDismissed.add(i)); itSet(IT_KEYS.dismissed, [...S.itDismissed].slice(-200)); renderInstallToast(); }
+function itCtx() { return {now: Date.now() / 1000, dismissed: S.itDismissed, hidden: S.itHidden, away: S.itAway, doneUntil: S.itDoneUntil, pending: S.itPending}; }
+function itOnJobs() {   // called by refreshJobs with the fresh list
+  const now = Date.now() / 1000, jobs = S.jobs || [];
+  if (!S.itBooted) { S.itBooted = true; S.itAway = itAway(jobs, itGet(IT_KEYS.seen, null), S.itDismissed); }   // only what ended after this browser last saw the list; never on a first visit
+  const live = new Set(jobs.filter(itLive).map(j => j.id));
+  S.itPrevLive.forEach(id => { if (!live.has(id)) S.itDoneUntil[id] = now + IT_DONE_MS / 1000; });   // seen running here: its Done card gets its full 8 s even if the poll was late
+  S.itPrevLive = live;
+  S.itHidden = new Set([...S.itHidden].filter(id => live.has(id))); itSet(IT_KEYS.hidden, [...S.itHidden]);
+  itSet(IT_KEYS.seen, now);
+  renderInstallToast();
+}
+function renderInstallToast() {
+  const el = document.getElementById("insttoast"); if (!el) return;
+  const m = itModel(S.jobs, itCtx()), html = itHTML(m, {open: S.itOpen}), nlive = m.live.length;
+  const chip = document.getElementById("instchipwrap");
+  if (chip) { chip.hidden = !(m.hidden && nlive); const b = document.getElementById("instchip"); if (b && !chip.hidden) { b.querySelector("#instchiptx").textContent = `Installing ${nlive}`; b.setAttribute("aria-label", `${nlive} installation${nlive > 1 ? "s" : ""} running: show details`); } }
+  el.setAttribute("aria-busy", String(nlive > 0 && !m.hidden)); el.hidden = !html;
+  if (el._html !== html) {
+    const f = document.activeElement && el.contains(document.activeElement) ? document.activeElement : null;
+    const key = f && f.closest("[data-k]") ? [f.closest("[data-k]").dataset.k, f.dataset.it, f.dataset.id || ""] : null;
+    el._html = html; el.innerHTML = html; hydrateTips(el);
+    if (key) { const t = [...el.querySelectorAll(`[data-k="${CSS.escape(key[0])}"] [data-it="${key[1]}"]`)].find(x => (x.dataset.id || "") === key[2]); if (t) t.focus(); }
+  }
+  itTick();
+}
+function itTick() {
+  const now = Date.now() / 1000;
+  document.querySelectorAll("#insttoast .it-el").forEach(s => { const t = fmtElapsed(now - Number(s.dataset.s)); if (s.textContent !== t) s.textContent = t; });
+}
+async function itCancel(id) {
+  const j = (S.jobs || []).find(x => x.id === id); if (!j) return;
+  if (!await askConfirm({title: "Cancel this installation?", danger: true, cancelLabel: "Keep installing", confirmLabel: "Cancel install", body: "What is already installed is kept. Run the install again to finish it.",
+    facts: [["Install", itBase(j)], ["Command", j.command || ""], ["Started", j.started ? fmtTime(j.started) : ""]]})) return;
+  try { await api(`jobs/${id}/cancel`, {}); toast("Cancelling…"); refreshJobs(); } catch (e) { toast(e.message, "bad"); }
+}
+document.addEventListener("click", async e => {
+  const chip = e.target.closest && e.target.closest("#instchip");
+  if (chip) { S.itHidden = new Set(); itSet(IT_KEYS.hidden, []); renderInstallToast(); const b = document.querySelector('#insttoast [data-it="hide"]'); if (b) b.focus(); return; }
+  const b = e.target.closest && e.target.closest("#insttoast [data-it]"); if (!b) return;
+  const id = b.dataset.id, a = b.dataset.it;
+  if (a === "view") showConsole(id, true);
+  else if (a === "cancel") await itCancel(id);
+  else if (a === "hide") { (S.jobs || []).filter(itLive).forEach(j => S.itHidden.add(j.id)); itSet(IT_KEYS.hidden, [...S.itHidden]); renderInstallToast(); const c = document.getElementById("instchip"); if (c && !c.closest("[hidden]")) c.focus(); }
+  else if (a === "expand") { S.itOpen = !S.itOpen; renderInstallToast(); }
+  else if (a === "dismiss") itDismiss(id === "away" ? S.itAway.slice() : [id]);
+  else if (a === "jobs") go("jobs");
+  else if (a === "recheck") { itDismiss([id]); dockerRecheck(); }
+});
+setInterval(() => { if (document.getElementById("insttoast") && (S.jobs || []).length) renderInstallToast(); }, 1000);
+/* ==INSTALL-TOAST-END== */
 async function refreshJobs() {
   if (S.conn) return;
   try { S.jobs = (await api("jobs")).jobs; } catch { return; }
   renderInstallBar();
+  itOnJobs();
   renderRunToast();
   if (!$("#v_runs").hidden || S.jobs.some(j => j.state === "running" || j.state === "cancelling") || !S.sessionsLoaded) { S.sessionsLoaded = true; refreshSessions(); }
   const running = S.jobs.filter(j => j.state === "running" || j.state === "cancelling");
@@ -1973,6 +2162,7 @@ async function pollConsole(force) {
 }
 function afterJob(j) {
   const n = j.argv[0];
+  if (n === "upgrade") { updLoad(true); if (j.state === "done" && typeof ssPoll === "function") ssPoll(); }   // the Updates card follows the job; a finished update makes the running server stale: the banner and Restart window appear
   if (j.kind === "git") refreshGit();   // fetch, pull, push: the drawer and the page show the new state
   if (n === "install-tools" && j.argv[1] === "docker") dockerLoad(true);      // the engine may be working now: look again (Re-check does the same by hand)
   if (["check","install-tools","install-conda","tools"].includes(n)) { S.env = null; S.tools = null; S.toolsStale = true; S.user = null; if (!$("#v_setup").hidden) loadSetup(true); }
@@ -2289,21 +2479,160 @@ function renderEnv(env) {
   }).join("")).join("");
 }
 $("#envref").onclick = async () => { $("#envlist").innerHTML = `<div class="bd mut">Checking…</div>`; await loadSetup(true); toast("Checked"); };
-$("#updcheck").onclick = async () => {
-  const box = $("#updresult"); box.style.display = ""; box.innerHTML = `<span class="mut">Checking GitHub…</span>`;
+/* ---- Updates card (Set up this computer): check, download and install, install from a file, roll back, restart ----
+   The server (plasbench/updater.py) builds the one real command, `plasbench upgrade ...`, and runs it as a job; this card shows that job's phases, log and result.
+   The cached answer comes from GET /api/updates (no network); only the Check button (POST /api/updates/check) and the install contact GitHub. */
+const UPD = {data: null, timer: null, busy: false, fileInfo: null};
+const updWhen = t => t ? `${ago(t)} (${fmtTime(t)})` : "never";
+const updDate = d => d || "date unknown";
+async function updLoad(force) {
+  if (S.conn && !force) return;
+  try { UPD.data = await api("updates"); } catch (e) { return; }
+  updRender(); updBadge(); updSchedule();
+}
+function updSchedule() {
+  clearTimeout(UPD.timer);
+  const j = UPD.data && UPD.data.job, running = j && (j.state === "running" || j.state === "cancelling");
+  UPD.timer = setTimeout(() => updLoad(), running ? 2000 : 30 * 60 * 1000);   // the job is followed every 2 s while it runs; otherwise the cached answer is re-read twice an hour
+}
+function updBadge() {
+  const d = UPD.data, newer = !!(d && d.check && d.check.newer && !d.needs_restart);
+  const dot = $("#upd_dot"), item = $("#updmenu");
+  if (dot) dot.hidden = !newer;
+  if (item) { item.hidden = !newer; const t = item.querySelector(".mt"); if (t && newer) t.textContent = `Update available: PlasBench ${d.check.latest}`; }
+  const sub = $("#upd_sub"); if (sub && d) sub.textContent = `this is ${d.current}`;
+}
+function updRender() {
+  const d = UPD.data; if (!d) return;
+  const c = d.check || {}, j = d.job, running = !!j && (j.state === "running" || j.state === "cancelling");
+  const busy = running || UPD.busy;
+  let html = `<div class="small"><b>Installed:</b> ${esc(d.current)}${d.needs_restart ? ` (this window still runs ${esc(d.running)})` : ""}`;
+  if (c.checked) html += ` &middot; <b>Latest release:</b> ${esc(c.latest)}${c.published ? `, published ${esc(updDate(c.published))}` : ""} &middot; checked ${esc(updWhen(c.checked_at))}`;
+  html += `</div>`;
+  if (c.error) html += `<div class="note warn" style="margin-top:8px">${icon("alert", "ico")}<div>${esc(c.error)}${c.checked ? ` <span class="mut">(Showing the last answer, from ${esc(updWhen(c.checked_at))}.)</span>` : ""}</div></div>`;
+  if (c.checked && !d.needs_restart) {
+    if (c.relation === "newer") {
+      const size = c.asset && c.asset.size != null ? ` (${fmtSize(c.asset.size)})` : "";
+      html += `<div class="note" style="margin-top:8px">${icon("info", "ico")}<div><b>PlasBench ${esc(c.latest)} is available</b>${size}.
+        ${c.notes && c.notes.length ? `<div class="small" style="margin-top:6px"><b>What's new</b></div><ul class="small updnotes">${c.notes.map(n => `<li>${esc(n.replace(/^- /, ""))}</li>`).join("")}</ul>` : ""}
+        ${c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">Full release notes on GitHub</a>` : ""}</div></div>`;
+    } else if (c.relation === "same") html += `<div class="note" style="margin-top:8px">${icon("check", "ico")}<div>PlasBench ${esc(c.current || d.current)} is the latest release.</div></div>`;
+    else if (c.relation === "older") html += `<div class="note" style="margin-top:8px">${icon("info", "ico")}<div>This installation (${esc(d.current)}) is newer than the latest published release (${esc(c.latest)}). Nothing to install.</div></div>`;
+  } else if (!c.checked && !c.error) html += `<div class="note" style="margin-top:8px">${icon("info", "ico")}<div>PlasBench has not looked for a newer release yet. Press Check for updates.</div></div>`;
+  if (c.mode === "off") html += `<div class="small mut" style="margin-top:6px">The automatic check is off (setting UPDATE_CHECK); Check for updates still works.</div>`;
+  if (c.relation === "newer" && d.active && d.active.length) html += `<div class="note warn" style="margin-top:8px">${icon("alert", "ico")}<div><b>${d.active.length === 1 ? "A run or job is going" : d.active.length + " runs or jobs are going"}</b>: ${esc(d.active.map(a => a.label).slice(0, 3).join("; "))}. The update waits until they finish (or you confirm Update anyway).</div></div>`;
+  setIfChanged($("#updresult"), html);
+  const go = $("#updgo"), chk = $("#updcheck"), newer = c.relation === "newer" && !d.needs_restart;
+  go.hidden = !newer; go.disabled = busy; go.textContent = newer ? `Download and install ${c.latest}` : "Download and install";
+  chk.className = newer ? "btn sec" : "btn"; chk.disabled = UPD.busy || running;
+  const rb = $("#updrollback"); rb.hidden = !(d.rollback && d.rollback.version); rb.disabled = busy; if (d.rollback && d.rollback.version) rb.textContent = `Roll back to ${d.rollback.version}`;
+  $("#upd_filego").disabled = busy;
+  updRenderJob();
+}
+const UPD_STEP_ICON = {done: "check", current: "refresh", failed: "x", pending: "info"};
+function updRenderJob() {
+  const d = UPD.data, j = d && d.job, box = $("#upd_job");
+  const recent = j && (j.state === "running" || j.state === "cancelling" || (j.ended && Date.now() / 1000 - j.ended < 6 * 3600));
+  box.hidden = !recent; if (!recent) { $("#upd_restart").hidden = true; return; }
+  const res = j.result || {}, running = j.state === "running" || j.state === "cancelling";
+  $("#upd_jobtitle").textContent = j.label || "Update";
+  const tag = $("#upd_jobstate"); tag.textContent = running ? "running" : res.ok ? "finished" : (j.state === "cancelled" ? "cancelled" : "did not finish"); tag.className = "tag " + (running ? "" : res.ok ? "ok" : "bad");
+  applyKeyed($("#upd_steps"), j.steps.map(st => ({key: st.id, sig: st.state, label: st.label, state: st.state})),
+    it => `<li class="updstep ${it.state}">${icon(UPD_STEP_ICON[it.state] || "info", "ico")}<span>${esc(it.label)}</span><span class="sr-only"> (${esc(it.state)})</span></li>`);
+  let rh = "";
+  if (res.ok) rh = `<div class="note ok">${icon("check", "ico")}<div><b>${esc(res.title)}.</b> ${d.needs_restart ? `Restart the window to use ${esc(d.current)}. Your studies, settings, databases and tools were kept.` : `PlasBench ${esc(d.current)} is running.`}</div></div>`;
+  else if (res.ok === false) rh = `<div class="note bad">${icon("alert", "ico")}<div><b>${esc(res.title)}.</b> ${res.detail ? esc(res.detail) + " " : ""}${esc(res.next)}${d.restart_supported === false ? "" : ""}</div></div>`;
+  setIfChanged($("#upd_res"), rh);
+  const rs = $("#upd_restart"); rs.hidden = !(res.ok && d.needs_restart);
+  $("#upd_log").textContent = (j.lines || []).join("\n");
+}
+async function updCheck() {
+  if (UPD.busy) return; UPD.busy = true; const b = $("#updcheck"); b.disabled = true; b.textContent = "Checking GitHub…";
+  try { UPD.data = await api("updates/check", {}); updRender(); updBadge(); updSchedule(); }
+  catch (e) { toast(e.message, "bad"); }
+  finally { UPD.busy = false; b.textContent = "Check for updates"; if (UPD.data) updRender(); }
+}
+function updFacts(d, kind, o) {
+  const c = d.check || {}, f = [];
+  if (kind === "latest") {
+    f.push(["Version", `${d.current} to ${c.latest}`]);
+    f.push(["Download", c.asset && c.asset.name ? `${c.asset.name}${c.asset.size != null ? `, ${fmtSize(c.asset.size)}` : ""}` : `plasbench-${c.latest}.tar.gz`]);
+    f.push(["From", c.asset && c.asset.url ? c.asset.url.replace(/\/[^/]*$/, "/") + " (github.com, https only)" : `https://github.com/ubeffiong/plasbench/releases/download/v${c.latest}/ (https only)`]);
+    f.push(["Checked", `against plasbench-${c.latest}.tar.gz.sha256 from the same release, before anything is replaced`]);
+  } else if (kind === "archive") {
+    f.push(["Version", `${d.current} to ${o.version}`]);
+    f.push(["File", `${o.path}${o.size != null ? `, ${fmtSize(o.size)}` : ""}`]);
+    f.push(["Checked", o.has_sha256 ? `against ${o.name}.sha256 beside the file, before anything is replaced` : `no ${o.name}.sha256 beside the file: the log prints its SHA-256 so you can compare it with the release page; nothing is downloaded`]);
+  } else {
+    f.push(["Version", `${d.current} to ${o.version}`]);
+    f.push(["File", `${d.rollback.path} (the copy saved by the last update)`]);
+  }
+  f.push(["Installs into", d.folder]);
+  f.push(["Kept", "your studies, settings, databases and tools"]);
+  f.push(["Previous version", d.rollback && d.rollback.version && kind !== "rollback" ? `a rollback copy of ${d.current} is saved first (replacing the older one, ${d.rollback.version})` : `a rollback copy of ${d.current} is saved first`]);
+  f.push(["After", "this window must be restarted to use the new code; there is a Restart window button"]);
+  return f;
+}
+/* The consent dialog: exactly what will happen, and the loud variant when something is running (the server refuses without `force`) or when it is an older release. */
+async function updInstall(kind, o) {
+  const d = UPD.data; if (!d) return;
+  o = o || {};
+  const active = d.active || [], older = kind === "archive" ? o.relation === "older" : (kind === "rollback" ? true : false);
+  const title = kind === "rollback" ? `Roll back to ${o.version}?` : older ? `Install an OLDER release (${o.version})?` : kind === "archive" ? `Install PlasBench ${o.version} from a file?` : `Update PlasBench to ${d.check.latest}?`;
+  let warn = "";
+  if (active.length) warn += `<p><b>${active.length === 1 ? "A run or job is going now" : active.length + " runs or jobs are going now"}</b> (${esc(active.map(a => a.label).slice(0, 3).join("; "))}). An update replaces the program files they are using while they work. Runs started from this window keep going, but a stage that starts, or a report that is written, during the update can fail or mix versions. Wait for them to finish unless you must update now.</p>`;
+  if (older) warn += `<p><b>This is a downgrade.</b> Studies and settings are kept, but a study written by a newer release can use features this older one lacks.</p>`;
+  const risky = active.length > 0 || older;
+  const r = await modalDialog({title, danger: risky, wide: true, cancelId: "cancel", facts: updFacts(d, kind, o), bodyHTML: warn + `<p>The update runs as a job; its phases and log appear in this card.</p>`,
+    buttons: [{id: "cancel", label: active.length ? "Wait" : "Cancel"}, {id: "ok", label: active.length ? "Update anyway" : kind === "rollback" ? "Roll back" : kind === "archive" ? "Install from this file" : "Download and install", danger: risky, primary: !risky}]});
+  if (r.id !== "ok") return;
+  const body = kind === "latest" ? {kind, version: d.check.latest} : kind === "archive" ? {kind, archive: o.path} : {kind};
+  if (active.length) body.force = true;
+  if (older) body.downgrade = true;
+  await updStart(body);
+}
+async function updStart(body) {
+  UPD.busy = true; updRender();
   try {
-    const u = await api("update-check");
-    if (u.error) { box.innerHTML = `<div class="note warn">${icon("alert", "ico")}<div>${esc(u.error)}</div></div>`; return; }
-    if (u.newer) {
-      box.innerHTML = `<div class="note">${icon("info", "ico")}<div><b>PlasBench ${esc(u.latest)} is available</b> (you have ${esc(u.current)}).
-        <a href="${esc(u.url)}" target="_blank" rel="noopener noreferrer">What changed</a>
-        <div style="margin-top:8px"><button class="btn sm" id="updgo">Upgrade to ${esc(u.latest)}</button></div></div></div>`;
-      $("#updgo").onclick = () => confirmRun(["upgrade", "--yes"], `Upgrade PlasBench to ${u.latest}`);
-    } else {
-      box.innerHTML = `<div class="note">${icon("check", "ico")}<div>PlasBench ${esc(u.current)} is the latest release.</div></div>`;
-    }
-  } catch (e) { box.innerHTML = `<div class="note warn">${icon("alert", "ico")}<div>${esc(e.message)}</div></div>`; }
+    const r = await api("updates/install", body);
+    toast(`Started: ${r.plan.label}`, "ok"); refreshJobs();
+    await updLoad(true);
+  } catch (e) {
+    const p = e.data || {};
+    if (p.code === "busy" && !body.force) {
+      const lines = ((p.details && p.details.active) || []).map(a => a.label).join("; ");
+      const again = await askConfirm({title: "Something is running", danger: true, body: `${e.message}\n\nNow running: ${lines}.\n\nUpdate anyway only if you accept that those can fail.`, confirmLabel: "Update anyway", cancelLabel: "Wait"});
+      if (again) { UPD.busy = false; return updStart(Object.assign({}, body, {force: true})); }
+    } else if (p.code === "downgrade" && !body.downgrade) {
+      if (await askConfirm({title: "This is a downgrade", danger: true, body: e.message, confirmLabel: "Install the older release", cancelLabel: "Cancel"})) { UPD.busy = false; return updStart(Object.assign({}, body, {downgrade: true})); }
+    } else showMessage({title: "The update did not start", body: e.message, danger: true});
+  } finally { UPD.busy = false; updRender(); }
+}
+$("#updcheck").onclick = updCheck;
+$("#updgo").onclick = () => updInstall("latest");
+$("#updrollback").onclick = () => { const d = UPD.data; if (d && d.rollback) updInstall("rollback", {version: d.rollback.version}); };
+$("#upd_restart").onclick = () => restartWindow(UPD.data && UPD.data.restart_supported === false);
+let updFileTimer = null;
+$("#upd_file").addEventListener("input", () => {
+  clearTimeout(updFileTimer); UPD.fileInfo = null;
+  const v = $("#upd_file").value.trim(), msg = $("#upd_filemsg"); msg.textContent = "";
+  if (!v) return;
+  updFileTimer = setTimeout(async () => {
+    try { const i = await api("updates/archive", {path: v}); if ($("#upd_file").value.trim() !== v) return; UPD.fileInfo = i;
+      msg.className = "small" + (i.ok ? "" : " updbad");
+      msg.textContent = i.ok ? `${i.name}: PlasBench ${i.version}${i.size != null ? `, ${fmtSize(i.size)}` : ""}. ${i.has_sha256 ? "Checksum file found beside it." : "No .sha256 beside it: its SHA-256 is printed in the log."}${i.relation === "older" ? " This is OLDER than the installed version." : i.relation === "same" ? " Same version as installed: it is installed again (repair)." : ""}` : i.error;
+    } catch (e) { msg.textContent = e.message; }
+  }, 350);
+});
+$("#upd_filego").onclick = async () => {
+  const v = $("#upd_file").value.trim();
+  if (!v) { $("#upd_filemsg").textContent = "Choose the release file you downloaded (plasbench-<version>.tar.gz) with Browse, or paste its path."; $("#upd_file").focus(); return; }
+  let i; try { i = await api("updates/archive", {path: v}); } catch (e) { return toast(e.message, "bad"); }
+  if (!i.ok) { $("#upd_filemsg").textContent = i.error; $("#upd_file").focus(); return; }
+  updInstall("archive", i);
 };
+{ const item = $("#updmenu"); if (item) item.onclick = () => { go("setup"); setTimeout(() => { const c = $("#updcard"); if (c) { c.scrollIntoView({block: "start"}); $("#updcheck").focus({preventScroll: true}); } }, 150); }; }
+setTimeout(() => updLoad(), 4000);   // after the page has loaded: the cached answer sets the badge in the top bar (the server may start its own once-a-day check in the background)
 $("#profgo").onclick = () => { const p = $("#profile").value; if (p === "docker") return dockerInstall(); confirmRun(["install-tools", p, "--yes"], `Install the ${p} profile`); };
 $("#ncbi_show").onclick = () => { const k = $("#ncbi_key"); k.type = k.type === "password" ? "text" : "password"; $("#ncbi_show").textContent = k.type === "password" ? "Show" : "Hide"; };
 $("#ncbi_save").onclick = async () => {
@@ -2511,7 +2840,7 @@ async function rtBuild() {
       <ul class="small">${r.build_note.map(l => `<li>${esc(l)}</li>`).join("")}</ul>
       <p class="small mut">The build runs as a job with a live log; if it fails the reason and the last lines are shown. Needs the internet.</p>`});
   if (x.id !== "ok") return;
-  try { const job = await api("runtime/pull", {build: true}); toast("Started: build the image", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (e) { toast(e.message, "bad"); }
+  itPend("Build the image"); try { const job = await api("runtime/pull", {build: true}); toast("Started: build the image", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (e) { toast(e.message, "bad"); } finally { itPendClear(); }
 }
 async function rtTest() {
   const box = $("#rt_test"); box.hidden = false; box.innerHTML = `<span class="mut">Testing Docker (a few small containers)...</span>`;
@@ -2528,12 +2857,12 @@ async function rtReady() {
       <li><b>Databases:</b> Platon, MOB-suite and the others the enabled tools use, into <span class="mono">${esc(S.rt.extras.home)}</span> (tools) and your database folder (databases). Total size: not measured; some databases are several GB, so check the free space first.</li>
       <li><b>Needs the internet.</b> Times are not measured. The image is not changed; everything is kept between runs.</li></ul>`});
   if (x.id !== "ok") return;
-  try { const job = await api("runtime/ready", {}); toast("Started: make everything ready", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (e) { toast(e.message, "bad"); }
+  itPend("Make everything ready"); try { const job = await api("runtime/ready", {}); toast("Started: make everything ready", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (e) { toast(e.message, "bad"); } finally { itPendClear(); }
 }
 document.addEventListener("click", async e => {
   const b = e.target.closest && e.target.closest("#env_card button"); if (!b || b.disabled || b.getAttribute("aria-disabled") === "true") return;
   if (b.id === "rt_docker") rtUseDocker(); else if (b.id === "rt_conda") rtUseConda(); else if (b.id === "rt_build") rtBuild(); else if (b.id === "rt_test_btn") rtTest(); else if (b.id === "rt_ready") rtReady();
-  else if (b.id === "rt_pull") { try { const job = await api("runtime/pull", {}); toast("Started: pull the image", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (err) { toast(err.message, "bad"); } }
+  else if (b.id === "rt_pull") { itPend("Pull the image"); try { const job = await api("runtime/pull", {}); toast("Started: pull the image", "ok"); await refreshJobs(); showConsole(job.id, true); } catch (err) { toast(err.message, "bad"); } finally { itPendClear(); } }
 });
 /* ==RUNTIME-UI-END== */
 
@@ -3143,8 +3472,7 @@ const PAGE_HELP = {
 "Optional items, shown in grey, are only needed for some analyses. A benchmark runs without them.",
 "<b>Add desktop icon</b> puts a PlasBench icon on your desktop and in the applications menu. Clicking it starts PlasBench.",
 "Conda is the normal way to get the tools. Docker is an alternative: the card shows the command when Docker is available.",
-"<b>Check for updates</b> asks GitHub whether a newer release exists and offers the upgrade; it only runs when you press it.",
-"<b>Upgrade PlasBench</b> updates this folder in place. Your studies, settings, downloads and tools are kept. Close and reopen PlasBench afterwards.",
+"The <b>Updates</b> card checks GitHub for a newer release (also once a day in the background unless the UPDATE_CHECK setting is off), downloads it, verifies its checksum and installs it into this folder, or installs a release file you already downloaded (no internet needed). Studies, settings, databases and tools are kept; restart the window afterwards.",
 "<b>Git</b> (optional) keeps a history of your runs. On Windows, Git for Windows also provides Git Bash, which runs PlasBench's scripts and is a Terminal shell."
 ],
 "cli": [
