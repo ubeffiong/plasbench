@@ -38,6 +38,7 @@ from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ena_download  # noqa: E402
 import download_scratch  # noqa: E402
+import depth_cap  # noqa: E402
 from plasbench_common import net_explain, net_require  # noqa: E402
 
 RETRY_DELAY_SECONDS = float(os.environ.get("ENA_RETRY_DELAY_SECONDS", "15") or 15)   # wait before attempt n+1 is n times this (15 s, 30 s, ...); tests set 0
@@ -45,7 +46,7 @@ SEGMENT_MIN_BYTES = int(os.environ.get("ENA_SEGMENT_MIN_BYTES", str(16 << 20)) o
 
 # ENA_PORTAL_URL points the file-report lookup at a mirror (or, in the tests, at a local fake server). The default is ENA itself.
 PORTAL = os.environ.get("ENA_PORTAL_URL") or "https://www.ebi.ac.uk/ena/portal/api/filereport"
-FIELDS = "run_accession,fastq_ftp,fastq_md5,fastq_bytes,library_layout"
+FIELDS = "run_accession,fastq_ftp,fastq_md5,fastq_bytes,library_layout,read_count,base_count,instrument_platform"
 
 
 def file_report(run, timeout=60):
@@ -73,6 +74,30 @@ def download(url, path, expected_md5, expected_bytes=None, budget=None, progress
         ena_download.log(f"{name}: moved from the scratch folder into {os.path.dirname(os.path.abspath(path))}")
 
 
+def make_plan(args, report, pairs):
+    """The read-depth cap plan (python/depth_cap.py) for this run: reference size from --ref-bases or --reference, cap from --depth-cap / READ_DEPTH_CAP_X."""
+    sizes = [str(b) for _, _, b in pairs]
+    ref = int(args.ref_bases or 0) or (depth_cap.reference_bases(args.reference) if args.reference else 0)
+    cap_x = depth_cap.parse_cap(args.depth_cap)
+    if not all(x.strip().isdigit() for x in sizes):
+        return {"capped": False, "cap_x": cap_x, "ref_bases": ref, "full_bytes": 0, "reason": "ENA reports no file sizes: whole files"}
+    return depth_cap.plan(cap_x, ref, report, [int(x) for x in sizes])
+
+
+def capped_record(dplan, files):
+    """What the provenance JSON (and through it the run manifest and report) says about the cap, applied or not."""
+    record = {"applied": bool(dplan.get("capped")), "cap_x": dplan.get("cap_x"), "reason": dplan.get("reason", ""), "reference_bases": dplan.get("ref_bases", 0)}
+    if dplan.get("capped"):
+        record.update(
+            target_pairs=dplan["target_pairs"], read_pairs_available=dplan["read_count"], depth_available=round(dplan["depth"], 1), estimated_depth=round(dplan["est_depth"], 1),
+            bytes_available=dplan["full_bytes"], bytes_fetched=sum(f["bytes_fetched"] for f in files), source_urls=[f["url"] for f in files],
+            method="prefix of each file (the first read pairs, in sequencer output order; not a random sample), cut at a complete 4-line record, recompressed (gzip -n style)",
+            integrity="prefix of the file, whole-file md5 not checked. Checked instead: 4-line records with equal sequence and quality lengths, equal pair counts in both mates, "
+                      "first and last read names pair up, the deflate stream decodes without error",
+            scoring_note=f"read depth was capped to about {dplan['est_depth']:.0f}x (cap {dplan['cap_x']:g}x); truth and scoring do not use read depth")
+    return record
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", required=True, help="SRR/ERR/DRR run accession")
@@ -81,27 +106,41 @@ def main():
                     help="download nothing: print the run's total FASTQ bytes from ENA, then each file's bytes, tab-separated, on one line. "
                          "Exit 3 when ENA cannot be reached or reports no sizes (the download stage then goes ahead without a size check).")
     ap.add_argument("--progress-file", default=os.environ.get("DOWNLOAD_PROGRESS_FILE", ""), help="merge this run's progress into this JSON file (results/download_progress.json)")
+    ap.add_argument("--reference", default="", help="the isolate's reference.fna: its size sets the read-depth cap (READ_DEPTH_CAP_X)")
+    ap.add_argument("--ref-bases", type=int, default=0, help="the reference's total bases, when already known")
+    ap.add_argument("--depth-cap", default=os.environ.get("READ_DEPTH_CAP_X", ""), help="read-depth cap in x (default 150; 0 or off = whole files)")
+    ap.add_argument("--plan", action="store_true", help="download nothing: print capped_bytes, full_bytes, capped (0/1) and a plain line, tab-separated (exit 3 when ENA cannot be asked)")
     ap.add_argument("--study", default=os.environ.get("PLASBENCH_STUDY", ""), help="the study's name (the scratch folder is ~/.plasbench/downloads/<study>)")
     ap.add_argument("--sample", default="", help="the sample the run belongs to (shown in the progress file)")
     args = ap.parse_args()
-    if not args.size_only and not args.out_dir:
+    lookup = args.size_only or args.plan
+    if not lookup and not args.out_dir:
         ap.error("--out-dir is required unless --size-only is given")
     if not os.environ.get("ENA_PORTAL_URL"):       # a mirror or a local test server is not "the internet"
-        net_require(["ena"], action=f"Looking up {args.run} at ENA" if args.size_only else f"Downloading {args.run} from ENA",
-                    code=3 if args.size_only else 1, probe=False)
+        net_require(["ena"], action=f"Looking up {args.run} at ENA" if lookup else f"Downloading {args.run} from ENA",
+                    code=3 if lookup else 1, probe=False)
     try:
         # A size lookup is only advice for the download stage, so it must not hold a run up: a short timeout (ENA_SIZE_TIMEOUT, seconds).
-        report = file_report(args.run, timeout=max(1, int(os.environ.get("ENA_SIZE_TIMEOUT", "20") or 20))) if args.size_only else file_report(args.run)
+        report = file_report(args.run, timeout=max(1, int(os.environ.get("ENA_SIZE_TIMEOUT", "20") or 20))) if lookup else file_report(args.run)
     except (OSError, ValueError) as exc:
-        if args.size_only:
+        if lookup:
             sys.stderr.write(f"[fetch_ena_reads] size lookup failed for {args.run}: {net_explain(exc, 'ena', 'The ENA size lookup')}" + chr(10))
             raise SystemExit(3)
         raise SystemExit(f"ERROR: ENA lookup failed for {args.run}: {net_explain(exc, 'ena', 'The ENA lookup')}")
-    if args.size_only:
+    if lookup:
         sizes = [x for x in (report.get("fastq_bytes") or "").split(";") if x.strip()]
         if not sizes or not all(x.strip().isdigit() for x in sizes):
             sys.stderr.write(f"[fetch_ena_reads] ENA reports no FASTQ sizes for {args.run}" + chr(10))
             raise SystemExit(3)
+        if args.plan:
+            urls_ = [u for u in (report.get("fastq_ftp") or "").split(";") if u]
+            pairs_ = sorted((u, "", b) for u, b in zip(urls_, sizes) if u.endswith("_1.fastq.gz") or u.endswith("_2.fastq.gz"))
+            if report.get("library_layout") != "PAIRED" or len(pairs_) != 2:
+                print(chr(9).join([str(sum(int(x) for x in sizes)), str(sum(int(x) for x in sizes)), "0", f"{args.run}: ENA has no usable paired FASTQ"]))
+                return
+            dp = make_plan(args, report, pairs_)
+            print(chr(9).join([str(dp["fetch_bytes"] if dp.get("capped") else dp["full_bytes"]), str(dp["full_bytes"]), "1" if dp.get("capped") else "0", depth_cap.describe(args.run, dp)]))
+            return
         print(chr(9).join([str(sum(int(x) for x in sizes))] + [x.strip() for x in sizes]))
         return
     urls = [u for u in (report.get("fastq_ftp") or "").split(";") if u]
@@ -114,7 +153,9 @@ def main():
         raise SystemExit(4)    # 4 = ENA has no usable paired FASTQ for this run (stage 1 then uses the SRA Toolkit)
     os.makedirs(args.out_dir, exist_ok=True)
     pairs = sorted(pairs)
-    total_bytes = sum(int(b) for _, _, b in pairs if str(b).isdigit())
+    dplan = make_plan(args, report, pairs)
+    total_bytes = dplan["fetch_bytes"] if dplan.get("capped") else sum(int(b) for _, _, b in pairs if str(b).isdigit())
+    ena_download.log(depth_cap.describe(args.run, dplan))
     # Where the .part files and the MD5 check live: a fast local folder when the data folder is on a slow mount (DOWNLOAD_TMP_DIR).
     place = download_scratch.resolve(os.environ.get("DOWNLOAD_TMP_DIR", "auto"), args.out_dir, args.study, total_bytes)
     scratch_dir = place["dir"] if place["scratch"] else args.out_dir
@@ -159,11 +200,53 @@ def main():
         sys.stderr.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [fetch_ena_reads] {args.run}_{mate}.fastq.gz verified (md5 {md5})" + chr(10))
         return {"url": url, "md5": md5, "bytes": size, "path": os.path.basename(path)}
 
-    # Register both files up front so the budget is shared fairly from the first byte. The first failure is raised after the other transfer finishes or fails.
+    def fetch_mate_capped(index):
+        """The first target_pairs reads of one mate: fetch a prefix, cut it at a record boundary, recompress to a .cap.part file (not yet under its final name)."""
+        url, md5, size = pairs[index]
+        url = "https://" + url if not url.startswith("http") else url
+        mate = "1" if url.endswith("_1.fastq.gz") else "2"
+        name = f"{args.run}_{mate}.fastq.gz"
+        prefix_tmp, cap_tmp = os.path.join(scratch_dir, name + ".prefix.part"), os.path.join(scratch_dir, name + ".cap.part")
+        length = dplan["prefix_bytes"][index]
+        size = int(size)
+        while True:
+            ena_download.fetch(url, prefix_tmp, md5, size, budget, progress, name, attempts=5, retry_delay=RETRY_DELAY_SECONDS, prefix_bytes=length)
+            try:
+                info = depth_cap.cut_prefix(prefix_tmp, cap_tmp, dplan["target_pairs"])
+                break
+            except depth_cap.NeedMore as exc:
+                if length >= size:
+                    raise ValueError(f"{name}: the whole file holds fewer than {dplan['target_pairs']} reads ({exc.records}); ENA's read count does not match the file")
+                longer = min(size, int(length * 1.3) + (1 << 20))
+                ena_download.log(f"{name}: the first {ena_download.human_bytes(length)} hold {exc.records} of the {dplan['target_pairs']} reads needed; fetching a longer prefix ({ena_download.human_bytes(longer)})")
+                length = longer
+        info.update(url=url, name=name, remote_md5=md5, prefix_bytes=length, remote_bytes=size, prefix_tmp=prefix_tmp, cap_tmp=cap_tmp)
+        ena_download.log(f"{name}: kept the first {info['records']} read pairs ({ena_download.human_bytes(os.path.getsize(cap_tmp))} compressed) from a {ena_download.human_bytes(length)} prefix")
+        return info
+
+    def finish_capped(infos):
+        depth_cap.check_pair(infos[0], infos[1], dplan["target_pairs"])
+        for info in infos:
+            progress.set_state(info["name"], "moving")
+            download_scratch.move_into_place(info["cap_tmp"], os.path.join(args.out_dir, info["name"]))
+            for extra in (info["prefix_tmp"], info["prefix_tmp"] + ".state"):
+                try:
+                    os.remove(extra)
+                except OSError:
+                    pass
+            progress.set_state(info["name"], "done")
+        return [{"url": i["url"], "remote_md5": i["remote_md5"], "remote_bytes": i["remote_bytes"], "bytes_fetched": i["prefix_bytes"], "records": i["records"],
+                 "first_read": i["first_name"], "last_read": i["last_name"], "path": i["name"], "prefix": True} for i in infos]
+
+    # Both files go at once and share the budget; the first failure is raised after the other transfer finishes or fails.
     ok = False
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
-            provenance["files"] = list(pool.map(fetch_mate, pairs))
+            if dplan.get("capped"):
+                provenance["files"] = finish_capped(list(pool.map(fetch_mate_capped, range(len(pairs)))))
+            else:
+                provenance["files"] = list(pool.map(fetch_mate, pairs))
+        provenance["read_depth_cap"] = capped_record(dplan, provenance["files"])
         ok = True
     finally:
         stop.set()

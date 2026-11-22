@@ -28,6 +28,8 @@ import threading
 import time
 import urllib.parse
 
+NL_ = chr(10)
+
 
 class Content:
     """size bytes, deterministic from seed; read(start, end) returns bytes without holding the file in memory."""
@@ -64,12 +66,40 @@ class Content:
         return self._md5
 
 
+class BytesContent:
+    """A file held in memory (the gzip FASTQ of a capped-download test); same interface as Content."""
+
+    def __init__(self, data):
+        self.data, self.size, self._md5 = data, len(data), hashlib.md5(data).hexdigest()
+
+    def read(self, start, end):
+        return self.data[start:end + 1]
+
+    def md5(self):
+        return self._md5
+
+
+def fastq_gz(run, mate, pairs, read_len=100, seed=1):
+    """Deterministic gzip FASTQ: `pairs` records named <run>.<n>/<mate>, random bases, so the compressed size grows with the read count."""
+    import gzip
+    import io
+    rng = random.Random(seed * 7919 + mate)
+    out = io.BytesIO()
+    with gzip.GzipFile(filename="", mode="wb", fileobj=out, compresslevel=6, mtime=0) as handle:
+        for n in range(1, pairs + 1):
+            seq = "".join(rng.choice("ACGT") for _ in range(read_len))
+            qual = "".join(rng.choice("<>?@ABCDEFGHI") for _ in range(read_len))
+            handle.write(f"@{run}.{n}/{mate}{NL_}{seq}{NL_}+{NL_}{qual}{NL_}".encode())
+    return out.getvalue()
+
+
 class FakeENA:
     def __init__(self, rate=None):
         self.files = {}
         self.etags = {}
         self.sizes = {}
         self.runs = {}
+        self.meta = {}
         self.faults = []
         self.honour_range = True
         self.rate = rate                       # bytes per second per connection (None = unlimited)
@@ -95,6 +125,17 @@ class FakeENA:
             self.add_file(path, Content(size, seed + mate))
             paths.append(path)
         self.runs[run] = (paths, md5_wrong, layout)
+        return paths
+
+    def add_fastq_run(self, run, pairs, read_len=100, seed=1, platform="ILLUMINA", layout="PAIRED"):
+        """A real paired gzip FASTQ run (for the read-depth cap); the file report carries read_count, base_count and instrument_platform."""
+        paths = []
+        for mate in (1, 2):
+            path = f"/f/{run}_{mate}.fastq.gz"
+            self.add_file(path, BytesContent(fastq_gz(run, mate, pairs, read_len, seed)))
+            paths.append(path)
+        self.runs[run] = (paths, False, layout)
+        self.meta[run] = {"read_count": pairs, "base_count": pairs * read_len * 2, "instrument_platform": platform}
         return paths
 
     def start(self):
@@ -261,8 +302,10 @@ class FakeENA:
         else:
             paths, wrong, layout = self.runs[run]
             md5s = [self.files[p].md5() if not (wrong and i == 0) else "0" * 32 for i, p in enumerate(paths)]
-            body = ("run_accession\tfastq_ftp\tfastq_md5\tfastq_bytes\tlibrary_layout\n"
-                    f"{run}\t{';'.join('http://' + host + p for p in paths)}\t{';'.join(md5s)}\t{';'.join(str(self.sizes[p]) for p in paths)}\t{layout}\n")
+            meta = self.meta.get(run, {})
+            body = ("run_accession\tfastq_ftp\tfastq_md5\tfastq_bytes\tlibrary_layout\tread_count\tbase_count\tinstrument_platform\n"
+                    f"{run}\t{';'.join('http://' + host + p for p in paths)}\t{';'.join(md5s)}\t{';'.join(str(self.sizes[p]) for p in paths)}\t{layout}\t"
+                    f"{meta.get('read_count', '')}\t{meta.get('base_count', '')}\t{meta.get('instrument_platform', '')}\n")
         data = body.encode()
         h.send_response(200)
         h.send_header("Content-Length", str(len(data)))

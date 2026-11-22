@@ -467,8 +467,9 @@ def probe(url, timeout=60):
 
 # --- the chunked download --------------------------------------------------------------------------------------------------------
 class Chunked:
-    def __init__(self, url, tmp, total, budget, progress, name, cfg=None, partial=None):
+    def __init__(self, url, tmp, total, budget, progress, name, cfg=None, partial=None, remote_total=None):
         self.url, self.tmp, self.total = url, tmp, total
+        self.remote_total = remote_total or total      # the size of the file on the server (self.total is the part of it being fetched: all of it, or a prefix)
         self.budget, self.progress, self.name = budget, progress, name
         self.cfg = cfg or settings()
         self.chunk = self.cfg["chunk"]
@@ -488,7 +489,7 @@ class Chunked:
         return start, min(start + self.chunk, self.total) - 1
 
     def _state(self):
-        return {"version": 1, "url": self.url, "total": self.total, "chunk": self.chunk, "etag": self.etag, "last_modified": self.modified,
+        return {"version": 1, "url": self.url, "total": self.total, "remote_total": self.remote_total, "chunk": self.chunk, "etag": self.etag, "last_modified": self.modified,
                 "done": sorted(self.done)}
 
     def prepare(self, probed):
@@ -501,12 +502,17 @@ class Chunked:
         have_file = os.path.exists(tmp)
         if state and not have_file:
             state = None                       # a state without its data file records nothing that exists
-        if state and (state["url"] != self.url or int(state["total"]) != self.total):
+        if state and (state["url"] != self.url or int(state.get("remote_total", state["total"])) != self.remote_total):
             discard(tmp, "it belongs to a different URL or size than the one now requested")
             state, have_file = None, False
-        if state and have_file and os.path.getsize(tmp) != self.total:
-            discard(tmp, f"the partial file is {os.path.getsize(tmp)} bytes but the state records {self.total}")
+        if state and have_file and os.path.getsize(tmp) != int(state["total"]):
+            discard(tmp, f"the partial file is {os.path.getsize(tmp)} bytes but the state records {state['total']}")
             state, have_file = None, False
+        if state and int(state["total"]) != self.total:
+            # A longer (or shorter) prefix of the same file is wanted than before: the whole chunks inside both lengths are still good, the old short last chunk is not.
+            keep = min(int(state["total"]), self.total)
+            state["done"] = [i for i in state["done"] if (int(i) + 1) * int(state["chunk"]) <= keep]
+            state["total"] = self.total
         if state and ((state.get("etag") and etag and state["etag"] != etag) or (state.get("last_modified") and modified and state["last_modified"] != modified)):
             self.partial.clear()
             self.progress.reset(self.name, "the file on the server has changed since the partial download started (ETag or Last-Modified differ): starting this file again")
@@ -542,7 +548,7 @@ class Chunked:
         have = self.partial.get(index, 0)
         response = open_range(self.url, start + have, end, self.cfg["stall"])
         try:
-            etag, modified, _ = check_response(response, start + have, end, self.total)
+            etag, modified, _ = check_response(response, start + have, end, self.remote_total)
             with self.lock:
                 if (self.etag and etag and etag != self.etag) or (self.modified and modified and modified != self.modified):
                     raise RemoteChanged("the ETag or Last-Modified of the file changed during the download")
@@ -667,7 +673,7 @@ class Chunked:
         return True
 
 
-def single_stream(url, tmp, total, progress, name, cfg=None, retries=5):
+def single_stream(url, tmp, total, progress, name, cfg=None, retries=5, limit=None):
     """One connection; resumes from the bytes already in `tmp` (HTTP Range) and starts again from zero only when the server cannot continue."""
     cfg = cfg or settings()
     delay = cfg["backoff"]
@@ -701,9 +707,15 @@ def single_stream(url, tmp, total, progress, name, cfg=None, retries=5):
                 response = urllib.request.urlopen(urllib.request.Request(url), timeout=cfg["stall"])
                 mode = "wb"
             with response, open(tmp, mode) as handle:
+                written = have if mode == "ab" else 0
                 for block in iter(lambda: response.read(BLOCK), b""):
+                    if limit is not None and written + len(block) > limit:
+                        block = block[:limit - written]
                     handle.write(block)
+                    written += len(block)
                     progress.add(name, len(block))
+                    if limit is not None and written >= limit:
+                        break
             size = os.path.getsize(tmp)
             if total and size < total:
                 raise OSError(f"transfer ended early ({size} of {total} bytes); will resume")
@@ -769,23 +781,24 @@ def md5_of(path, block=4 << 20):
     return digest.hexdigest()
 
 
-def fetch(url, tmp, expected_md5, expected_bytes, budget, progress, name, min_bytes=16 << 20, attempts=5, retry_delay=15.0):
-    """Download url to `tmp` (a `.part` path), verify the MD5, return. The partial file and its state stay on disk on failure; the caller moves tmp to its final name."""
+def fetch(url, tmp, expected_md5, expected_bytes, budget, progress, name, min_bytes=16 << 20, attempts=5, retry_delay=15.0, prefix_bytes=0):
+    """Download url to `tmp` (a `.part` path), verify the MD5, return. With `prefix_bytes` only the first that many bytes are fetched (the read-depth cap, python/depth_cap.py): a prefix has
+    no whole-file MD5, so none is checked and the caller validates what it makes from it. The partial file and its state stay on disk on failure; the caller moves tmp to its final name."""
     cfg = settings()
     total = int(expected_bytes) if expected_bytes else None
     state = load_state(tmp)
-    if state and state.get("verified_md5") == expected_md5 and os.path.exists(tmp) and os.path.getsize(tmp) == int(state["total"]):
+    if not prefix_bytes and state and state.get("verified_md5") == expected_md5 and os.path.exists(tmp) and os.path.getsize(tmp) == int(state["total"]):
         progress.add_file(name, int(state["total"]), int(state["total"]))
         log(f"{name}: the file was already downloaded and verified (md5 {expected_md5}); only moving it is left")
         return
     budget.register(name)
     try:
-        return _fetch(url, tmp, expected_md5, total, cfg, budget, progress, name, min_bytes, attempts, retry_delay)
+        return _fetch(url, tmp, expected_md5, total, cfg, budget, progress, name, min_bytes, attempts, retry_delay, int(prefix_bytes or 0))
     finally:
         budget.unregister(name)
 
 
-def _fetch(url, tmp, expected_md5, total, cfg, budget, progress, name, min_bytes, attempts, retry_delay):
+def _fetch(url, tmp, expected_md5, total, cfg, budget, progress, name, min_bytes, attempts, retry_delay, prefix=0):
     refetched = False
     force_single = False
     partial_store = {}
@@ -795,7 +808,7 @@ def _fetch(url, tmp, expected_md5, total, cfg, budget, progress, name, min_bytes
             budget.register(name)
             probed = None
             ranged = False
-            if not force_single and (total is None or total >= min_bytes):
+            if not force_single and (prefix or total is None or total >= min_bytes):
                 try:
                     if not budget.acquire(name):
                         raise OSError("connection budget unavailable")
@@ -809,19 +822,25 @@ def _fetch(url, tmp, expected_md5, total, cfg, budget, progress, name, min_bytes
             if ranged and total and probed[0] != total:
                 raise OSError(f"the server reports {probed[0]} bytes for {url} but ENA's file report says {total}")
             if ranged:
-                grand = probed[0]
+                grand = prefix or probed[0]
                 done = False
-                if aria2_available():
+                if aria2_available() and not prefix:
                     if aria2_fetch(url, tmp, grand, cfg["per_file"] or budget.share(), progress, name):
                         done = True
                 if not done:
-                    Chunked(url, tmp, grand, budget, progress, name, cfg, partial_store).run(probed)
+                    Chunked(url, tmp, grand, budget, progress, name, cfg, partial_store, remote_total=probed[0]).run(probed)
             else:
                 # A partial file from a chunked transfer cannot be continued as one stream (its state says which chunks are real): drop that state only.
                 if load_state(tmp) is not None:
                     discard(tmp, "the chunked partial file cannot be used for a single-stream transfer")
-                single_stream(url, tmp, total, progress, name, cfg)
+                single_stream(url, tmp, prefix or total, progress, name, cfg, limit=prefix or None)
             budget.unregister(name)          # checking the file uses no connection: the other file may have the whole budget
+            if prefix:
+                size = os.path.getsize(tmp)
+                if size != prefix:
+                    raise OSError(f"{name}: the prefix on disk is {size} bytes, expected {prefix}")
+                progress.set_state(name, "done")
+                return
             progress.set_state(name, "verifying")
             size = os.path.getsize(tmp)
             if total and size != total:
