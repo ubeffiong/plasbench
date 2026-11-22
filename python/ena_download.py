@@ -359,6 +359,79 @@ def write_progress_file(path, run, snap, line, sample=""):
                 pass
 
 
+
+# --- a quiet log -----------------------------------------------------------------------------------------------------------------------------------
+def short_line(entry):
+    """The log's line for one run, from its progress-JSON entry: short, plain, no repeated fields ('SRR36114699: 34% of 9.5 GB, 3.4 MB/s, about 31 min left').
+    The live detail (rate now and average, bytes, state) stays in results/download_progress.json for `plasbench status` and the window."""
+    run, total, have = entry.get("run") or entry.get("sample") or "download", int(entry.get("total_bytes") or 0), int(entry.get("done_bytes") or 0)
+    if not total:
+        return f"{run}: starting"
+    if have == 0:
+        return f"{run}: starting, {human_bytes(total)} to download"
+    pct = int(100 * have / total)
+    rate = float(entry.get("rate_now") or 0)
+    eta = entry.get("eta_seconds")
+    tail = f", {rate / 1e6:.1f} MB/s" if rate else ""
+    tail += f", about {human_duration(eta)} left" if eta is not None else ""
+    return f"{run}: {pct}% of {human_bytes(total)}{tail}"
+
+
+class LogGate:
+    """Decides which progress lines reach the log, so a 9.5 GB isolate is a dozen lines and not two hundred.
+
+    A line is printed (1) for the first look at a run, (2) when at least `interval` seconds (default 300) have passed AND the run has moved on by `step` percent (default 10) since the
+    last line, whichever of the two comes later, and (3) when something changes: a chunk retry (at most one such line a minute), a stall, a restart of a file, a lower connection
+    budget, the file being checked or moved. `state` is a dict the caller keeps (and, between processes, saves)."""
+
+    def __init__(self, state=None, interval=None, step=None, clock=time.time):
+        self.state = state if state is not None else {}
+        self.interval = _env_num("ENA_LOG_INTERVAL_SECONDS", 300.0) if interval is None else interval
+        self.step = _env_num("ENA_LOG_STEP_PERCENT", 10.0) if step is None else step
+        self.clock = clock
+
+    def check(self, entry):
+        """Lines (a list of str, possibly empty) to log now for this progress entry."""
+        st, now = self.state, self.clock()
+        run = entry.get("run") or entry.get("sample") or "download"
+        total, have = int(entry.get("total_bytes") or 0), int(entry.get("done_bytes") or 0)
+        pct = (100.0 * have / total) if total else 0.0
+        lines = []
+        if not st.get("started"):
+            st.update(started=True, t=now, pct=pct, retries=int(entry.get("retries") or 0), restarts=len(entry.get("restarts") or []), conn=entry.get("connections"),
+                      state=entry.get("state"), retry_t=0.0)
+            first = short_line(entry)
+            if entry.get("resumed_bytes"):
+                first += f" ({human_bytes(entry['resumed_bytes'])} already on disk from an earlier attempt)"
+            return [first]
+        state = entry.get("state")
+        if state != st.get("state"):
+            text = {"stalled": f"{run}: no bytes for a minute, still retrying", "verifying": f"{run}: all bytes received, checking the checksum",
+                    "moving": f"{run}: checksum verified, moving the files into the data folder"}.get(state)
+            if state == "downloading" and st.get("state") == "stalled":
+                text = f"{run}: receiving data again"
+            if text:
+                lines.append(text)
+            st["state"] = state
+        restarts = entry.get("restarts") or []
+        if len(restarts) > st.get("restarts", 0):
+            lines.append(f"{run}: {restarts[-1]}")
+            st["restarts"] = len(restarts)
+        retries = int(entry.get("retries") or 0)
+        if retries > st.get("retries", 0) and now - st.get("retry_t", 0.0) >= 60.0:
+            lines.append(f"{run}: a connection problem, a chunk was retried ({retries} so far); nothing already downloaded is lost")
+            st["retries"], st["retry_t"] = retries, now
+        conn = entry.get("connections")
+        if conn is not None and st.get("conn") is not None and conn < st["conn"]:
+            lines.append(f"{run}: ENA asked for fewer connections: now {conn} (was {st['conn']})")
+        if conn is not None:
+            st["conn"] = conn
+        if state == "downloading" and now - st.get("t", 0.0) >= self.interval and pct >= st.get("pct", 0.0) + self.step:
+            lines.append(short_line(entry))
+            st["t"], st["pct"] = now, pct
+        return lines
+
+
 # --- the state file --------------------------------------------------------------------------------------------------------------
 def state_path(tmp):
     return tmp + ".state"

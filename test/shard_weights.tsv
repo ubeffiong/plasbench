@@ -502,3 +502,4 @@ test_prefetch_history_and_diagnosis.py	1.5
 test_net_bench.py	25
 test_download_status.py	0.5
 test_stage1_downloads.sh	25
+test_ena_real_network.py	0.3

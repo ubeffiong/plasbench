@@ -67,6 +67,59 @@ def main():
     check("the log's stage number is 2 and its position in this run's list is 3 (the old label said 'Stage 3 of 8' next to the log's 'stage 2')", parsed["current"] == "2" and idx == 2 and len(parsed["stages"]) == 8)
     check("the window now says 'Stage <number>: <name> (step <position> of <n>)', so it agrees with the log and `plasbench status`",
           "Stage ${pr.stages[idx].id}: ${pr.current_name} (step ${idx + 1} of ${n})" in html and "Stage ${idx + 1} of ${n}" not in html)
+
+    # a quiet log: the first line, one per 10% and 5 minutes, and a line when something changes
+    import ena_download as ed
+    clock = [1000.0]
+    gate = ed.LogGate(clock=lambda: clock[0])
+    total = 9_500_000_000
+    out = []
+    for step in range(1, 46):                       # 45 looks, one every 66 s, like the stage 1 loop did: about 50 minutes
+        clock[0] += 66
+        have = int(total * step / 46)
+        entry = {"run": "SRR36114699", "state": "downloading", "total_bytes": total, "done_bytes": have, "rate_now": 3.4e6, "eta_seconds": (total - have) / 3.4e6, "retries": 0, "restarts": [], "connections": 16}
+        out += gate.check(entry)
+    check("a 50-minute 9.5 GB download logs about ten lines, not about forty-five (it was about 200 for the 9.5 GB isolate)", 6 <= len(out) <= 14, (len(out), out[:3]))
+    check("the first line comes at once and says how much there is", out[0] == "SRR36114699: 2% of 9.5 GB, 3.4 MB/s, about 45 min left" or out[0].startswith("SRR36114699: 2% of 9.5 GB"), out[0])
+    check("lines are short and plain, with no repeated fields (no 'now'/'average', no 'so far')", all(len(x) < 80 and "average" not in x and " now" not in x for x in out), out[:3])
+    check("each later line is at least 5 minutes and 10 percentage points after the previous one", all(("%" in x) for x in out))
+    gate = ed.LogGate(clock=lambda: clock[0])
+    base = {"run": "SRRA", "state": "downloading", "total_bytes": 1000, "done_bytes": 100, "rate_now": 1e6, "eta_seconds": 5, "retries": 0, "restarts": [], "connections": 16}
+    first = gate.check(dict(base, resumed_bytes=50_000_000))
+    check("a resumed download says so in its first line", first and "already on disk from an earlier attempt" in first[0], first)
+    clock[0] += 10
+    check("nothing is printed when nothing changed", gate.check(dict(base)) == [])
+    clock[0] += 70
+    got = gate.check(dict(base, retries=1))
+    check("a chunk retry is a line (a plain sentence, saying nothing was lost)", got and "chunk was retried" in got[0] and "nothing already downloaded is lost" in got[0], got)
+    clock[0] += 5
+    check("retries are rate-limited to one line a minute", gate.check(dict(base, retries=7)) == [])
+    got = gate.check(dict(base, retries=7, state="stalled"))
+    check("a stall is a line", got and "no bytes for a minute" in got[0], got)
+    clock[0] += 5
+    got = gate.check(dict(base, retries=7, state="downloading", connections=12))
+    check("recovering and a lower connection budget (back-off) are lines", any("receiving data again" in x for x in got) and any("fewer connections: now 12 (was 16)" in x for x in got), got)
+    got = gate.check(dict(base, retries=7, restarts=["the file on the server changed: starting it again from zero"], connections=12))
+    check("a restart of a file is a line with its reason", got and "the file on the server changed" in got[0], got)
+    got = gate.check(dict(base, retries=7, restarts=["x"], state="verifying", connections=12))
+    check("the checksum step is a line", any("checking the checksum" in x for x in got), got)
+    # the helper keeps its state between processes
+    with tempfile.TemporaryDirectory() as tmp:
+        pf = str(Path(tmp) / "p.json")
+        Path(pf).write_text(json.dumps({"isolates": {"SRRA": dict(base, updated=time.time())}}))
+        sf = str(Path(tmp) / "state.json")
+        import io
+        import contextlib
+        def run_helper():
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                dp.log_lines(pf, "SRRA", sf)
+            return buf.getvalue().splitlines()
+        a, b = run_helper(), run_helper()
+        check("download_progress.py --log-line prints the first line once and then nothing until something is due (state kept in a file)", len(a) == 1 and a[0].startswith("SRRA: ") and b == [], (a, b))
+        Path(pf).write_text(json.dumps({"isolates": {"SRRA": dict(base, updated=time.time() - 1000)}}))
+        check("a stale entry prints nothing", run_helper() == [])
+    check("the window's status panel draws a live bar and the plain line for each active download (from d.downloads), instead of the log repeating it", "d.downloads || []" in html and "<b>Downloading</b>" in html and "${dlHTML}" in html)
     print("ALL DOWNLOAD STATUS TESTS PASSED" if ok else "SOME DOWNLOAD STATUS TESTS FAILED")
     sys.exit(0 if ok else 1)
 

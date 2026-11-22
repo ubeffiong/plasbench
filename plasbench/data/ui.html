@@ -2205,8 +2205,12 @@ function rsHTML(path) {
   const counts = Object.entries(prog).filter(([, v]) => v && typeof v === "object").map(([k, v]) => `${esc(k)}: ${esc(v.ok)} of ${esc(v.rows)} ok${v.failed ? `, ${esc(v.failed)} failed` : ""}`).join(" · ");
   const logLine = rsPick(log, "last_line", "line"), logAge = rsPick(log, "age_seconds", "idle_seconds"), logName = rsPick(log, "name", "path", "file");
   const hints = rsHints(d), af = d.assembly_failures || {};
+  // Live downloads (results/download_progress.json via `plasbench status --json`): one bar and one plain line per active download; the run log itself stays quiet.
+  const dlHTML = (d.downloads || []).map(x => { const pct = x.total_bytes ? Math.min(100, Math.round(100 * x.done_bytes / x.total_bytes)) : 0;
+    return `<div class="small" style="margin-top:4px"><b>Downloading</b> ${esc(x.line || x.run)}<div class="sbar" style="height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:4px 0"><i style="display:block;height:100%;width:${pct}%;background:var(--primary)"></i></div></div>`; }).join("");
   const afHTML = af.failed ? `<div class="small bad-t" style="margin-top:4px"><b>${esc(af.failed)} assembl${af.failed === 1 ? "y" : "ies"} failed${af.same_cause ? `, all for the same reason: ${esc(af.same_cause)}` : ""}</b>${(af.items || []).slice(0, 5).map(i => `<div>${esc(i.sample)}: ${esc(i.cause || "cause not recorded")}${i.advice ? ` <span class="mut">${esc(String(i.advice).slice(0, 300))}</span>` : ""}</div>`).join("")}</div>` : "";
   return `<div class="rs-row"><span class="badge ${kind === "ok" ? "ok" : kind === "bad" ? "bad" : kind === "run" ? "run" : ""}">${esc(chip)}</span>${nowBits ? ` <b>Now:</b> ${esc(nowBits)}${ran ? `; this command has run ${esc(ran)}` : ""}` : ""}</div>
+    ${dlHTML}
     ${procs ? `<div class="small">${esc(procs)}</div>` : ""}${machine ? `<div class="small mut">This computer: ${esc(machine)}</div>` : ""}${counts ? `<div class="small mut">${counts}</div>` : ""}${afHTML}
     ${logName ? `<div class="small mut">Newest log: <span class="mono">${esc(String(logName).split(/[\\/]/).pop())}</span>${logAge != null ? `, last written ${esc(rsDur(logAge))} ago` : ""}${logLine ? `: <span class="mono">${esc(String(logLine).slice(0, 200))}</span>` : ""}</div>` : ""}
     ${hints.length ? `<div class="small" style="margin-top:4px"><b>What this means</b><ul class="rs-hints">${hints.map(h => `<li class="${rsAlarm(h) ? "bad-t" : ""}">${esc(h.text)}${h.evidence ? ` <span class="mut">(${esc(h.evidence)})</span>` : ""}</li>`).join("")}</ul></div>` : ""}`;

@@ -21,6 +21,7 @@ import glob
 import json
 import os
 import struct
+import sys
 import time
 
 
@@ -113,6 +114,30 @@ def stage_summary(progress_file, via_dir, seconds):
             f"{retries} chunk retries, {resumed / 1e6:.0f} MB resumed from earlier attempts.")
 
 
+def log_lines(progress_file, run, state_file):
+    """Print the lines due for the run log. Prints nothing when there is no fresh entry for the run yet (never a made-up line)."""
+    try:
+        with open(progress_file, encoding="utf-8") as handle:
+            entry = json.load(handle).get("isolates", {}).get(run)
+        if not entry or time.time() - float(entry.get("updated", 0)) > 180:
+            return
+        try:
+            with open(state_file, encoding="utf-8") as handle:
+                state = json.load(handle)
+        except (OSError, ValueError):
+            state = {}
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import ena_download
+        lines = ena_download.LogGate(state).check(dict(entry, run=run))
+        if state_file:
+            with open(state_file, "w", encoding="utf-8") as handle:
+                json.dump(state, handle)
+        for text in lines:
+            print(text)
+    except Exception:  # noqa: BLE001 - a progress line must never stop a download
+        return
+
+
 def describe(data_dir, run, total_bytes=None, progress_file=None):
     """One line for the run log, e.g. 'SRR123: 3.2 of 9.5 GB (34%), 3.4 MB/s now, 3.1 MB/s average, about 31 min left'."""
     line = read_progress_file(progress_file, run) if progress_file else None
@@ -144,10 +169,15 @@ def main():
     ap.add_argument("--run", default="")
     ap.add_argument("--total-bytes", type=int, help="the run's total FASTQ bytes when known (fetch_ena_reads.py --size-only)")
     ap.add_argument("--progress-file", help="results/download_progress.json, written by python/fetch_ena_reads.py")
+    ap.add_argument("--log-line", action="store_true", help="print the progress lines that are DUE for the run log (python/ena_download.py LogGate: the first, one per 10%% and 5 minutes, and changes); needs --progress-file and --state-file")
+    ap.add_argument("--state-file", help="where --log-line keeps what it has already printed")
     ap.add_argument("--summary", action="store_true", help="print the end-of-stage summary instead (needs --progress-file, --via-dir, --seconds)")
     ap.add_argument("--via-dir")
     ap.add_argument("--seconds", type=float, default=0)
     args = ap.parse_args()
+    if args.log_line:
+        log_lines(args.progress_file or "", args.run, args.state_file or "")
+        return
     if args.summary:
         print(stage_summary(args.progress_file or "", args.via_dir or ".", args.seconds))
         return

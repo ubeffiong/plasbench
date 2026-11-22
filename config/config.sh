@@ -189,8 +189,8 @@ export READ_DEPTH_CAP_X="${READ_DEPTH_CAP_X:-150}"
 # With READ_SOURCE=auto: once the SRA Toolkit's prefetch has failed, and ENA has worked, for this many isolates in a row, stage 1 fetches from ENA first for the rest of
 # the run. That saves about a minute per isolate when the toolkit cannot connect. 0 = always try prefetch first. The count restarts each time stage 1 starts.
 export PREFETCH_FAIL_LIMIT="${PREFETCH_FAIL_LIMIT:-2}"
-# While reads download, the run log gets one progress line (percent of each mate, GB done) this often, in seconds, so a long download is not mistaken for a stall.
-# 0 = no progress lines.
+# While reads download, stage 1 looks at the download this often (seconds). The run log stays quiet: the first line, then at most one short line per 10% and per 5 minutes, and a
+# line when something changes (a retry, a stall, a lower connection budget, a restart). The live detail is in results/download_progress.json. 0 = no progress lines.
 export DOWNLOAD_PROGRESS_SECONDS="${DOWNLOAD_PROGRESS_SECONDS:-30}"
 # ENA connections. ENA_MAX_CONNECTIONS is the TOTAL number of connections open at once (default 16, hard maximum 24), shared fairly by the two mates (and split between
 # parallel downloads). 16 is what aria2c itself allows per server and what a measured speed test (docs/USER_GUIDE.md, "My downloads are slow or restart") kept gaining from;

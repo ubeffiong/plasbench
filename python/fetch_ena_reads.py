@@ -171,25 +171,29 @@ def main():
                      + (f" ({ena_download.settings()['per_file']} per file)" if ena_download.settings()["per_file"] else ""))
     started = time.time()
     interval = max(1.0, float(os.environ.get("ENA_PROGRESS_SECONDS", "30") or 30))
-    json_every = min(5.0, interval)
+    json_every = min(2.0, interval)
     stop = threading.Event()
+
+    gate = ena_download.LogGate()
 
     def publish(force_line=False):
         snap = progress.snapshot()
+        snap["connections"] = budget.limit
         ena_download.write_progress_file(args.progress_file, args.run, snap, progress.line(snap), args.sample)
         return snap
 
     def reporter():
-        last_line = 0.0
+        # The live detail goes to the progress JSON every few seconds; the log gets the first line, one line per 10% and 5 minutes, and a line when something changes.
         while not stop.wait(json_every):
             snap = publish()
-            if time.time() - last_line >= interval and snap["total_bytes"]:
-                last_line = time.time()
-                sys.stderr.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {progress.line(snap)}" + chr(10))
-                sys.stderr.flush()
+            if snap["total_bytes"]:
+                for text in gate.check(dict(snap, run=args.run)):
+                    sys.stderr.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {text}" + chr(10))
+                    sys.stderr.flush()
 
     thread = threading.Thread(target=reporter, daemon=True)
     thread.start()
+    publish()                       # the first entry exists at once, so the run log can show the first line without waiting
     provenance = {"run": args.run, "source": "ENA", "files": []}
 
     def fetch_mate(entry):

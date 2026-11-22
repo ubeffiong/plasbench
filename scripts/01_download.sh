@@ -142,6 +142,7 @@ fetch_from_ena() {
     [[ "$interval" =~ ^[0-9]+$ ]] || interval=30
     attempt=$(( $(grep -c '^===== attempt ' "$logf" 2>/dev/null || true) + 1 ))
     printf '===== attempt %s, %s, run %s =====\n' "$attempt" "$(date '+%Y-%m-%d %H:%M:%S')" "$run" >> "$logf"
+    rm -f "$LOG_DIR/.dlprog.$run.json"
     log "  fetching $run from ENA (attempt $attempt) ..."
     # The downloader writes to its own log, so a long transfer would leave the run log silent and the window would show the run as stalled.
     # It runs in the background while this loop logs a progress line every DOWNLOAD_PROGRESS_SECONDS (0 = none): bytes actually received, not file sizes.
@@ -153,7 +154,8 @@ fetch_from_ena() {
         waited=$((waited + 1))
         if [[ "$interval" -gt 0 && "$waited" -ge "$interval" ]]; then
             waited=0
-            log "  $(python3 "$HERE/../python/download_progress.py" --data-dir "$sdir" --run "$run" --progress-file "$DOWNLOAD_PROGRESS_FILE" ${total_bytes:+--total-bytes "$total_bytes"} 2>/dev/null || echo "$run: still downloading")"
+            # Only the lines that are DUE (python/ena_download.py LogGate): the first, one per 10% and 5 minutes, and a line when something changes. The live detail is in results/download_progress.json.
+            while IFS= read -r pline; do [[ -n "$pline" ]] && log "  $pline"; done < <(python3 "$HERE/../python/download_progress.py" --log-line --run "$run" --progress-file "$DOWNLOAD_PROGRESS_FILE" --state-file "$LOG_DIR/.dlprog.$run.json" 2>/dev/null || true)
         fi
     done
     rc=0
