@@ -280,6 +280,24 @@ def runtime_record():
     record["extras"] = {"home": extra, "tools": tools, "provenance": provenance, "packages": packages}
     return record
 
+def read_downloads(data_dir, samples):
+    """{sample: {...}} from each sample's <run>.ena_provenance.json: where the reads came from and whether the read-depth cap (READ_DEPTH_CAP_X) cut them. Missing files are skipped."""
+    out = {}
+    for sample in samples:
+        sample_id = sample.get("sample_id")
+        if not sample_id:
+            continue
+        for path in sorted((Path(data_dir) / sample_id).glob("*.ena_provenance.json")):
+            try:
+                prov = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            out[sample_id] = {"run": prov.get("run"), "source": prov.get("source"), "file": path.name, "read_depth_cap": prov.get("read_depth_cap") or {},
+                              "transfer": prov.get("transfer") or {}}
+            break
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True)
@@ -317,7 +335,7 @@ def main():
                 "HEADLINE_MAX_REFERENCE_TIER", "HEADLINE_INDEPENDENCE", "HEADLINE_REFERENCE_INDEPENDENCE", "PLASBENCH_CI_METHOD", "PLASBENCH_CI_METHOD_STRATIFIED", "PLASBENCH_DOMINANT_SHARE", "PLASBENCH_DOMINANT_FALLBACK", "HEADLINE_MIN_CLUSTERS", "ALLOW_PRIMARY_FALLBACK", "MIN_SPECIES_CLUSTERS", "CLONAL_MASH_DISTANCE",
                 # release 0.4: the settings behind the statistics validation, the truth audits, the AMR context and the rank-sensitivity sweeps
                 "RUN_STATS_VALIDATION", "STATS_VALIDATION_MODE", "CHROMID_MIN_BP", "LARGE_PLASMID_BP", "AMR_FLANK_BP", "RUN_RANK_SENSITIVITY",
-                "RUN_TRUTH_LABEL_EVIDENCE", "TRUTH_LABEL_SCHEME", "READ_SOURCE", "PRESERVE_DOWNLOADS", "RUN_DIMER_DETECTION", "COLLAPSE_DIMERS", "DIMER_MIN_IDENTITY",
+                "RUN_TRUTH_LABEL_EVIDENCE", "TRUTH_LABEL_SCHEME", "READ_SOURCE", "READ_DEPTH_CAP_X", "PRESERVE_DOWNLOADS", "RUN_DIMER_DETECTION", "COLLAPSE_DIMERS", "DIMER_MIN_IDENTITY",
                 "DIMER_MIN_HALF_COVERAGE",
                 "REQUIRE_PREREG", "PERFECT_THRESHOLD", "FRAGMENT_SHARE", "MISSED_RECALL", "TOOL_RETRIES",
                 "TOOL_TIMEOUT_SECONDS", "RUN_RECOMMENDER_EVAL", "NEAR_OPTIMAL_MARGIN", "ORACLE_GAP_FLOOR",
@@ -396,6 +414,7 @@ def main():
         "preregistration": prereg_status(args.project_root),
         "input_checksums": {"sample_sheet": checksum_record(
             sample_sheet, manifest_warnings, "sample sheet"), "truth_tables": truth_tables},
+        "read_downloads": read_downloads(args.data_dir, samples),
         "samples": samples, "tools": {name: command_version(name) for name in TOOLS},
         # User-added tools (python/user_tools.py): their manifests, and versions the report reads by tool name.
         "user_tools": user_records, "method_versions": user_versions,

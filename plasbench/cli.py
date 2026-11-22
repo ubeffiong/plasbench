@@ -630,6 +630,14 @@ def build_parser():
     net_parser.add_argument("--service", action="append", default=[], metavar="NAME",
                             help="Check only this service (repeatable; names are in config/network_services.tsv). Default: all.")
     net_parser.add_argument("--json", action="store_true", help="Print the answer as JSON, for scripts and the window.")
+    bench_parser = sub.add_parser(
+        "net-bench", help="Measure how fast ENA delivers to this computer with 1, 4, 8 and 16 connections (small time-boxed ranges, nothing saved) and recommend ENA_MAX_CONNECTIONS.")
+    bench_parser.add_argument("--run", default="SRR36114699", help="The ENA run whose first FASTQ file is read (default SRR36114699).")
+    bench_parser.add_argument("--url", help="A file URL that honours HTTP Range, instead of looking one up.")
+    bench_parser.add_argument("--mib", type=float, default=32.0, help="MiB fetched per setting (default 32).")
+    bench_parser.add_argument("--seconds", type=float, default=20.0, help="Time limit per setting (default 20).")
+    bench_parser.add_argument("--settings", default="1,4,8,16", help="Connection counts to try (default 1,4,8,16; at most 16).")
+    bench_parser.add_argument("--json", action="store_true", help="Print the result as JSON.")
     upgrade_parser = sub.add_parser(
         "upgrade",
         help="Download the latest release and reuse this install's shared reads and databases.",
@@ -1512,6 +1520,13 @@ def main(argv=None):
             command.extend(["--sheet-out", str(args.sheet_out)])
         if args.api_key:
             command.extend(["--api-key", args.api_key])
+        code = run(command, root)
+    elif args.command == "net-bench":
+        command = [sys.executable, "python/net_bench.py", "--run", args.run, "--mib", str(args.mib), "--seconds", str(args.seconds), "--settings", args.settings]
+        if args.url:
+            command.extend(["--url", args.url])
+        if args.json:
+            command.append("--json")
         code = run(command, root)
     elif args.command == "discover-design-cohort":
         command = [sys.executable, "python/discover_design_cohort.py", "--out", str(args.out),

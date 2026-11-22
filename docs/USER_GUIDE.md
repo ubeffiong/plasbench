@@ -838,13 +838,14 @@ Stage 1 downloads each isolate's reference assembly and its paired reads.
 
 - **Before it starts**, PlasBench prints what it is about to fetch. For a sheet with no lock file it asks ENA for each run's exact compressed size, so the total is real and the **largest read set** is named; a set above `WARN_RUN_DOWNLOAD_GB` (default 5) is flagged as very large.
 - **While it runs**, the run log gets one progress line a minute per active download (`DOWNLOAD_PROGRESS_SECONDS`, 0 turns it off), for example `SRR123: mate 1 74.7%, mate 2 66.2% (7.1 of 9.5 GB)`. The reads come from the SRA Toolkit first and from ENA when that fails (`READ_SOURCE`). After `PREFETCH_FAIL_LIMIT` isolates in a row where the toolkit failed and ENA worked, the rest of the run goes to ENA first, and the log shows the toolkit's own last line as the reason.
-- **A limit.** `MAX_RUN_DOWNLOAD_GB` skips an isolate whose reads are larger; it is recorded as failed with the reason and retried when you raise the limit.
+- **No isolate is skipped for its size.** `MAX_RUN_DOWNLOAD_GB` is an opt-in limit you can set yourself (blank by default); only then is an isolate whose download is above it skipped, recorded as failed with the reason and retried when you raise the limit. A very deep run is instead cut by `READ_DEPTH_CAP_X` (see below).
 - **A file that is not a cohort.** `plasbench run --cohort NAME` refuses a file that is certainly not a cohort (the accession ledger, or a table with no `sample_id` column), once and before a study folder is made. Whether a sheet has the curated columns is stage 0's check (REQUIRE_CURATED_METADATA, which `config/local.env` can switch off): it names the first three bad rows and counts the rest.
 
 | Setting | Default | What it does |
 |---|---|---|
-| `READ_SOURCE` | `auto` | `auto`: SRA Toolkit, then ENA if it fails. `sra`: toolkit only. `ena`: ENA only, MD5-verified. |
-| `MAX_RUN_DOWNLOAD_GB` | blank | Skip an isolate whose reads exceed this many GB. Blank = no limit. |
+| `READ_SOURCE` | `auto` | `auto`: ENA first, the SRA Toolkit only when ENA has no paired FASTQ or fails. `sra`: toolkit only. `ena`: ENA only, MD5-verified. |
+| `MAX_RUN_DOWNLOAD_GB` | blank | Opt-in: skip an isolate whose download exceeds this many GB. Blank = never skip. |
+| `READ_DEPTH_CAP_X` | `150` | Download only the first read pairs of a short paired run deeper than this many x over the reference (0 or `off` = whole files). |
 | `WARN_RUN_DOWNLOAD_GB` | `5` | Warn above this size (0 = never). |
 | `PREFETCH_FAIL_LIMIT` | `2` | Go to ENA first after this many toolkit failures in a row (0 = always try the toolkit first). |
 | `DOWNLOAD_PROGRESS_SECONDS` | `60` | How often a progress line is logged (0 = none). |

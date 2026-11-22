@@ -187,7 +187,7 @@ heartbeat_report() {
     run_event heartbeat "what=$description" "elapsed=$elapsed" "stats=${stats}" "system=${sysstats}" "log_idle=${idle}" "phase=${phase}"
     avail="$(sed -n 's/.*mem_avail=\([0-9]*\)MB.*/\1/p' <<< "$sysstats")"
     if [[ "$avail" =~ ^[0-9]+$ && "$avail" -lt 300 ]]; then
-        heartbeat_log "WARNING: only ${avail} MB of memory is available: $description may be killed (exit 137) or crawl in swap. Lower THREADS or ASSEMBLY_MEMORY_GB, or skip isolates with very large read sets (MAX_RUN_DOWNLOAD_GB)."
+        heartbeat_log "WARNING: only ${avail} MB of memory is available: $description may be killed (exit 137) or crawl in swap. Lower THREADS or ASSEMBLY_MEMORY_GB, or lower READ_DEPTH_CAP_X (reads deeper than it are cut at download)."
         run_event warning "what=$description" "kind=low_memory" "mem_avail_mb=$avail"
     fi
     cpu="$(sed -n 's/.*cpu=\([0-9]*\)%.*/\1/p' <<< "$stats")"

@@ -19,6 +19,7 @@ How it works
   * A server that does not honour Range is read as a single stream, resuming from the bytes on disk where it can.
   * Every connection counts against one budget (`Budget`) shared fairly by the files being fetched; the budget only ever shrinks during a run.
 
+This module only makes requests for its callers, which check the internet first (net_require in python/fetch_ena_reads.py and python/net_bench.py, PLASBENCH_OFFLINE honoured there).
 Standard library only; Python 3.9 compatible.
 """
 from __future__ import annotations

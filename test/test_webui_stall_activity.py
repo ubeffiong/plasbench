@@ -122,7 +122,7 @@ def main():
     check("the cohort picker hides ledgers and says so if one is chosen", "!c.metagenomic && !c.ledger" in html and "Not a cohort sheet." in html)
     check("the Cohorts page tags the ledger", 'c.ledger ? `<span class="tag warn"' in html)
     check("the Quit dialog says in one sentence what each choice does", "Quit and keep running closes this window and PlasBench but leaves the run going in the background, while plain Quit (Stop and quit) cancels the run first" in html)
-    check("the Runs list shows the current stage and isolate for ongoing runs", "Stage ${idx + 1} of ${n}: ${pr.current_name}" in html and "isolate ${pr.isolates_in_stage} of ${pr.isolates}" in html)
+    check("the Runs list shows the current stage and isolate for ongoing runs", "Stage ${pr.stages[idx].id}: ${pr.current_name} (step ${idx + 1} of ${n})" in html and "Stage ${idx + 1} of" not in html and "isolate ${pr.isolates_in_stage} of ${pr.isolates}" in html)
     print("FAILED: " + ", ".join(FAILED) if FAILED else "ALL PASS")
     return 1 if FAILED else 0
 

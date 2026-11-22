@@ -1065,6 +1065,13 @@ def run_manifest_html(manifest_path, tool_versions):
     shown = [f"{key}={settings[key]}" for key in KEY_SETTINGS if key in settings]
     if shown:
         item("Key settings", "; ".join(shown) + f" ({len(settings)} settings are recorded in run_manifest.json)")
+    capped = {k: v["read_depth_cap"] for k, v in (manifest.get("read_downloads") or {}).items() if isinstance(v, dict) and (v.get("read_depth_cap") or {}).get("applied")}
+    if capped:
+        shown_caps = "; ".join(f"{k}: first {c['target_pairs']:,} pairs of {c['read_pairs_available']:,} (about {c.get('estimated_depth')}x of {c.get('depth_available')}x)"
+                               for k, c in sorted(capped.items())[:8] if isinstance(c.get("target_pairs"), int) and isinstance(c.get("read_pairs_available"), int))
+        item("Read depth capped", f"{len(capped)} isolate(s) were downloaded as the first read pairs only, at most {next(iter(capped.values())).get('cap_x')}x (READ_DEPTH_CAP_X): {shown_caps}. "
+             "The reads are the start of the sequencer's output, not a random sample, and a prefix has no whole-file MD5 (its structure was checked instead). Scoring does not use read depth, so "
+             "the cap does not change how tools are scored; it changes only the input they were given. Set READ_DEPTH_CAP_X=off to download whole files.")
     resources = manifest.get("resources") if isinstance(manifest.get("resources"), dict) else {}
     if resources:
         adj = resources.get("adjustments") or []

@@ -85,7 +85,7 @@ with tempfile.TemporaryDirectory() as tmp:
     check("progress comes from the status tables", s["progress"]["download"]["ok"] == 2 and s["progress"]["assembly"]["ok"] == 1, s["progress"])
     check("the isolate's reads are measured from the data folder", s["reads_bytes"] == 6000, s["reads_bytes"])
     text = " ".join(s["hints"])
-    check("a large read set is named with its size, and the way out", "6 KB compressed" in text and "MAX_RUN_DOWNLOAD_GB" in text, text)
+    check("a large read set is named with its size, and the way out", "6 KB compressed" in text and "READ_DEPTH_CAP_X" in text and "does not skip an isolate" in text, text)
     check("low memory is named with the figure", "180 MB of memory is available" in text, text)
     check("swap is named with the figure", "3100 MB of swap" in text, text)
     check("a busy run is said to be working, with the CPU figure", "using 1850% CPU" in text or "1850% CPU" in text, text)
