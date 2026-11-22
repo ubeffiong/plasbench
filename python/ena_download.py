@@ -701,7 +701,7 @@ class Chunked:
                 if isinstance(exc, (socket.timeout, TimeoutError)) or "timed out" in str(exc):
                     exc = OSError(f"no bytes for {self.cfg['stall']:.0f} s (stalled connection abandoned)")
                 wait = self._backoff(attempts[index])
-                log(f"{self.name}: chunk {index + 1} of {self.n_chunks()} failed ({exc}); retry {attempts[index]} of {self.cfg['retries']} in {wait:.1f} s, "
+                log(f"{self.name}: chunk {index + 1} of {self.n_chunks()} failed ({exc}); {'retry ' + str(attempts[index]) + ' of ' + str(self.cfg['retries']) if attempts[index] else 'it had made progress, so the retry count starts again'}, next try in {wait:.1f} s, "
                     f"{len(self.done)} chunks are safe on disk and kept")
             if attempts.get(index, 0) > self.cfg["retries"]:
                 self._fail(DownloadError(f"chunk {index + 1} of {self.n_chunks()} of {self.name} failed {self.cfg['retries']} times in a row; "
