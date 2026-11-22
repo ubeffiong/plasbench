@@ -13,6 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed -- "No new output for 35 minutes" shown beside "newest log written 41 s ago" (22 November 2026)
+- **One signal, not two.** The "No new output" banner counted only what the run printed on the console, and the *Check activity* probe looked only at the results and data folders, so a run whose tools write to their own logs (SPAdes, ISEScan, a download) in the study's `logs/` folder or in the local working folder (`~/.plasbench/scratch`) was reported as idle while the Run status panel showed a log written seconds ago. A quiet console is now called `working_quiet` ("Working (console quiet)") when a tool log changed in the last 3 minutes or the run's processes use at least half a core; it is called stalled only when the console, the tool logs and the processes are all quiet. *Check activity* also looks in the study's logs and the working and download folders and says why it thinks the run is working.
+
 ### Added -- AI help: hardening review, a folder you choose, file plans, window actions, guided flows (21 November 2026)
 - **Review.** The reply parser had a quadratic pattern (60,000 spaces took 36 s and froze the window's thread): fixed, with fuzz and size tests. A stream that ended without a finish was shown as complete: it is now marked cut and the pane offers Continue. A service line is capped at 1 MB and an answer at 8 MB. The key file is written with a unique temporary name and retried on Windows (six concurrent writers used to fail). A command with a lookalike or invisible character is refused. A GET from another origin is refused on every AI route. See `docs/AI_HELP.md` (threat model) and `docs/qa/AI_UI_REVIEW.md`.
 - **The assistant never opens your files.** If you choose a folder, PlasBench itself reads names, sizes and the first lines, shows you what it found and sends a summary only when you press Share. Folder content is treated as hostile data.

@@ -1211,6 +1211,9 @@ class Jobs:
         `stalled` and a run that finished with failed tools reads `completed_with_warnings`. Derived, never stored, so it cannot outlive the condition."""
         state = job.get("state", "")
         if state == "running" and jobrunner.is_stalled(str(self.dir), job["id"]):
+            # the console is quiet, but a tool that writes to its own log (SPAdes, ISEScan, a download) is not stalled: say so instead of showing two contradictory messages
+            if job.get("kind") == "plasbench" and self._working_evidence(job).get("working"):
+                return "working_quiet"
             return "stalled"
         if state == "running" and self._is_retrying(job["id"]):
             return "retrying"
@@ -1481,9 +1484,51 @@ class Jobs:
             roots.append(job["results"])
         if job.get("kind") == "plasbench":
             roots.append(str(self.project.path_setting("DATA_DIR", "data")))
+            roots += self._tool_roots(job)      # the tools' own logs and the local working / download folders: a run that is quiet on the console is usually writing there
         out = jobrunner.recent_activity(roots)
+        evidence = self._working_evidence(job) if job.get("kind") == "plasbench" else {}
+        if evidence.get("working") and out.get("status") != "active":
+            out["status"] = "active"        # a fresh tool log or busy processes count as activity even when no file under the roots changed in the last 3 minutes
+        out["evidence"] = evidence
         out["state"] = job.get("state")
         out["idle_seconds"] = jobrunner.idle_seconds(str(self.dir), job_id) if job.get("state") == "running" else None
+        return out
+
+    def _tool_roots(self, job: dict) -> list:
+        """Folders where a running benchmark writes besides its results and data folders: the study's logs, and the local working / download folders (`~/.plasbench/scratch`, `~/.plasbench/downloads`)."""
+        roots = []
+        if job.get("results"):
+            real = Path(job["results"])
+            study = real.parent if (real.parent / "study.json").is_file() else None
+            roots.append(str((study / "logs") if study else real.parent / "logs"))
+        for name in ("scratch", "downloads"):
+            roots.append(str(Path.home() / ".plasbench" / name))
+        return roots
+
+    def _working_evidence(self, job: dict) -> dict:
+        """Signs that a run whose console is quiet is nevertheless working: {"working": bool, "why": plain words, "log_age": seconds or None, "cpu_cores": busy cores or None}.
+        Working = the newest tool log changed in the last 3 minutes, or the run's processes use at least half a core (the same figures as the Run status panel)."""
+        out = {"working": False, "why": "", "log_age": None, "cpu_cores": None}
+        if not job.get("results"):
+            return out
+        try:
+            from .cli import configured_data_dir
+            real = Path(job["results"])
+            study = real.parent if (real.parent / "study.json").is_file() else None
+            log_dir = (study / "logs") if study else real.parent / "logs"
+            status = run_status_json(self.project.root, real, log_dir, configured_data_dir(self.project.root))
+            log = status.get("newest_log") or {}
+            procs = status.get("processes") or {}
+            if isinstance(log.get("idle_seconds"), (int, float)):
+                out["log_age"] = log["idle_seconds"]
+            if isinstance(procs.get("cpu_percent"), (int, float)):
+                out["cpu_cores"] = round(procs["cpu_percent"] / 100.0, 2)
+            if out["log_age"] is not None and out["log_age"] <= jobrunner.ACTIVE_SECONDS:
+                out.update(working=True, why=f"a tool log was written {int(out['log_age'])} s ago")
+            elif out["cpu_cores"] is not None and out["cpu_cores"] >= 0.5:
+                out.update(working=True, why=f"the run's processes are using about {out['cpu_cores']:g} CPU cores")
+        except Exception:  # noqa: BLE001 - evidence is a courtesy; without it the old rule (console silence) applies
+            pass
         return out
 
     def _refresh_from_folder(self):
