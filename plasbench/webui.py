@@ -126,7 +126,7 @@ RELIABILITY_GROUP = "Reliability and downloads"
 # Environment settings the window may pass with a job (Jobs.start): the Settings keys of config/config.sh plus the download and reliability
 # names the wizard's "Downloads and reliability" card sets. Anything else (LD_PRELOAD, PATH ...) is refused.
 EXTRA_ENV_KEYS = frozenset(["READ_SOURCE", "MAX_RUN_DOWNLOAD_GB", "WARN_RUN_DOWNLOAD_GB", "PREFETCH_FAIL_LIMIT", "TOOL_TIMEOUT_SECONDS",
-                            "ALLOW_ALL_TOOLS_FAILED", "NETWORK_RETRIES", "ENA_DOWNLOAD_CONNECTIONS", "RUN_CONSOLE_LOG", "LOG_RETENTION_RUNS"])
+                            "ALLOW_ALL_TOOLS_FAILED", "NETWORK_RETRIES", "ENA_DOWNLOAD_CONNECTIONS", "ENA_MAX_CONNECTIONS", "MAX_PARALLEL_DOWNLOADS", "READ_DEPTH_CAP_X", "RUN_CONSOLE_LOG", "LOG_RETENTION_RUNS"])
 ENV_KEY = re.compile(r"[A-Z][A-Z0-9_]*")
 ENV_FORBIDDEN = frozenset(["PATH", "PYTHONPATH", "PYTHONHOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "PROJECT_ROOT"])
 ENV_VALUE_MAX = 200

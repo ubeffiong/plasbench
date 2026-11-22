@@ -201,3 +201,107 @@ def check_pair(a, b, target_pairs):
         raise ValueError(f"the two mates have {a['records']} and {b['records']} reads, expected {target_pairs} in both")
     if a["first_name"] != b["first_name"] or a["last_name"] != b["last_name"]:
         raise ValueError(f"the mates do not pair: first reads {a['first_name']} / {b['first_name']}, last reads {a['last_name']} / {b['last_name']}")
+
+
+# --- what is already on disk -------------------------------------------------------------------------------------------------------------------------
+def provenance_path(sdir, run):
+    return os.path.join(sdir, f"{run}.ena_provenance.json")
+
+
+def read_provenance(sdir, run):
+    import json
+    try:
+        with open(provenance_path(sdir, run), encoding="utf-8") as handle:
+            data = json.load(handle)
+        return data if isinstance(data, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def decide(sdir, run, requested):
+    """Are the reads of `run` already in `sdir` valid for a run whose READ_DEPTH_CAP_X is `requested`? Returns (action, message): action is 'keep' or 'refetch'.
+
+    * no provenance (SRA Toolkit reads, your own files, an older download): whole files as far as anyone knows, kept.
+    * whole files on disk (not capped): kept whatever the cap now is, never deleted or shrunk; a note is returned when the cap would otherwise have applied.
+    * a capped prefix on disk and the cap is now off or HIGHER than the one used: the prefix is not what is asked for, so it is fetched again (the capped files are our own
+      recompressed prefix, not the original bytes, so they cannot be continued: the new download starts from the server's file).
+    * a capped prefix and the cap is the same or LOWER: kept (the reads on disk are at least as deep as asked for)."""
+    cap = parse_cap(requested)
+    prov = read_provenance(sdir, run)
+    info = (prov or {}).get("read_depth_cap") or {}
+    if not prov:
+        return "keep", ""
+    if not info.get("applied"):
+        if cap:
+            return "keep", f"{run}: the reads on disk are whole files; READ_DEPTH_CAP_X={cap:g} is not applied to files already downloaded (delete them to download a capped set); stage 3 uses the full reads"
+        return "keep", ""
+    used = float(info.get("cap_x") or 0)
+    depth = float(info.get("estimated_depth") or used)
+    if not cap:
+        return "refetch", f"{run}: reads on disk are a {used:g}x prefix; READ_DEPTH_CAP_X is now off, fetching the whole file"
+    if cap > used:
+        return "refetch", f"{run}: reads on disk are a {used:g}x prefix (about {depth:.0f}x deep); READ_DEPTH_CAP_X is now {cap:g}, fetching the deeper read set"
+    return "keep", f"{run}: reads on disk are a {used:g}x prefix; READ_DEPTH_CAP_X is {cap:g}, so they are deep enough and are kept"
+
+
+def discard_capped(sdir, run):
+    """Remove a capped read set (its two files, provenance and their lines in downloads.sha256) so it can be fetched again. Only ever called for files whose provenance says they are a prefix."""
+    names = [f"{run}_1.fastq.gz", f"{run}_2.fastq.gz", f"{run}.ena_provenance.json"]
+    for name in names:
+        path = os.path.join(sdir, name)
+        try:
+            if os.path.exists(path):
+                os.chmod(path, 0o644)
+                os.remove(path)
+        except OSError:
+            pass
+    manifest = os.path.join(sdir, "downloads.sha256")
+    try:
+        with open(manifest, encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+        keep = [ln for ln in lines if not any(ln.rstrip().endswith(n) for n in names)]
+        with open(manifest, "w", encoding="utf-8") as handle:
+            handle.write("".join(ln + chr(10) for ln in keep))
+    except OSError:
+        pass
+
+
+def note_kept(sdir, run, requested):
+    """Record in the provenance of whole-file reads that a cap was requested but not applied (shown in the manifest and the report)."""
+    import json
+    prov = read_provenance(sdir, run)
+    cap = parse_cap(requested)
+    if not prov or not cap:
+        return
+    info = prov.setdefault("read_depth_cap", {"applied": False})
+    if info.get("applied"):
+        return
+    info["note"] = f"READ_DEPTH_CAP_X={cap:g} was requested later, but these are whole files already on disk; they were kept as they are and the full reads are used"
+    tmp = provenance_path(sdir, run) + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as handle:
+        json.dump(prov, handle, indent=2)
+    os.replace(tmp, provenance_path(sdir, run))
+
+
+def main(argv=None):
+    import argparse
+    ap = argparse.ArgumentParser(description="Reads already on disk versus the read-depth cap now requested (used by scripts/01_download.sh).")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    for name in ("decide", "discard", "note-kept"):
+        p = sub.add_parser(name)
+        p.add_argument("--dir", required=True)
+        p.add_argument("--run", required=True)
+        p.add_argument("--cap", default=os.environ.get("READ_DEPTH_CAP_X", ""))
+    args = ap.parse_args(argv)
+    if args.cmd == "decide":
+        action, message = decide(args.dir, args.run, args.cap)
+        print(action + chr(9) + message)
+    elif args.cmd == "discard":
+        discard_capped(args.dir, args.run)
+    else:
+        note_kept(args.dir, args.run, args.cap)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

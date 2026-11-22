@@ -109,6 +109,23 @@ preserve_downloads() {
     (cd "$sdir" && sha256sum "${files[@]}" > downloads.sha256)
     chmod 0444 "$sdir/${sra}_1.fastq.gz" "$sdir/${sra}_2.fastq.gz" 2>/dev/null || true   # read-only, and never executable: a Windows drive seen from WSL reports every file as 0755, which chmod a-w turned into r-xr-xr-x
 }
+# Are the reads on disk valid for the READ_DEPTH_CAP_X of THIS run? (python/depth_cap.py decide.) Whole files are always kept, even when a cap is now set (never deleted or shrunk);
+# reads that are a capped prefix are not valid for a run with the cap off or higher: they are removed here (they are our own recompressed prefix and cannot be continued) so the next
+# step downloads again, and one plain line says so. Prints nothing and returns 0 when the reads are fine.
+reads_state_ok() {
+    local sdir="$1" run="$2" quiet="${3:-}" line action message
+    line="$(python3 -I "$HERE/../python/depth_cap.py" decide --dir "$sdir" --run "$run" --cap "${READ_DEPTH_CAP_X:-}" 2>/dev/null)" || return 0
+    action="${line%%$'\t'*}"; message="${line#*$'\t'}"
+    if [[ "$action" == "refetch" ]]; then
+        [[ -n "$quiet" ]] || { log "  $message"; python3 -I "$HERE/../python/depth_cap.py" discard --dir "$sdir" --run "$run" 2>/dev/null || true; }
+        return 1
+    fi
+    if [[ -z "$quiet" && -n "$message" ]]; then
+        log "  $message"
+        python3 -I "$HERE/../python/depth_cap.py" note-kept --dir "$sdir" --run "$run" --cap "${READ_DEPTH_CAP_X:-}" 2>/dev/null || true
+    fi
+    return 0
+}
 # 0 when every file in the manifest still matches (or there is no manifest yet).
 verify_downloads() {
     local sdir="$1"
@@ -363,7 +380,7 @@ download_sample() {
             fi
             log "  simulated reads -> $R1 , $R2 , $LONG_READS"
         fi
-    elif [[ -s "$R1" && -s "$R2" ]] && verify_downloads "$SDIR"; then
+    elif [[ -s "$R1" && -s "$R2" ]] && verify_downloads "$SDIR" && reads_state_ok "$SDIR" "$SRA"; then
         log "  reads already present (checked against downloads.sha256 when present), skipping download"
     elif ! read_size_gate "$SAMPLE" "$SRA" "$([[ -s "$REF" ]] && echo "$REF")"; then
         return 0   # the person set MAX_RUN_DOWNLOAD_GB and this isolate is above it; read_size_gate recorded the skip
@@ -512,7 +529,7 @@ require_downloads_online() {
         if [[ "$has_ref" -eq 1 && ! ( -s "$sdir/reference.fna" && -s "$sdir/sequence_report.jsonl" ) ]]; then
             need_ref=1; lacking+=" $sample:reference"
         fi
-        if [[ "$truth" != "simulated" ]] && ! { [[ -s "$sdir/${sra}_1.fastq.gz" && -s "$sdir/${sra}_2.fastq.gz" ]] && verify_downloads "$sdir"; }; then
+        if [[ "$truth" != "simulated" ]] && ! { [[ -s "$sdir/${sra}_1.fastq.gz" && -s "$sdir/${sra}_2.fastq.gz" ]] && verify_downloads "$sdir" && reads_state_ok "$sdir" "$sra" quiet; }; then
             need_reads=1; lacking+=" $sample:reads"
         fi
         if [[ "$truth" == "self_assembled_hybrid" && -n "$long_run" && ! -s "$sdir/${LONG_READS_FILE:-long_reads.fastq.gz}" ]]; then

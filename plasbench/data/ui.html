@@ -4693,7 +4693,9 @@ function renderWizard() {
         ${ef("timeout_hours", "Tool time limit, hours", "tool_timeout_hours", num("timeout_hours", "no limit"), "Per tool per isolate; sent as seconds (hours x 3600). Empty = no limit.")}
         ${ef("allow_all_failed", "Continue when every tool failed", "allow_all_tools_failed", `<label class="switch"><input type="checkbox" id="we_allow_all_failed" data-wenv="allow_all_failed" ${E.allow_all_failed ? "checked" : ""}><span></span></label>`, "Sets ALLOW_ALL_TOOLS_FAILED=1.")}
         ${ef("retries", "Download retries", "network_retries", num("retries", "3", 1), "Empty = the default, 3.")}
-        ${ef("connections", "Parallel downloads per isolate", "ena_download_connections", num("connections", "4", 1), "Empty = the default, 4. Applies to ENA downloads.")}
+        ${ef("max_connections", "ENA connections in total", "ena_max_connections", num("max_connections", "16", 1), "Empty = the default, 16 (at most 24), shared by the two mates.")}
+        ${ef("parallel_downloads", "Isolates downloaded at once", "max_parallel_downloads", num("parallel_downloads", "1", 1), "Empty = the default, 1.")}
+        ${ef("connections", "Connections per file (optional cap)", "ena_download_connections", num("connections", "", 1), "Empty = each file gets its fair share of the total.")}
         ${ef("console_log", "Keep a console log of the run in the study (logs/run_*.log)", "console_log", `<label class="switch"><input type="checkbox" id="we_console_log" data-wenv="console_log" ${E.console_log !== false ? "checked" : ""}><span></span></label>`, "On by default. Unchecked, the run is started with RUN_CONSOLE_LOG=0.")}
         ${ef("log_runs", "Console logs kept", "log_retention_runs", num("log_runs", "20", 1), "Empty = the default, 20 runs.")}
       </div></details>` : "";
@@ -4761,6 +4763,8 @@ function wizEnv() {
   if (E.allow_all_failed) d.ALLOW_ALL_TOOLS_FAILED = "1";
   if (n(E.retries)) d.NETWORK_RETRIES = String(E.retries);
   if (n(E.connections) && Number(E.connections) > 0) d.ENA_DOWNLOAD_CONNECTIONS = String(E.connections);
+  if (n(E.max_connections) && Number(E.max_connections) > 0) d.ENA_MAX_CONNECTIONS = String(E.max_connections);
+  if (n(E.parallel_downloads) && Number(E.parallel_downloads) > 0) d.MAX_PARALLEL_DOWNLOADS = String(E.parallel_downloads);
   if (E.console_log === false) d.RUN_CONSOLE_LOG = "0";
   if (n(E.log_runs) && Number(E.log_runs) > 0) d.LOG_RETENTION_RUNS = String(E.log_runs);
   if (S.wiz.wf) Object.assign(d, S.wiz.wf);   // workflow steps: per-run on / off of items that have no command-line flag

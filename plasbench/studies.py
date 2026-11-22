@@ -216,6 +216,44 @@ def resolve_data(root, folder, keep_in_study: bool = False, data_dir=None, share
     return chosen, message
 
 
+def parse_depth_cap(text):
+    """--read-depth-cap / READ_DEPTH_CAP_X: 'off' (also 0, none, false, no, whole) or a number of x coverage. Returns the canonical text ('off' or '150'); ValueError for anything else."""
+    value = str(text if text is not None else "").strip().lower()
+    if value in ("off", "0", "none", "false", "no", "whole"):
+        return "off"
+    try:
+        number = float(value)
+    except ValueError:
+        raise ValueError(f"--read-depth-cap must be off or a number of x coverage (for example 150), not {text!r}")
+    if number <= 0:
+        return "off"
+    return str(int(number)) if number == int(number) else str(number)
+
+
+def resolve_depth_cap(folder, requested=None) -> tuple:
+    """The read-depth cap for this run, recorded in study.json like the data folder: (value or None, message).
+
+    `requested` (the --read-depth-cap flag) wins and is recorded; otherwise the study's recorded value is reused (so a resumed or repeated run keeps the choice); with neither, None
+    (the READ_DEPTH_CAP_X of config/config.sh or the environment applies, default 150)."""
+    path = Path(folder) / "study.json"
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        record = {"name": Path(folder).name, "runs": []}
+    if requested not in (None, ""):
+        value = parse_depth_cap(requested)
+        record["read_depth_cap"] = value
+        message = f"Read depth cap: {'off (whole read files)' if value == 'off' else value + 'x'} (recorded for this study)"
+    elif record.get("read_depth_cap"):
+        value = str(record["read_depth_cap"])
+        message = f"Read depth cap: {'off (whole read files)' if value == 'off' else value + 'x'} (recorded for this study; give --read-depth-cap to change it)"
+    else:
+        return None, ""
+    if Path(path).parent.is_dir():
+        path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    return value, message
+
+
 def prepare(root, name: str, samples=None, cohort=None, argv=None, location=None) -> Path:
     """Create (or reuse) the study folder and record this run in its study.json. Returns the folder."""
     folder = study_path(root, name, location)

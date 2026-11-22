@@ -4,6 +4,7 @@
 #   2. READ_SOURCE=auto: ENA failing after its retries falls back to the SRA Toolkit and says so; READ_SOURCE=ena uses ENA only (no prefetch, the isolate fails with the log named)
 #   3. MAX_PARALLEL_DOWNLOADS: default 1; 2 downloads two isolates at once and splits ENA_MAX_CONNECTIONS between them
 #   4. the stage prints one summary line (bytes, time, MB/s, ENA/SRA counts, retries, resumes) and writes results/download_progress.json
+#   6. state across runs (READ_DEPTH_CAP_X): reads that are a capped prefix are fetched again when the cap is now off, with one plain line; whole files are kept when a cap is set
 #   5. the final read files are read-only and NOT executable (0444), the downloaded files carry no .part leftovers
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -38,7 +39,8 @@ EOF
 chmod +x "$TMP/bin/prefetch" "$TMP/bin/fasterq-dump"
 
 run_stage() {
-    rm -rf "$TMP/data" "$TMP/results" "$TMP/state"; mkdir -p "$TMP/data"
+    if [[ "${KEEP_DATA:-0}" != "1" ]]; then rm -rf "$TMP/data"; fi
+    rm -rf "$TMP/results" "$TMP/state"; mkdir -p "$TMP/data"
     [[ "${KEEP_LOGS:-0}" == "1" ]] || { rm -rf "$TMP/logs"; mkdir -p "$TMP/logs"; }
     : > "$TMP/prefetch_calls.log"
     PATH="$TMP/bin:$PATH" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" SAMPLE_SHEET="$TMP/sheet.tsv" \
@@ -89,4 +91,34 @@ mode="$(stat -c %a "$TMP/data/p1/SRR1_1.fastq.gz")"
 [[ "$mode" == "444" ]] || fail "the final read files should be 0444 (read-only, not executable), they are $mode"
 [[ -z "$(find "$TMP/data" -name '*.part*' -print -quit)" ]] || fail "no .part or .part.state leftovers should remain"
 echo "final files are 0444 and no .part leftovers remain -> PASS"
+
+# --- 6. state across runs: capped reads on disk, then the cap is switched off; whole reads on disk, then a cap is set ---
+printf 'sample_id\tassembly_accession\tsra_run\nc1\tNA\tSRR1\n' > "$TMP/sheet.tsv"
+run_stage env READ_SOURCE=auto || fail "stage 1 for the state-change test"
+python3 - "$TMP/data/c1/SRR1.ena_provenance.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p))
+d["read_depth_cap"] = {"applied": True, "cap_x": 100, "estimated_depth": 100, "target_pairs": 10}
+json.dump(d, open(p, "w"))
+PY
+( cd "$TMP/data/c1" && chmod u+w SRR1_1.fastq.gz SRR1_2.fastq.gz && sha256sum SRR1_1.fastq.gz SRR1_2.fastq.gz SRR1.ena_provenance.json > downloads.sha256 )
+KEEP_DATA=1 run_stage env READ_SOURCE=auto READ_DEPTH_CAP_X=100 || fail "stage 1 with the same cap again"
+grep -q "SRR1: reads on disk are a 100x prefix; READ_DEPTH_CAP_X is 100, so they are deep enough and are kept" "$TMP/stage.log" || fail "capped reads and the same cap: they should be kept, with a line saying so"
+! grep -q "fetching SRR1 from ENA" "$TMP/stage.log" || fail "capped reads that are deep enough must not be downloaded again"
+KEEP_DATA=1 run_stage env READ_SOURCE=auto READ_DEPTH_CAP_X=off || fail "stage 1 with the cap switched off"
+grep -q "SRR1: reads on disk are a 100x prefix; READ_DEPTH_CAP_X is now off, fetching the whole file" "$TMP/stage.log" || fail "capped -> off: the one plain line is missing"
+grep -q "fetching SRR1 from ENA" "$TMP/stage.log" || fail "capped -> off: the whole file should be fetched again"
+python3 - "$TMP/data/c1/SRR1.ena_provenance.json" <<'PY' || fail "after the refetch the provenance should say whole files"
+import json, sys
+assert json.load(open(sys.argv[1]))["read_depth_cap"]["applied"] is False
+PY
+( cd "$TMP/data/c1" && sha256sum --quiet -c downloads.sha256 ) || fail "downloads.sha256 must match the files after the refetch"
+echo "capped -> off: the prefix is replaced by the whole file, one plain line says why, downloads.sha256 stays consistent -> PASS"
+before="$(sha256sum "$TMP/data/c1/SRR1_1.fastq.gz" | cut -d' ' -f1)"
+KEEP_DATA=1 run_stage env READ_SOURCE=auto READ_DEPTH_CAP_X=150 || fail "stage 1 with a cap set over whole files"
+grep -q "SRR1: the reads on disk are whole files; READ_DEPTH_CAP_X=150 is not applied" "$TMP/stage.log" || fail "off -> capped: the line saying whole files are kept is missing"
+! grep -q "fetching SRR1 from ENA" "$TMP/stage.log" || fail "off -> capped: whole files on disk must not be downloaded again"
+[[ "$(sha256sum "$TMP/data/c1/SRR1_1.fastq.gz" | cut -d' ' -f1)" == "$before" ]] || fail "off -> capped: the whole files must not change"
+echo "off -> capped: whole files are kept untouched and the log says the full reads are used -> PASS"
 echo "ALL STAGE 1 DOWNLOAD TESTS PASSED"

@@ -1090,6 +1090,9 @@ def build_parser():
                             help="Score only tools declared under this track this run (each tool's own "
                                  "track is still stamped correctly regardless); leave unset to score "
                                  "every enabled tool under its own correct track in one run.")
+        inputs.add_argument("--read-depth-cap", metavar="off|N",
+                            help="Stage 1: for a short paired Illumina run deeper than N x coverage over the reference, download only the first read pairs that give N x "
+                                 "(default 150, config READ_DEPTH_CAP_X). 'off' (also 0, none, false) downloads whole files, MD5-checked as before. Recorded for the study.")
         inputs.add_argument("--decision-profile", choices=("accuracy_first", "amr_surveillance", "rapid_screening"),
                             help="Named decision_score weight set for operational recommendations (default: "
                                  "accuracy_first, today's original formula). A different profile only changes "
@@ -1834,6 +1837,11 @@ def main(argv=None):
                 folder = studies.prepare(root, study_name, args.samples if args.command == "run" else None,
                                          args.cohort, argv or sys.argv[1:], location=getattr(args, "study_location", None))
                 if args.command == "run":
+                    depth_cap, depth_note = studies.resolve_depth_cap(folder, getattr(args, "read_depth_cap", None))
+                    if depth_cap is not None:
+                        args.read_depth_cap = depth_cap
+                    if depth_note:
+                        print(f"[plasbench] {depth_note}")
                     data_folder, data_note = studies.resolve_data(root, folder, getattr(args, "keep_data_in_study", False), args.data_dir, configured_data_dir(root))
                     if data_folder is not None:
                         args.data_dir = data_folder
@@ -1896,6 +1904,12 @@ def main(argv=None):
             env["ANALYSIS_TRACK_FILTER"] = args.analysis_track
         if args.decision_profile:
             env["DECISION_PROFILE"] = args.decision_profile
+        if getattr(args, "read_depth_cap", None):
+            from . import studies as _studies
+            try:
+                env["READ_DEPTH_CAP_X"] = _studies.parse_depth_cap(args.read_depth_cap)
+            except ValueError as exc:
+                parser.error(str(exc))
         positive_options = {"threads": "THREADS", "memory_gb": "MEMORY_GB", "min_read_len": "MIN_READ_LEN",
                             "parallel_samples": "MAX_PARALLEL_SAMPLES", "parallel_tools": "MAX_PARALLEL_TOOLS",
                             "trycycler_assembly_count": "TRYCYCLER_ASSEMBLY_COUNT"}

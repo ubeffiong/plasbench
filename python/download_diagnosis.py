@@ -24,7 +24,7 @@ RULES = [
                "PlasBench fetches the reads from ENA first anyway, checks them against ENA's checksums, and a prefetch that keeps failing is not retried on every isolate for the next 24 hours.",
          check="A proxy the toolkit does not know about (set HTTPS_PROXY, or `vdb-config --proxy host:port`); the system's CA certificates (on Ubuntu and WSL: `sudo apt install ca-certificates` "
                "then `sudo update-ca-certificates`); a VPN or firewall that inspects HTTPS; and `vdb-config -i` to look at the toolkit's own network settings. Running `prefetch SRR...` by hand "
-               "shows the same message. A newer SRA Toolkit may behave differently; none of this is guaranteed to cure it."),
+               "shows the same message. A newer SRA Toolkit may behave differently; this is not guaranteed to cure it."),
     dict(cause="sra_certificate", title="the SRA Toolkit does not trust the certificate NCBI presented",
          patterns=[r"certificate verify failed", r"unable to get local issuer certificate", r"self[- ]signed certificate"],
          plain="The SRA Toolkit refused the certificate it was shown when it connected to NCBI. This usually means a proxy or firewall that re-signs HTTPS traffic, or missing system CA "
