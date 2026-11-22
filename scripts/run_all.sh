@@ -55,6 +55,9 @@ if [[ -s "$RUN_MARK" ]]; then
 fi
 acquire_run_lock "run_all.sh stages ${STAGES[*]}"
 run_event run_start "stages=${STAGES[*]}" "log=${_CONSOLE_LOG_FILE:-}"
+while IFS= read -r _profile_line; do log "$_profile_line"; done < <(python3 -I "$HERE/../python/run_profiles.py" plan "${RUN_PROFILE:-standard}" 2>/dev/null || true)
+run_event run_profile "profile=${RUN_PROFILE:-standard}"
+_pb_sentinel_start          # keeps the computer awake while this run is active (KEEP_AWAKE=0 turns that off) and records any time it was asleep
 rm -f "$RESULTS_DIR/.completed_with_warnings"
 if [[ -s "$RUN_MARK" ]]; then
     warn "the previous run stopped before it finished, without a chance to report why ($(head -1 "$RUN_MARK")): the terminal, WSL or the computer ended it, or it ran out of memory. Finished work is reused; see $LOG_DIR for its last messages."
@@ -78,6 +81,7 @@ for s in "${STAGES[@]}"; do
     fi
 done
 rm -f "$RUN_MARK"
+_pb_sentinel_stop           # lets the computer sleep again as soon as the work is done
 run_event run_end "status=finished"
 # A run that finished but in which some tool runs failed is "completed with warnings": exit 0 (the other tools' results are valid), but never a plain DONE.
 n_failed=0
@@ -89,6 +93,9 @@ if [[ "$n_failed" -gt 0 ]]; then
 else
     log "############ DONE ############"
 fi
+# Where the time went (awake time; a sleep is shown separately). `plasbench profile-run` has the full table and the biggest costs with suggestions.
+_time_spent="$(python3 -I "$HERE/../python/run_profile.py" --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" --log-dir "$LOG_DIR" --summary 2>/dev/null || true)"
+if [[ -n "$_time_spent" ]]; then log "Time spent (awake time; 'plasbench profile-run' has the table and suggestions):"; while IFS= read -r _l; do log "  $_l"; done <<< "$_time_spent"; fi
 if [[ -f "$RESULTS_DIR/benchmark.leaderboard.md" ]]; then
     echo; echo "Leaderboard:"; cat "$RESULTS_DIR/benchmark.leaderboard.md"
 fi

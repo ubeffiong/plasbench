@@ -280,6 +280,33 @@ def runtime_record():
     record["extras"] = {"home": extra, "tools": tools, "provenance": provenance, "packages": packages}
     return record
 
+def performance_record(data_dir, samples):
+    """How this run was made fast or thorough, so it is never mistaken for a standard run: the run profile, the ISEScan scope actually used for each isolate (and whether the
+    chromosome was searched), and whether the computer was kept awake. Read from the profile table and each isolate's annotation_provenance.json."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import run_profiles
+    name = os.environ.get("RUN_PROFILE") or "standard"
+    try:
+        record = run_profiles.record(name)
+    except ValueError:
+        record = {"profile": name, "overrides": [], "headline_unchanged": True}
+    scopes = {}
+    for sample in samples:
+        sid = sample.get("sample_id") if isinstance(sample, dict) else sample
+        try:
+            with open(os.path.join(data_dir, str(sid), "annotation_provenance.json"), encoding="utf-8") as handle:
+                status = (json.load(handle).get("callers") or {}).get("isescan") or {}
+        except (OSError, ValueError, AttributeError):
+            continue
+        if status.get("status") in ("ok", "timed_out", "failed"):
+            scopes[str(sid)] = {"status": status.get("status"), "scope": status.get("scope", "all"), "chromosome_searched": status.get("chromosome_searched", True)}
+    record["isescan_scope"] = os.environ.get("ISESCAN_SCOPE") or "plasmids"
+    record["isescan_by_isolate"] = scopes
+    record["chromosome_insertion_sequences"] = ("not evaluated (chromosome not searched)" if any(not v["chromosome_searched"] for v in scopes.values()) else "searched where ISEScan ran")
+    record["keep_awake"] = os.environ.get("KEEP_AWAKE", "1")
+    return record
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True)
@@ -288,7 +315,7 @@ def main():
     parser.add_argument("--results-dir", required=True)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
-    settings = ("THREADS", "MEMORY_GB", "ASSEMBLER", "MIN_READ_LEN", "MINIMAP2_PRESET",
+    settings = ("RUN_PROFILE", "ISESCAN_SCOPE", "KEEP_AWAKE", "THREADS", "MEMORY_GB", "ASSEMBLER", "MIN_READ_LEN", "MINIMAP2_PRESET",
                 "RUN_MOB_RECON", "RUN_PLATON", "RUN_PLASMIDSPADES", "RUN_GPLAS2_MOB", "RUN_GPLAS2_EXTERNAL",
                 "PLASMID_RECOVERY_THRESHOLD", "AMR_GENE_RECOVERY_THRESHOLD", "PLATON_DB",
                 "MIN_ALIGNMENT_LENGTH", "MIN_ALIGNMENT_IDENTITY", "MIN_ALIGNMENT_MAPQ", "MIN_ALIGNMENT_QUERY_COVERAGE",
@@ -390,6 +417,7 @@ def main():
                    "plasme": directory_identity(os.environ.get("PLASME_CHECKOUT_DIR", "")),
                    "recommendation": recommendation_model_status(args.results_dir)},
         "settings": {key: os.environ.get(key) for key in settings},
+        "performance": performance_record(args.data_dir, samples),
         # Pre-registration (python/freeze_prereg.py): the frozen plan's SHA-256,
         # whether the lock still matches, TO_FIX parameters, and every config
         # variable that departs from its pre-registered value in this run.

@@ -42,6 +42,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import tool_readiness  # noqa: E402  (what a tool needs to work, not only that it starts)
+import awake_clock  # noqa: E402  (time the computer was asleep is not time a caller took)
 
 
 FIELDS = ("sequence_id", "start", "end", "feature_type", "label", "source", "version")
@@ -84,6 +85,9 @@ def _failed(error, version=None):
     return status
 
 
+POLL_SECONDS = 5.0
+
+
 def run(command, timeout):
     """Return (stdout, "") or (None, reason); never raise into the run. The command's own process group is killed on a timeout (ISEScan starts workers), and it never reads
     this process's stdin."""
@@ -92,9 +96,18 @@ def run(command, timeout):
                                 start_new_session=(os.name == "posix"))
     except OSError as exc:
         return None, f"{command[0]} did not start: {exc}"
-    try:
-        stdout, stderr = proc.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
+    # The limit counts time the computer was awake: a laptop that sleeps for an hour must not get its callers killed for being "slow" (a real run lost mob_typer,
+    # AMRFinder and barrnap results that way). The wait is cut into short polls so a sleep is noticed (python/awake_clock.py).
+    timer = awake_clock.AwakeTimer(expected=POLL_SECONDS)
+    while True:
+        try:
+            stdout, stderr = proc.communicate(timeout=POLL_SECONDS)
+            break
+        except subprocess.TimeoutExpired:
+            timer.tick()
+            if not timeout or timer.elapsed() <= timeout:
+                continue
+        # the awake time limit has run out
         try:
             if os.name == "posix":
                 import signal
@@ -115,7 +128,9 @@ def run(command, timeout):
 
 # Typical seconds per caller for a ~4 Mbp genome on a 6-CPU laptop. ESTIMATED: abricate, barrnap and mob_typer were measured once; ISEScan's 663 s is one run that
 # ended in a failure (its usual time is a few minutes), so it is the least reliable. Used only for the "still running, typical N min" note, never to stop a caller.
-TYPICAL_SECONDS = {"mob_typer": 108, "abricate": 13, "amrfinder": 60, "isescan": 663, "barrnap": 31, "isfinder": 30}
+# Re-based 2026-11-22 on four real isolates (5 to 9 Mbp) on a 6-CPU WSL2 laptop with the data folder on a Windows drive, scaled to 4 Mbp: MEASURED, but taken while the callers
+# were oversubscribed (13 threads on 6 CPUs, whole-genome ISEScan); the new thread plan and plasmid-only ISEScan should be faster, so these are upper figures. isfinder is unmeasured.
+TYPICAL_SECONDS = {"mob_typer": 360, "abricate": 40, "amrfinder": 240, "isescan": 1400, "barrnap": 240, "isfinder": 30}
 TYPICAL_GENOME_MBP = 4.0
 SLOW_FACTOR = 2.0
 
@@ -150,6 +165,14 @@ def annotation_timeouts(total_bp, environ=None):
     mbp = total_bp / 1e6
     base = max(300, int(150 * mbp))
     return {"*": base, "isescan": max(900, 3 * base)}
+
+
+def thread_plan(threads):
+    """(quick, amrfinder, isescan) threads for a total of `threads` CPUs. The callers run at the same time, so the shares are chosen to add up near the machine's size:
+    the short callers (mob_typer, the abricate runs, barrnap) get one thread each, AMRFinderPlus a third of the CPUs, and ISEScan the rest minus two (a real run gave ISEScan
+    all 6 threads on top of 7 more and the "short" callers took 10 times their usual time). The share only changes speed, never a result."""
+    threads = max(1, int(threads))
+    return 1, max(1, threads // 3), max(1, threads - 2)
 
 
 def timeout_for(timeouts, name):
@@ -217,7 +240,65 @@ def call_amrfinder(reference, timeout, sequences, threads=1):
     return features, {"status": "ok", "version": version, "features": len(features)}
 
 
-def call_isescan(reference, timeout, sequences, workdir, threads=1):
+ISESCAN_SCOPES = ("plasmids", "all")
+
+
+def read_truth_molecules(truth_path):
+    """{sequence_id: PLASMID|CHROMOSOME|...} from a truth.tsv, or None when it cannot be read."""
+    try:
+        with open(truth_path, encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle, delimiter="\t"))
+    except (OSError, TypeError, UnicodeDecodeError):
+        return None
+    out = {}
+    for row in rows:
+        name = (row.get("sequence_id") or "").strip()
+        if name:
+            out[name] = (row.get("molecule_type") or "").strip().upper()
+    return out or None
+
+
+def isescan_plan(scope, truth_path, sequences):
+    """What ISEScan searches. Returns a dict: scope (the requested one), effective (plasmids|all), searched (sequence ids, in file order), not_searched (ids), reason.
+    plasmids = only the replicons the truth table labels PLASMID (ids and coordinates are unchanged: ISEScan reports per sequence). If the truth table is missing, empty or
+    names none of this reference's sequences, everything is searched and the reason says so: scope never silently drops coverage it cannot justify."""
+    scope = (scope or "plasmids").strip().lower()
+    ids = list(sequences)
+    if scope not in ISESCAN_SCOPES:
+        scope = "plasmids"
+    if scope == "all":
+        return {"scope": "all", "effective": "all", "searched": ids, "not_searched": [], "reason": ""}
+    molecules = read_truth_molecules(truth_path) if truth_path else None
+    if molecules is None:
+        return {"scope": "plasmids", "effective": "all", "searched": ids, "not_searched": [], "reason": "no readable truth table, so every sequence was searched"}
+    known = [name for name in ids if name in molecules]
+    if not known:
+        return {"scope": "plasmids", "effective": "all", "searched": ids, "not_searched": [],
+                "reason": "the truth table names none of this reference's sequences, so every sequence was searched"}
+    searched = [name for name in ids if molecules.get(name) == "PLASMID"]
+    return {"scope": "plasmids", "effective": "plasmids", "searched": searched, "not_searched": [name for name in ids if name not in searched], "reason": ""}
+
+
+def scope_label(plan):
+    """The short text stored in the cache fingerprint: scope plus the exact sequences searched, so two scopes (or two labelings of the same reference) never share a key."""
+    if plan["effective"] == "all":
+        return "all"
+    return "plasmids:" + hashlib.sha256(("\n").join(plan["searched"]).encode("utf-8")).hexdigest()[:16]
+
+
+def write_subset_fasta(reference, names, out_path):
+    """The records of `reference` whose id (first word of the header) is in `names`, byte for byte."""
+    keep, wanted = False, set(names)
+    with open(reference, encoding="utf-8") as src, open(out_path, "w", encoding="utf-8", newline="\n") as dst:
+        for line in src:
+            if line.startswith(">"):
+                header = line[1:].strip().split()
+                keep = bool(header) and header[0] in wanted
+            if keep:
+                dst.write(line if line.endswith("\n") else line + "\n")
+
+
+def call_isescan(reference, timeout, sequences, workdir, threads=1, plan=None):
     executable = shutil.which("isescan.py") or shutil.which("isescan")
     if not executable:
         return [], {"status": "not_evaluated", "reason": "isescan is not installed"}
@@ -225,16 +306,31 @@ def call_isescan(reference, timeout, sequences, workdir, threads=1):
     status, detail, fix = tool_readiness.check("isescan")
     if status == "miss":      # ISEScan would search for minutes and then fail in its clustering step: do not start it
         return [], {"status": "not_evaluated", "reason": "%s: %s" % (detail, fix), "version": version}
-    _, error = run([executable, "--seqfile", str(reference), "--output", str(workdir), "--nthread", str(threads)], timeout)
+    scope_record = {}
+    seqfile, outdir = reference, Path(workdir)
+    if plan is not None:
+        scope_record = {"scope": plan["effective"], "requested_scope": plan["scope"], "chromosome_searched": not plan["not_searched"],
+                        "sequences_searched": plan["searched"], "sequences_not_searched": plan["not_searched"]}
+        if plan["reason"]:
+            scope_record["scope_note"] = plan["reason"]
+        if plan["effective"] == "plasmids":
+            if not plan["searched"]:        # the truth table has no plasmid: there is nothing for ISEScan to search
+                return [], dict({"status": "ok", "version": version, "features": 0, "note": "no plasmid sequence in the truth table: nothing to search"}, **scope_record)
+            outdir = Path(workdir) / "isescan_plasmids"          # its own folder: results of an earlier scope are never read back
+            shutil.rmtree(outdir, ignore_errors=True)
+            outdir.mkdir(parents=True, exist_ok=True)
+            seqfile = Path(workdir) / "isescan_plasmids.fna"
+            write_subset_fasta(reference, plan["searched"], seqfile)
+    _, error = run([executable, "--seqfile", str(seqfile), "--output", str(outdir), "--nthread", str(threads)], timeout)
     if error:
-        return [], _failed(error, version)
+        return [], dict(_failed(error, version), **scope_record)
     features = []
-    for path in Path(workdir).rglob("*.csv"):
+    for path in outdir.rglob("*.csv"):
         features.extend(parse_tabular(path.read_text(encoding="utf-8").replace(",", "\t"),
                                       {"sequence": "seqID", "start": "isBegin", "end": "isEnd",
                                        "label": "family"}, "insertion_sequence", "isescan",
                                       version, sequences))
-    return features, {"status": "ok", "version": version, "features": len(features)}
+    return features, dict({"status": "ok", "version": version, "features": len(features)}, **scope_record)
 
 
 def parse_isfinder_blast(text, sequences, version, min_identity=ISFINDER_MIN_IDENTITY,
@@ -453,6 +549,11 @@ def main():
     parser.add_argument("--threads", type=int, default=int(os.environ.get("THREADS") or os.cpu_count() or 1),
                         help="CPU threads in total; the callers run at the same time and share them (default: THREADS)")
     parser.add_argument("--workdir", type=Path)
+    parser.add_argument("--truth", type=Path, default=None,
+                        help="the isolate's truth.tsv (default: truth.tsv next to --out); says which sequences are plasmids, for --isescan-scope plasmids")
+    parser.add_argument("--isescan-scope", choices=ISESCAN_SCOPES, default=(os.environ.get("ISESCAN_SCOPE") or "plasmids").strip().lower() or "plasmids",
+                        help="plasmids (default, ISESCAN_SCOPE): ISEScan searches only the truth-labelled plasmid replicons and the chromosome is recorded as not searched; "
+                             "all: every sequence")
     parser.add_argument("--cache-dir", default=os.environ.get("ANNOTATION_CACHE_DIR", ""),
                         help="shared folder of finished annotations, keyed by the reference's checksum and the callers' versions "
                              "(default: ANNOTATION_CACHE_DIR; empty turns the cache off)")
@@ -467,9 +568,10 @@ def main():
     # The callers are independent, so they run at the same time (they used to run one after another, and ISEScan,
     # the slowest by far, had a single thread). ISEScan gets the whole thread allowance; the quick ones share a few.
     total_bp = sum(sequences.values())
+    isescan_plan_ = isescan_plan(args.isescan_scope, args.truth or (args.out.parent / "truth.tsv"), sequences)
     timeouts = {"*": args.timeout} if args.timeout else ({} if args.timeout == 0 else annotation_timeouts(total_bp))
     threads = max(1, args.threads)
-    small = max(1, min(4, threads // 4))
+    small, amr_threads, isescan_threads = thread_plan(threads)
     calls = (
         ("mob_typer", lambda: call_mob_typer(args.reference, timeout_for(timeouts, "mob_typer"), sequences, small)),
         ("abricate_amr", lambda: call_abricate(args.reference, args.amr_database, timeout_for(timeouts, "abricate"), sequences, threads=small)),
@@ -477,8 +579,8 @@ def main():
            lambda name=name: call_abricate(args.reference, name, timeout_for(timeouts, "abricate"), sequences, kind="replicon", threads=small))
           for index, name in enumerate([n for n in args.replicon_database.replace(",", " ").split() if n]
                                        or ["plasmidfinder"])],
-        ("amrfinder", lambda: call_amrfinder(args.reference, timeout_for(timeouts, "amrfinder"), sequences, max(1, threads // 2))),
-        ("isescan", lambda: call_isescan(args.reference, timeout_for(timeouts, "isescan"), sequences, workdir, threads)),
+        ("amrfinder", lambda: call_amrfinder(args.reference, timeout_for(timeouts, "amrfinder"), sequences, amr_threads)),
+        ("isescan", lambda: call_isescan(args.reference, timeout_for(timeouts, "isescan"), sequences, workdir, isescan_threads, isescan_plan_)),
         ("isfinder", lambda: call_isfinder(args.reference, args.isfinder_fasta, timeout_for(timeouts, "isfinder"), sequences)),
         ("barrnap", lambda: call_barrnap(args.reference, timeout_for(timeouts, "barrnap"), sequences, small)),
     )
@@ -497,6 +599,8 @@ def main():
             fingerprint = caller_fingerprint(args.amr_database, args.replicon_database, args.isfinder_fasta)
             if off:                      # a different set of callers is a different annotation: never reuse one made with all of them
                 fingerprint = dict(fingerprint, switched_off=",".join(off))
+            if isescan_plan_["effective"] != "all":   # a plasmid-only ISEScan search is a different annotation: the cache never mixes scopes (and "all" keeps its earlier key)
+                fingerprint = dict(fingerprint, isescan_scope=scope_label(isescan_plan_))
             cache_id = cache_key(args.reference, fingerprint)
         except OSError:
             cache_id = None
@@ -524,19 +628,22 @@ def main():
         print(f"  annotation: {name} finished in {time.time() - started[name]:.0f} s ({status.get('status')}, {len(found)} feature(s)){why}", flush=True)
         return found, status
 
-    features, provenance, slow_noted = [], {}, set()
+    features, provenance, slow_noted, last_say = [], {}, set(), time.time()
     with ThreadPoolExecutor(max_workers=len(calls)) as pool:
         futures = [(name, pool.submit(timed, name, call)) for name, call in calls]
         pending = {future for _, future in futures}
         t0 = time.time()
+        overall = awake_clock.AwakeTimer(expected=5.0)       # progress and "slow" notes count awake time only
         while pending:
-            _, pending = wait(pending, timeout=60)
-            if pending:
+            _, pending = wait(pending, timeout=5)
+            overall.tick()
+            if pending and time.time() - last_say >= 60:
+                last_say = time.time()
                 running = sorted(name for name, future in futures if future in pending)
-                print(f"  annotation: {int(time.time() - t0)} s in, still running: {', '.join(running)}", flush=True)
+                print(f"  annotation: {int(overall.elapsed())} s in, still running: {', '.join(running)}", flush=True)
                 for name in running:      # a caller far past its usual time: say so once (typical times are estimates for a 6-CPU laptop)
                     typical = typical_seconds(name, total_bp)
-                    ran = time.time() - started.get(name, t0)
+                    ran = overall.elapsed() - (started.get(name, t0) - t0)
                     if typical and ran > SLOW_FACTOR * typical and name not in slow_noted:
                         slow_noted.add(name)
                         print(f"  annotation: NOTE {name} has run {ran / 60:.0f} min; typical is about {typical / 60:.0f} min for this genome size (estimated, 6-CPU laptop). "
@@ -570,6 +677,12 @@ def main():
               "feature_classes_not_evaluated": missing,
               "meaning": ("Absent callers yield 'not evaluated' for their feature class. "
                           "A missing feature class is not evidence that the feature is absent.")}
+    isescan_status = provenance.get("isescan") or {}
+    if isescan_status.get("status") == "ok" and isescan_status.get("chromosome_searched") is False:
+        # The features of other callers are unaffected. A table that counts insertion sequences per replicon must show these sequences as "not evaluated", never as zero.
+        record["not_evaluated_sequences"] = {"insertion_sequence": {"sequences": isescan_status.get("sequences_not_searched", []),
+                                                                    "label": "not evaluated (chromosome not searched)",
+                                                                    "why": "ISESCAN_SCOPE=plasmids: ISEScan searched only the replicons the truth table labels plasmid"}}
     stored = False
     if cache_id and not any(status.get("status") in ("failed", "timed_out") for status in provenance.values()):
         stored = cache_store(args.cache_dir, cache_id, args.out, record, fingerprint, args.reference)

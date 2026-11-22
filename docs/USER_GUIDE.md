@@ -1440,6 +1440,18 @@ Slow data folder. When the data folder is on a Windows drive seen from WSL (`/mn
 (`WORK_DIR=auto`, the default; `WORK_DIR=data` turns it off; `WORK_DIR=<folder>` picks one). The log says `assembly work folder: <path> (fast local disk ...)`. A crash leaves a scratch folder behind; the next run removes it and says so.
 The stage 2 and 3 loops print one summary line for isolates whose reference or reads are not downloaded yet, not one warning per row.
 
+## Speed, sleep and run profiles
+
+* **The computer going to sleep.** A laptop that sleeps pauses the run. While a run is active PlasBench asks the operating system not to sleep (the screen may still turn off; nothing outside the run is changed; no administrator
+  rights): the run log says "keeping this computer awake while the run is active; it can still turn the screen off". `KEEP_AWAKE=0` turns it off. If the computer sleeps anyway, `plasbench status` says "The computer was asleep from
+  00:46 to 03:33 (2 h 47 min); the run was paused, not slow", that time is left out of every step's time, and no tool is stopped or called slow because of it. In WSL without Windows interop it says it cannot prevent sleep and names
+  `powercfg /change standby-timeout-ac 0`.
+* **Where did the time go?** `plasbench profile-run` (or `--json`) prints a per-stage, per-step and per-isolate table, the annotation callers' own times, the sleeps and the five biggest costs with a suggestion for each. A run ends with a short "Time spent" list.
+* **Insertion sequences on the chromosome.** `ISESCAN_SCOPE=plasmids` (default) searches only the replicons labelled plasmid in the truth; the report then says "not evaluated (chromosome not searched)", never "none found". `all` searches everything.
+* **Profiles.** `plasbench run --profile fast|standard|thorough` (or `RUN_PROFILE`, the window's Settings, the assistant). `fast` switches off optional analyses that never change the leaderboard (ISEScan, the ranking-stability and rank-sensitivity sweeps, performance drivers,
+  the recommender evaluation, per-dimension tables, bin agreement, candidate multiplicity, MultiQC) and prints what it turned off and what that saves; `thorough` turns extras on. The profile is in the run manifest and the report's run metadata. The table is `config/run_profiles.tsv`; a setting you set yourself always wins.
+* **CPU figures** in `plasbench status` and the window are shown as cores ("about 4.8 of 6 CPU cores busy (79% of this computer)"); the raw summed percentage (100% = one core) is in the JSON (`cpu_percent`, with `cores_busy`, `cpu_cores`, `cpu_share_of_computer`).
+
 ## Stopping PlasBench: closing the window, Quit, Quit everything, `plasbench stop`
 
 Closing the window vs quitting PlasBench. These are different things, and closing a window never stops anything.

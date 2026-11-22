@@ -23,6 +23,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import awake_clock  # noqa: E402  (time the computer slept is not time the run took)
+
 HEARTBEAT_FRESH_SECONDS = 90          # a run whose lock heartbeat is younger than this is alive
 QUIET_AFTER_SECONDS = 900             # no event for this long while a process lives: say so
 LONG_STEP_SECONDS = 3 * 3600          # a single step this long deserves a plain note
@@ -163,6 +166,58 @@ def human_seconds(seconds):
     return f"{seconds // 3600} h {seconds % 3600 // 60:02d} min"
 
 
+def usable_cpus():
+    """CPUs this process may use: the affinity mask, lowered by a container's CPU limit (plasbench/computer_info.py reads the cgroup)."""
+    try:
+        n = len(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        n = os.cpu_count() or 1
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from plasbench import computer_info
+        cpus = computer_info.cgroup_limits().get("cpus")
+        if cpus and cpus < n:
+            n = max(1, int(cpus))
+    except Exception:  # noqa: BLE001 - a display figure only
+        pass
+    return max(1, n)
+
+
+def cpu_figures(percent, cores=None):
+    """The raw summed percentage (100% = one core) as cores busy and as a share of the computer."""
+    cores = cores or usable_cpus()
+    busy = max(0.0, float(percent)) / 100.0
+    return {"cores_busy": round(busy, 2), "cpu_cores": cores, "cpu_share_of_computer": round(min(100.0, 100.0 * busy / cores))}
+
+
+def cpu_phrase(percent, cores=None):
+    """'about 4.8 of 6 CPU cores busy (79% of this computer)'; '1 of 6 cores' style for low values. The raw figure is kept elsewhere (tooltip, JSON)."""
+    f = cpu_figures(percent, cores)
+    busy, cores = f["cores_busy"], f["cpu_cores"]
+    if busy < 0.15:
+        return f"almost no CPU used (0 of {cores} cores busy)"
+    shown = "1" if busy < 1.5 else (f"{busy:.1f}".rstrip("0").rstrip("."))
+    return f"about {shown} of {cores} CPU cores busy ({f['cpu_share_of_computer']}% of this computer)"
+
+
+def human_mb(mb):
+    return f"{mb / 1024:.1f} GB" if mb >= 1024 else f"{int(mb)} MB"
+
+
+def human_stats(text):
+    """'cpu=421% rss=1619MB procs=20' as 'about 4.2 of 6 CPU cores busy (70% of this computer), 1.6 GB memory, 20 processes'; unreadable text is returned as it is."""
+    import re
+    m = dict(re.findall(r"(cpu|rss|procs)=([0-9.]+)", text or ""))
+    parts = []
+    if "cpu" in m:
+        parts.append(cpu_phrase(float(m["cpu"])))
+    if "rss" in m:
+        parts.append(human_mb(float(m["rss"])) + " memory")
+    if "procs" in m:
+        parts.append(f"{m['procs']} processes")
+    return ", ".join(parts) or (text or "")
+
+
 def human_bytes(n):
     if n >= 1e9:
         return f"{n / 1e9:.1f} GB"
@@ -270,6 +325,9 @@ def summarize(results_dir, log_dir=None, data_dir=None, now=None, procs=None, ma
         state = "no-run"
     summary["state"] = state
     summary["last_event"] = last_event
+    # Time the computer was asleep (system_suspend events and the run's .suspend_gaps file) is not time the run took: every elapsed time, the slow-step note and the "no event
+    # for N minutes" figure below leave it out.
+    gaps = suspend_intervals(events, results_dir)
 
     # --- where it is -------------------------------------------------------------------------------------------------------------
     # The LATEST event of any kind decides; an older stage's sample or step never answers for the current one (it used to: during stage 2 the status said
@@ -334,19 +392,24 @@ def summarize(results_dir, log_dir=None, data_dir=None, now=None, procs=None, ma
     if step is None and last_beat_any:
         step = (last_beat_any.get("what") or "").partition(" / ")[2] or last_beat_any.get("what")
         sample = sample or (last_beat_any.get("what") or "").partition(" / ")[0] or None
-    summary.update(stage=stage, sample=sample, step=step, command=(open_command or {}).get("what"), step_seconds=(now - since) if since else None,
-                   step_typical_seconds=typical)
+    step_asleep = awake_clock.overlap_seconds(gaps, since, now) if since else 0.0
+    summary.update(stage=stage, sample=sample, step=step, command=(open_command or {}).get("what"), step_seconds=(now - since - step_asleep) if since else None,
+                   step_suspended_seconds=round(step_asleep), step_typical_seconds=typical)
     slow = [e for e in events if e["event"] == "slow_step" and (not open_command or e.get("what") == open_command.get("what"))]
     summary["slow_step"] = slow[-1] if (slow and open_command) else None
+    if summary["slow_step"] and step_asleep and typical and summary["step_seconds"] < float(summary["slow_step"].get("factor") or 3) * typical:
+        summary["slow_step"] = None            # the step only looked slow because the computer slept inside it
+    run_from = event_time(started) if started else None
+    summary["suspends"] = [{"start": s0, "end": e0, "seconds": round(e0 - s0), "sentence": awake_clock.describe(s0, e0)} for s0, e0 in gaps if run_from is None or e0 >= run_from][-5:]
     beats = [e for e in events if e["event"] == "heartbeat" and (not open_command or e.get("what") == open_command.get("what"))]
     summary["last_heartbeat"] = beats[-1] if beats else None
-    summary["seconds_since_event"] = (now - event_time(last_event)) if last_event and event_time(last_event) else None
+    summary["seconds_since_event"] = (now - event_time(last_event) - awake_clock.overlap_seconds(gaps, event_time(last_event), now)) if last_event and event_time(last_event) else None
 
     # --- processes and machine -----------------------------------------------------------------------------------------------------
     cpu = sum(r["cpu"] for r in alive_rows)
     rss = sum(r["rss_kb"] for r in alive_rows)
     top = sorted(alive_rows, key=lambda r: -r["cpu"])[:6]
-    summary["processes"] = {"count": len(alive_rows), "cpu_percent": round(cpu), "rss_mb": rss // 1024,
+    summary["processes"] = {"count": len(alive_rows), "cpu_percent": round(cpu), **cpu_figures(cpu), "rss_mb": rss // 1024,
                             "top": [{"pid": r["pid"], "cpu": r["cpu"], "rss_mb": r["rss_kb"] // 1024, "seconds": r["seconds"], "args": r["args"][:160]} for r in top]}
     summary["machine"] = machine(results_dir) if mach is None else mach
 
@@ -373,8 +436,34 @@ def summarize(results_dir, log_dir=None, data_dir=None, now=None, procs=None, ma
     summary["assembly_failures"] = assembly_failures(results_dir, log_dir)
     asm = (summary.get("progress") or {}).get("assembly")
     summary["assembly_partial"] = {"assembled": asm["ok"], "total": asm["rows"], "failed": asm["failed"]} if asm and 0 < asm["ok"] < asm["rows"] else None
+    summary["time_spent"] = time_spent(events, data_dir, log_dir, results_dir)
     summary["hints"] = hints(summary)
     return summary
+
+
+def suspend_intervals(events, results_dir):
+    """[(start, end)] of the time the computer was asleep: the system_suspend events plus the run's .suspend_gaps file, merged."""
+    found = []
+    for e in events:
+        if e.get("event") == "system_suspend":
+            try:
+                found.append((float(e.get("start_epoch")), float(e.get("end_epoch"))))
+            except (TypeError, ValueError):
+                continue
+    found.extend(awake_clock.read_gaps(os.path.join(str(results_dir), ".suspend_gaps")))
+    return awake_clock.merge(found)
+
+
+def time_spent(events, data_dir, log_dir, results_dir):
+    """Short lines on where the time went ('stage 2: 2 h 39 min, 74% in reference annotation'); [] while no stage has finished."""
+    if not any(e.get("event") == "stage_end" for e in events):
+        return []
+    try:
+        import run_profile
+        profile = run_profile.build_profile(events, data_dir, log_dir if log_dir and os.path.isdir(str(log_dir)) else None, os.path.join(str(results_dir), ".suspend_gaps"))
+        return run_profile.time_spent_summary(profile)
+    except Exception:  # noqa: BLE001 - a summary line must never break `status`
+        return []
 
 
 def hints(s):
@@ -384,14 +473,16 @@ def hints(s):
     m = s.get("machine") or {}
     procs = s.get("processes") or {}
     secs = s.get("step_seconds")
+    for gap in (s.get("suspends") or [])[-2:]:
+        out.append(gap["sentence"])
     if state == "stopped":
         out.append("The run left its markers (.run.lock or .run_in_progress) but no process of it is alive: it was cut off (the terminal, WSL or the computer ended it, or it was "
                    "killed) without a chance to say why. Re-running resumes: finished isolates and tool results are reused.")
     if state == "running":
         if procs.get("count") and procs.get("cpu_percent", 0) >= 50:
-            out.append(f"It is working: the run's processes use {procs['cpu_percent']}% CPU and {procs['rss_mb']} MB of memory.")
+            out.append(f"It is working: the run's processes use {cpu_phrase(procs['cpu_percent'])} and {human_mb(procs['rss_mb'])} of memory.")
         elif procs.get("count"):
-            out.append(f"The run's processes use only {procs['cpu_percent']}% CPU. That is normal while it waits on the network (a download) and unusual during an assembly. "
+            out.append(f"The run's processes are using little CPU ({cpu_phrase(procs['cpu_percent'])}). That is normal while it waits on the network (a download) and unusual during an assembly. "
                        "If the newest log below has not changed for a long time as well, it may be waiting on something.")
         since_event = s.get("seconds_since_event")
         if since_event is not None and since_event > QUIET_AFTER_SECONDS and procs.get("count"):
@@ -458,15 +549,19 @@ def render(s, diagnose=False):
         lines.append(f"  command: {s['command']}")
     beat = s.get("last_heartbeat")
     if beat:
-        lines.append(f"  last heartbeat {human_seconds(s['now'] - (event_time(beat) or s['now']))} ago: {beat.get('stats', '')} | {beat.get('system', '')}")
+        lines.append(f"  last heartbeat {human_seconds(s['now'] - (event_time(beat) or s['now']))} ago: {human_stats(beat.get('stats', ''))} | {beat.get('system', '')}")
     elif s.get("last_event"):
         e = s["last_event"]
         lines.append(f"  last event {human_seconds(s['seconds_since_event'] or 0)} ago: {e.get('event')} {e.get('what') or e.get('sample') or ''}".rstrip())
     for name, p in (s.get("progress") or {}).items():
         lines.append(f"  {name}: {p['ok']} of {p['rows']} ok" + (f", {p['failed']} failed" if p["failed"] else ""))
+    for gap in s.get("suspends") or []:
+        lines.append("  " + gap["sentence"])
+    if s.get("time_spent"):
+        lines.append("  where the time went (awake time): " + "; ".join(s["time_spent"]))
     procs = s.get("processes") or {}
     if procs.get("count"):
-        lines.append(f"  processes: {procs['count']} ({procs['cpu_percent']}% CPU, {procs['rss_mb']} MB)")
+        lines.append(f"  processes: {procs['count']} ({cpu_phrase(procs['cpu_percent'])}, {human_mb(procs['rss_mb'])}; raw {procs['cpu_percent']}% summed over cores, 100% = one core)")
         if diagnose:
             for r in procs["top"]:
                 lines.append(f"    pid {r['pid']:>7}  cpu {r['cpu']:>6.1f}%  {r['rss_mb']:>6} MB  {r['args']}")

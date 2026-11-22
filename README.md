@@ -1312,6 +1312,7 @@ window or the command line.
 |---|---|---|
 | `plasbench issue-report` | **Always.** One paste does most of the work below | Version, install, computer, WSL/Docker kind, Python/conda/Docker versions, disk space, the latest run's status, the last 60 lines of its newest log and of each failed assembler or tool log, with secrets removed. `--out report.md` saves it to a file; `--include-logs 120` adds lines; `--study NAME` picks a study |
 | `plasbench status` and `plasbench diagnose` | A run failed, stopped or looks stuck | Stage, isolate and step, how long, CPU and memory, plain hints (add `--study NAME` if it is not the newest study) |
+| `plasbench profile-run` | You want to know where a run's time went | A per-stage, per-step and per-isolate time table, the annotation callers' times, any time the computer was asleep, and the five biggest costs with a suggestion for each (`--json`, `--summary`) |
 | `plasbench check` | A tool or database is missing or will not start | Tool and database checks. **It offers to install what is missing**, so answer **n** if you only want to report |
 | `plasbench ui-state` | The window says it is older than the page, or shows the wrong version | Which program and which folder the window runs, every installed copy |
 | `plasbench picker-check` | **Browse** does not open the folder window | PASS or FAIL for each step |
