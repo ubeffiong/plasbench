@@ -153,27 +153,6 @@ proc_stats() {
     return 0
 }
 
-# _pb_human_stats "cpu=421% rss=1619MB procs=20": the same figures for people: "about 4.2 of 6 CPU cores busy (70% of this computer), 1.6 GB memory, 20 processes".
-# The raw summed percentage (100% = one core) stays in the run_events.jsonl `stats` field.
-_pb_human_stats() {
-    local cores
-    cores="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)"
-    awk -v s="$1" -v cores="$cores" 'BEGIN {
-        n = split(s, f, " "); cpu = -1; rss = -1; procs = -1
-        for (i = 1; i <= n; i++) { if (f[i] ~ /^cpu=/) { v = f[i]; gsub(/[^0-9.]/, "", v); cpu = v + 0 }
-                                   else if (f[i] ~ /^rss=/) { v = f[i]; gsub(/[^0-9.]/, "", v); rss = v + 0 }
-                                   else if (f[i] ~ /^procs=/) { v = f[i]; gsub(/[^0-9]/, "", v); procs = v + 0 } }
-        out = ""
-        if (cpu >= 0) { busy = cpu / 100
-            if (busy < 0.15) out = "almost no CPU used (0 of " cores " cores busy)"
-            else { if (busy < 1.5) shown = "1"; else { shown = sprintf("%.1f", busy); sub(/\.0$/, "", shown) }
-                   share = int(100 * busy / cores + 0.5); if (share > 100) share = 100
-                   out = "about " shown " of " cores " CPU cores busy (" share "% of this computer)" } }
-        if (rss >= 0) out = out (out == "" ? "" : ", ") (rss >= 1024 ? sprintf("%.1f GB", rss / 1024) : sprintf("%d MB", rss)) " memory"
-        if (procs >= 0) out = out (out == "" ? "" : ", ") procs " process" (procs == 1 ? "" : "es")
-        print out }'
-}
-
 # sys_stats [DIR]: "mem_avail=NNNMB swap_used=NNNMB disk_free=NNGB" (Linux /proc/meminfo; the fields it cannot read are left out).
 sys_stats() {
     local out="" avail swap free
@@ -191,7 +170,7 @@ sys_stats() {
 # One heartbeat: elapsed time, CPU and memory of the command and what it started, memory/swap/disk of the machine, how long ago its log (WATCH_LOG, set by
 # the caller) last changed and that log's last line, plus a plain warning when memory is nearly gone or the command is idle. Also written to the event log.
 heartbeat_report() {
-    local pid="$1" description="$2" elapsed="$3" stats sysstats idle="" tail_line="" now mtime avail cpu phase=""
+    local pid="$1" description="$2" elapsed="$3" stats sysstats idle="" now mtime avail cpu phase=""
     stats="$(proc_stats "$pid" || true)"
     sysstats="$(sys_stats "${RESULTS_DIR:-.}" || true)"
     if [[ -n "${WATCH_LOG:-}" && -f "$WATCH_LOG" ]]; then
@@ -199,7 +178,6 @@ heartbeat_report() {
         mtime="$(stat -c %Y "$WATCH_LOG" 2>/dev/null || stat -f %m "$WATCH_LOG" 2>/dev/null || true)"
         [[ "$mtime" =~ ^[0-9]+$ ]] && idle=$(( now - mtime - $(_pb_suspended_between "$mtime" "$now") ))   # time asleep is not time without output
         [[ "$idle" =~ ^-?[0-9]+$ && "$idle" -lt 0 ]] && idle=0
-        tail_line="$(grep -v '^[[:space:]]*$' "$WATCH_LOG" 2>/dev/null | tail -n 1 | tr -d '\r' | cut -c1-110 || true)"
     fi
     # SPAdes prints its own phases ("== Running read error correction", "== Running assembler: K77"): name the current one, so a 20-minute quiet step shows where it is.
     if [[ "${WATCH_LOG:-}" == *spades.log && -f "$WATCH_LOG" ]]; then
