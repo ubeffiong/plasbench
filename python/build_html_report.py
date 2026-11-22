@@ -1019,7 +1019,7 @@ def read_tool_versions(path, ran=None):
     return {label: clean_version(value) for label, value in versions.items() if ran is None or label in ran}
 
 
-KEY_SETTINGS = ("ANALYSIS_TRACK", "ASSEMBLER", "CONTIG_MIN_LENGTH", "MIN_ALIGNMENT_IDENTITY", "MIN_ALIGNMENT_LENGTH", "MIN_ALIGNMENT_MAPQ", "MIN_ALIGNMENT_QUERY_COVERAGE",
+KEY_SETTINGS = ("RUN_PROFILE", "ANALYSIS_TRACK", "ASSEMBLER", "CONTIG_MIN_LENGTH", "MIN_ALIGNMENT_IDENTITY", "MIN_ALIGNMENT_LENGTH", "MIN_ALIGNMENT_MAPQ", "MIN_ALIGNMENT_QUERY_COVERAGE",
                 "PLASMID_RECOVERY_THRESHOLD", "CPRR_MIN_COVERAGE", "CPRR_MIN_IDENTITY", "HEADLINE_MAX_REFERENCE_TIER", "MIN_SPECIES_CLUSTERS", "RESOURCE_FAILURES")
 
 
@@ -1065,6 +1065,14 @@ def run_manifest_html(manifest_path, tool_versions):
     shown = [f"{key}={settings[key]}" for key in KEY_SETTINGS if key in settings]
     if shown:
         item("Key settings", "; ".join(shown) + f" ({len(settings)} settings are recorded in run_manifest.json)")
+    perf = manifest.get("performance") if isinstance(manifest.get("performance"), dict) else {}
+    if perf:
+        profile = perf.get("profile") or "standard"
+        changed = "; ".join(f"{o.get('label')} ({o.get('key')}={o.get('value')})" for o in (perf.get("overrides") or [])[:12])
+        item("Run profile", f"{profile}" + (f": {changed}" if changed else " (no setting changed)")
+             + ("; the leaderboard and scoring are the same in every profile, only optional analyses differ" if profile != "standard" else ""))
+        if perf.get("chromosome_insertion_sequences", "").startswith("not evaluated"):
+            item("Insertion sequences on the chromosome", "not evaluated (chromosome not searched: ISEScan searched only the replicons labelled plasmid; this is not 'none found')")
     resources = manifest.get("resources") if isinstance(manifest.get("resources"), dict) else {}
     if resources:
         adj = resources.get("adjustments") or []

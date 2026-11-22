@@ -120,8 +120,8 @@ def main():
 
     print("page")
     html = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
-    check("the panel exists on ongoing run cards and in the stalled console panel", "rsPanel(s.results)" in html and "rsHTML(st.results)" in html and 'aria-label="Run status"' in html)
-    check("it shows state chip, Now, CPU and memory, the machine, progress, newest log and 'What this means'", all(k in html for k in ("rsState(d)", "<b>Now:</b>", "this command has run", "CPU ${Math.round", "This computer:", "Newest log:", "What this means")))
+    check("the panel exists on ongoing run cards and in the stalled console panel", "rsPanel(s.results, s)" in html and "rsHTML(st.results)" in html and 'aria-label="Run status"' in html)
+    check("it shows state chip, Now, CPU and memory, the machine, progress, newest log and 'What this means'", all(k in html for k in ("rs-now", "on this step", "CPU cores", "memory free", "disk free", "Last log write", "Newest log:", "<summary>Details</summary>")))  # deliberately changed: every fact once, the diagnosis under Details
     check("hints are a list with their evidence, alarming only for memory or disk", "rsAlarm" in html and "h.evidence" in html and "memory|swap|disk" in html)
     check("buttons: Refresh, Copy diagnosis, Open the console log, Open run_events.jsonl", all(k in html for k in ('data-rsa="refresh"', 'data-rsa="copy"', ">Copy diagnosis<", ">Open the console log<", ">Open run_events.jsonl<", "run.latest.log")))
     check("Copy diagnosis copies the server's text", 'S.rs[path].data || {}).text' in html and "copyText(t, \"Diagnosis copied\")" in html)

@@ -18,6 +18,18 @@ if [[ -f "$LOCAL_SETTINGS" ]]; then
     source "$LOCAL_SETTINGS"
 fi
 
+# --- Run profile -------------------------------------------------------------
+# RUN_PROFILE: standard (default; today's behaviour), fast (switches off optional analyses that never change the leaderboard: ISEScan, the ranking-stability and rank-sensitivity sweeps,
+# performance drivers, the recommender evaluation, the per-dimension tables, bin agreement, candidate multiplicity, MultiQC) or thorough (turns the optional extras on). The table is
+# config/run_profiles.tsv; a profile only sets a key you did not set yourself (an explicit environment variable always wins). The name is recorded in run_manifest.json and the report.
+export RUN_PROFILE="${RUN_PROFILE:-standard}"
+if [[ "$RUN_PROFILE" != "standard" && -z "${_PB_PROFILE_APPLIED:-}" ]]; then
+    _pb_profile_lines="$(python3 -I "$PROJECT_ROOT/python/run_profiles.py" export "$RUN_PROFILE" 2>/dev/null || true)"
+    [[ -n "$_pb_profile_lines" ]] && eval "$_pb_profile_lines"
+    unset _pb_profile_lines
+    export _PB_PROFILE_APPLIED="$RUN_PROFILE"
+fi
+
 export DATA_DIR="${DATA_DIR:-${PLASBENCH_DATA_DIR:-$PROJECT_ROOT/data}}" # refs + reads
 # Tool databases are kept once per machine, not per project or per DATA_DIR, so
 # a new checkout, a new cohort folder or a rebuilt conda environment reuses them
@@ -357,6 +369,12 @@ export ANNOTATION_TIMEOUT_SECONDS="${ANNOTATION_TIMEOUT_SECONDS:-}"
 # STEP_SLOW_FACTOR: a long command that has run this many times its typical time (config/step_typical.tsv) gets ONE "still running, typical N min" note and a slow_step event.
 # Nothing is stopped by it. 0 turns it off.
 export STEP_SLOW_FACTOR="${STEP_SLOW_FACTOR:-3}"
+# KEEP_AWAKE (default 1): while a run is active the computer is asked not to go to sleep (the screen may still turn off; nothing outside the run's life is changed, no administrator
+# rights are needed; python/keep_awake.py). 0 = do not ask. A computer that sleeps anyway pauses the run: the gap is recorded (system_suspend event), left out of every elapsed time,
+# slow-step note, "no new output" figure and caller time limit, and shown by `plasbench status`.
+export KEEP_AWAKE="${KEEP_AWAKE:-1}"
+# SUSPEND_MIN_SECONDS (default 60): a pause of the clock longer than this that the run did not cause is treated as the computer having been asleep.
+export SUSPEND_MIN_SECONDS="${SUSPEND_MIN_SECONDS:-60}"
 
 # --- Parallelism ---------------------------------------------------------
 # Every default below (1) is exactly today's fully sequential behavior: one
@@ -719,6 +737,10 @@ export ANNOTATE_WITH_MOB_TYPER="${ANNOTATE_WITH_MOB_TYPER:-1}"   # replicon and 
 export ANNOTATE_WITH_ABRICATE="${ANNOTATE_WITH_ABRICATE:-1}"     # AMR genes and replicons by BLAST (abricate)
 export ANNOTATE_WITH_AMRFINDER="${ANNOTATE_WITH_AMRFINDER:-1}"   # AMR genes (AMRFinderPlus; needs its database)
 export ANNOTATE_WITH_ISESCAN="${ANNOTATE_WITH_ISESCAN:-1}"       # insertion sequences (ISEScan; the slowest caller)
+# ISESCAN_SCOPE: plasmids (default) = ISEScan searches only the replicons the truth table labels PLASMID; the chromosome is NOT searched and is recorded as "not evaluated
+# (chromosome not searched)", never as "no insertion sequences". all = every sequence of the reference (the earlier behaviour; the annotation cache never mixes the two).
+# Every table and figure that uses insertion sequences is about the truth plasmids, so the plasmid results are the same; on a 5-7 Mbp isolate the chromosome is 90% of the search.
+export ISESCAN_SCOPE="${ISESCAN_SCOPE:-plasmids}"
 export ANNOTATE_WITH_BARRNAP="${ANNOTATE_WITH_BARRNAP:-1}"       # rRNA genes (barrnap)
 export ANNOTATION_AMR_DB="${ANNOTATION_AMR_DB:-ncbi}"
 # Finished reference annotations are kept here, keyed by the reference's SHA-256 and the annotation tools' versions and databases, so a second study of the same

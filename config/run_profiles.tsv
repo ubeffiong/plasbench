@@ -1,0 +1,21 @@
+# Run profiles: fast, standard (today's defaults, no overrides) and thorough. Select one with `plasbench run --profile NAME`, RUN_PROFILE=NAME, the window's New benchmark and Settings, or the AI help.
+# A profile only sets the keys listed here, and only where you did not set that key yourself (an explicit environment variable or --flag always wins). python/run_profiles.py reads this file;
+# test/test_run_profiles.py checks every key exists in config/config.sh, every value is legal, that standard overrides nothing, and that no scoring code reads a key a profile changes.
+# Columns: key; fast; thorough (blank = the standard value); affects_headline (always no: the leaderboard, the scoring and the truth-label evidence are never touched by a profile); label (plain words);
+# saving (what fast saves) and basis (measured on the owner's laptop on a date, or "not measured": a switch with no measurement is listed honestly, never given an invented time).
+# Measured: 2026-11-22, WSL2 on a 6-CPU laptop, public-v4 5 isolates, data folder on a Windows drive: ISEScan was 99% of reference annotation (about 1 h 56 min of 1 h 57 min over 4 isolates).
+key	fast	thorough	affects_headline	label	saving	basis
+ANNOTATE_WITH_ISESCAN	0		no	ISEScan insertion sequences	about 30 min per isolate on a 5 Mbp genome (measured, whole genome); about 3 min with the plasmid-only scope	measured 2026-11-22 on the owner's laptop; insertion sequences only feed the repeat_rich scenario tag, never a score
+ISESCAN_SCOPE		all	no	ISEScan search scope (plasmids only, or every sequence)	plasmid-only scope is already the standard	measured 2026-11-22; the chromosome is searched only in thorough
+RUN_RANKING_STABILITY	0		no	Leave-one-study/species-out ranking stability	seconds to minutes on 5 isolates; grows with the cohort	not measured on a real run (descriptive only, never ranked)
+RUN_RANK_SENSITIVITY	0		no	Rank sensitivity sweeps	seconds to minutes on 5 isolates; grows with the cohort	not measured on a real run (advisory)
+RUN_PERFORMANCE_DRIVERS	0		no	Performance-driver analysis	seconds to minutes	not measured on a real run (advisory)
+RUN_RECOMMENDER_EVAL	0		no	Recommender evaluation	seconds	not measured on a real run (advisory)
+RUN_DIMENSION_ANALYSES	0		no	Per-dimension analyses	seconds to minutes	not measured on a real run (advisory tables)
+RUN_BIN_AGREEMENT	0		no	Bin agreement between tools	seconds	not measured on a real run (advisory)
+RUN_CANDIDATE_MULTIPLICITY	0		no	Candidate multiplicity	seconds	not measured on a real run (advisory)
+MULTIQC_REPORT	off		no	MultiQC companion report	up to MULTIQC_TIMEOUT_SECONDS (600 s) when MultiQC is installed	not measured; a separate file, never part of a score
+RUN_DIFFICULTY_FEATURES		1	no	Truth-derived difficulty descriptors	(thorough turns it on)	not measured
+RUN_QUAST_DIAGNOSTICS		1	no	QUAST assembly diagnostics	(thorough turns it on; needs QUAST installed)	not measured
+RUN_TRUTH_DEPTH_ANOMALIES		1	no	Windows of unusual read depth on the truth	(thorough turns it on)	not measured
+RUN_BASELINE_REPLICON		1	no	Replicon-typing baseline	(thorough turns it on)	not measured

@@ -494,3 +494,9 @@ test_ai_routes2.py	6.0
 test_ai_hardening.py	6.0
 test_ai_ui_review.py	0.3
 test_ai_pane_logic.py	1.5
+test_run_profile.py	1.0
+test_suspend_awake.py	3.0
+test_keep_awake.py	8.0
+test_suspend_heartbeat.sh	8.0
+test_isescan_scope.py	1.0
+test_run_profiles.py	5.0

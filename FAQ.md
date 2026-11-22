@@ -1070,3 +1070,8 @@ PlasBench builds it from the Dockerfile after you agree (needs the internet, sev
 mounted into every container (the image is never changed); a tool that needs a licence is still a manual step. `plasbench runtime check` tests Docker step by step. **Evidence.** `plasbench/docker_runtime.py`,
 `test/test_docker_runtime.py` (a recording fake Docker), `test/test_docker_runtime_e2e.py` (a real build and real containers in CI). **Status.** Verified with real Docker only in CI (Linux);
 the Windows and WSL2 paths are tested with fakes, so run `plasbench runtime check` on your computer.
+
+### Q78. My laptop went to sleep during a run and a step shows hours. Is it slow, and can I stop it happening?
+
+It was paused, not slow. A real run showed a 4-minute fastp trim as 10,096 s because Windows slept for 2 h 47 min inside it. PlasBench now keeps the computer awake while a run is active (`KEEP_AWAKE=1`, the screen may still turn off, no administrator rights), records any sleep that still happens
+(`system_suspend`), leaves it out of every step time and time limit, and says so in `plasbench status`. Windows "Modern Standby" laptops can still sleep on a lid close or battery saver; for long runs set the power plan or use `powercfg /change standby-timeout-ac 0`. See `docs/PERFORMANCE_AUDIT.md`.

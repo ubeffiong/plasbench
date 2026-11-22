@@ -85,3 +85,6 @@ NETWORK_RETRIES	int	0..20	Times a failed network fetch is retried	low
 WARN_RUN_DOWNLOAD_GB	int	0..1000	Warn when one isolate's reads are larger than this many GB	low
 MIN_FREE_DISK_GB	int	0..100000	Warn before stage 1 when less than this many GB is free	low
 MULTIQC_TIMEOUT_SECONDS	int	10..86400	Seconds allowed for the MultiQC companion	low
+KEEP_AWAKE	flag	0|1	Keep the computer awake while a run is active (the screen may still turn off)	low
+RUN_PROFILE	choice	standard|fast|thorough	Run profile: standard, fast (skips optional analyses that never change the leaderboard) or thorough	low
+ISESCAN_SCOPE	choice	plasmids|all	ISEScan searches only the plasmids (default) or every sequence	low
