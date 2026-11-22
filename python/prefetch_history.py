@@ -3,7 +3,7 @@
 
 The history is a small JSON file, ~/.plasbench/prefetch_history.json (PLASBENCH_STATE_DIR overrides the folder):
 
-  {"version": "<PlasBench version>|<sra-tools version>", "entries": [{"t": <unix time>, "ok": true|false, "reason": "..."}]}
+  {"version": "<PlasBench version>|<the prefetch program: name, size, date>", "entries": [{"t": <unix time>, "ok": true|false, "reason": "..."}]}
 
 Entries older than 24 hours are ignored (a fixed proxy, certificate or toolkit gets a fresh try the next day), and so is the whole file when it was written by another PlasBench or
 another sra-tools version (an upgrade is a new chance). prefetch counts as known-broken when the last PREFETCH_FAIL_LIMIT entries (default 2) all failed; 0 turns that off.
@@ -19,9 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import shutil
-import subprocess
 import sys
 import time
 
@@ -47,13 +45,16 @@ def plasbench_version():
 
 
 def sra_version():
-    if not shutil.which("prefetch"):
+    """Which SRA Toolkit this is, WITHOUT running it (running prefetch to ask its version would be one more call of the very program whose failures are being counted): its resolved
+    path, size and modification time, which change when it is upgraded or replaced. 'none' when it is not installed."""
+    path = shutil.which("prefetch")
+    if not path:
         return "none"
     try:
-        out = subprocess.run(["prefetch", "--version"], capture_output=True, text=True, timeout=15, check=False).stdout
-        match = re.search(r"(\d+\.\d+(?:\.\d+)?)", out)
-        return match.group(1) if match else "unknown"
-    except (OSError, subprocess.SubprocessError):
+        real = os.path.realpath(path)
+        info = os.stat(real)
+        return f"{os.path.basename(real)}:{info.st_size}:{int(info.st_mtime)}"
+    except OSError:
         return "unknown"
 
 

@@ -5,11 +5,13 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLASBENCH_DB_DIR="$(mktemp -d)"; export PLASBENCH_DB_DIR
 # ... and never move or link the machine's real MOB-suite database (scripts/lib.sh).
 export PLASBENCH_DB_PRESERVE=0
+# ... nor the SRA Toolkit failure history (~/.plasbench/prefetch_history.json, python/prefetch_history.py).
+PLASBENCH_STATE_DIR="$(mktemp -d)"; export PLASBENCH_STATE_DIR
 # Tests never need the real internet: the connection check (plasbench/netcheck.py) assumes it is there. The network tests set their own environment.
 export PLASBENCH_ASSUME_ONLINE=1
 RUN_LOG="$(mktemp)"
 SHARD_FILE="$(mktemp)"
-trap 'rm -rf "$PLASBENCH_DB_DIR" "$RUN_LOG" "$SHARD_FILE"' EXIT
+trap 'rm -rf "$PLASBENCH_DB_DIR" "$PLASBENCH_STATE_DIR" "$RUN_LOG" "$SHARD_FILE"' EXIT
 # Sharding (CI runs the suite as parallel shards, see CONTRIBUTING.md). PB_SHARDS=n PB_SHARD=i (1..n) runs only the tests test/shard_select.py assigns to shard i,
 # balanced by test/shard_weights.tsv; with PB_SHARDS unset every test runs, in this order, exactly as before. PB_LIST=1 only prints the registered test names (one per
 # registration, in run order) and runs nothing. Every test must be run through pb_run so that the selection and the listing see it.
