@@ -170,20 +170,25 @@ sys_stats() {
 # One heartbeat: elapsed time, CPU and memory of the command and what it started, memory/swap/disk of the machine, how long ago its log (WATCH_LOG, set by
 # the caller) last changed and that log's last line, plus a plain warning when memory is nearly gone or the command is idle. Also written to the event log.
 heartbeat_report() {
-    local pid="$1" description="$2" elapsed="$3" stats sysstats idle="" tail_line="" now mtime avail cpu phase=""
+    local pid="$1" description="$2" elapsed="$3" stats sysstats idle="" now mtime avail cpu phase=""
     stats="$(proc_stats "$pid" || true)"
     sysstats="$(sys_stats "${RESULTS_DIR:-.}" || true)"
     if [[ -n "${WATCH_LOG:-}" && -f "$WATCH_LOG" ]]; then
         now="$(date +%s)"
         mtime="$(stat -c %Y "$WATCH_LOG" 2>/dev/null || stat -f %m "$WATCH_LOG" 2>/dev/null || true)"
-        [[ "$mtime" =~ ^[0-9]+$ ]] && idle=$(( now - mtime ))
-        tail_line="$(grep -v '^[[:space:]]*$' "$WATCH_LOG" 2>/dev/null | tail -n 1 | tr -d '\r' | cut -c1-110 || true)"
+        [[ "$mtime" =~ ^[0-9]+$ ]] && idle=$(( now - mtime - $(_pb_suspended_between "$mtime" "$now") ))   # time asleep is not time without output
+        [[ "$idle" =~ ^-?[0-9]+$ && "$idle" -lt 0 ]] && idle=0
     fi
     # SPAdes prints its own phases ("== Running read error correction", "== Running assembler: K77"): name the current one, so a 20-minute quiet step shows where it is.
     if [[ "${WATCH_LOG:-}" == *spades.log && -f "$WATCH_LOG" ]]; then
         phase="$(grep -E '== Running|K=[0-9]+|Read error correction|Repeat resolution|Assembling|Mismatch correction' "$WATCH_LOG" 2>/dev/null | tail -n 1 | tr -d '\r' | cut -c1-100 || true)"
     fi
-    heartbeat_log "still working: $description (${elapsed}s elapsed;${phase:+ SPAdes phase: ${phase##*  };} ${stats:-process figures unavailable}${sysstats:+; $sysstats}${idle:+; its log last changed ${idle}s ago}${tail_line:+: \"$tail_line\"})"
+    # The console gets ONE short line every HEARTBEAT_CONSOLE_SECONDS (default 300): the CPU, memory, disk and log fields are in the run's status panel and in the
+    # machine-readable heartbeat event below, so the console does not repeat them. The event is written every time, unchanged.
+    if [[ "${_PB_BEAT_WHAT:-}" != "$description" || "$elapsed" -ge $(( ${_PB_BEAT_AT:-0} + ${HEARTBEAT_CONSOLE_SECONDS:-300} )) ]]; then
+        _PB_BEAT_WHAT="$description"; _PB_BEAT_AT="$elapsed"
+        heartbeat_log "still working: $description ($(( elapsed / 60 )) min${phase:+; SPAdes phase: ${phase##*  }}; 'plasbench status' shows CPU, memory and the log)"
+    fi
     run_event heartbeat "what=$description" "elapsed=$elapsed" "stats=${stats}" "system=${sysstats}" "log_idle=${idle}" "phase=${phase}"
     avail="$(sed -n 's/.*mem_avail=\([0-9]*\)MB.*/\1/p' <<< "$sysstats")"
     if [[ "$avail" =~ ^[0-9]+$ && "$avail" -lt 300 ]]; then
@@ -213,11 +218,56 @@ slow_step_note() {   # slow_step_note DESCRIPTION ELAPSED TYPICAL
     run_event slow_step "what=$what" "elapsed=$elapsed" "typical=$typical" "factor=${STEP_SLOW_FACTOR:-3}"
 }
 
+# ---- computer sleep (suspend): time the computer was asleep is not time the step took -------------------------------------------------
+# The run's sentinel (python/run_sentinel.py, started by run_all.sh) and the polling loop below both notice a jump of the wall clock that the loop did not cause and
+# record it in RESULTS_DIR/.suspend_gaps (plus a system_suspend run event). Elapsed times, the slow-step note and the "no new output" figure leave those gaps out.
+_pb_now() { date +%s; }
+_pb_awake_py() { printf '%s' "${PROJECT_ROOT:-${HERE:-.}/..}/python/awake_clock.py"; }
+# _pb_suspended_between START [END]: whole seconds of recorded sleep inside START..END (END defaults to now); 0 when nothing was recorded.
+_pb_suspended_between() {
+    local f="${RESULTS_DIR:+$RESULTS_DIR/.suspend_gaps}" out=""
+    [[ -n "$f" && -s "$f" ]] || { printf '0'; return 0; }
+    out="$(python3 "$(_pb_awake_py)" sum "$f" "$1" "${2:-$(_pb_now)}" 2>/dev/null || true)"
+    [[ "$out" =~ ^[0-9]+$ ]] || out=0
+    printf '%s' "$out"
+}
+# _pb_note_suspend START END: record a sleep seen by the polling loop (a no-op when the sentinel already recorded it).
+_pb_note_suspend() {
+    local f="${RESULTS_DIR:+$RESULTS_DIR/.suspend_gaps}"
+    [[ -n "$f" ]] || return 0
+    python3 "$(_pb_awake_py)" record "$f" "$1" "$2" --events "${RUN_EVENTS_FILE:-$RESULTS_DIR/run_events.jsonl}" --source heartbeat >/dev/null 2>&1 || true
+    heartbeat_log "NOTE: the computer was asleep for about $(python3 "$(_pb_awake_py)" format "$(( $2 - $1 ))" 2>/dev/null || echo "$(( $2 - $1 )) s"); the run was paused, not slow (this time is left out of the step's elapsed time)"
+}
+
+# The run's sentinel (python/run_sentinel.py): keeps the computer awake while the run is active (KEEP_AWAKE, default 1) and records sleep. Its own output goes to a file,
+# never to this script's pipes (a copy of the console's pipe would keep the log's tee open). It ends by itself when this script's process does.
+_pb_sentinel_start() {
+    [[ -n "${RESULTS_DIR:-}" && -z "${_PB_SENTINEL_PID:-}" ]] || return 0
+    local note_file="$RESULTS_DIR/.sentinel_note" tries=0 py="${PROJECT_ROOT:-${HERE:-.}/..}/python/run_sentinel.py"
+    [[ -f "$py" ]] || return 0
+    : > "$note_file" 2>/dev/null || return 0
+    python3 "$py" --pid "$$" --results-dir "$RESULTS_DIR" > "$note_file" 2>/dev/null < /dev/null &
+    _PB_SENTINEL_PID=$!
+    disown "$_PB_SENTINEL_PID" 2>/dev/null || true
+    while [[ ! -s "$note_file" && "$tries" -lt 150 ]] && kill -0 "$_PB_SENTINEL_PID" 2>/dev/null; do sleep 0.2; tries=$(( tries + 1 )); done
+    [[ -s "$note_file" ]] && cat "$note_file" || true
+    on_exit_add _pb_sentinel_stop
+    return 0
+}
+_pb_sentinel_stop() {
+    [[ -n "${_PB_SENTINEL_PID:-}" ]] || return 0
+    kill "$_PB_SENTINEL_PID" 2>/dev/null || true
+    local i=0
+    while kill -0 "$_PB_SENTINEL_PID" 2>/dev/null && [[ "$i" -lt 100 ]]; do sleep 0.1; i=$(( i + 1 )); done
+    _PB_SENTINEL_PID=""
+    return 0
+}
+
 run_with_heartbeat() {
     local description="$1"; shift
-    local delay="${HEARTBEAT_DELAY_SECONDS:-180}" interval="${HEARTBEAT_INTERVAL_SECONDS:-60}"
-    local started elapsed=0 last_notice=0 pid rc=0 typical slow_after=0 slow_noted=0 factor="${STEP_SLOW_FACTOR:-3}"
-    started="$(date +%s)"
+    local delay="${HEARTBEAT_DELAY_SECONDS:-180}" interval="${HEARTBEAT_INTERVAL_SECONDS:-60}" min_gap="${SUSPEND_MIN_SECONDS:-60}"
+    local started now prev_now elapsed=0 last_notice=0 pid rc=0 typical slow_after=0 slow_noted=0 factor="${STEP_SLOW_FACTOR:-3}" asleep=0 end_now gsize gsize_seen=""
+    started="$(_pb_now)"; prev_now="$started"
     typical="$(step_typical_seconds "$description" || true)"
     [[ "$typical" =~ ^[0-9]+$ && "$factor" =~ ^[0-9]+$ && "$factor" -gt 0 ]] && slow_after=$(( typical * factor )) || typical=""
     run_event command_start "what=$description" "typical=${typical}"
@@ -226,7 +276,15 @@ run_with_heartbeat() {
         # Poll cheaply so a fast command returns promptly; only print at the
         # much less frequent configured interval once the quiet-delay passes.
         sleep 1
-        elapsed=$(( $(date +%s) - started ))
+        now="$(_pb_now)"
+        if [[ "$min_gap" =~ ^[0-9]+$ && $(( now - prev_now )) -gt $(( min_gap + 1 )) ]]; then
+            _pb_note_suspend "$(( prev_now + 1 ))" "$now"      # a pause this loop did not cause: the computer slept
+        fi
+        prev_now="$now"
+        gsize="$(stat -c %s "${RESULTS_DIR:-/nonexistent}/.suspend_gaps" 2>/dev/null || stat -f %z "${RESULTS_DIR:-/nonexistent}/.suspend_gaps" 2>/dev/null || echo 0)"
+        if [[ "$gsize" != "$gsize_seen" ]]; then asleep="$(_pb_suspended_between "$started" "$now")"; gsize_seen="$gsize"; fi   # recomputed only when a gap was recorded
+        elapsed=$(( now - started - asleep ))                      # awake time only
+        [[ "$elapsed" -lt 0 ]] && elapsed=0
         if [[ "$slow_noted" -eq 0 && "$slow_after" -gt 0 && "$elapsed" -ge "$slow_after" ]]; then
             slow_noted=1; slow_step_note "$description" "$elapsed" "$typical"
         fi
@@ -236,7 +294,9 @@ run_with_heartbeat() {
         fi
     done
     wait "$pid" || rc=$?
-    run_event command_end "what=$description" "seconds=$(( $(date +%s) - started ))" "exit=$rc"
+    end_now="$(_pb_now)"
+    asleep="$(_pb_suspended_between "$started" "$end_now")"
+    run_event command_end "what=$description" "seconds=$(( end_now - started ))" "awake_seconds=$(( end_now - started - asleep ))" "suspended_seconds=$asleep" "exit=$rc"
     return "$rc"
 }
 # Warnings print yellow and errors red, when they go to a terminal (never into a log file or the window, which
@@ -572,7 +632,8 @@ stage_timing_begin() {
 
 record_stage_timing() {
     [[ -n "${_STAGE_TIMING_ID:-}" && -d "${RESULTS_DIR:-/nonexistent}" ]] || return 0
-    run_event stage_end "seconds=$(( $(date +%s) - _STAGE_TIMING_START ))" "exit=${_PLASBENCH_EXIT_RC:-}"
+    local _asleep; _asleep="$(_pb_suspended_between "$_STAGE_TIMING_START" "$(date +%s)")"
+    run_event stage_end "seconds=$(( $(date +%s) - _STAGE_TIMING_START ))" "awake_seconds=$(( $(date +%s) - _STAGE_TIMING_START - _asleep ))" "suspended_seconds=$_asleep" "exit=${_PLASBENCH_EXIT_RC:-}"
     local file="$RESULTS_DIR/stage_timing.tsv" tmp end
     tmp="$file.$$.tmp"; end="$(date +%s)"
     {

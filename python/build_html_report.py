@@ -1019,7 +1019,7 @@ def read_tool_versions(path, ran=None):
     return {label: clean_version(value) for label, value in versions.items() if ran is None or label in ran}
 
 
-KEY_SETTINGS = ("ANALYSIS_TRACK", "ASSEMBLER", "CONTIG_MIN_LENGTH", "MIN_ALIGNMENT_IDENTITY", "MIN_ALIGNMENT_LENGTH", "MIN_ALIGNMENT_MAPQ", "MIN_ALIGNMENT_QUERY_COVERAGE",
+KEY_SETTINGS = ("RUN_PROFILE", "ANALYSIS_TRACK", "ASSEMBLER", "CONTIG_MIN_LENGTH", "MIN_ALIGNMENT_IDENTITY", "MIN_ALIGNMENT_LENGTH", "MIN_ALIGNMENT_MAPQ", "MIN_ALIGNMENT_QUERY_COVERAGE",
                 "PLASMID_RECOVERY_THRESHOLD", "CPRR_MIN_COVERAGE", "CPRR_MIN_IDENTITY", "HEADLINE_MAX_REFERENCE_TIER", "MIN_SPECIES_CLUSTERS", "RESOURCE_FAILURES")
 
 
@@ -1072,6 +1072,14 @@ def run_manifest_html(manifest_path, tool_versions):
         item("Read depth capped", f"{len(capped)} isolate(s) were downloaded as the first read pairs only, at most {next(iter(capped.values())).get('cap_x')}x (READ_DEPTH_CAP_X): {shown_caps}. "
              "The reads are the start of the sequencer's output, not a random sample, and a prefix has no whole-file MD5 (its structure was checked instead). Scoring does not use read depth, so "
              "the cap does not change how tools are scored; it changes only the input they were given. Set READ_DEPTH_CAP_X=off to download whole files.")
+    perf = manifest.get("performance") if isinstance(manifest.get("performance"), dict) else {}
+    if perf:
+        profile = perf.get("profile") or "standard"
+        changed = "; ".join(f"{o.get('label')} ({o.get('key')}={o.get('value')})" for o in (perf.get("overrides") or [])[:12])
+        item("Run profile", f"{profile}" + (f": {changed}" if changed else " (no setting changed)")
+             + ("; the leaderboard and scoring are the same in every profile, only optional analyses differ" if profile != "standard" else ""))
+        if perf.get("chromosome_insertion_sequences", "").startswith("not evaluated"):
+            item("Insertion sequences on the chromosome", "not evaluated (chromosome not searched: ISEScan searched only the replicons labelled plasmid; this is not 'none found')")
     resources = manifest.get("resources") if isinstance(manifest.get("resources"), dict) else {}
     if resources:
         adj = resources.get("adjustments") or []

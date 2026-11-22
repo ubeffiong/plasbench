@@ -108,7 +108,7 @@ with tempfile.TemporaryDirectory() as tmp:
     check("a small genome still gets 300 s (ISEScan 900 s)", ar.annotation_timeouts(1_000_000, {}) == {"*": 300, "isescan": 900})
     check("ANNOTATION_TIMEOUT_SECONDS=off removes the limit", ar.annotation_timeouts(4_000_000, {"ANNOTATION_TIMEOUT_SECONDS": "off"}) == {} and ar.timeout_for({}, "isescan") is None)
     check("a number applies to every caller", ar.timeout_for(ar.annotation_timeouts(4_000_000, {"ANNOTATION_TIMEOUT_SECONDS": "90"}), "isescan") == 90)
-    check("typical durations are scaled by genome size", abs(ar.typical_seconds("isescan", 8_000_000) - 1326) < 1 and ar.typical_seconds("abricate_amr", 4_000_000) == 13)
+    check("typical durations are scaled by genome size", abs(ar.typical_seconds("isescan", 8_000_000) - 2800) < 1 and ar.typical_seconds("abricate_amr", 4_000_000) == 40)   # re-based on measurements 2026-11-22
     check("the failure reason helper drops the echoed command line", "Running:" not in ar._reason(["amrfinder"], 1, "Running: amrfinder -n x\nERROR: no database\n", ""), "")
     os.environ["PATH"] = old_path
 

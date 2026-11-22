@@ -37,7 +37,7 @@ SHELL_CHARS = re.compile(r"[;&|<>`$(){}\\#\r\n\t!*?\[\]]")
 ABS_PATH = re.compile(r"^(?:/|~|[A-Za-z]:[\\/]|\\\\)")
 # Commands that open a window or a server, or end this one, are not started from the assistant: the person runs them from the terminal.
 NEVER_IN_WINDOW = frozenset(["ui", "desktop-icon", "picker-check", "install-git", "ask", "ai", "docs", "concept-note"])
-SAFE_COMMANDS = frozenset(["status", "diagnose", "ui-state", "issue-report", "net", "open-report", "check-results", "validate-cohort", "validate-orthogonal-evidence",
+SAFE_COMMANDS = frozenset(["status", "diagnose", "profile-run", "ui-state", "issue-report", "net", "open-report", "check-results", "validate-cohort", "validate-orthogonal-evidence",
                            "validate-meta-intake", "selection-report", "compare-published", "scan-isolates", "check"])
 INSTALL_SUBS = {"tools": {"install", "remove", "add", "new"}, "runtime": {"pull", "build", "use", "test"}}
 

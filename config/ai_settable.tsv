@@ -90,3 +90,6 @@ MAX_PARALLEL_DOWNLOADS	int	1..4	Isolates downloaded at the same time in stage 1 
 READ_DEPTH_CAP_X	choice	off|50|75|100|150|200|300|500|1000	Read depth cap in x for short paired runs: only the first read pairs are downloaded (default 150; off = whole files)	medium
 ENA_CHUNK_MIB	int	1..256	Size in MiB of the pieces an ENA file is fetched in (default 32)	low
 ENA_USE_ARIA2	flag	0|1	Use aria2c for ENA downloads instead of the built-in resumable downloader (default 0)	low
+KEEP_AWAKE	flag	0|1	Keep the computer awake while a run is active (the screen may still turn off)	low
+RUN_PROFILE	choice	standard|fast|thorough	Run profile: standard, fast (skips optional analyses that never change the leaderboard) or thorough	low
+ISESCAN_SCOPE	choice	plasmids|all	ISEScan searches only the plasmids (default) or every sequence	low

@@ -297,7 +297,7 @@ h1 .tipi,h3 .tipi,h4 .tipi,.hd .tipi{margin-left:8px;vertical-align:middle}[data
 #tipbox[hidden]{display:none}#tipbox p{margin:0 0 6px}#tipbox dl{margin:0 0 6px;display:grid;grid-template-columns:auto 1fr;gap:3px 10px}#tipbox dt{font-weight:600}#tipbox dd{margin:0;color:var(--fg-2)}
 #tipbox .ttl{font-weight:600}#tipbox ul{margin:0 0 6px;padding-left:18px}#tipbox li{margin:2px 0}
 #tipbox .tmeta{color:var(--mut);font-size:12px;margin:2px 0 0}#tipbox .twhen{margin:6px 0 0;padding-top:6px;border-top:1px solid var(--line-2);color:var(--fg-2)}
-.rspanel{margin:8px 0 0;padding:8px 10px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface-2)}.rs-row{font-size:13px}.rs-hints{margin:2px 0 0;padding-left:18px}.rsbox{margin-top:6px;padding-top:6px;border-top:1px solid var(--term-line)}
+.rspanel{margin:8px 0 0;padding:8px 10px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface-2)}.rs-row{font-size:13px}.rs-now{font-size:13px;font-weight:500}.rs-details{margin-top:6px}.rs-details summary{cursor:pointer;font-size:12px;color:var(--muted,inherit)}.rs-hints{margin:2px 0 0;padding-left:18px}.rsbox{margin-top:6px;padding-top:6px;border-top:1px solid var(--term-line)}
 .stallnote{margin:8px 0 0;padding:8px 10px;border:1px solid var(--warn);border-left-width:3px;border-radius:4px;background:var(--surface-2);color:var(--fg);font-size:12.5px;line-height:1.45}
 .stallnote .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.stallnote ul{margin:6px 0 0;padding-left:18px;font-family:var(--mono,monospace);font-size:11.5px;word-break:break-all}
 #cstall{flex:none;padding:6px 12px;background:var(--term-head);color:var(--term-fg);border-bottom:1px solid var(--term-line);font-size:12px;max-height:40%;overflow:auto}
@@ -1883,17 +1883,30 @@ function stageLine(s) {
   if (pr.isolates && pr.isolates_in_stage) bits.push(`isolate ${pr.isolates_in_stage} of ${pr.isolates}`);
   return bits.join(" · ");
 }
+/* Awake time: the elapsed time minus any sleep the run recorded (status data when it is loaded). */
+function awakeDur(s, dur) {
+  if (s.group !== "ongoing" || !s.results) return dur;
+  const e = S.rs[s.results], gaps = (e && e.data && e.data.suspends) || [], asleep = gaps.reduce((a, g) => a + (+g.seconds || 0), 0);
+  return asleep ? fmtDur((Date.now() / 1000) - s.started - asleep) : dur;
+}
+/* The one sentence a stalled run card may add: the console-quiet case says what it is; the genuinely stalled case says what to do. Nothing in the normal state. */
+function runVerdict(s) {
+  if (s.state !== "running" && s.state !== "cancelling") return "";
+  if (s.display_state !== "stalled") return "";
+  if (quietWorking(s.id, "stalled")) return `<div class="small mut" role="status">The console is quiet; the tool writes to its own log.${activityHTML(S.act[s.id])}</div>`;
+  return `<div class="stallnote" role="status">${esc(rsFirstHint(s.results) || STALL_TEXT(s.idle_seconds))}<div class="acts"><button class="btn sec sm" data-sa="activity">Check activity</button></div>${activityHTML(S.act[s.id])}</div>`;
+}
 function sessCard(s) {
   const pr = s.progress || {}, open = S.sessOpen.has(s.id);
   const dur = fmtDur((s.ended || Date.now() / 1000) - s.started);
-  const chip = {ongoing: s.state === "cancelling" ? "Cancelling" : s.display_state === "stalled" ? (quietWorking(s.id, "stalled") ? "Working (quiet log)" : (rsFirstHint(s.results).slice(0, 70) || "No new output for a while")) : s.display_state === "retrying" ? "Retrying a failed tool" : "Running", completed: s.display_state === "completed_with_warnings" ? "Completed with warnings" : "Completed"}[s.group] || ({failed: "Failed", interrupted: "Interrupted", cancelled: "Cancelled"}[s.state] || s.state);
+  const chip = {ongoing: s.state === "cancelling" ? "Cancelling" : s.display_state === "stalled" ? (quietWorking(s.id, "stalled") ? "Working, console quiet" : "Needs attention") : s.display_state === "retrying" ? "Retrying a failed tool" : "Working", completed: s.display_state === "completed_with_warnings" ? "Done with warnings" : "Done"}[s.group] || ({failed: "Failed", interrupted: "Needs attention", cancelled: "Cancelled"}[s.state] || s.state);
   const pct = s.group === "completed" ? 100 : pr.percent;
   const bar = s.group === "ongoing" && pct == null ? `<div class="sbar ind"><i></i></div>` : `<div class="sbar"><i style="width:${pct == null ? (s.group === "attention" ? 8 : 0) : pct}%"></i></div>`;
   const run = s.run_index != null ? (S.runs || [])[s.run_index] : null;
   const leaders = run && run.leaders && run.leaders.length ? "Leading: " + run.leaders.map(l => `${esc(l.display || l.tool)} <span class="mut">(${esc(l.task || "leader")})</span>`).join(", ") : "";
-  const why = s.group === "attention" ? (s.state === "interrupted" ? "Stopped without finishing (the computer or PlasBench went away)." : s.state === "cancelled" ? "Cancelled." : `Failed${s.exit != null ? ` (exit ${s.exit})` : ""}.`) : "";
+  const why = s.group === "attention" ? (s.state === "interrupted" ? "Stopped without finishing (the computer or PlasBench went away)." : s.state === "cancelled" ? "" : (s.exit != null ? `Exit code ${s.exit}.` : "")) : "";
   const acts = [];
-  if (s.group === "ongoing") acts.push(`<button class="btn sec sm" data-sa="log">${icon("list")}Follow progress</button>`, s.state === "running" ? `<button class="btn danger sm" data-sa="cancel">Cancel</button>` : "");
+  if (s.group === "ongoing") acts.push(`<button class="btn sec sm" data-sa="log">${icon("list")}Follow progress</button>`, s.state === "running" ? `<button class="btn danger sm" data-sa="cancel" title="Cancel keeps the finished work; Resume is then offered under Needs attention">Cancel</button>` : "");
   if (s.group === "attention") acts.push(s.resumable ? `<button class="btn sm" data-sa="resume">${icon("play")}Resume</button>` : (s.resumed_by ? `<span class="mut small">Resumed in a newer run</span>` : ""),
     `<button class="btn sec sm" data-sa="log">${icon("list")}Log</button>`, `<button class="btn ghost sm" data-sa="remove">Remove</button>`);
   if (s.group === "completed") acts.push(s.run_index != null && run && run.report ? `<a class="btn sm" href="/view/${s.run_index}/benchmark.report.html" title="Open the report in a tab">${icon("chart")}Open report</a>` : `<span class="mut small">${s.argv[0] === "demo" || s.argv[0] === "run" ? "Report not found in the results folder" : ""}</span>`,
@@ -1907,11 +1920,9 @@ function sessCard(s) {
     <div class="mut" style="margin-top:6px">Started ${esc(fmtTime(s.started))}${s.ended ? ` · ended ${esc(fmtTime(s.ended))}` : ""}${s.reattached ? " · found again after PlasBench restarted" : ""}</div>
     <div style="margin-top:6px"><button class="btn ghost sm" data-sa="copy">${icon("copy")}Copy command</button></div></div>` : "";
   return `<div class="sess ${s.group}" data-id="${esc(s.id)}"><div class="sh"><div style="min-width:0"><h4>${esc(s.label)} <span class="badge ${s.group === "ongoing" ? "run" : s.group === "completed" ? "ok" : "bad"}">${chip}</span></h4>
-    <div class="sm"><span>${esc(ago(s.started))}</span><span>${esc(dur)}${s.group === "ongoing" ? " so far" : ""}</span>${leaders ? `<span>${leaders}</span>` : ""}${why ? `<span class="bad-t">${esc(why)}</span>` : ""}</div></div></div>
-    ${s.group === "completed" ? "" : bar}${stageLine(s) ? `<div class="small">${esc(stageLine(s))}${pct != null && s.group === "ongoing" ? ` · about ${pct}%` : ""}</div>` : ""}
-    ${s.group !== "completed" && pr.last_line ? `<div class="last" title="${esc(pr.last_line)}">${esc(pr.last_line)}</div>` : ""}
-    ${s.group === "ongoing" && s.display_state === "stalled" ? `<div class="stallnote" role="status">${esc(STALL_TEXT(s.idle_seconds))}<div class="acts"><button class="btn sec sm" data-sa="activity">Check activity</button><button class="btn danger sm" data-sa="cancel">Cancel</button></div>${activityHTML(S.act[s.id])}<div class="small mut" style="margin-top:4px">Resume is offered under Needs attention after a cancel.</div></div>` : ""}
-    ${s.group === "ongoing" && s.results ? rsPanel(s.results) : ""}
+    <div class="sm"><span>${esc(ago(s.started))}</span><span>${esc(awakeDur(s, dur))}${s.group === "ongoing" ? " awake so far" : ""}${s.group === "ongoing" && pct != null ? `, about ${pct}%` : ""}</span>${leaders ? `<span>${leaders}</span>` : ""}${why ? `<span class="bad-t">${esc(why)}</span>` : ""}</div></div></div>
+    ${s.group === "completed" ? "" : bar}${s.group === "ongoing" && s.results ? runVerdict(s) + rsPanel(s.results, s) : (stageLine(s) ? `<div class="small">${esc(stageLine(s))}</div>` : "")}
+    ${s.group === "attention" && pr.last_line ? `<div class="last" title="${esc(pr.last_line)}">${esc(pr.last_line)}</div>` : ""}
     <div class="acts">${acts.filter(Boolean).join("")}</div>${detail}</div>`;
 }
 /* Runs started outside the window (the Terminal tab, a shell): read-only, never cancellable from here. */
@@ -2194,29 +2205,50 @@ function rsHints(d) {
 const rsAlarm = h => /memory|swap|disk|space|oom|out of/i.test(h.text);
 /* the first hint, to show in place of the generic "no new output" text when a status exists */
 const rsFirstHint = path => { const e = S.rs[path]; const h = e && rsHints(e.data)[0]; return h ? h.text : ""; };
-function rsHTML(path) {
+/* Every fact once: a Now line, a resources line, an activity line, a verdict only when it adds something, and the full diagnosis folded under Details. */
+S.rsOpen = S.rsOpen || new Set();
+const rsGB = mb => mb == null || isNaN(mb) ? "" : mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
+const rsCores = n => { n = +n; return n >= 1.5 ? String(Math.round(n * 10) / 10) : n >= 0.15 ? "1" : "0"; };
+function rsLines(d, s) {
+  const pr = (s && s.progress) || {}, ps = d.processes || {}, m = rsPick(d, "machine", "system") || {}, nl = rsPick(d, "newest_log", "log") || {};
+  const stage = d.stage != null && d.stage !== "" ? `Stage ${d.stage}${pr.current_name ? " " + pr.current_name : ""}` : "";
+  const iso = pr.isolates && pr.isolates_in_stage ? `isolate ${pr.isolates_in_stage} of ${pr.isolates}` : (d.sample ? `isolate ${d.sample}` : "");
+  const on = d.step_seconds != null ? `${rsDur(d.step_seconds)} on this step${d.step_typical_seconds ? ` (typical about ${rsDur(d.step_typical_seconds)})` : ""}` : "";
+  const now = [stage, iso, d.step || "", on].filter(Boolean).join(" · ");
+  const res = [ps.count && ps.cpu_cores ? `${rsCores(ps.cores_busy)} of ${ps.cpu_cores} CPU cores` : "", ps.count ? `${rsGB(ps.rss_mb)} used` : "", m.mem_avail_mb != null ? `${rsGB(m.mem_avail_mb)} memory free` : "",
+    m.disk_free_gb != null ? `${m.disk_free_gb} GB disk free` : ""].filter(Boolean).join(" · ");
+  const idle = rsPick(nl, "idle_seconds", "age_seconds");
+  const act = idle != null ? `Last log write ${rsDur(idle)} ago` : "";
+  const tip = rsPick(nl, "last_line", "line") || "";
+  const hints = rsHints(d), alarm = hints.find(rsAlarm);
+  const sus = (d.suspends || []).slice(-1)[0];
+  const recentSleep = sus && Date.now() / 1000 - sus.end < 1800 ? sus.sentence : "";
+  return {now, res, act, tip, verdict: recentSleep || (alarm ? alarm.text : ""), alarm: !!alarm && !recentSleep, hints};
+}
+function rsHTML(path, s) {
   const e = S.rs[path]; if (!e) return `<div class="small mut">Loading the run status…</div>`;
-  const d = e.data || {}, [chip, kind] = rsState(d), now = rsPick(d, "now", "current") || {}, mach = rsPick(d, "machine", "system") || {}, prog = rsPick(d, "progress", "counts") || {}, log = rsPick(d, "newest_log", "log") || {};
+  const d = e.data || {};
   if (d.error && (d.state === "no-run" || !d.state)) return `<div class="small mut">${esc("No run status is available: " + d.error)}</div>`;
-  const pr = d.processes || {}, nowBits = [d.stage ? `stage ${d.stage}` : "", d.sample ? `isolate ${d.sample}` : "", (d.step || d.command) ? `step ${d.step || d.command}` : ""].filter(Boolean).join(", ");
-  const ran = rsDur(d.step_seconds), cpu = pr.count ? pr.cpu_percent : null, mem = pr.count ? pr.rss_mb * 1048576 : null;
-  const procs = [cpu != null ? `CPU ${Math.round(cpu)}% (${pr.count} processes)` : "", mem != null ? `memory ${rsBytes(mem)}` : ""].filter(Boolean).join(" · ");
-  const machine = [mach.mem_avail_mb != null ? `free memory ${rsBytes(mach.mem_avail_mb * 1048576)}` : "", mach.swap_used_mb != null ? `swap in use ${rsBytes(mach.swap_used_mb * 1048576)}` : "", mach.disk_free_gb != null ? `free disk ${mach.disk_free_gb} GB` : ""].filter(Boolean).join(" · ");
+  const L = rsLines(d, s), prog = rsPick(d, "progress", "counts") || {}, nl = rsPick(d, "newest_log", "log") || {}, m = rsPick(d, "machine", "system") || {}, af = d.assembly_failures || {};
   const counts = Object.entries(prog).filter(([, v]) => v && typeof v === "object").map(([k, v]) => `${esc(k)}: ${esc(v.ok)} of ${esc(v.rows)} ok${v.failed ? `, ${esc(v.failed)} failed` : ""}`).join(" · ");
-  const logLine = rsPick(log, "last_line", "line"), logAge = rsPick(log, "age_seconds", "idle_seconds"), logName = rsPick(log, "name", "path", "file");
-  const hints = rsHints(d), af = d.assembly_failures || {};
+  const logName = rsPick(nl, "name", "path", "file");
+  const ps = d.processes || {}, raw = ps.count ? `raw CPU figure ${ps.cpu_percent}% summed over cores (100% = one core), ${ps.count} processes` : "";
   // Live downloads (results/download_progress.json via `plasbench status --json`): one bar and one plain line per active download; the run log itself stays quiet.
   const dlHTML = (d.downloads || []).map(x => { const pct = x.total_bytes ? Math.min(100, Math.round(100 * x.done_bytes / x.total_bytes)) : 0;
     return `<div class="small" style="margin-top:4px"><b>Downloading</b> ${esc(x.line || x.run)}<div class="sbar" style="height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:4px 0"><i style="display:block;height:100%;width:${pct}%;background:var(--primary)"></i></div></div>`; }).join("");
-  const afHTML = af.failed ? `<div class="small bad-t" style="margin-top:4px"><b>${esc(af.failed)} assembl${af.failed === 1 ? "y" : "ies"} failed${af.same_cause ? `, all for the same reason: ${esc(af.same_cause)}` : ""}</b>${(af.items || []).slice(0, 5).map(i => `<div>${esc(i.sample)}: ${esc(i.cause || "cause not recorded")}${i.advice ? ` <span class="mut">${esc(String(i.advice).slice(0, 300))}</span>` : ""}</div>`).join("")}</div>` : "";
-  return `<div class="rs-row"><span class="badge ${kind === "ok" ? "ok" : kind === "bad" ? "bad" : kind === "run" ? "run" : ""}">${esc(chip)}</span>${nowBits ? ` <b>Now:</b> ${esc(nowBits)}${ran ? `; this command has run ${esc(ran)}` : ""}` : ""}</div>
-    ${dlHTML}
-    ${procs ? `<div class="small">${esc(procs)}</div>` : ""}${machine ? `<div class="small mut">This computer: ${esc(machine)}</div>` : ""}${counts ? `<div class="small mut">${counts}</div>` : ""}${afHTML}
-    ${logName ? `<div class="small mut">Newest log: <span class="mono">${esc(String(logName).split(/[\\/]/).pop())}</span>${logAge != null ? `, last written ${esc(rsDur(logAge))} ago` : ""}${logLine ? `: <span class="mono">${esc(String(logLine).slice(0, 200))}</span>` : ""}</div>` : ""}
-    ${hints.length ? `<div class="small" style="margin-top:4px"><b>What this means</b><ul class="rs-hints">${hints.map(h => `<li class="${rsAlarm(h) ? "bad-t" : ""}">${esc(h.text)}${h.evidence ? ` <span class="mut">(${esc(h.evidence)})</span>` : ""}</li>`).join("")}</ul></div>` : ""}`;
+  const detail = [
+    L.hints.length ? `<ul class="rs-hints">${L.hints.map(h => `<li class="${rsAlarm(h) ? "bad-t" : ""}">${esc(h.text)}${h.evidence ? ` <span class="mut">(${esc(h.evidence)})</span>` : ""}</li>`).join("")}</ul>` : "",
+    counts ? `<div class="small mut">${counts}</div>` : "",
+    af.failed ? `<div class="small bad-t">${esc(af.failed)} assembl${af.failed === 1 ? "y" : "ies"} failed${af.same_cause ? `, all for the same reason: ${esc(af.same_cause)}` : ""}</div>${(af.items || []).slice(0, 5).map(i => `<div class="small mut">${esc(i.sample)}: ${esc(i.cause || "cause not recorded")}${i.advice ? ` (${esc(i.advice)})` : ""}</div>`).join("")}` : "",
+    logName ? `<div class="small mut">Newest log: <span class="mono">${esc(String(logName).split(/[\\/]/).pop())}</span>${L.tip ? `, last line: <span class="mono">${esc(String(L.tip).slice(0, 200))}</span>` : ""}</div>` : "",
+    raw ? `<div class="small mut">${esc(raw)}</div>` : ""].filter(Boolean).join("");
+  return `<div class="rs-now">${esc(L.now || "Waiting for the first step…")}</div>${dlHTML}${L.res ? `<div class="small mut">${esc(L.res)}</div>` : ""}${L.act ? `<div class="small mut" title="${esc(L.tip)}">${esc(L.act)}</div>` : ""}
+    ${L.verdict ? `<div class="small ${L.alarm ? "bad-t" : ""}" role="status">${esc(L.verdict)}</div>` : ""}
+    <details class="rs-details" data-rsd="${esc(path)}"${S.rsOpen.has(path) ? " open" : ""}><summary>Details</summary>${detail}${rsButtons(path)}</details>`;
 }
 const rsButtons = path => `<div class="acts"><button class="btn sec sm" data-rsa="refresh" data-rs-path="${esc(path)}" title="Ask for the status again now">Refresh</button><button class="btn sec sm" data-rsa="copy" data-rs-path="${esc(path)}" title="Copy a plain-text diagnosis of this run (to paste into a message)">Copy diagnosis</button><button class="btn ghost sm" data-rsa="log" data-rs-path="${esc(path)}" title="Open the run's console log (logs/run.latest.log) in this window">Open the console log</button><button class="btn ghost sm" data-rsa="events" data-rs-path="${esc(path)}" title="Open run_events.jsonl: one line per event of the run">Open run_events.jsonl</button></div>`;
-const rsPanel = path => `<div class="rspanel" data-rs="${esc(path)}" aria-label="Run status"><div class="rs-body">${rsHTML(path)}</div>${rsButtons(path)}</div>`;
+const rsPanel = (path, sess) => `<div class="rspanel" data-rs="${esc(path)}" aria-label="Run status"><div class="rs-body">${rsHTML(path, sess)}</div></div>`;
+document.addEventListener("toggle", e => { const d = e.target; if (d && d.dataset && d.dataset.rsd) d.open ? S.rsOpen.add(d.dataset.rsd) : S.rsOpen.delete(d.dataset.rsd); }, true);
 async function rsFetch(path, force) {
   const e = S.rs[path]; if (!force && e && Date.now() - e.t < 2500) return false;
   let data; try { data = await api(`runs/status?path=${encodeURIComponent(path)}`); } catch (err) { data = {state: "no-run", error: err.message}; }
@@ -2266,7 +2298,7 @@ function paintStall() {
   if (!st || st.id !== id) { box.hidden = true; return; }
   box.hidden = false;
   const hint = st.results ? rsFirstHint(st.results) : "";
-  box.innerHTML = `<div>${esc(hint || STALL_TEXT(st.idle))}</div><div style="margin-top:4px"><button data-st-act="activity">Check activity</button><button data-st-act="cancel">Cancel</button><span class="mut small">Cancel keeps finished work; Resume then appears under Runs &rarr; Needs attention.</span></div>${activityHTML(S.act[id])}${st.results ? `<div class="rsbox">${rsHTML(st.results)}${rsButtons(st.results)}</div>` : ""}`;
+  box.innerHTML = `<div>${esc(hint || STALL_TEXT(st.idle))}</div><div style="margin-top:4px"><button data-st-act="activity">Check activity</button><button data-st-act="cancel">Cancel</button><span class="mut small">Cancel keeps finished work; Resume then appears under Runs &rarr; Needs attention.</span></div>${activityHTML(S.act[id])}${st.results ? `<div class="rsbox">${rsHTML(st.results)}</div>` : ""}`;
 }
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-st-act]"); if (!b || !$("#cstall").contains(b)) return;

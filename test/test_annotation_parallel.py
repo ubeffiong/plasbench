@@ -29,7 +29,8 @@ def main():
 
     def slow(name, extra=None):
         def call(*args, **kw):
-            seen[name] = kw.get("threads", args[-1] if args and isinstance(args[-1], int) else None)
+            ints = [a for a in args if isinstance(a, int) and not isinstance(a, bool)]
+            seen[name] = kw.get("threads", ints[-1] if ints else None)
             time.sleep(0.6)
             return [], {"status": "ok", "features": 0}
         return call
@@ -49,7 +50,9 @@ def main():
     order = list(json.loads((tmp / "p.json").read_text(encoding="utf-8"))["callers"])
     check("every caller's result is recorded", sorted(order) == sorted(["mob_typer", "abricate_amr", "abricate_replicon",
                                                                         "amrfinder", "isescan", "isfinder", "barrnap"]), order)
-    check("ISEScan gets the whole thread allowance", seen.get("isescan") == 16, seen)
+    # Deliberately changed (run-speed work): ISEScan used to get ALL the threads on top of the other callers' shares (13 threads on 6 CPUs; a real run's quick callers took 10x
+    # their usual time). It now gets the allowance minus two, and the callers' shares stay close to the machine's size.
+    check("ISEScan gets the allowance minus two CPUs for the short callers", seen.get("isescan") == 14, seen)
     # ---- one switch per caller: a caller switched off is not run and is recorded as not evaluated with the reason ----
     import os
     ran = []

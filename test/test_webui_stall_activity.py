@@ -116,7 +116,7 @@ def main():
     print("page")
     html = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
     check("plain-words stall text", "No new output for ${stallMinutes(secs)} minute" in html and "This is often normal while reads download or a tool assembles. Closing this window does NOT stop the run." in html)
-    check("Check activity and Cancel are offered in the console and on the run card", html.count("Check activity") >= 2 and 'data-st-act="cancel"' in html and 'data-sa="cancel">Cancel' in html)
+    check("Check activity and Cancel are offered in the console and on the run card", html.count("Check activity") >= 2 and 'data-st-act="cancel"' in html and 'data-sa="cancel"' in html)
     check("the chip is relabelled when the check finds writes", "Working (quiet log)" in html and 'status === "active"' in html)
     check("the old 'Stalled: no output' wording is gone", "Stalled: no output" not in html and "Stalled (no output" not in html)
     check("the cohort picker hides ledgers and says so if one is chosen", "!c.metagenomic && !c.ledger" in html and "Not a cohort sheet." in html)

@@ -624,6 +624,15 @@ def build_parser():
         status_group.add_argument("--results-dir", type=Path, help="A results folder to inspect (its run_events.jsonl and .run.lock are read).")
         status_parser.add_argument("--json", action="store_true", help="Print the summary as JSON, for scripts and the window.")
         status_parser.add_argument("--watch", type=int, metavar="SECONDS", help="Repeat every SECONDS until you press Ctrl+C.")
+    profile_parser = sub.add_parser(
+        "profile-run",
+        help="Where did the time of a run go: a per-stage, per-step and per-isolate table, the time the computer was asleep, and the five biggest costs with a plain suggestion for each.")
+    profile_group = profile_parser.add_mutually_exclusive_group()
+    profile_group.add_argument("--study", help="The study whose run to profile (default: the most recently updated study).")
+    profile_group.add_argument("--results-dir", type=Path, help="A results folder to profile (its run_events.jsonl is read; ../logs and the study's data folder are used when present).")
+    profile_parser.add_argument("--data-dir", type=Path, help="The data folder (default: the study's).")
+    profile_parser.add_argument("--json", action="store_true", help="Print the profile as JSON.")
+    profile_parser.add_argument("--summary", action="store_true", help="Only the short 'time spent' lines.")
     sub.add_parser("test", help="Run the complete offline regression suite.")
     net_parser = sub.add_parser(
         "net", help="Check which online services this computer can reach (NCBI, ENA, GitHub, conda, ...) and what to do when one is not.")
@@ -1098,6 +1107,10 @@ def build_parser():
                                  "accuracy_first, today's original formula). A different profile only changes "
                                  "which tool ranks highest; it never changes which tools are eligible.")
         resources = command_parser.add_argument_group("resources and assembly")
+        resources.add_argument("--profile", choices=("fast", "standard", "thorough"),
+                               help="Run profile (RUN_PROFILE). standard (default) is today's behaviour; fast switches off optional analyses that never change the leaderboard "
+                                    "(ISEScan, ranking-stability and rank-sensitivity sweeps, performance drivers, MultiQC, ...) and says what it turned off and the time it saves; "
+                                    "thorough turns optional extras on. The profile is recorded in the run manifest and the report. See config/run_profiles.tsv.")
         resources.add_argument("-t", "--threads", type=int, help="CPU threads per tool (default: config value, normally 4).")
         resources.add_argument("--memory-gb", type=int, help="SPAdes memory limit in GB (default: config value, normally 16).")
         resources.add_argument("--parallel-samples", type=int,
@@ -1356,6 +1369,31 @@ def main(argv=None):
             for flag in ("dry_run", "yes", "force", "report"):
                 if getattr(args, flag):
                     command.append("--" + flag.replace("_", "-"))
+        code = run(command, root)
+    elif args.command == "profile-run":
+        from . import studies
+        if args.results_dir:
+            results_dir = Path(args.results_dir)
+        elif args.study:
+            try:
+                results_dir = studies.study_path(root, args.study) / "results"
+            except ValueError as exc:
+                parser.error(str(exc))
+        else:
+            listed = studies.list_studies(root)
+            results_dir = (Path(listed[0]["path"]) / "results") if listed else (root / "results")
+        command = [sys.executable, str(root / "python" / "run_profile.py"), "--results-dir", str(results_dir)]
+        record = {}
+        try:
+            record = json.loads((results_dir.parent / "study.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
+        data_dir = args.data_dir or record.get("data_dir")
+        if data_dir:
+            command += ["--data-dir", str(data_dir)]
+        for flag in ("json", "summary"):
+            if getattr(args, flag):
+                command.append("--" + flag)
         code = run(command, root)
     elif args.command in ("status", "diagnose"):
         from . import studies
@@ -1900,6 +1938,8 @@ def main(argv=None):
             env["LOCAL_INPUTS_ONLY"] = "1"
         if args.long_reads_file:
             env["LONG_READS_FILE"] = args.long_reads_file
+        if getattr(args, "profile", None):
+            env["RUN_PROFILE"] = args.profile
         if args.analysis_track:
             env["ANALYSIS_TRACK_FILTER"] = args.analysis_track
         if args.decision_profile:

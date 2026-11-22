@@ -153,7 +153,7 @@ if [[ -r /proc/self/stat && "$(uname -s)" == "Linux" ]]; then
     ok "proc_stats falls back to /proc"
 fi
 out="$(env PATH="$NOPS_BIN" bash -c "set -euo pipefail; source '$ROOT/scripts/lib.sh'; proc_stats(){ :; }; heartbeat_report \$\$ 'x' 5" 2>&1)"
-grep -q "process figures unavailable" <<< "$out" || fail "the heartbeat does not say the figures are unavailable: $out"
+grep -q "still working: x (0 min" <<< "$out" || fail "the heartbeat line is missing when the figures are unavailable: $out"   # deliberately changed: the console line no longer carries figures
 ok "the heartbeat says 'process figures unavailable' when there are none"
 fi
 

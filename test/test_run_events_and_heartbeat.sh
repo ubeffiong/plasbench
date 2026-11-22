@@ -48,10 +48,11 @@ RESULTS_DIR="$RES" HEARTBEAT_DELAY_SECONDS=1 HEARTBEAT_INTERVAL_SECONDS=1 bash -
 grep -q "still working: s1 / fake tool" "$CONSOLE" || { echo "FAIL: the heartbeat should reach the console" >&2; cat "$CONSOLE" >&2; exit 1; }
 ! grep -q "still working" "$TOOLLOG" || { echo "FAIL: the heartbeat must not be written into the tool's own log" >&2; cat "$TOOLLOG" >&2; exit 1; }
 grep -q "tool output" "$TOOLLOG" || { echo "FAIL: the tool's output belongs in its own log" >&2; exit 1; }
-grep -Eq "s elapsed;" "$CONSOLE" || { echo "FAIL: the heartbeat should carry the elapsed time" >&2; cat "$CONSOLE" >&2; exit 1; }
-grep -Eq "disk_free=[0-9]+GB" "$CONSOLE" || { echo "FAIL: the heartbeat should carry the disk figure" >&2; cat "$CONSOLE" >&2; exit 1; }
-grep -q "its log last changed" "$CONSOLE" || { echo "FAIL: the heartbeat should say when the watched log last changed" >&2; cat "$CONSOLE" >&2; exit 1; }
-grep -q "tool output" "$CONSOLE" || { echo "FAIL: the heartbeat should quote the watched log's last line" >&2; cat "$CONSOLE" >&2; exit 1; }
+# Deliberately changed: the console line is short and rare (one every HEARTBEAT_CONSOLE_SECONDS) and no longer repeats the CPU, memory, disk and log fields the status panel shows;
+# the machine-readable heartbeat event keeps them (checked below).
+grep -Eq "still working: s1 / fake tool \([0-9]+ min" "$CONSOLE" || { echo "FAIL: the console heartbeat should carry the elapsed minutes" >&2; cat "$CONSOLE" >&2; exit 1; }
+! grep -Eq "disk_free=|its log last changed|rss=|cpu=" "$CONSOLE" || { echo "FAIL: the console heartbeat must not repeat the fields the status panel shows" >&2; cat "$CONSOLE" >&2; exit 1; }
+grep -Fq "disk_free" "$RES/run_events.jsonl" && grep -Fq "log_idle" "$RES/run_events.jsonl" || { echo "FAIL: the heartbeat EVENT keeps the machine figures and the log idle time" >&2; exit 1; }
 python3 - "$RES/run_events.jsonl" <<'PY'
 import json, sys
 rows = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]

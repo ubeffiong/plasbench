@@ -88,18 +88,19 @@ with tempfile.TemporaryDirectory() as tmp:
     check("a large read set is named with its size, and the way out", "6 KB compressed" in text and "READ_DEPTH_CAP_X" in text and "does not skip an isolate" in text, text)
     check("low memory is named with the figure", "180 MB of memory is available" in text, text)
     check("swap is named with the figure", "3100 MB of swap" in text, text)
-    check("a busy run is said to be working, with the CPU figure", "using 1850% CPU" in text or "1850% CPU" in text, text)
+    check("a busy run is said to be working, with the CPU figure", "CPU cores busy" in text and "% of this computer" in text and "1850%" not in text and "6.8 GB" in text, text)   # deliberately changed: cores, not a summed percentage
     check("the newest log of the isolate and its age are shown", s["newest_log"]["idle_seconds"] == 2400 and "General" in s["newest_log"]["last_line"], s.get("newest_log"))
     out = rs.render(s, diagnose=True)
-    check("the text names stage, isolate, step and the heartbeat figures", "stage 3, isolate streptomyces_sp, step SPAdes assembly" in out and "cpu=1850%" in out, out)
+    check("the text names stage, isolate, step and the heartbeat figures", "stage 3, isolate streptomyces_sp, step SPAdes assembly" in out and "CPU cores busy" in out and "6.7 GB memory" in out, out)   # deliberately changed: the raw cpu=1850% stays in the JSON event
     check("diagnose lists the busiest process", "spades.py" in out and "pid    4400" in out, out)
     check("status (without diagnose) does not list processes", "spades.py" not in rs.render(s, diagnose=False))
 
     # --- the window reads this summary: every field it uses must exist in the real thing (the panel was first written against guessed names) ---------------
     page = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
     contract = {"d.stage": s.get("stage"), "d.sample": s.get("sample"), "d.step": s.get("step"), "d.step_seconds": s.get("step_seconds"),
-                "pr.cpu_percent": s["processes"].get("cpu_percent"), "pr.rss_mb": s["processes"].get("rss_mb"), "pr.count": s["processes"].get("count"),
-                "mach.mem_avail_mb": s["machine"].get("mem_avail_mb"), "mach.swap_used_mb": s["machine"].get("swap_used_mb"), "mach.disk_free_gb": s["machine"].get("disk_free_gb"),
+                "ps.cpu_percent": s["processes"].get("cpu_percent"), "ps.rss_mb": s["processes"].get("rss_mb"), "ps.count": s["processes"].get("count"),
+                "ps.cores_busy": s["processes"].get("cores_busy"), "ps.cpu_cores": s["processes"].get("cpu_cores"),
+                "m.mem_avail_mb": s["machine"].get("mem_avail_mb"), "m.disk_free_gb": s["machine"].get("disk_free_gb"),
                 "v.ok": s["progress"]["download"].get("ok"), "v.rows": s["progress"]["download"].get("rows"),
                 "last_line": s["newest_log"].get("last_line"), "idle_seconds": s["newest_log"].get("idle_seconds")}
     check("the page reads the real summary's field names", all(k in page for k in contract), [k for k in contract if k not in page])
@@ -135,7 +136,7 @@ with tempfile.TemporaryDirectory() as tmp:
     s5 = rs.summarize(quiet, now=NOW, procs=procs((7, 1, 0.0, 5, 3000, "bash run_all.sh"), (8, 7, 4.0, 90, 2900, "python fetch_ena_reads.py")), mach={"mem_avail_mb": 5000, "disk_free_gb": 100})
     text5 = " ".join(s5["hints"])
     check("a live run with no recent event says a long step writes to its own log", "No event for" in text5 and "own log" in text5, text5)
-    check("a busy-less process is described as waiting on the network, not as an error", "4% CPU" in text5 and "network" in text5, text5)
+    check("a busy-less process is described as waiting on the network, not as an error", "little CPU" in text5 and "network" in text5, text5)
 
     # --- a run that stopped in stage 3 because SPAdes failed: the cause and advice stage 3 recorded, or the classifier on the log for an old status file -----------------
     page_text = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
