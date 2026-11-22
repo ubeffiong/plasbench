@@ -493,11 +493,12 @@ def open_range(url, start, end, timeout):
         return urllib.request.urlopen(request, timeout=timeout)
     except urllib.error.HTTPError as exc:
         code = exc.code
-        if code in (429, 503):
+        if code in (429, 503, 403):
+            # 403 is treated like a throttle, not as fatal: during testing ENA answered a plain ranged request with 403 Forbidden once and with 206 a few seconds later.
             raise Throttled(f"HTTP {code} from the server", parse_retry_after(exc.headers.get("Retry-After") if exc.headers else ""))
         if code == 416:
             raise RemoteChanged(f"the server says the requested range {start}-{end} is outside the file (HTTP 416): the file has changed")
-        if code in (400, 401, 403, 404, 410):
+        if code in (400, 401, 404, 410):
             raise Fatal(f"HTTP {code} {exc.reason} for {url}")
         raise OSError(f"HTTP {code} {exc.reason}")
     except ConnectionRefusedError as exc:

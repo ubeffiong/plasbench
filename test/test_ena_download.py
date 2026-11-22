@@ -91,7 +91,7 @@ def main():
     s.stop()
 
     # 4. 429 and 503 with Retry-After
-    for code in ("http429", "http503"):
+    for code in ("http429", "http503", "http403"):
         s = make()
         s.faults.append({"kind": code, "start": 1 * MIB, "retry_after": 1, "times": 2})
         t0 = time.time()

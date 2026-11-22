@@ -9,7 +9,7 @@ Fault kinds (dict keys: kind, times (default 1), start (the first byte of the re
 after (bytes sent before the fault acts, default 0), seconds (stall length), retry_after):
   reset            send `after` bytes, then close the connection hard
   stall            send `after` bytes, then send nothing for `seconds`
-  http429 / http503   answer with that status and a Retry-After header (`retry_after`, seconds)
+  http429 / http503 / http403   answer with that status and a Retry-After header (`retry_after`, seconds)
   ignore_range     answer 200 with the whole file
   bad_range        answer 206 with a Content-Range that is not the one asked for
   short            declare the right length, send `after` bytes less and close
@@ -227,7 +227,7 @@ class FakeENA:
 
     def respond(self, h, path, content, size, start, end, ranged, fault):
         kind = fault["kind"] if fault else ""
-        if kind in ("http429", "http503"):
+        if kind in ("http429", "http503", "http403"):
             h.send_response(int(kind[4:]))
             h.send_header("Retry-After", str(fault.get("retry_after", 1)))
             h.send_header("Content-Length", "0")
