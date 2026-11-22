@@ -13,6 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed -- "No new output for 35 minutes" shown beside "newest log written 41 s ago" (22 November 2026)
+- **One signal, not two.** The "No new output" banner counted only what the run printed on the console, and the *Check activity* probe looked only at the results and data folders, so a run whose tools write to their own logs (SPAdes, ISEScan, a download) in the study's `logs/` folder or in the local working folder (`~/.plasbench/scratch`) was reported as idle while the Run status panel showed a log written seconds ago. A quiet console is now called `working_quiet` ("Working (console quiet)") when a tool log changed in the last 3 minutes or the run's processes use at least half a core; it is called stalled only when the console, the tool logs and the processes are all quiet. *Check activity* also looks in the study's logs and the working and download folders and says why it thinks the run is working.
+
 ### Added -- faster, honest runs: profile-run, sleep handling, ISEScan scope, run profiles (22 November 2026)
 - `plasbench profile-run`: per-stage, per-step and per-isolate time, the annotation callers' times, sleeps and the five biggest costs with suggestions; the first measured profile of a real 5-isolate laptop run is in `docs/PERFORMANCE_AUDIT.md` (ISEScan was 99% of reference annotation).
 - `KEEP_AWAKE` (default 1): the run asks the OS not to sleep while it is active and lets go when it ends or dies (Windows and WSL through `SetThreadExecutionState`, systemd-inhibit, caffeinate); sleep that still happens is recorded as `system_suspend`, left out of elapsed times, slow-step notes, "no new output" figures and the annotation callers' time limits (a real run lost three callers' results to wall-clock limits), and shown plainly by `plasbench status`. Steps now carry `awake_seconds`.

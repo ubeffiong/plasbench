@@ -113,11 +113,55 @@ def main():
         check("cohort_info calls it a ledger", cohort_info.info(ROOT, "accepted_accessions")["kind"] == "ledger")
     check("is_ledger: a curated sheet is not one", not cohort_info.is_ledger(["sample_id", "organism", "assembly_accession", "sra_run", "biosample", "source_cohort"]))
 
+    print("a quiet console is not a stall when the tools are working (one signal, no contradiction)")
+    study = tmp / "studyA"
+    (study / "results").mkdir(parents=True)
+    (study / "logs").mkdir()
+    (study / "study.json").write_text("{}", encoding="utf-8")
+    for old in (study / "results").glob("*"):
+        old.unlink()
+    job = {"id": "j9", "label": "t", "argv": ["run"], "command": "plasbench run", "env": {}, "kind": "plasbench", "state": "running", "started": time.time(), "ended": None,
+           "exit": None, "pid": 0, "results": str(study / "results")}
+    jobs.jobs["j9"] = job
+    real_stalled, real_status = jobrunner.is_stalled, webui.run_status_json
+    jobrunner.is_stalled = lambda *a, **k: True          # the console has printed nothing for the stall window
+    try:
+        def status(log_idle, cpu):
+            return lambda *a, **k: {"state": "running", "newest_log": {"file": "x.spades.log", "idle_seconds": log_idle}, "processes": {"count": 9, "cpu_percent": cpu}}
+        webui.run_status_json = status(41, 508)
+        check("console quiet, a tool log written 41 s ago: working_quiet, not stalled", jobs.display_state(job) == "working_quiet", jobs.display_state(job))
+        ev = jobs._working_evidence(job)
+        check("the evidence says why in plain words", ev["working"] and "41 s ago" in ev["why"] and ev["cpu_cores"] == 5.08, ev)
+        webui.run_status_json = status(4000, 508)
+        check("tool log old but the processes use 5 cores: still working_quiet", jobs.display_state(job) == "working_quiet" and "CPU cores" in jobs._working_evidence(job)["why"])
+        webui.run_status_json = status(4000, 3)
+        check("everything quiet for an hour and the processes idle: stalled", jobs.display_state(job) == "stalled")
+        def boom(*a, **k):
+            raise RuntimeError("no status")
+        webui.run_status_json = boom
+        check("no evidence available (an error): the old rule applies, stalled", jobs.display_state(job) == "stalled")
+        webui.run_status_json = status(4000, 3)
+        fresh = study / "logs" / "k.spades.log"
+        fresh.write_text("INFO collecting k-mer coverage")
+        act = jobs.activity("j9")
+        check("Check activity looks in the study's logs folder: a log just written counts as active", act["status"] == "active" and any(f["path"].endswith("k.spades.log") for f in act["files"]), act)
+        age(fresh, 4000)
+        webui.run_status_json = status(41, 508)
+        act = jobs.activity("j9")
+        check("activity is active when the run's own tool log or CPU says so, even if no file under the roots changed", act["status"] == "active" and act["evidence"]["working"], act)
+        webui.run_status_json = status(4000, 3)
+        check("and quiet when nothing at all is happening", jobs.activity("j9")["status"] == "quiet")
+        check("the scratch and download folders are among the places looked at", any(r.endswith("scratch") for r in jobs._tool_roots(job)) and any(r.endswith("downloads") for r in jobs._tool_roots(job)))
+    finally:
+        jobrunner.is_stalled, webui.run_status_json = real_stalled, real_status
+        jobs.jobs.pop("j9", None)
+
     print("page")
     html = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
     check("plain-words stall text", "No new output for ${stallMinutes(secs)} minute" in html and "This is often normal while reads download or a tool assembles. Closing this window does NOT stop the run." in html)
     check("Check activity and Cancel are offered in the console and on the run card", html.count("Check activity") >= 2 and 'data-st-act="cancel"' in html and 'data-sa="cancel"' in html)
     check("the chip is relabelled when the check finds writes", "Working (quiet log)" in html and 'status === "active"' in html)
+    check("the page shows 'Working, console quiet' for a quiet console with busy tools (display_state working_quiet), and the activity answer says why", 's.display_state === "working_quiet" ? "Working, console quiet"' in html and "a.evidence.why" in html and "run's processes are idle" in html)
     check("the old 'Stalled: no output' wording is gone", "Stalled: no output" not in html and "Stalled (no output" not in html)
     check("the cohort picker hides ledgers and says so if one is chosen", "!c.metagenomic && !c.ledger" in html and "Not a cohort sheet." in html)
     check("the Cohorts page tags the ledger", 'c.ledger ? `<span class="tag warn"' in html)
