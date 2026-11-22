@@ -33,8 +33,8 @@ TRUTH = "sequence_id\tmolecule_type\tlength\nchr1\tCHROMOSOME\t16\npl1\tPLASMID\
 with tempfile.TemporaryDirectory() as tmp:
     tmp = Path(tmp)
     ref, truth = tmp / "reference.fna", tmp / "truth.tsv"
-    ref.write_text(FASTA, encoding="utf-8", newline="\n")
-    truth.write_text(TRUTH, encoding="utf-8", newline="\n")
+    ref.write_bytes(FASTA.encode("utf-8"))
+    truth.write_bytes(TRUTH.encode("utf-8"))
     seqs = ar.reference_sequences(ref)
 
     plan = ar.isescan_plan("plasmids", truth, seqs)
