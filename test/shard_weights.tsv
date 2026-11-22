@@ -494,3 +494,11 @@ test_ai_routes2.py	6.0
 test_ai_hardening.py	6.0
 test_ai_ui_review.py	0.3
 test_ai_pane_logic.py	1.5
+test_ena_download.py	25
+test_depth_cap.py	12
+test_read_depth_cap_state.py	14
+test_download_scratch.py	6
+test_prefetch_history_and_diagnosis.py	1.5
+test_net_bench.py	25
+test_download_status.py	0.5
+test_stage1_downloads.sh	25

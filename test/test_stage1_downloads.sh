@@ -26,6 +26,7 @@ PORT="$(cat "$TMP/port")"
 mkdir -p "$TMP/bin"
 cat > "$TMP/bin/prefetch" <<EOF
 #!/usr/bin/env bash
+[[ "\$1" == "--version" ]] && { echo "prefetch : 3.0.0"; exit 0; }   # the history keys on the toolkit version: asking is not a download
 run=""
 while [[ \$# -gt 0 ]]; do case "\$1" in -O) shift 2;; *) run="\$1"; shift;; esac; done
 echo "\$run" >> "$TMP/prefetch_calls.log"
