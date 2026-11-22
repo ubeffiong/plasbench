@@ -14,14 +14,17 @@ stage_timing_begin 2        # stage_start/stage_end events, so `plasbench status
 fmt_dur() { local s="$1"; if (( s >= 3600 )); then printf '%dh%02dm' $((s / 3600)) $((s % 3600 / 60));
             elif (( s >= 60 )); then printf '%dm%02ds' $((s / 60)) $((s % 60)); else printf '%ds' "$s"; fi; }
 step_reset() { STEP_T0=$(date +%s); STEP_START=$STEP_T0; STEP_LOG=(); }
-step_mark() { local now; now=$(date +%s); STEP_LOG+=("$1:$(( now - STEP_T0 ))"); STEP_T0=$now; }
+# Each entry is name:seconds:awake_seconds; time the computer was asleep (RESULTS_DIR/.suspend_gaps) is in seconds but not in awake_seconds.
+step_mark() { local now asleep; now=$(date +%s); asleep="$(_pb_suspended_between "$STEP_T0" "$now")"; STEP_LOG+=("$1:$(( now - STEP_T0 )):$(( now - STEP_T0 - asleep ))"); STEP_T0=$now; }
 step_report() {
     local sample="$1" sdir="$2" e name secs slow=() total
     total=$(( $(date +%s) - STEP_START ))
-    { printf 'step\tseconds\n'; for e in "${STEP_LOG[@]+"${STEP_LOG[@]}"}"; do printf '%s\t%s\n' "${e%%:*}" "${e##*:}"; done
-      printf 'total\t%s\n' "$total"; } > "$sdir/stage2_timing.tsv" 2>/dev/null || true
+    local rest total_asleep
+    total_asleep="$(_pb_suspended_between "$STEP_START" "$(date +%s)")"
+    { printf 'step\tseconds\tawake_seconds\n'; for e in "${STEP_LOG[@]+"${STEP_LOG[@]}"}"; do rest="${e#*:}"; printf '%s\t%s\t%s\n' "${e%%:*}" "${rest%%:*}" "${rest##*:}"; done
+      printf 'total\t%s\t%s\n' "$total" "$(( total - total_asleep ))"; } > "$sdir/stage2_timing.tsv" 2>/dev/null || true
     for e in "${STEP_LOG[@]+"${STEP_LOG[@]}"}"; do
-        name="${e%%:*}"; secs="${e##*:}"
+        name="${e%%:*}"; rest="${e#*:}"; secs="${rest%%:*}"
         (( secs >= 10 )) && slow+=("$name $(fmt_dur "$secs")")
     done
     if (( total >= 10 )); then

@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 219 analysis modules, 28 registered tools and baselines (20 real tools), 220 registered
-outputs, 54 run switches, 495 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 224 analysis modules, 28 registered tools and baselines (20 real tools), 220 registered
+outputs, 55 run switches, 501 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -375,7 +375,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-219 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+224 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -605,6 +605,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | Module | What it does |
 |---|---|
 | `audit_three_class_scoring.py` | One-off three-class scoring audit (Phase E, Part 14 of the sibling-repo |
+| `awake_clock.py` | Computer sleep (suspend) bookkeeping: find the time a computer was asleep during a run and take it out of every "how long did this take" figure. |
 | `build_ai_kb.py` | Build the knowledge index of PlasBench's AI help (plasbench/data/ai_kb.json.gz). |
 | `build_publication_cohort_candidates.py` | Build CANDIDATE ledgers for three published plasmid-reconstruction cohorts. |
 | `build_publication_cohorts.py` | Build the publication cohorts: the isolates a published benchmark used, as runnable PlasBench cohorts. |
@@ -618,6 +619,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `generate_install_audit.py` | Write docs/TOOL_INSTALL_AUDIT.md from the registries (config/tool_installers.tsv, config/metagenomic_tool_installers.tsv, config/source_tools.json). |
 | `install_diagnosis.py` | Say WHY a package install failed when the cause is a read-only environment, in the style of assembler_diagnosis.py. |
 | `intake.py` | Bring your own isolates: get the sheet right, point at your folders, check that PlasBench can see and use what you have. |
+| `keep_awake.py` | Ask the operating system not to put the computer to sleep while a PlasBench run is active, and let go when the run ends or dies. |
 | `keep_report_inputs.py` | keep the small per-sample inputs the report needs inside the results folder. |
 | `make_demo_readqc.py` | SYNTHETIC short-read QC and assembly-candidate tables for the six isolates of the offline demonstration. Never for real data. |
 | `make_workflow_crate.py` | Build the Workflow RO-Crate that WorkflowHub registers: dist/plasbench-score.crate.zip. |
@@ -633,6 +635,9 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `resource_adapt.py` | Resource adaptation: classify why a tool failed for lack of a resource, choose ONE safe response, remember what an isolate needs. |
 | `run_consistency.py` | Do the run tables agree before anything is ranked? |
 | `run_multiqc.py` | Optional MultiQC companion: run `multiqc` over the fastp (and QUAST) outputs of a run into results/multiqc/. Never fails the run. |
+| `run_profile.py` | `plasbench profile-run`: where did the time of a run go? |
+| `run_profiles.py` | Run profiles: fast, standard and thorough (config/run_profiles.tsv). |
+| `run_sentinel.py` | The run's sentinel: one small background process that lives exactly as long as the run. |
 | `run_status.py` | What is this run doing right now, and why might it look stuck? |
 | `setting_ranges.py` | The one table of what each numeric Scoring-decision setting accepts (config/setting_ranges.tsv), and the checks built on it. |
 | `source_install.py` | Install the source-distributed tools PlasBench can run, pinned, isolated and verified. |
@@ -875,6 +880,7 @@ These `RUN_*` settings in `config/config.sh` turn an analysis on or off (1 = on)
 
 | Switch | Default | What it controls |
 |---|---|---|
+| `RUN_PROFILE` | `standard` | see the comment block above it in config/config.sh |
 | `RUN_TRUTH_LABEL_EVIDENCE` | `1` | see the comment block above it in config/config.sh |
 | `RUN_DIMER_DETECTION` | `1` | see the comment block above it in config/config.sh |
 | `RUN_RECOMMENDER_EVAL` | `1` | see the comment block above it in config/config.sh |

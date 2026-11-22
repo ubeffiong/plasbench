@@ -416,3 +416,46 @@ Evidence is from one real WSL2 run (6 CPUs, 7.8 GB, data on a 9p Windows drive);
 
 Audit of the other long steps (assumed unless a figure is given): ENA/SRA downloads print percentages and resume; prefetch and fasterq-dump have heartbeat labels and typical times in the table; fastp and SPAdes are labelled, SPAdes also names its phase;
 tool runs (stage 4) have no limit unless `TOOL_TIMEOUT_SECONDS` or `PLASBENCH_TOOL_TIMEOUT_PRESET` is set (a limit can score a slow tool zero, so it stays opt-in, announced at the start of stage 4); minimap2 alignment, scoring and the report build run under the stage heartbeat. Not measured: stage 4 to 8 durations on this machine.
+
+## Where the time goes: a measured 5-isolate laptop run (22 November 2026)
+
+Measured on the owner's laptop (WSL2, 6 CPUs, 6.9 GB free memory, data folder on a Windows drive seen through 9p), `public-v4 --max-isolates 5`, read from `results/run_events.jsonl`, the
+annotation logs and each isolate's `stage2_timing.tsv` with `plasbench profile-run`. Clock figures are measured; anything marked "estimated" is not.
+
+| Stage | Clock | Awake | Note |
+|---|---|---|---|
+| 1 download | 4 h 28 min | 4 h 28 min | one 9.5 GB isolate was 4 h 20 min of it (measured); the download code is being rewritten elsewhere |
+| 2 truth and reference annotation | 2 h 39 min | 2 h 39 min | 74% of the stage is reference annotation; per isolate 21 to 38 min |
+| 3 assemble (so far) | 3 h 12 min | 25 min | fastp showed 10,096 s: the computer slept for 2 h 47 min inside it (Windows Kernel-Power 42 at 00:46:12, resume 03:33:19); awake it was about 1 min |
+
+Reference annotation, the callers (they run at the same time, so the step takes as long as the slowest): ISEScan 38, 20, 22 (stopped at its limit) and 35 min on four isolates, 99% of the
+annotation time (1 h 56 min of 1 h 57 min). The "quick" callers took 5 to 22 min instead of 1 to 3 (abricate 46 to 444 s against a typical 13 s, barrnap about 300 s against 31 s): the callers were given
+13 threads on 6 CPUs (ISEScan all 6, AMRFinderPlus 3, the others 1 each) and read and wrote on the 9p drive. Three of them hit their time limit (mob_typer on three isolates, AMRFinderPlus and barrnap on one) and
+their results are missing (recorded as `timed_out`, never as zero); the limits were wall-clock, so a sleep inside the wait also counts against them. The `repeat_content` step of the 8.8 Mbp isolate took 32 min against
+5 to 43 s on the others, and started when Windows logged its connected-standby transitions (506/507 at 00:12): a possible pause that left no event (profile-run flags it as "possible", not as measured).
+
+What changed because of this (all in this change):
+
+| Change | Why, and what is measured |
+|---|---|
+| `KEEP_AWAKE=1` (default): the run asks the OS not to sleep (`python/keep_awake.py`, `run_sentinel.py`) | 2 h 47 min lost to one sleep. Verified on this laptop through WSL: powershell.exe holds `SetThreadExecutionState(ES_CONTINUOUS and ES_SYSTEM_REQUIRED)`, not the display, with no administrator rights (the shell was not elevated); the helper was gone within 8 s of a `kill -9` of the sentinel. Not verified: native Windows, macOS, systemd, Modern Standby under lid close or battery saver. |
+| Suspend detection, `system_suspend` event, `awake_seconds` | Every elapsed time, slow-step note, "no output for N min" figure and annotation time limit leaves the sleep out. WSL2's CLOCK_MONOTONIC was not tested across a real sleep (the owner's run was active, and sleeping the machine would have disturbed it); the detector uses the wall clock and works with either behaviour of the monotonic clock (tested with simulated clocks). |
+| `ISESCAN_SCOPE=plasmids` (default) | ISEScan searches only the replicons the truth labels plasmid; the chromosome is 90% or more of the bases. One measurement, noisy (measured under load: the owner's run was using the CPUs; nice 19, 2 threads): the 57 kb plasmid of the 3 Mbp S. aureus isolate took 211 s, so ISEScan has a start-up cost of minutes and the saving is less than proportional on isolates with large plasmids. A whole-genome time under the same load was not taken (it would have slowed the real run), so a before/after on one isolate under equal conditions is NOT measured; the real-run figure for that isolate is 1329 s (stopped at its limit) with 6 threads. |
+| Thread plan: ISEScan gets threads minus 2, AMRFinderPlus a third, the quick callers 1 each | 13 threads on 6 CPUs became 10 (estimated; not re-measured end to end). |
+| `plasbench profile-run`, end-of-run "Time spent", status "where the time went" | this table. |
+| Run profiles `fast`, `standard`, `thorough` | fast drops ISEScan and the advisory sweeps; thorough adds extras. Only ISEScan has a measured time; the rest is "not measured" in `config/run_profiles.tsv`. |
+| `config/step_typical.tsv` and the annotation callers' typical times re-based | measured on this laptop 2026-11-22 (upper figures: taken while oversubscribed). |
+
+What stayed the same: `MAX_PARALLEL_SAMPLES` and `MAX_PARALLEL_TOOLS` still default to 1, the scratch folder is still SPAdes-only (`python/work_dir.py`), and stages
+still run one after another. These are NOT done in this change; the measured case and design for each:
+
+* **Local working copy for stages 3 and 4 (and annotation).** The quick callers' 10x slowdown points at the 9p drive (or the oversubscription; the two are not separated), but no ext4-versus-9p timing of fastp, SPAdes or mob_recon
+  was taken: the real run was using every CPU, and a benchmark would have slowed it. Next step: extend `WORK_DIR` to fastp output and every tool's output folder with copy-in once and an atomic copy back, then measure on an idle machine.
+* **Adaptive parallelism.** CPU use in the real run: 260 to 430% of 600% during annotation (about 3 to 4 cores busy), 470 to 505% in SPAdes. Stages 5 and 6 were not reached, so no figure exists for scoring or the report.
+  Design: AUTO_PARALLEL=1 would size MAX_PARALLEL_SAMPLES from CPUs and free memory with the budget of `python/resource_adapt.py`, start with stage 2 (annotation across isolates, which is I/O-bound) and stage 5 scoring, keep assembly at 1 unless memory allows
+  (SPAdes used 2.1 GB RSS on a 273 MB read set here), divide threads by slots as `config.sh` does, and keep output order deterministic. Not implemented.
+* **Stage overlap.** Today `run_all.sh` runs each stage for all isolates. A per-isolate pipeline would run stage 2 for an isolate as soon as its stage-1 outputs exist, behind `PIPELINE_OVERLAP=1` (default off), with a bounded
+  producer and consumer, so annotation (CPU) overlaps the long download (network). On this run the 4 h 20 min download of the 9.5 GB isolate would have hidden about 1 h 20 min of the other four isolates' stage 2 (estimated from their measured stage-2 time). Risks: interleaved logs and events, the status panel assuming one stage at a time, resume
+  logic, disk use. Not implemented: the download code is changing concurrently and a half-tested overlap in `run_all.sh` is worse than none.
+
+Tests: `test_run_profile.py`, `test_suspend_awake.py`, `test_keep_awake.py`, `test_suspend_heartbeat.sh`, `test_isescan_scope.py`, `test_run_profiles.py`.
