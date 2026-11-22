@@ -21,7 +21,7 @@ RULES = [
          patterns=[r"Failed to create TLS stream", r"connection failed while opening file within cryptographic module"],
          plain="The SRA Toolkit's prefetch could not open a TLS (secure HTTPS) connection to NCBI (www.ncbi.nlm.nih.gov). That is a problem of the toolkit's own network set-up on this "
                "computer, not of the isolate; ENA (a European mirror of the same sequencing runs) and the NCBI Datasets service are separate connections and can still work. "
-               "PlasBench fetches the reads from ENA instead, checks them against ENA's checksums, and will not retry prefetch on every isolate for the next 24 hours.",
+               "PlasBench fetches the reads from ENA first anyway, checks them against ENA's checksums, and a prefetch that keeps failing is not retried on every isolate for the next 24 hours.",
          check="A proxy the toolkit does not know about (set HTTPS_PROXY, or `vdb-config --proxy host:port`); the system's CA certificates (on Ubuntu and WSL: `sudo apt install ca-certificates` "
                "then `sudo update-ca-certificates`); a VPN or firewall that inspects HTTPS; and `vdb-config -i` to look at the toolkit's own network settings. Running `prefetch SRR...` by hand "
                "shows the same message. A newer SRA Toolkit may behave differently; none of this is guaranteed to cure it."),
