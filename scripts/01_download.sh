@@ -137,7 +137,7 @@ verify_downloads() {
 # Every attempt is APPENDED to logs/<sample>.ena.log under a header with its number and time, so the message of an earlier failure is never overwritten.
 # Returns 0 when the reads are in place, 4 when ENA has no usable paired FASTQ for the run, 1 for any other failure (finished chunks stay on disk for the next attempt).
 fetch_from_ena() {
-    local sample="$1" run="$2" sdir="$3" total_bytes="${4:-}" ref="${5:-}"
+    local sample="$1" run="$2" sdir="$3" ref="${5:-}"   # $4 (the size to download) is no longer needed: the downloader reports its own totals
     local interval="${DOWNLOAD_PROGRESS_SECONDS:-30}" waited=0 pid rc attempt logf="$LOG_DIR/${sample}.ena.log"
     [[ "$interval" =~ ^[0-9]+$ ]] || interval=30
     attempt=$(( $(grep -c '^===== attempt ' "$logf" 2>/dev/null || true) + 1 ))
