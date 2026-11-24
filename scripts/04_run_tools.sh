@@ -155,7 +155,7 @@ classify_failure() {
 with_budget() {
     if [[ -n "${TOOL_TIMEOUT_SECONDS:-}" ]]; then
         if command -v timeout >/dev/null 2>&1; then
-            timeout "$TOOL_TIMEOUT_SECONDS" "$@"
+            awake_timeout "$TOOL_TIMEOUT_SECONDS" "$@"      # the limit counts awake time: a sleep is not the tool's slowness
             return
         fi
         # A limit was asked for but cannot be applied: say so (once per process) instead of silently running without it, which would break "the same budget for every tool".
