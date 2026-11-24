@@ -5,7 +5,7 @@
 # contract now matches stage 3 (see test_assemble_parallel.sh): record the
 # failure, carry on with the remaining samples, and abort only when NOTHING
 # downloaded, since only then is there nothing to benchmark.
-# MAX_PARALLEL_SAMPLES>1 must additionally overlap downloads for real.
+# MAX_PARALLEL_DOWNLOADS>1 must additionally overlap downloads for real (stage 1 has its own setting now; MAX_PARALLEL_SAMPLES governs stages 2 to 5 -- changed deliberately).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
@@ -56,10 +56,10 @@ now_ms() { date +%s%N | cut -c1-13; }
 mkdir -p "$TMP/data" "$TMP/logs"
 printf 'sample_id\tassembly_accession\tsra_run\ns1\tNA\tSRR1\ns2\tNA\tSRR2\ns3\tNA\tSRR3\n' > "$TMP/sheet.tsv"
 
-# --- default (MAX_PARALLEL_SAMPLES=1): one failed sample must not abort the
+# --- default (MAX_PARALLEL_DOWNLOADS=1): one failed sample must not abort the
 # stage, and its siblings must still be downloaded. ---
 : > "$TMP/prefetch_calls.log"
-run_stage env FAIL_SRA=SRR1 MAX_PARALLEL_SAMPLES=1 || {
+run_stage env FAIL_SRA=SRR1 MAX_PARALLEL_DOWNLOADS=1 || {
     echo "FAIL: one failed sample among others should not abort the stage" >&2
     cat "$TMP/stage.log" >&2; exit 1; }
 # A failing fetch is retried before the sample is given up on, so the call log
@@ -78,18 +78,18 @@ awk -F'\t' '$1=="s1" && $2=="failed"' "$TMP/results/download_status.tsv" | grep 
     cat "$TMP/results/download_status.tsv" >&2; exit 1; }
 [[ -s "$TMP/data/s2/SRR2_1.fastq.gz" && -s "$TMP/data/s3/SRR3_1.fastq.gz" ]] || {
     echo "FAIL: sibling samples should still have downloaded reads" >&2; exit 1; }
-echo "MAX_PARALLEL_SAMPLES=1 (default) tolerates one failed download and still fetches its siblings -> PASS"
+echo "MAX_PARALLEL_DOWNLOADS=1 (default) tolerates one failed download and still fetches its siblings -> PASS"
 
 # --- every sample failing is the one case that does abort the stage ---
 rm -rf "$TMP/data" "$TMP/results"; mkdir -p "$TMP/data"
-if run_stage env FAIL_ALL=1 MAX_PARALLEL_SAMPLES=1; then
+if run_stage env FAIL_ALL=1 MAX_PARALLEL_DOWNLOADS=1; then
     echo "FAIL: stage should abort when no sample downloaded at all" >&2; cat "$TMP/stage.log" >&2; exit 1
 fi
 grep -qi "no sample downloaded successfully" "$TMP/stage.log" || {
     echo "FAIL: expected a clear nothing-to-benchmark error" >&2; cat "$TMP/stage.log" >&2; exit 1; }
 echo "stage aborts only when every download fails -> PASS"
 
-# --- parallel (MAX_PARALLEL_SAMPLES=3): overlap must be real, and a failure
+# --- parallel (MAX_PARALLEL_DOWNLOADS=3): overlap must be real, and a failure
 # in one sample must not silently swallow the others or the overall failure. ---
 # Concurrency is asserted by observing OVERLAP, not by comparing wall-clock
 # times. On a loaded or single-core machine three concurrent jobs can finish
@@ -99,35 +99,35 @@ echo "stage aborts only when every download fails -> PASS"
 # concurrently and every fetch should have STARTed before the first one ENDed.
 rm -rf "$TMP/data"; mkdir -p "$TMP/data"
 : > "$TMP/prefetch_calls.log"; : > "$TMP/prefetch_events.log"
-run_stage env MAX_PARALLEL_SAMPLES=1 || { echo "FAIL: sequential baseline (no failures) should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
+run_stage env MAX_PARALLEL_DOWNLOADS=1 || { echo "FAIL: sequential baseline (no failures) should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
 sequential_events="$(tr "
 " " " < "$TMP/prefetch_events.log")"
 case "$sequential_events" in
     "START SRR1 END SRR1 START SRR2 END SRR2 START SRR3 END SRR3 ") ;;
-    *) echo "FAIL: MAX_PARALLEL_SAMPLES=1 should fetch strictly one at a time, saw: $sequential_events" >&2; exit 1 ;;
+    *) echo "FAIL: MAX_PARALLEL_DOWNLOADS=1 should fetch strictly one at a time, saw: $sequential_events" >&2; exit 1 ;;
 esac
 
 rm -rf "$TMP/data"; mkdir -p "$TMP/data"
 : > "$TMP/prefetch_calls.log"; : > "$TMP/prefetch_events.log"
-run_stage env MAX_PARALLEL_SAMPLES=3 || { echo "FAIL: parallel run (no failures) should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
+run_stage env MAX_PARALLEL_DOWNLOADS=3 || { echo "FAIL: parallel run (no failures) should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
 for s in s1 s2 s3; do
     [[ -s "$TMP/data/$s/SRR${s#s}_1.fastq.gz" ]] || { echo "FAIL: sample $s missing downloaded reads" >&2; exit 1; }
 done
 # How many fetches were open at once?
 peak_concurrent=$(awk '$1=="START"{n++; if (n>max) max=n} $1=="END"{n--} END{print max+0}' "$TMP/prefetch_events.log")
 [[ "$peak_concurrent" -ge 2 ]] || {
-    echo "FAIL: MAX_PARALLEL_SAMPLES=3 never had more than $peak_concurrent fetch in flight;" >&2
+    echo "FAIL: MAX_PARALLEL_DOWNLOADS=3 never had more than $peak_concurrent fetch in flight;" >&2
     echo "      the downloads were not actually overlapped." >&2
     cat "$TMP/prefetch_events.log" >&2; exit 1
 }
-echo "MAX_PARALLEL_SAMPLES=3 overlaps independent downloads (peak ${peak_concurrent} in flight; sequential never exceeds 1) -> PASS"
+echo "MAX_PARALLEL_DOWNLOADS=3 overlaps independent downloads (peak ${peak_concurrent} in flight; sequential never exceeds 1) -> PASS"
 
 # Now with one sample deliberately failing: the other two must still finish
 # (concurrency means their downloads were already in flight), and the stage
 # must still exit non-zero and name the failed sample.
 rm -rf "$TMP/data"; mkdir -p "$TMP/data"
 : > "$TMP/prefetch_calls.log"
-run_stage env FAIL_SRA=SRR2 MAX_PARALLEL_SAMPLES=3 || {
+run_stage env FAIL_SRA=SRR2 MAX_PARALLEL_DOWNLOADS=3 || {
     echo "FAIL: one failed sample should not abort a concurrent stage either" >&2
     cat "$TMP/stage.log" >&2; exit 1; }
 grep -q "s2" "$TMP/stage.log" || { echo "FAIL: failure report did not name the failed sample (s2)" >&2; cat "$TMP/stage.log" >&2; exit 1; }

@@ -292,6 +292,23 @@ def reads_size(data_dir, sample):
     return total
 
 
+def active_downloads(results_dir, now):
+    """Reads being downloaded now, from results/download_progress.json (written by python/fetch_ena_reads.py: bytes actually received): [{run, line, state, done_bytes, total_bytes}]."""
+    try:
+        with open(os.path.join(str(results_dir), "download_progress.json"), encoding="utf-8") as handle:
+            entries = json.load(handle).get("isolates", {})
+    except (OSError, ValueError, AttributeError):
+        return []
+    out = []
+    for run, e in entries.items():
+        try:
+            if e.get("state") in ("downloading", "stalled", "verifying", "moving") and now - float(e.get("updated", 0)) < 300:
+                out.append({"run": run, "sample": e.get("sample", ""), "line": e.get("line", ""), "state": e.get("state"), "done_bytes": e.get("done_bytes", 0), "total_bytes": e.get("total_bytes", 0)})
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def summarize(results_dir, log_dir=None, data_dir=None, now=None, procs=None, mach=None):
     """Everything status/diagnose knows, as one dict (also what --json prints)."""
     now = time.time() if now is None else now
@@ -431,6 +448,7 @@ def summarize(results_dir, log_dir=None, data_dir=None, now=None, procs=None, ma
                 summary["newest_log"]["last_line"] = lines[-1][:200] if lines else ""
             except OSError:
                 pass
+    summary["downloads"] = active_downloads(results_dir, now)
     summary["adjustments"] = [{"sample": e.get("sample", ""), "tool": e.get("tool", ""), "what": e.get("what", ""), "message": e.get("message", ""), "from": e.get("from", ""),
                                "to": e.get("to", "")} for e in events if e["event"] == "resource_adjust"][-10:]
     summary["assembly_failures"] = assembly_failures(results_dir, log_dir)
@@ -492,7 +510,8 @@ def hints(s):
     reads = s.get("reads_bytes") or 0
     if reads > BIG_READS_BYTES:
         out.append(f"This isolate's reads are {human_bytes(reads)} compressed (above {human_bytes(BIG_READS_BYTES)}). Trimming and assembling a read set that large can take many hours and "
-                   "a great deal of memory. MAX_RUN_DOWNLOAD_GB skips such isolates at download; stopping the run and removing this isolate from the sheet is the other way out.")
+                   "a great deal of memory. PlasBench does not skip an isolate for its size. READ_DEPTH_CAP_X (default 150) downloads only the first read pairs of a run deeper than that, "
+                   "when the reference size is known; if this set was downloaded whole, delete its two .fastq.gz files and run again, or set READ_DEPTH_CAP_X lower.")
     avail = m.get("mem_avail_mb")
     if avail is not None and avail < 500:
         out.append(f"Only {avail} MB of memory is available on this computer: a tool may be killed (exit 137) or crawl. Lower THREADS or ASSEMBLY_MEMORY_GB.")
@@ -553,6 +572,8 @@ def render(s, diagnose=False):
     elif s.get("last_event"):
         e = s["last_event"]
         lines.append(f"  last event {human_seconds(s['seconds_since_event'] or 0)} ago: {e.get('event')} {e.get('what') or e.get('sample') or ''}".rstrip())
+    for d in s.get("downloads") or []:
+        lines.append(f"  download: {d['line']}")
     for name, p in (s.get("progress") or {}).items():
         lines.append(f"  {name}: {p['ok']} of {p['rows']} ok" + (f", {p['failed']} failed" if p["failed"] else ""))
     for gap in s.get("suspends") or []:

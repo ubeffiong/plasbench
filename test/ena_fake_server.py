@@ -5,7 +5,8 @@
 
 Writes the port it listens on to PORT_FILE and serves until killed. Runs named SRR1..SRR9 return a small paired read set (each file is a few hundred bytes, the MD5
 and size in the report are true). A run named SRRBIG reports 12 GB per file without serving anything, to exercise the size gate. DELAY_SECONDS holds each FASTQ
-response back, so a download lasts long enough for the progress lines.
+response back, so a download lasts long enough for the progress lines. Runs named SRRNOFQ* have no FASTQ in ENA (empty file report: the SRA Toolkit is the only way);
+runs named SRRFAIL* list files whose download always answers 500 (ENA fails after its retries).
 """
 import hashlib
 import http.server
@@ -30,7 +31,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if parsed.path.endswith("/filereport"):
             run = urllib.parse.parse_qs(parsed.query).get("accession", [""])[0]
             host = f"127.0.0.1:{self.server.server_address[1]}"
-            if run == "SRRBIG":
+            if run.startswith("SRRNOFQ"):
+                body = ("run_accession\tfastq_ftp\tfastq_md5\tfastq_bytes\tlibrary_layout\n"
+                        f"{run}\t\t\t\tPAIRED\n")
+            elif run == "SRRBIG":
                 big = 12_000_000_000
                 body = ("run_accession\tfastq_ftp\tfastq_md5\tfastq_bytes\tlibrary_layout\n"
                         f"{run}\t{host}/f/{run}_1.fastq.gz;{host}/f/{run}_2.fastq.gz\t{'0' * 32};{'0' * 32}\t{big};{big}\tPAIRED\n")
@@ -48,6 +52,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if "/f/" in parsed.path:
             name = parsed.path.rsplit("/", 1)[1]
             run, mate = name.split("_")[0], name.split("_")[1][0]
+            if run.startswith("SRRFAIL"):
+                self.send_response(500)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
             data = content(run, mate)
             time.sleep(DELAY)
             self.send_response(200)

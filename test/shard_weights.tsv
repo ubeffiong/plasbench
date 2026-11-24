@@ -476,6 +476,7 @@ test_resource_adapt.py	12.0
 test_stop_all.py	40.0
 test_publishing.py	3.0
 test_no_conflict_markers.py	1.0
+test_console_scroll.py	2.0
 test_support_tools.py	2.0
 test_ai_kb.py	25.0
 test_ai_prompt.py	1.5
@@ -494,6 +495,15 @@ test_ai_routes2.py	6.0
 test_ai_hardening.py	6.0
 test_ai_ui_review.py	0.3
 test_ai_pane_logic.py	1.5
+test_ena_download.py	25
+test_depth_cap.py	12
+test_read_depth_cap_state.py	14
+test_download_scratch.py	6
+test_prefetch_history_and_diagnosis.py	1.5
+test_net_bench.py	25
+test_download_status.py	0.5
+test_stage1_downloads.sh	25
+test_ena_real_network.py	0.3
 test_run_profile.py	1.0
 test_suspend_awake.py	3.0
 test_keep_awake.py	8.0
