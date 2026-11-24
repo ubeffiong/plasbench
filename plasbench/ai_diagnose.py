@@ -22,8 +22,9 @@ from .ai_folder import clean
 
 DIGEST_TOKEN_CAP = 700
 DIGEST_CHAR_CAP = int(DIGEST_TOKEN_CAP * 3.6)
-TAIL_LINES = 12
+TAIL_LINES = 8
 EVIDENCE_LINES = 4
+EVIDENCE = re.compile(r"error|fail|killed|exception|traceback|not found|denied|no space|refused|timed? ?out|abort|cannot|could not|exit (status|code)|MemoryError|bad_alloc", re.I)
 STAGE_WORDS = {"0": "set-up and input checks", "1": "download of reads and references", "2": "truth labels from the references", "3": "assembly of the short reads",
                "4": "the plasmid tools", "5": "scoring against the truth", "6": "aggregation, statistics and the report", "7": "long-read reconstruction (optional)",
                "8": "operational reconstruction (optional)", "9": "the final report"}
@@ -206,9 +207,15 @@ def digest(project, diagnose_output: str = "", failed: dict = None) -> dict:
     causes = classify(project, raw_tail + "\n" + "\n".join(str(h) for h in (s.get("hints") or [])), code)
     for c in causes:
         lines.append("Cause [%s] %s: %s%s" % (c["source"], c["code"], _line(c["title"], 140), (" | evidence: " + _line(c["evidence"], 160)) if c.get("evidence") else ""))
-    if tail.strip():
+    marked = [x for x in ai_actions.redact_output(raw_tail, 400, 20000).splitlines() if EVIDENCE.search(x)]
+    shown_tail = [x for x in tail.splitlines()[-TAIL_LINES:] if x.strip()]
+    evidence = [x for x in marked if x not in shown_tail][-EVIDENCE_LINES:]
+    if evidence:
+        lines.append("Evidence lines from the log (redacted):")
+        lines.extend(_line(x, 200) for x in evidence)
+    if shown_tail:
         lines.append("Log tail (last %d lines, redacted):" % TAIL_LINES)
-        lines.extend(_line(x, 200) for x in tail.splitlines()[-TAIL_LINES:] if x.strip())
+        lines.extend(_line(x, 200) for x in shown_tail)
     if len(lines) == 1:
         lines.append("Nothing to go on: no diagnosis output and no failed command were given.")
     text = "\n".join(lines)
