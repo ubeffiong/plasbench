@@ -312,6 +312,18 @@ try:
 except FolderError as exc:
     check("Apply refuses a plan that is not the one reviewed", "changed since you reviewed" in str(exc))
 check("nothing was written by the refused Apply", not (tmp / "config" / "fp.tsv").exists())
+print("the run card works on such a sheet: --local-inputs with a sheet of your own isolates needs no REQUIRE_CURATED_METADATA=0 in front")
+own, cur = tmp / "own.tsv", tmp / "cur.tsv"
+own.write_text("\t".join(["sample_id", "assembly_accession", "sra_run", "organism"]) + "\nA\tNA\tA\t\n", encoding="utf-8")
+cur.write_text("\t".join(["sample_id", "assembly_accession", "sra_run", "organism", "truth_technology", "truth_quality_tier", "biosample", "bioproject"])
+               + "\nA\tGCF_1\tSRR1\tE\thybrid\tA\tB\tP\n", encoding="utf-8")
+env = {k: v for k, v in os.environ.items() if k != "REQUIRE_CURATED_METADATA"}
+for sheet, script in ((own, tmp / "own.sh"), (cur, tmp / "cur.sh")):
+    subprocess.run([sys.executable, "-m", "plasbench", "run", "--samples", str(sheet), "--local-inputs", "--results-dir", str(tmp / ("r_" + sheet.stem)), "--write-script", str(script)],
+                   cwd=str(ROOT), capture_output=True, text=True, timeout=300, env=env)
+check("a sheet with only sample_id, assembly_accession, sra_run (and organism) runs with REQUIRE_CURATED_METADATA=0", script.parent.joinpath("own.sh").is_file()
+      and "REQUIRE_CURATED_METADATA=0" in (tmp / "own.sh").read_text(encoding="utf-8"))
+check("a sheet with curated columns is still checked in full", (tmp / "cur.sh").is_file() and "REQUIRE_CURATED_METADATA" not in (tmp / "cur.sh").read_text(encoding="utf-8"))
 shutil.rmtree(tmp, ignore_errors=True)
 print("PASS" if ok else "FAIL")
 sys.exit(0 if ok else 1)
