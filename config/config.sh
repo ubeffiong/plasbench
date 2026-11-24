@@ -356,6 +356,9 @@ plasbench_default_budget_gb() {
 # the slots cannot make every job ask for every core at once (oversubscription:
 # context switching and cache thrashing, slower than fewer jobs). With the default
 # single slot this is all cores, as before; an explicit THREADS always wins.
+# Which of these YOU set (AUTO_PARALLEL never changes an explicit value). Recorded once, by the first config.sh of a run, and inherited by every stage.
+export PLASBENCH_THREADS_EXPLICIT="${PLASBENCH_THREADS_EXPLICIT:-$([[ -n "${THREADS:-}" ]] && echo 1 || echo 0)}"
+export PLASBENCH_SAMPLES_EXPLICIT="${PLASBENCH_SAMPLES_EXPLICIT:-$([[ -n "${MAX_PARALLEL_SAMPLES:-}" ]] && echo 1 || echo 0)}"
 if [[ -z "${THREADS:-}" ]]; then
     PLASBENCH_JOB_SLOTS=$(( ${MAX_PARALLEL_SAMPLES:-1} * ${MAX_PARALLEL_TOOLS:-1} ))
     [[ "$PLASBENCH_JOB_SLOTS" -ge 1 ]] || PLASBENCH_JOB_SLOTS=1
@@ -411,6 +414,13 @@ export SUSPEND_MIN_SECONDS="${SUSPEND_MIN_SECONDS:-60}"
 # machine's core/RAM budget below can actually support it -- e.g. 2 parallel
 # samples x 2 parallel tools x THREADS=4 wants 16 CPU threads at once.
 export MAX_PARALLEL_SAMPLES="${MAX_PARALLEL_SAMPLES:-1}"   # stages 2, 3, 4, 5
+# AUTO_PARALLEL (default 1; 0 = off): when you have not set MAX_PARALLEL_SAMPLES, stages 2 (truth and reference annotation) and 5 (scoring) run several isolates at once,
+# sized to this computer's CPUs and free memory, and the threads are DIVIDED between them (never more threads than CPUs); stage 3 (assembly) stays at one isolate unless the
+# free memory holds two assemblies or more; stage 4 is unchanged. The plan is printed at the start of the run and of each stage. Results are identical (python/parallel_plan.py).
+export AUTO_PARALLEL="${AUTO_PARALLEL:-1}"
+# ASSEMBLY_SLOT_GB (default 8): the memory one assembly is assumed to need when the run has not learned it yet; AUTO_PARALLEL runs two assemblies at once only when
+# two of these (plus 15% and 0.5 GB each) fit in 85% of the free memory.
+export ASSEMBLY_SLOT_GB="${ASSEMBLY_SLOT_GB:-8}"
 # Isolates downloaded at the same time in stage 1 (default 1). Keep 1 while one isolate already fills your link (see the MB/s lines or `plasbench net-bench`); to try 2 or 3 raise it
 # and compare the MB/s. ENA_MAX_CONNECTIONS is still the total: each download gets its share.
 export MAX_PARALLEL_DOWNLOADS="${MAX_PARALLEL_DOWNLOADS:-1}"

@@ -30,6 +30,7 @@ source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 need fastp
 stage_timing_begin 3        # stage_start/stage_end events, so `plasbench status` knows this is stage 3
+auto_parallel_apply 3       # AUTO_PARALLEL: one assembly at a time unless the free memory holds more (python/parallel_plan.py)
 preflight_resources 3 quiet
 warn_resource_oversubscription "stage 3 (assembly)" "$MAX_PARALLEL_SAMPLES" "$THREADS" "$ASSEMBLY_MEMORY_GB"
 

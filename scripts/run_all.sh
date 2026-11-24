@@ -57,6 +57,15 @@ acquire_run_lock "run_all.sh stages ${STAGES[*]}"
 run_event run_start "stages=${STAGES[*]}" "log=${_CONSOLE_LOG_FILE:-}"
 while IFS= read -r _profile_line; do log "$_profile_line"; done < <(python3 -I "$HERE/../python/run_profiles.py" plan "${RUN_PROFILE:-standard}" 2>/dev/null || true)
 run_event run_profile "profile=${RUN_PROFILE:-standard}"
+# AUTO_PARALLEL: the isolates-at-a-time plan, said once at the start (each stage says it again when it applies it; an explicit MAX_PARALLEL_SAMPLES or AUTO_PARALLEL=0 skips this)
+if [[ "${AUTO_PARALLEL:-1}" == "1" && "${PLASBENCH_SAMPLES_EXPLICIT:-0}" != "1" && -f "${SAMPLE_SHEET:-}" ]]; then
+    _pb_n="$(read_samples "$SAMPLE_SHEET" 2>/dev/null | awk 'NF' | wc -l | tr -d '[:space:]')"
+    if [[ "$_pb_n" =~ ^[0-9]+$ && "$_pb_n" -gt 1 ]]; then
+        log "Concurrency (AUTO_PARALLEL=1; AUTO_PARALLEL=0 or MAX_PARALLEL_SAMPLES=N sets it yourself):"
+        while IFS= read -r _plan_line; do log "  $_plan_line"; done < <(python3 -I "$HERE/../python/parallel_plan.py" summary --cpus "${PLASBENCH_TEST_CPUS:-$(plasbench_detect_cores)}" \
+            --available-mb "${PLASBENCH_TEST_AVAILABLE_MB:-$(plasbench_detect_memory_mb)}" --isolates "$_pb_n" --slot-gb "${ASSEMBLY_SLOT_GB:-8}" --profile "$RESULTS_DIR/resource_profile.tsv" 2>/dev/null || true)
+    fi
+fi
 _pb_sentinel_start          # keeps the computer awake while this run is active (KEEP_AWAKE=0 turns that off) and records any time it was asleep
 rm -f "$RESULTS_DIR/.completed_with_warnings"
 if [[ -s "$RUN_MARK" ]]; then
