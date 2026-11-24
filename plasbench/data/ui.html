@@ -2211,7 +2211,7 @@ const rsGB = mb => mb == null || isNaN(mb) ? "" : mb >= 1024 ? `${(mb / 1024).to
 const rsCores = n => { n = +n; return n >= 1.5 ? String(Math.round(n * 10) / 10) : n >= 0.15 ? "1" : "0"; };
 function rsLines(d, s) {
   const pr = (s && s.progress) || {}, ps = d.processes || {}, m = rsPick(d, "machine", "system") || {}, nl = rsPick(d, "newest_log", "log") || {};
-  const stage = d.stage != null && d.stage !== "" ? `Stage ${d.stage}${pr.current_name ? " " + pr.current_name : ""}` : "";
+  const stage = d.stage != null && d.stage !== "" ? `Stage ${d.stage}${pr.current_name ? ": " + pr.current_name : ""}` : "";
   const iso = pr.isolates && pr.isolates_in_stage ? `isolate ${pr.isolates_in_stage} of ${pr.isolates}` : (d.sample ? `isolate ${d.sample}` : "");
   const on = d.step_seconds != null ? `${rsDur(d.step_seconds)} on this step${d.step_typical_seconds ? ` (typical about ${rsDur(d.step_typical_seconds)})` : ""}` : "";
   const now = [stage, iso, d.step || "", on].filter(Boolean).join(" · ");
@@ -2305,7 +2305,7 @@ document.addEventListener("click", e => {
   if (b.dataset.stAct === "activity") checkActivity(S.consJob);
   else $("#ccancel").click();
 });
-const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted", stalled:"No new output (may still be working)", working_quiet:"Working (quiet log)", retrying:"Retrying a failed tool", completed_with_warnings:"Completed with warnings", manual_step:"Manual step needed", consent_needed:"Consent needed", waiting_for_you:"Waiting for you to finish"})[s] || s;
+const stateWord = s => ({running:"Working", cancelling:"Cancelling", done:"Done", completed:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Needs attention", stalled:"Needs attention", working_quiet:"Working, console quiet", retrying:"Retrying a failed tool", completed_with_warnings:"Done with warnings", manual_step:"Manual step needed", consent_needed:"Consent needed", waiting_for_you:"Waiting for you to finish"})[s] || s;
 function showConsole(id, expand) {
   if (id && id !== S.consJob) { S.consJob = id; S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; setFollow(true); }
   $("#cjob").value = S.consJob || "";
@@ -4690,7 +4690,8 @@ function renderWizard() {
       ${W.source === "cohort" || W.source === "sheet" ? `<div class="card" style="margin-top:12px"><div class="hd"><h3>How many isolates</h3><span class="sub">optional</span></div><div class="bd">
         <div class="field"><label for="w_max_isolates">Run only${argTip("run", "max_isolates")}</label><div class="ctl"><input type="number" min="1" step="1" id="w_max_isolates" data-dest="max_isolates" value="${esc(V.max_isolates || "")}" placeholder="all" style="max-width:120px"><span class="mut small">isolates${W.source === "cohort" && cohorts.find(c => c.name === V.cohort) ? ` of ${cohorts.find(c => c.name === V.cohort).rows}` : ""}</span></div>
         </div>
-        <div class="field"><label>Which isolates${argTip("run", "isolate_order")}</label><div class="ctl"><select id="w_isolate_order" data-dest="isolate_order"><option value="">balanced (recommended)</option><option value="file" ${V.isolate_order === "file" ? "selected" : ""}>the first rows in the sheet</option></select></div></div></div></div>` : ""}
+        <div class="field"><label>Which isolates${argTip("run", "isolate_order")}</label><div class="ctl"><select id="w_isolate_order" data-dest="isolate_order"><option value="">balanced (recommended)</option><option value="file" ${V.isolate_order === "file" ? "selected" : ""}>the first rows in the sheet</option></select></div></div>
+        <div class="field"><label for="w_profile">How thorough${argTip("run", "profile")}</label><div class="ctl"><select id="w_profile" data-dest="profile"><option value="">standard (default)</option><option value="fast" ${V.profile === "fast" ? "selected" : ""}>fast: skips optional analyses, same leaderboard</option><option value="thorough" ${V.profile === "thorough" ? "selected" : ""}>thorough: adds optional extras</option></select></div></div></div></div>` : ""}
       ${W.source !== "demo" ? `<div class="card" style="margin-top:12px"><div class="hd"><h3>Study folder</h3><span class="sub">everything this benchmark produces goes here</span></div><div class="bd">
         <div class="field"><label for="wstudy">Study name${wizTip("study")}</label><div class="ctl"><input type="text" id="wstudy" value="${esc(V.study || "")}" placeholder="${esc(wizDefaultStudy())}"></div>
         <div class="help" id="wstudyhelp">${esc(studyWhere())}</div></div>
