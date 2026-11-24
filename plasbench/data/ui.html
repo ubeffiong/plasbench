@@ -1899,7 +1899,7 @@ function runVerdict(s) {
 function sessCard(s) {
   const pr = s.progress || {}, open = S.sessOpen.has(s.id);
   const dur = fmtDur((s.ended || Date.now() / 1000) - s.started);
-  const chip = {ongoing: s.state === "cancelling" ? "Cancelling" : s.display_state === "stalled" ? (quietWorking(s.id, "stalled") ? "Working, console quiet" : "Needs attention") : s.display_state === "retrying" ? "Retrying a failed tool" : "Working", completed: s.display_state === "completed_with_warnings" ? "Done with warnings" : "Done"}[s.group] || ({failed: "Failed", interrupted: "Needs attention", cancelled: "Cancelled"}[s.state] || s.state);
+  const chip = {ongoing: s.state === "cancelling" ? "Cancelling" : s.display_state === "stalled" ? (quietWorking(s.id, "stalled") ? "Working, console quiet" : "Needs attention") : s.display_state === "working_quiet" ? "Working, console quiet" : s.display_state === "retrying" ? "Retrying a failed tool" : "Working", completed: s.display_state === "completed_with_warnings" ? "Done with warnings" : "Done"}[s.group] || ({failed: "Failed", interrupted: "Needs attention", cancelled: "Cancelled"}[s.state] || s.state);
   const pct = s.group === "completed" ? 100 : pr.percent;
   const bar = s.group === "ongoing" && pct == null ? `<div class="sbar ind"><i></i></div>` : `<div class="sbar"><i style="width:${pct == null ? (s.group === "attention" ? 8 : 0) : pct}%"></i></div>`;
   const run = s.run_index != null ? (S.runs || [])[s.run_index] : null;
@@ -2283,7 +2283,7 @@ const quietWorking = (id, shown) => shown === "stalled" && S.act[id] && S.act[id
 function activityHTML(a) {
   if (!a) return "";
   if (a.error) return `<div class="small bad-t">${esc(a.error)}</div>`;
-  const head = a.status === "active" ? `Files are being written (something changed in the last 3 minutes): the run is working, its log is just quiet.` : `Nothing has been written in the last 3 minutes. If this lasts, check the tool's own log, or cancel and resume.`;
+  const why = a.evidence && a.evidence.why ? a.evidence.why : "", head = a.status === "active" ? (why ? `The run is working: ${why}. Its console is just quiet.` : `Files are being written (something changed in the last 3 minutes): the run is working, its log is just quiet.`) : `Nothing was written to the results, data, log or working folders in the last 3 minutes, and the run's processes are idle. If this lasts, check the tool's own log, or cancel and resume.`;
   const list = (a.files || []).slice(0, 8).map(f => `<li>${esc(f.path)} · ${esc(fmtSize(f.size))} · ${esc(fmtDur(f.age_seconds))} ago</li>`).join("");
   return `<div class="small"><b>${esc(head)}</b></div>${list ? `<ul>${list}</ul>` : ""}${a.truncated ? `<div class="small mut">Only the first ${a.walked} entries were examined.</div>` : ""}`;
 }
@@ -2349,7 +2349,7 @@ async function pollConsole(force) {
     const st = $("#cstate"); st.className = j.display_state || j.state;
     const shown0 = quietWorking(j.id, j.display_state) ? "working_quiet" : (j.display_state || j.state);
     st.textContent = stateWord(shown0) + (j.exit != null && j.state !== "done" ? ` (exit ${j.exit})` : "");
-    st.title = j.display_state === "stalled" ? STALL_TEXT(j.idle_seconds) : "";
+    st.title = j.display_state === "stalled" ? STALL_TEXT(j.idle_seconds) : j.display_state === "working_quiet" ? "The console is quiet, but the run's tools write to their own logs and are working (Check activity shows what changed)." : "";
     if (j.display_state === "stalled") { const fresh = !S._stallJob || S._stallJob.id !== j.id; S._stallJob = {id: j.id, idle: j.idle_seconds, results: j.results || ""}; if (j.results && !S.rs[j.results]) rsFetch(j.results).then(() => paintStall()); if (fresh && !S.act[j.id]) checkActivity(j.id); paintStall(); }
     else if (S._stallJob) { S._stallJob = null; paintStall(); }
     $("#ccancel").hidden = j.state !== "running";
