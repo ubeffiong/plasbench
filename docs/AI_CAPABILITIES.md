@@ -7,7 +7,7 @@ This page is for the AI help and for people. Every statement below is taken from
 <!-- source: README.md (opening paragraphs, "PlasBench does / does not" table), docs/SCIENTIFIC_GUIDE.md sections 1 and 17 -->
 PlasBench benchmarks how well plasmid-reconstruction tools recover plasmids, using complete long-read or hybrid assemblies as ground truth. It compares tools on a common footing and shows how and where each fails. It does **not** identify, cluster or classify the plasmids in your own sample, annotate or interpret them, infer transmission, outbreaks or horizontal gene transfer, or prove that a plasmid is closed or clinically meaningful. The shipped cohorts are small and taxonomically narrow and there is no laboratory confirmation.
 
-## The pipeline stages
+## The pipeline stages (0 to 9)
 
 <!-- source: config/workflow_steps.tsv -->
 `plasbench run` goes through these stages, each with switches on the Workflow page:
@@ -22,6 +22,33 @@ PlasBench benchmarks how well plasmid-reconstruction tools recover plasmids, usi
 - **7 Long-read and hybrid tools**: optional tools that need long reads.
 - **8 Operational reconstruction**: reconstructs plasmids for one new isolate with the best-ranked tool (a separate command).
 - **9 Metagenomics track**: a separate track that scores normalised community outputs.
+
+## Optional switches on the Workflow page
+
+<!-- source: config/workflow_steps.tsv (setting_key, default, cli_flag), config/config.sh -->
+Each stage has a core step that always runs and optional items, each tied to one setting you switch on or off on the Workflow page (saved in `config/local.env`):
+
+- **Stage 2 truth evidence**: `RUN_REFERENCE_ANNOTATION` and one switch per annotation caller (`ANNOTATE_WITH_MOB_TYPER`, `ANNOTATE_WITH_ABRICATE`, `ANNOTATE_WITH_AMRFINDER`, `ANNOTATE_WITH_ISESCAN`, `ANNOTATE_WITH_BARRNAP`). They add evidence to the truth table and never change F1. `ISESCAN_SCOPE=plasmids` (default) makes ISEScan search only the truth plasmids; the chromosome is then reported as "not evaluated (chromosome not searched)", never as zero. `all` searches every sequence (slow: about 30 minutes per 5 Mbp genome).
+- **Stage 3 assembly**: `ASSEMBLER` = `spades` (default) or `unicycler`; `RUN_ASSEMBLY_QC_GATE` keeps a poor assembly out of the ranking.
+- **Stage 4 tools**: one `RUN_<TOOL>` switch per plasmid tool (for example `RUN_MOB_RECON`, `RUN_PLATON`, `RUN_PLASMIDSPADES`, `RUN_GENOMAD`, `RUN_PLASME`). A tool that is switched on but not installed is offered for installation, not silently skipped.
+- **Stages 5 and 6 extra analyses**: `RUN_DIMENSION_ANALYSES`, `RUN_RANKING_STABILITY`, `RUN_RANK_SENSITIVITY`, `RUN_PERFORMANCE_DRIVERS`, `RUN_RECOMMENDER_EVAL`, `RUN_QUAST_DIAGNOSTICS`, `MULTIQC_REPORT`. They are advisory: none of them changes the leaderboard.
+- **Stage 7**: the long-read and hybrid tools (`RUN_FLYE_MOB_RECON`, `RUN_PLASSEMBLER`, `RUN_HYBRACTER_LONG`, `RUN_HYBRACTER_HYBRID`, `RUN_TRYCYCLER_MOB_RECON`) need long reads.
+
+## Run profiles: fast, standard, thorough
+
+<!-- source: config/run_profiles.tsv, plasbench/cli.py (run --profile) -->
+`plasbench run --profile fast|standard|thorough` (or `RUN_PROFILE`, or the New benchmark form) picks a set of the optional switches. **standard** is the default and changes nothing. **fast** switches off the optional analyses that never change the leaderboard: ISEScan (`ANNOTATE_WITH_ISESCAN=0`, measured at about 30 minutes per isolate), the ranking-stability and rank-sensitivity sweeps, performance drivers, the recommender evaluation, the per-dimension tables, bin agreement, candidate multiplicity and MultiQC. **thorough** turns optional extras on: `ISESCAN_SCOPE=all`, difficulty descriptors, QUAST diagnostics, truth-depth anomalies and the replicon baseline. A profile only sets a key you did not set yourself, and no profile touches the scoring, the truth labels or the leaderboard. The profile is recorded in the run manifest and the report. `plasbench profile-run` shows where the time of a finished run went.
+
+## Settings that change how a run uses the computer
+
+<!-- source: config/config.sh comments for each key -->
+- `THREADS` (CPU threads per tool), `MAX_PARALLEL_SAMPLES` (isolates at once in stages 1 to 5) and `MAX_PARALLEL_TOOLS` (tools at once per isolate in stage 4): together they decide how many CPU cores are busy.
+- `MEMORY_GB` and `ASSEMBLY_MEMORY_GB`: the assembler's memory budget. `AUTO_RESOURCES=1` (default) raises it to what SPAdes says it needs, halves threads after an out-of-memory kill (exit 137) and skips an isolate that cannot fit, saying so.
+- `TOOL_TIMEOUT_SECONDS`: a time limit per tool run (exit 124 when reached).
+- `MAX_RUN_DOWNLOAD_GB` (empty = no limit) skips an isolate whose reads are larger ("skipped by choice"); `WARN_RUN_DOWNLOAD_GB` (default 5) only warns.
+- `KEEP_AWAKE=1` (default) asks the computer not to sleep while a run is active; a sleep that still happens is recorded and left out of every elapsed time ("The computer was asleep from ... ; the run was paused, not slow").
+- `LOCAL_INPUTS_ONLY` / `--local-inputs`: use your own staged files and never download. `REQUIRE_CURATED_METADATA=0` lets stage 0 accept a sheet that has only `sample_id`, `assembly_accession` and `sra_run` (your own isolates).
+- Scoring thresholds (`CPRR_*`, `HEADLINE_*`, `*_THRESHOLD`) are pre-registered decisions: the assistant never changes them.
 
 ## Evidence, independence and tracks
 
@@ -62,6 +89,10 @@ Pages: Home, Setup, Workspace and studies, Cohorts, Your own isolates, New bench
 - It can be wrong. Facts about PlasBench come from the documentation; its general knowledge can be mistaken. Check anything important.
 - A free model follows instructions less reliably than a large one. The guided flows therefore work without the model, and a command or plan is checked by PlasBench's own code however it was written.
 - Providers set their own limits: OpenRouter free models are limited in requests per minute and per day; Hugging Face free accounts have no included credits; a local model on this computer has no account but may be slower and less accurate.
+
+## Your own isolates, sample sheets and troubleshooting (assistant flows)
+
+<!-- placeholder: filled with the description of the assistant's isolate set-up, sheet check and run-troubleshooting flows -->
 
 ## Action blocks the assistant can write
 
