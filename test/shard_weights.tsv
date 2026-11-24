@@ -358,6 +358,8 @@ test_score_analysis_track.sh	1.0
 test_score_bins_paf_guards.py	0.3
 test_score_entry_filters.py	0.3
 test_score_failure_reason.sh	0.7
+test_auto_parallel.sh	6.0
+test_parallel_plan.py	0.5
 test_score_parallel.sh	7.7
 test_scores_validation.py	0.3
 test_scoring.py	0.3

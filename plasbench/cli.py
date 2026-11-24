@@ -1115,7 +1115,8 @@ def build_parser():
         resources.add_argument("--memory-gb", type=int, help="SPAdes memory limit in GB (default: config value, normally 16).")
         resources.add_argument("--parallel-samples", type=int,
                                help="Samples to download/assemble/reconstruct/score concurrently "
-                                    "(default: config value, normally 1 = sequential).")
+                                    "(default: AUTO_PARALLEL sizes stages 2 and 5 to this computer with the threads divided, "
+                                    "assembly one at a time unless memory allows; a number given here is used as set).")
         resources.add_argument("--parallel-tools", type=int,
                                help="Independent reconstruction tools to run concurrently per sample in "
                                     "stage 4 -- mob_recon, platon, plasmidspades, gplas2_external; "

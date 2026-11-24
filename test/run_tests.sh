@@ -82,6 +82,8 @@ pb_run bash test_assemble_parallel.sh
 pb_run bash test_assemble_crash_safe.sh
 pb_run bash test_truth_stage_speed.sh
 pb_run bash test_score_parallel.sh
+pb_run bash test_auto_parallel.sh
+pb_run python3 test_parallel_plan.py
 pb_run bash test_score_analysis_track.sh
 pb_run bash test_pr_curve_stale_cleanup.sh
 pb_run bash test_run_all_default_stages.sh

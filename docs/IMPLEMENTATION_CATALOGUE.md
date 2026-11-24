@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 230 analysis modules, 28 registered tools and baselines (20 real tools), 220 registered
-outputs, 55 run switches, 510 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 231 analysis modules, 28 registered tools and baselines (20 real tools), 220 registered
+outputs, 55 run switches, 512 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -375,7 +375,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-230 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+231 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -629,6 +629,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `make_workflow_crate.py` | Build the Workflow RO-Crate that WorkflowHub registers: dist/plasbench-score.crate.zip. |
 | `multiqc_note.py` | The one plain-language note on MultiQC versus PlasBench's own QC panel, shared by every place that shows it. |
 | `net_bench.py` | plasbench net-bench: how fast does ENA deliver to THIS computer with 1, 4, 8 and 16 connections, and what should ENA_MAX_CONNECTIONS be? |
+| `parallel_plan.py` | AUTO_PARALLEL: how many isolates a stage runs at the same time, sized to this computer. |
 | `performance_drivers.py` | What drives per-plasmid reconstruction accuracy? A multivariable, study-clustered regression per tool. |
 | `plsdb_novelty.py` | How novel is each truth plasmid against PLSDB, and does recovery depend on it? |
 | `prefetch_history.py` | Remember, across runs, that the SRA Toolkit's `prefetch` does not work on this computer, so stage 1 stops losing about a minute per isolate to a call that will  |

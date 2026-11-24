@@ -116,7 +116,7 @@ _RUN = {
                 "when": "Use fast for a quick look, thorough for a full write-up, standard otherwise.", "setting": "RUN_PROFILE"},
     "threads": {"summary": "CPU threads per tool.", "when": "Leave empty to use the setting worked out from this computer's cores. Threads apply per tool: parallel samples x parallel tools x threads should not exceed your CPU count.", "setting": "THREADS"},
     "memory_gb": {"summary": "SPAdes memory limit in GB.", "when": "Leave empty to use the setting, worked out from the memory available on this computer.", "setting": "MEMORY_GB"},
-    "parallel_samples": {"summary": "Samples to download, assemble, reconstruct and score concurrently.", "when": "Leave empty for 1 (one sample at a time).", "setting": "MAX_PARALLEL_SAMPLES"},
+    "parallel_samples": {"summary": "Samples to download, assemble, reconstruct and score concurrently.", "when": "Leave empty to let AUTO_PARALLEL size it to this computer (truth/annotation and scoring run several isolates at once with the threads divided; assembly one at a time unless memory allows). A number is used as set.", "setting": "MAX_PARALLEL_SAMPLES"},
     "parallel_tools": {"summary": "Independent reconstruction tools to run concurrently per sample in stage 4; gplas2_mob always waits for mob_recon.", "when": "Leave empty for 1 (one tool at a time).", "setting": "MAX_PARALLEL_TOOLS"},
     "assembler": {"summary": "Short-read assembler.",
                   "choices": {"spades": "SPAdes (the default).", "unicycler": "Unicycler: cleaner graphs but slower (config.sh); also needed by some tools that use the assembly graph."},
