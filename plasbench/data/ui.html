@@ -1877,7 +1877,7 @@ function stageLine(s) {
   if (!pr.known) return pr.last_line ? "" : "Waiting for output…";
   const idx = pr.stages.findIndex(x => x.current), n = pr.stages.length;
   const bits = [];
-  if (s.group === "completed") return `All ${n} stages done`;
+  if (s.group === "completed") return "";   // the Done chip already says it
   if (idx >= 0) bits.push(`Stage ${pr.stages[idx].id}: ${pr.current_name} (step ${idx + 1} of ${n})`);   // the stage NUMBER (the one the log and `plasbench status` print), then the position in this run's list
   else if (pr.done.length) bits.push(`${pr.done.length} of ${n} stages done`);
   if (pr.isolates && pr.isolates_in_stage) bits.push(`isolate ${pr.isolates_in_stage} of ${pr.isolates}`);
@@ -1912,7 +1912,7 @@ function sessCard(s) {
   if (s.group === "completed") acts.push(s.run_index != null && run && run.report ? `<a class="btn sm" href="/view/${s.run_index}/benchmark.report.html" title="Open the report in a tab">${icon("chart")}Open report</a>` : `<span class="mut small">${s.argv[0] === "demo" || s.argv[0] === "run" ? "Report not found in the results folder" : ""}</span>`,
     `<button class="btn sec sm" data-sa="log">${icon("list")}Log</button>`, s.argv[0] === "run" || s.argv[0] === "demo" ? `<button class="btn ghost sm" data-sa="rerun">${icon("refresh")}Run again</button>` : "");
   if (s.results) acts.push(`<button class="btn ghost sm" data-sa="folder" title="${esc(s.results)}">${icon("folder")}Folder</button>`);
-  acts.push(`<button class="btn ghost sm" data-sa="details">${open ? "Hide details" : "Details"}</button>`);
+  acts.push(`<button class="btn ghost sm" data-sa="details">${open ? "Hide run info" : "Run info"}</button>`);
   const stages = pr.known ? `<div class="stg">${pr.stages.map(x => `<span class="${x.done ? "d" : x.current ? "c" : ""}">${x.done ? "✓ " : x.current ? "● " : ""}${esc(x.name)}</span>`).join("")}</div>` : "";
   const detail = open ? `<div class="det">${stages}<div class="mut" style="margin-top:6px">Command</div><div class="mono small" style="word-break:break-all">${esc(envPrefix(s.env) + s.command)}</div>
     ${s.results ? `<div class="mut" style="margin-top:6px">Results folder</div><div class="mono small" style="word-break:break-all">${esc(s.results)}</div>` : ""}
