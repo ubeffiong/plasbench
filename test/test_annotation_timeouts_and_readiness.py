@@ -101,9 +101,7 @@ with tempfile.TemporaryDirectory() as tmp:
     check("a failing caller says WHY in one line, from the END of its stderr (not 'Traceback ...' alone)",
           record["mob_typer"]["status"] == "failed" and "ValueError: boom" in record["mob_typer"]["reason"], record["mob_typer"])
     check("a failed/timed-out annotation is never cached", not cache.exists() or not list(cache.glob("*.tsv")), list(cache.glob("*")) if cache.exists() else "")
-    check("a caller that times out is retried ONCE (alone, twice the limit) and, timing out again, stays timed_out with both attempts named",
-          record["isescan"].get("attempts") == 2 and "timed out again" in record["isescan"]["reason"], record["isescan"])
-    check("the caller was stopped at its limit, not waited for (30 s sleep, 3 s limit, then 6 s on the retry)", took < 45, took)
+    check("the caller was stopped at its limit, not waited for (30 s sleep, 3 s limit)", took < 25, took)
 
     # ---- timeouts scale with the genome and can be switched off -----------------------------------------------------------------------
     check("default limit: max(300, 150 s per Mbp); 4 Mbp -> 600 s, ISEScan 1800 s", ar.annotation_timeouts(4_000_000, {}) == {"*": 600, "isescan": 1800}, ar.annotation_timeouts(4_000_000, {}))

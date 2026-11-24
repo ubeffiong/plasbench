@@ -389,10 +389,6 @@ export WORK_DIR="${WORK_DIR:-auto}"
 # ANNOTATION_TIMEOUT_SECONDS: per annotation caller (mob_typer, abricate, AMRFinder, ISEScan, barrnap). Blank = max(300, 150 s per Mbp of the reference), ISEScan three times that;
 # a number = that many seconds; 0 or off = no limit. A caller that hits the limit is stopped and recorded as timed_out (never cached); the others are kept.
 export ANNOTATION_TIMEOUT_SECONDS="${ANNOTATION_TIMEOUT_SECONDS:-}"
-# The callers start together and share the isolate's CPUs, so a DEFAULT limit is multiplied by how oversubscribed they are (threads asked / CPUs, never below 1); the limit counts
-# awake time only (a sleeping computer never times a caller out). ANNOTATION_RETRY_TIMED_OUT (default 1): a caller stopped at its limit is run ONCE more, alone, with all of the
-# isolate's threads and twice the limit, before it is recorded timed_out. A retried success is a normal result; a second timeout stays timed_out (never cached). 0 = no retry.
-export ANNOTATION_RETRY_TIMED_OUT="${ANNOTATION_RETRY_TIMED_OUT:-1}"
 # STEP_SLOW_FACTOR: a long command that has run this many times its typical time (config/step_typical.tsv) gets ONE "still running, typical N min" note and a slow_step event.
 # Nothing is stopped by it. 0 turns it off.
 export STEP_SLOW_FACTOR="${STEP_SLOW_FACTOR:-3}"

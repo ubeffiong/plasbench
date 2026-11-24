@@ -175,30 +175,6 @@ def thread_plan(threads):
     return 1, max(1, threads // 3), max(1, threads - 2)
 
 
-def contention_factor(threads, caller_threads):
-    """How oversubscribed the callers are when they all start together: the threads they ask for over the CPUs given to this isolate, never below 1. A default time limit is
-    multiplied by it, so a caller is judged on its fair share of the CPUs, not on a wall clock that six other callers are also using (a real run: 13 threads on 6 CPUs, and
-    mob_typer, AMRFinderPlus and barrnap lost their results at the limit)."""
-    threads = max(1, int(threads))
-    return max(1.0, float(sum(max(1, int(t)) for t in caller_threads)) / threads)
-
-
-def fair_timeouts(timeouts, factor):
-    """The default limits scaled by the contention factor (rounded up to whole seconds). An explicit ANNOTATION_TIMEOUT_SECONDS is never scaled (main() skips this)."""
-    if not timeouts or factor <= 1.0:
-        return dict(timeouts or {})
-    return {key: (int(-(-value * factor // 1)) if value else value) for key, value in timeouts.items()}
-
-
-RETRY_FACTOR = 2
-
-
-def retry_enabled(environ=None):
-    """ANNOTATION_RETRY_TIMED_OUT (default 1): a caller stopped at its limit is run once more, alone, with all of this isolate's threads and twice the limit."""
-    environ = os.environ if environ is None else environ
-    return str(environ.get("ANNOTATION_RETRY_TIMED_OUT", "1")).strip().lower() not in ("0", "no", "off", "false")
-
-
 def timeout_for(timeouts, name):
     if not timeouts:
         return None
@@ -593,40 +569,22 @@ def main():
     # the slowest by far, had a single thread). ISEScan gets the whole thread allowance; the quick ones share a few.
     total_bp = sum(sequences.values())
     isescan_plan_ = isescan_plan(args.isescan_scope, args.truth or (args.out.parent / "truth.tsv"), sequences)
-    explicit_limit = args.timeout is not None or str(os.environ.get("ANNOTATION_TIMEOUT_SECONDS", "")).strip() != ""
     timeouts = {"*": args.timeout} if args.timeout else ({} if args.timeout == 0 else annotation_timeouts(total_bp))
     threads = max(1, args.threads)
     small, amr_threads, isescan_threads = thread_plan(threads)
-    replicon_dbs = [n for n in args.replicon_database.replace(",", " ").split() if n] or ["plasmidfinder"]
+    calls = (
+        ("mob_typer", lambda: call_mob_typer(args.reference, timeout_for(timeouts, "mob_typer"), sequences, small)),
+        ("abricate_amr", lambda: call_abricate(args.reference, args.amr_database, timeout_for(timeouts, "abricate"), sequences, threads=small)),
+        *[("abricate_replicon" if index == 0 else f"abricate_replicon_{name}",
+           lambda name=name: call_abricate(args.reference, name, timeout_for(timeouts, "abricate"), sequences, kind="replicon", threads=small))
+          for index, name in enumerate([n for n in args.replicon_database.replace(",", " ").split() if n]
+                                       or ["plasmidfinder"])],
+        ("amrfinder", lambda: call_amrfinder(args.reference, timeout_for(timeouts, "amrfinder"), sequences, amr_threads)),
+        ("isescan", lambda: call_isescan(args.reference, timeout_for(timeouts, "isescan"), sequences, workdir, isescan_threads, isescan_plan_)),
+        ("isfinder", lambda: call_isfinder(args.reference, args.isfinder_fasta, timeout_for(timeouts, "isfinder"), sequences)),
+        ("barrnap", lambda: call_barrnap(args.reference, timeout_for(timeouts, "barrnap"), sequences, small)),
+    )
     off = callers_switched_off()
-
-    def build_calls(limits, quick, amr, ise):
-        """(name, threads, call) in the fixed order; the threads column is what the caller asks the CPU for (isfinder's blastn runs on one)."""
-        return (
-            ("mob_typer", quick, lambda: call_mob_typer(args.reference, timeout_for(limits, "mob_typer"), sequences, quick)),
-            ("abricate_amr", quick, lambda: call_abricate(args.reference, args.amr_database, timeout_for(limits, "abricate"), sequences, threads=quick)),
-            *[("abricate_replicon" if index == 0 else f"abricate_replicon_{name}", quick,
-               lambda name=name: call_abricate(args.reference, name, timeout_for(limits, "abricate"), sequences, kind="replicon", threads=quick))
-              for index, name in enumerate(replicon_dbs)],
-            ("amrfinder", amr, lambda: call_amrfinder(args.reference, timeout_for(limits, "amrfinder"), sequences, amr)),
-            ("isescan", ise, lambda: call_isescan(args.reference, timeout_for(limits, "isescan"), sequences, workdir, ise, isescan_plan_)),
-            ("isfinder", 1, lambda: call_isfinder(args.reference, args.isfinder_fasta, timeout_for(limits, "isfinder"), sequences)),
-            ("barrnap", quick, lambda: call_barrnap(args.reference, timeout_for(limits, "barrnap"), sequences, quick)),
-        )
-
-    def is_off(name):
-        return ("abricate" if name.startswith("abricate") else name) in off
-
-    # Fair limits: the callers start together and share this isolate's CPUs, so a DEFAULT limit is scaled by how oversubscribed they are (an explicit
-    # ANNOTATION_TIMEOUT_SECONDS is taken literally). The limit already counts awake time only (run() above).
-    planned = build_calls(timeouts, small, amr_threads, isescan_threads)
-    asked = sum(t for name, t, _ in planned if not is_off(name))
-    factor = contention_factor(threads, [t for name, t, _ in planned if not is_off(name)])
-    if not explicit_limit and timeouts and factor > 1.0:
-        timeouts = fair_timeouts(timeouts, factor)
-        print(f"  annotation: the callers ask for {asked} threads on {threads} CPU(s); their time limits are scaled by {factor:.2f} "
-              f"so each caller is judged on its share of the CPUs", flush=True)
-    calls = tuple((name, call) for name, _, call in build_calls(timeouts, small, amr_threads, isescan_threads))
 
     def gated(name, call):
         base = "abricate" if name.startswith("abricate") else name
@@ -690,27 +648,10 @@ def main():
                         slow_noted.add(name)
                         print(f"  annotation: NOTE {name} has run {ran / 60:.0f} min; typical is about {typical / 60:.0f} min for this genome size (estimated, 6-CPU laptop). "
                               f"It is stopped at its limit ({timeout_for(timeouts, name) or 'none'} s) unless ANNOTATION_TIMEOUT_SECONDS says otherwise.", flush=True)
-        results = {name: future.result() for name, future in futures}
-
-    # ONE retry for a caller stopped at its limit: alone (nothing else is running now), with all of this isolate's threads and twice its limit. A success is a
-    # normal result (and the annotation can be cached); a second timeout stays an honest timed_out record, never zero features, never cached.
-    retry_names = [name for name, _ in calls if results[name][1].get("status") == "timed_out"]
-    if retry_names and retry_enabled():
-        longer = {key: (value * RETRY_FACTOR if value else value) for key, value in timeouts.items()}
-        alone = dict((name, call) for name, _, call in build_calls(longer, threads, threads, threads))
-        for name in retry_names:
-            first = results[name][1].get("reason", "timed out")
-            limit = timeout_for(longer, "abricate" if name.startswith("abricate") else name)
-            print(f"  annotation: {name} stopped at its limit; trying it once more alone with {threads} thread(s) and a limit of {limit or 'none'} s", flush=True)
-            found, status = timed(name, gated(name, alone[name]))
-            status = dict(status, attempts=2, first_attempt=first)
-            if status.get("status") == "timed_out":
-                status["reason"] = f"{first}; retried once alone with {threads} thread(s) and {limit} s and it timed out again"
-            results[name] = (found, status)
-    for name, _ in calls:                           # collected in the original order: output stays the same
-        found, status = results[name]
-        features.extend(found)
-        provenance[name] = status
+        for name, future in futures:                  # collected in the original order: output stays the same
+            found, status = future.result()
+            features.extend(found)
+            provenance[name] = status
 
     # Deduplicate identical calls from overlapping databases, keeping provenance.
     seen, unique = set(), []

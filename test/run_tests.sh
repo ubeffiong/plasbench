@@ -167,7 +167,6 @@ pb_run python3 test_run_status_stages.py
 pb_run python3 test_work_dir.py
 pb_run python3 test_resource_adapt.py
 pb_run python3 test_annotation_timeouts_and_readiness.py
-pb_run python3 test_annotation_fair_limits.py
 pb_run bash test_download_gate_and_prefetch.sh
 pb_run bash test_stage1_downloads.sh
 pb_run bash test_require_internet.sh

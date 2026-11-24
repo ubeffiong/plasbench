@@ -472,7 +472,6 @@ test_slow_step_and_aggregation.sh	30.0
 test_run_status_stages.py	0.5
 test_work_dir.py	0.5
 test_annotation_timeouts_and_readiness.py	8.0
-test_annotation_fair_limits.py	14.0
 test_resource_adapt.py	12.0
 test_stop_all.py	40.0
 test_publishing.py	3.0
