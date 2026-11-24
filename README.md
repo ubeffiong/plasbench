@@ -1318,6 +1318,7 @@ window or the command line.
 | `plasbench picker-check` | **Browse** does not open the folder window | PASS or FAIL for each step |
 | `plasbench runtime doctor` and `plasbench runtime check` | Docker mode: the engine, the image or a container does not work | `doctor`: the Docker engine's health, PASS or FAIL per check with evidence and a numbered plan of safe steps; `check`: a step-by-step test of the image and a mounted folder (`plasbench runtime status` shows the setting) |
 | `plasbench net` | A download or an install cannot reach the internet | Which services (NCBI, ENA, GitHub, conda, ...) answer, and why not |
+| `plasbench net-bench` | Downloads are slow | Measures how fast ENA delivers to this computer with 1, 4, 8 and 16 connections (small time-boxed reads, nothing saved) and recommends `ENA_MAX_CONNECTIONS`; run it twice, single measurements are noisy |
 
 *Files to attach from the study folder.* A study is a folder in the workspace (the window's **Workspace** page shows where). Attach what exists:
 

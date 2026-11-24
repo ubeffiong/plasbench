@@ -616,8 +616,8 @@ the independent-truth subset of public-v4 is still to be done.
 **Status.** Fixed after v0.5.0 (next release).
 
 ### Q50. One isolate in my "quick" 20-isolate run has 9.5 GB of reads. Can I avoid that?
-**Answer.** Yes. Stage 1 now looks up each run's exact size at ENA before downloading, prints it, and warns above `WARN_RUN_DOWNLOAD_GB` (default 5): a read set that large is slow to download, needs about three times its size on disk, and is slow or memory-hungry to assemble (9.5 GB of reads for an 8.8 Mb genome is well over 1000-fold coverage). Set `MAX_RUN_DOWNLOAD_GB` (for example 5) to skip such isolates: they are recorded as failed with the reason, the rest of the run goes on, and re-running stage 1 retries them once you raise the limit. The summary printed before the download now also shows exact sizes and the largest read set even for a sheet with no lock file, where it used to say "size unknown".
-**Status.** Fixed after v0.5.0 (next release). There is still no cap on read depth during assembly.
+**Answer.** Yes. Stage 1 now looks up each run's exact size at ENA before downloading, prints it, and warns above `WARN_RUN_DOWNLOAD_GB` (default 5): a read set that large is slow to download, needs about three times its size on disk, and is slow or memory-hungry to assemble (9.5 GB of reads for an 8.8 Mb genome is well over 1000-fold coverage). PlasBench does not skip such an isolate: it downloads it in resumable chunks, and for a short paired run deeper than `READ_DEPTH_CAP_X` (default 150x over the reference) it downloads only the first read pairs, which is all the depth the tools can use. (`MAX_RUN_DOWNLOAD_GB` exists as an opt-in limit if you want isolates above some size skipped; it is blank by default.) The summary printed before the download now also shows exact sizes and the largest read set even for a sheet with no lock file, where it used to say "size unknown".
+**Status.** Fixed after v0.5.0 (next release). Since then a read-depth cap (`READ_DEPTH_CAP_X`, default 150, `off` for whole files) cuts a very deep run at download, and no isolate is skipped for its size unless you set `MAX_RUN_DOWNLOAD_GB` yourself (see Q78).
 
 ### Q51. What does `--no-report-prompt` mean?
 **Answer.** When a run finishes, PlasBench can stop and ask "open the report?". `--no-report-prompt` removes that question: it prints the report path and exits, so the run can go unattended. It changes nothing about what is run or written. `--open-report` does the opposite, opening the report in your browser at the end without asking. The window always sets `--no-report-prompt`.
@@ -785,6 +785,14 @@ about functions outside the benchmarking pipeline and are not answered here.
 | **Implemented here** | The review exposed a gap and it was closed in this change, with a test. |
 | **Out of scope** | The question concerns a function PlasBench does not have and does not claim. |
 | **Open** | Not done. The reason is given: usually it needs data or compute, not code. |
+
+### Q78. How do I download the whole read files?
+**Answer.** Set `READ_DEPTH_CAP_X=off` (in the window: Settings, or the run's `--read-depth-cap` field; on the command line `plasbench run --cohort public-v4 --read-depth-cap off`; `0`, `none` and `false` mean the same). By default (150) a short paired Illumina run deeper than 150x over the reference is downloaded as its first read pairs only, which is all the depth the tools can use; with `off` both files are fetched whole and verified against ENA's MD5, exactly as before. The choice is recorded for the study. If capped reads are already on disk, the next run with the cap off says so (`SRR36114699: reads on disk are a 150x prefix; READ_DEPTH_CAP_X is now off, fetching the whole file`) and fetches the whole files; whole files already on disk are never shrunk when you switch the cap on.
+**Status.** Added after v0.5.0 (next release).
+
+### Q79. My downloads are slow or keep restarting. What do I check?
+**Answer.** See the User Guide, Troubleshooting, "My downloads are slow or restart": the data folder's file system (a Windows drive seen from WSL is slow; PlasBench downloads on the local disk and moves the file), ENA versus the SRA Toolkit (ENA is tried first), the connection budget (`ENA_MAX_CONNECTIONS`, `plasbench net-bench`), and that a failed download resumes from the chunks already on disk instead of starting again.
+**Status.** Added after v0.5.0 (next release).
 
 ### The five foundational questions
 

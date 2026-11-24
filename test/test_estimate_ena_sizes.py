@@ -63,7 +63,7 @@ with tempfile.TemporaryDirectory() as tmp:
     check("the read sets show a total, not 'size unknown'", "size unknown" not in text and "ESTIMATED TOTAL" in text, text)
     check("it says the sizes are exact ENA sizes", "exact sizes from ENA" in text, text)
     check("it names the largest read set and its size", "LARGEST READ SET" in text and "SRRBIG" in text and "9.5 GB" in text, text)
-    check("a read set above 5 GB is flagged as very large, with the way to skip such isolates", "very large" in text and "MAX_RUN_DOWNLOAD_GB" in text, text)
+    check("a read set above 5 GB is flagged as large and says it is downloaded in resumable chunks and NOT skipped (no pointer to skipping)", "large: it is downloaded in resumable chunks" in text and "not skipped" in text and "MAX_RUN_DOWNLOAD_GB" not in text, text)
     check("the run ENA could not answer is listed as not included in the total", "no size for 1 sample(s) (odd)" in text and "NOT included" in text, text)
 
 # --- when the lookup is switched off or not applicable ---------------------------------------------------------------------------------------

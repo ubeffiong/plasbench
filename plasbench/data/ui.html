@@ -1878,7 +1878,7 @@ function stageLine(s) {
   const idx = pr.stages.findIndex(x => x.current), n = pr.stages.length;
   const bits = [];
   if (s.group === "completed") return `All ${n} stages done`;
-  if (idx >= 0) bits.push(`Stage ${idx + 1} of ${n}: ${pr.current_name}`);
+  if (idx >= 0) bits.push(`Stage ${pr.stages[idx].id}: ${pr.current_name} (step ${idx + 1} of ${n})`);   // the stage NUMBER (the one the log and `plasbench status` print), then the position in this run's list
   else if (pr.done.length) bits.push(`${pr.done.length} of ${n} stages done`);
   if (pr.isolates && pr.isolates_in_stage) bits.push(`isolate ${pr.isolates_in_stage} of ${pr.isolates}`);
   return bits.join(" · ");
@@ -2233,13 +2233,16 @@ function rsHTML(path, s) {
   const counts = Object.entries(prog).filter(([, v]) => v && typeof v === "object").map(([k, v]) => `${esc(k)}: ${esc(v.ok)} of ${esc(v.rows)} ok${v.failed ? `, ${esc(v.failed)} failed` : ""}`).join(" · ");
   const logName = rsPick(nl, "name", "path", "file");
   const ps = d.processes || {}, raw = ps.count ? `raw CPU figure ${ps.cpu_percent}% summed over cores (100% = one core), ${ps.count} processes` : "";
+  // Live downloads (results/download_progress.json via `plasbench status --json`): one bar and one plain line per active download; the run log itself stays quiet.
+  const dlHTML = (d.downloads || []).map(x => { const pct = x.total_bytes ? Math.min(100, Math.round(100 * x.done_bytes / x.total_bytes)) : 0;
+    return `<div class="small" style="margin-top:4px"><b>Downloading</b> ${esc(x.line || x.run)}<div class="sbar" style="height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:4px 0"><i style="display:block;height:100%;width:${pct}%;background:var(--primary)"></i></div></div>`; }).join("");
   const detail = [
     L.hints.length ? `<ul class="rs-hints">${L.hints.map(h => `<li class="${rsAlarm(h) ? "bad-t" : ""}">${esc(h.text)}${h.evidence ? ` <span class="mut">(${esc(h.evidence)})</span>` : ""}</li>`).join("")}</ul>` : "",
     counts ? `<div class="small mut">${counts}</div>` : "",
     af.failed ? `<div class="small bad-t">${esc(af.failed)} assembl${af.failed === 1 ? "y" : "ies"} failed${af.same_cause ? `, all for the same reason: ${esc(af.same_cause)}` : ""}</div>${(af.items || []).slice(0, 5).map(i => `<div class="small mut">${esc(i.sample)}: ${esc(i.cause || "cause not recorded")}${i.advice ? ` (${esc(i.advice)})` : ""}</div>`).join("")}` : "",
     logName ? `<div class="small mut">Newest log: <span class="mono">${esc(String(logName).split(/[\\/]/).pop())}</span>${L.tip ? `, last line: <span class="mono">${esc(String(L.tip).slice(0, 200))}</span>` : ""}</div>` : "",
     raw ? `<div class="small mut">${esc(raw)}</div>` : ""].filter(Boolean).join("");
-  return `<div class="rs-now">${esc(L.now || "Waiting for the first step…")}</div>${L.res ? `<div class="small mut">${esc(L.res)}</div>` : ""}${L.act ? `<div class="small mut" title="${esc(L.tip)}">${esc(L.act)}</div>` : ""}
+  return `<div class="rs-now">${esc(L.now || "Waiting for the first step…")}</div>${dlHTML}${L.res ? `<div class="small mut">${esc(L.res)}</div>` : ""}${L.act ? `<div class="small mut" title="${esc(L.tip)}">${esc(L.act)}</div>` : ""}
     ${L.verdict ? `<div class="small ${L.alarm ? "bad-t" : ""}" role="status">${esc(L.verdict)}</div>` : ""}
     <details class="rs-details" data-rsd="${esc(path)}"${S.rsOpen.has(path) ? " open" : ""}><summary>Details</summary>${detail}${rsButtons(path)}</details>`;
 }
@@ -4738,7 +4741,9 @@ function renderWizard() {
         ${ef("timeout_hours", "Tool time limit, hours", "tool_timeout_hours", num("timeout_hours", "no limit"), "Per tool per isolate; sent as seconds (hours x 3600). Empty = no limit.")}
         ${ef("allow_all_failed", "Continue when every tool failed", "allow_all_tools_failed", `<label class="switch"><input type="checkbox" id="we_allow_all_failed" data-wenv="allow_all_failed" ${E.allow_all_failed ? "checked" : ""}><span></span></label>`, "Sets ALLOW_ALL_TOOLS_FAILED=1.")}
         ${ef("retries", "Download retries", "network_retries", num("retries", "3", 1), "Empty = the default, 3.")}
-        ${ef("connections", "Parallel downloads per isolate", "ena_download_connections", num("connections", "4", 1), "Empty = the default, 4. Applies to ENA downloads.")}
+        ${ef("max_connections", "ENA connections in total", "ena_max_connections", num("max_connections", "16", 1), "Empty = the default, 16 (at most 24), shared by the two mates.")}
+        ${ef("parallel_downloads", "Isolates downloaded at once", "max_parallel_downloads", num("parallel_downloads", "1", 1), "Empty = the default, 1.")}
+        ${ef("connections", "Connections per file (optional cap)", "ena_download_connections", num("connections", "", 1), "Empty = each file gets its fair share of the total.")}
         ${ef("console_log", "Keep a console log of the run in the study (logs/run_*.log)", "console_log", `<label class="switch"><input type="checkbox" id="we_console_log" data-wenv="console_log" ${E.console_log !== false ? "checked" : ""}><span></span></label>`, "On by default. Unchecked, the run is started with RUN_CONSOLE_LOG=0.")}
         ${ef("log_runs", "Console logs kept", "log_retention_runs", num("log_runs", "20", 1), "Empty = the default, 20 runs.")}
       </div></details>` : "";
@@ -4806,6 +4811,8 @@ function wizEnv() {
   if (E.allow_all_failed) d.ALLOW_ALL_TOOLS_FAILED = "1";
   if (n(E.retries)) d.NETWORK_RETRIES = String(E.retries);
   if (n(E.connections) && Number(E.connections) > 0) d.ENA_DOWNLOAD_CONNECTIONS = String(E.connections);
+  if (n(E.max_connections) && Number(E.max_connections) > 0) d.ENA_MAX_CONNECTIONS = String(E.max_connections);
+  if (n(E.parallel_downloads) && Number(E.parallel_downloads) > 0) d.MAX_PARALLEL_DOWNLOADS = String(E.parallel_downloads);
   if (E.console_log === false) d.RUN_CONSOLE_LOG = "0";
   if (n(E.log_runs) && Number(E.log_runs) > 0) d.LOG_RETENTION_RUNS = String(E.log_runs);
   if (S.wiz.wf) Object.assign(d, S.wiz.wf);   // workflow steps: per-run on / off of items that have no command-line flag
