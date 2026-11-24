@@ -13,16 +13,26 @@
 # Every fetch is retried (config/config.sh: NETWORK_RETRIES) before a sample is
 # given up on.
 #
-# Parallelism (config/config.sh: MAX_PARALLEL_SAMPLES): downloads are network-
-# bound, not CPU-bound, so this is usually the safest stage to raise well
-# above the reconstruction-stage concurrency.
+# Parallelism: ONE isolate is downloaded at a time (MAX_PARALLEL_DOWNLOADS, default 1;
+# the connection budget ENA_MAX_CONNECTIONS is split between the downloads running at
+# once). Downloads are network-bound, so a second isolate only helps when one isolate
+# does not already use the whole link: `plasbench net-bench` and the MB/s lines tell.
+# MAX_PARALLEL_SAMPLES governs stages 2-5, not this stage.
+#
+# Reads: READ_SOURCE=auto fetches from ENA first (MD5-checked, chunked, resumable; no .sra
+# file and no FASTQ conversion) and uses the SRA Toolkit only when ENA has no paired FASTQ
+# for the run or fails after its retries. READ_DEPTH_CAP_X (default 150) fetches only the
+# first read pairs of a run deeper than that; no isolate is ever skipped because of its size
+# unless MAX_RUN_DOWNLOAD_GB is set.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 
 [[ -f "$SAMPLE_SHEET" ]] || die "sample sheet not found: $SAMPLE_SHEET"
-warn_resource_oversubscription "stage 1 (download)" "$MAX_PARALLEL_SAMPLES" "$THREADS"
+PARALLEL_DOWNLOADS="${MAX_PARALLEL_DOWNLOADS:-1}"
+[[ "$PARALLEL_DOWNLOADS" =~ ^[1-9][0-9]*$ ]] || PARALLEL_DOWNLOADS=1
+warn_resource_oversubscription "stage 1 (download)" "$PARALLEL_DOWNLOADS" "$THREADS"
 
 STATUS="$RESULTS_DIR/download_status.tsv"
 mkdir -p "$RESULTS_DIR" "$LOG_DIR" "$DATA_DIR"
@@ -30,6 +40,20 @@ stage_timing_begin 1
 check_free_disk "$DATA_DIR"
 reset_shard_dir "download"
 STATUS_SHARDS="$(shard_dir "download")"
+# Honest progress for `plasbench status` and the window (bytes actually received), a lowered connection budget that later isolates of this run remember, and which isolates came via ENA or the SRA Toolkit.
+DOWNLOAD_PROGRESS_FILE="$RESULTS_DIR/download_progress.json"
+ENA_BUDGET_FILE="$LOG_DIR/.ena_budget"
+VIA_DIR="$STATUS_SHARDS"
+STAGE1_START_SECONDS=$SECONDS
+rm -f "$ENA_BUDGET_FILE" "$DOWNLOAD_PROGRESS_FILE.lock"
+printf '{"updated": %s, "isolates": {}}\n' "$(date +%s)" > "$DOWNLOAD_PROGRESS_FILE" 2>/dev/null || true
+PLASBENCH_STUDY="$(basename "$(dirname "${RESULTS_DIR:-./results}")")"
+# The connection budget is shared by the downloads running at once.
+ENA_BUDGET_SHARE=""
+if [[ "$PARALLEL_DOWNLOADS" -gt 1 ]]; then
+    ENA_BUDGET_SHARE=$(( ${ENA_MAX_CONNECTIONS:-16} / PARALLEL_DOWNLOADS )); [[ "$ENA_BUDGET_SHARE" -ge 1 ]] || ENA_BUDGET_SHARE=1
+fi
+export DOWNLOAD_PROGRESS_FILE ENA_BUDGET_FILE PLASBENCH_STUDY ENA_BUDGET_SHARE
 
 # One shard file per sample, so concurrent jobs never contend for one file.
 record_download() {
@@ -83,7 +107,24 @@ preserve_downloads() {
     done
     [[ ${#files[@]} -gt 0 ]] || return 0
     (cd "$sdir" && sha256sum "${files[@]}" > downloads.sha256)
-    chmod a-w "$sdir/${sra}_1.fastq.gz" "$sdir/${sra}_2.fastq.gz" 2>/dev/null || true
+    chmod 0444 "$sdir/${sra}_1.fastq.gz" "$sdir/${sra}_2.fastq.gz" 2>/dev/null || true   # read-only, and never executable: a Windows drive seen from WSL reports every file as 0755, which chmod a-w turned into r-xr-xr-x
+}
+# Are the reads on disk valid for the READ_DEPTH_CAP_X of THIS run? (python/depth_cap.py decide.) Whole files are always kept, even when a cap is now set (never deleted or shrunk);
+# reads that are a capped prefix are not valid for a run with the cap off or higher: they are removed here (they are our own recompressed prefix and cannot be continued) so the next
+# step downloads again, and one plain line says so. Prints nothing and returns 0 when the reads are fine.
+reads_state_ok() {
+    local sdir="$1" run="$2" quiet="${3:-}" line action message
+    line="$(python3 -I "$HERE/../python/depth_cap.py" decide --dir "$sdir" --run "$run" --cap "${READ_DEPTH_CAP_X:-}" 2>/dev/null)" || return 0
+    action="${line%%$'\t'*}"; message="${line#*$'\t'}"
+    if [[ "$action" == "refetch" ]]; then
+        [[ -n "$quiet" ]] || { log "  $message"; python3 -I "$HERE/../python/depth_cap.py" discard --dir "$sdir" --run "$run" 2>/dev/null || true; }
+        return 1
+    fi
+    if [[ -z "$quiet" && -n "$message" ]]; then
+        log "  $message"
+        python3 -I "$HERE/../python/depth_cap.py" note-kept --dir "$sdir" --run "$run" --cap "${READ_DEPTH_CAP_X:-}" 2>/dev/null || true
+    fi
+    return 0
 }
 # 0 when every file in the manifest still matches (or there is no manifest yet).
 verify_downloads() {
@@ -92,78 +133,105 @@ verify_downloads() {
     (cd "$sdir" && sha256sum --quiet -c downloads.sha256 > /dev/null 2>&1)
 }
 
-# Paired FASTQ for one run from ENA (python/fetch_ena_reads.py: HTTPS, MD5-verified).
+# Paired FASTQ for one run from ENA (python/fetch_ena_reads.py: chunked and resumable, MD5-checked, the read-depth cap applies; see READ_DEPTH_CAP_X).
+# Every attempt is APPENDED to logs/<sample>.ena.log under a header with its number and time, so the message of an earlier failure is never overwritten.
+# Returns 0 when the reads are in place, 4 when ENA has no usable paired FASTQ for the run, 1 for any other failure (finished chunks stay on disk for the next attempt).
 fetch_from_ena() {
-    local sample="$1" run="$2" sdir="$3" total_bytes="${4:-}"
-    local interval="${DOWNLOAD_PROGRESS_SECONDS:-60}" waited=0 pid
-    [[ "$interval" =~ ^[0-9]+$ ]] || interval=60
-    log "  fetching $run from ENA ..."
-    # The downloader writes to its own log, so a long transfer used to leave the run log silent and the window showed the run as stalled.
-    # It runs in the background while this loop logs a progress line every DOWNLOAD_PROGRESS_SECONDS (0 = none).
-    python3 "$HERE/../python/fetch_ena_reads.py" --run "$run" --out-dir "$sdir" > "$LOG_DIR/${sample}.ena.log" 2>&1 &
+    local sample="$1" run="$2" sdir="$3" ref="${5:-}"   # $4 (the size to download) is no longer needed: the downloader reports its own totals
+    local interval="${DOWNLOAD_PROGRESS_SECONDS:-30}" waited=0 pid rc attempt logf="$LOG_DIR/${sample}.ena.log"
+    [[ "$interval" =~ ^[0-9]+$ ]] || interval=30
+    attempt=$(( $(grep -c '^===== attempt ' "$logf" 2>/dev/null || true) + 1 ))
+    printf '===== attempt %s, %s, run %s =====\n' "$attempt" "$(date '+%Y-%m-%d %H:%M:%S')" "$run" >> "$logf"
+    rm -f "$LOG_DIR/.dlprog.$run.json"
+    log "  fetching $run from ENA (attempt $attempt) ..."
+    # The downloader writes to its own log, so a long transfer would leave the run log silent and the window would show the run as stalled.
+    # It runs in the background while this loop logs a progress line every DOWNLOAD_PROGRESS_SECONDS (0 = none): bytes actually received, not file sizes.
+    python3 "$HERE/../python/fetch_ena_reads.py" --run "$run" --out-dir "$sdir" --sample "$sample" --study "$PLASBENCH_STUDY" \
+        --progress-file "$DOWNLOAD_PROGRESS_FILE" ${ref:+--reference "$ref"} >> "$logf" 2>&1 &
     pid=$!
     while kill -0 "$pid" 2>/dev/null; do
         sleep 1
         waited=$((waited + 1))
         if [[ "$interval" -gt 0 && "$waited" -ge "$interval" ]]; then
             waited=0
-            log "  $(python3 "$HERE/../python/download_progress.py" --data-dir "$sdir" --run "$run" ${total_bytes:+--total-bytes "$total_bytes"} 2>/dev/null || echo "$run: still downloading")"
+            # Only the lines that are DUE (python/ena_download.py LogGate): the first, one per 10% and 5 minutes, and a line when something changes. The live detail is in results/download_progress.json.
+            while IFS= read -r pline; do [[ -n "$pline" ]] && log "  $pline"; done < <(python3 "$HERE/../python/download_progress.py" --log-line --run "$run" --progress-file "$DOWNLOAD_PROGRESS_FILE" --state-file "$LOG_DIR/.dlprog.$run.json" 2>/dev/null || true)
         fi
     done
-    if wait "$pid"; then
+    rc=0
+    wait "$pid" || rc=$?
+    if [[ "$rc" -eq 0 ]]; then
+        printf 'ena\n' > "$VIA_DIR/$sample.via"
         return 0
     fi
-    warn "ENA download failed for $sample ($run); see $LOG_DIR/${sample}.ena.log"
+    if [[ "$rc" -eq 4 ]]; then
+        log "  ENA has no usable paired FASTQ for $run"
+        return 4
+    fi
+    warn "ENA download failed for $sample ($run), attempt $attempt: $(grep -v '^[[:space:]]*$' "$logf" | tail -n 1 | cut -c1-200). Chunks already downloaded are kept and the next attempt resumes from them; every attempt is in $logf"
     return 1
 }
 
-# Size of a run's FASTQ files from ENA's file report, in bytes (empty when ENA cannot be reached: the download then goes ahead without a size check).
-ena_run_bytes() {
-    python3 "$HERE/../python/fetch_ena_reads.py" --run "$1" --size-only 2>/dev/null | awk -F'\t' 'NR == 1 && $1 ~ /^[0-9]+$/ {print $1}' || true
+# What ENA will be asked for, from its file report: sets READ_BYTES (bytes to download: with the read-depth cap, the capped size), READ_FULL_BYTES (the whole files), READ_CAPPED (1 when the
+# cap applies) and READ_PLAN_LINE (the plain one-line message). All empty/0 when ENA cannot be reached: the download then goes ahead without a size check.
+READ_BYTES=""; READ_FULL_BYTES=""; READ_CAPPED=0; READ_PLAN_LINE=""
+read_plan() {
+    local out
+    READ_BYTES=""; READ_FULL_BYTES=""; READ_CAPPED=0; READ_PLAN_LINE=""
+    out="$(python3 "$HERE/../python/fetch_ena_reads.py" --run "$1" --plan ${2:+--reference "$2"} 2>/dev/null | head -n 1 || true)"
+    IFS=$'\t' read -r READ_BYTES READ_FULL_BYTES READ_CAPPED READ_PLAN_LINE <<< "$out" || true
+    [[ "$READ_BYTES" =~ ^[0-9]+$ && "$READ_FULL_BYTES" =~ ^[0-9]+$ ]] || { READ_BYTES=""; READ_FULL_BYTES=""; READ_CAPPED=0; READ_PLAN_LINE=""; }
 }
 
-# Say how big a run's reads are before downloading them. A very large read set is slow, needs about three times its size on disk, and is slow or
-# memory-hungry to assemble: warn above WARN_RUN_DOWNLOAD_GB (default 5), and skip the isolate when MAX_RUN_DOWNLOAD_GB is set and exceeded.
-# Returns 1 only when the isolate was skipped (and recorded); sets READ_BYTES for the progress line.
-READ_BYTES=""
+# Say how big a run's reads are before downloading them, and what PlasBench will do about it. NO isolate is skipped because of its size, unless the person set MAX_RUN_DOWNLOAD_GB
+# themselves (default: unset). A large read set is downloaded in resumable chunks (an interruption costs one chunk, not the file); a run deeper than READ_DEPTH_CAP_X (default 150)
+# is fetched as its first read pairs only. Returns 1 only when the isolate was skipped through MAX_RUN_DOWNLOAD_GB (and recorded).
 read_size_gate() {
-    local sample="$1" run="$2" bytes gb
-    READ_BYTES=""
+    local sample="$1" run="$2" ref="${3:-}" gb
     # READ_SOURCE=sra never touches ENA, so it does not look sizes up there either (and offline tests that pin it stay offline).
-    [[ "${READ_SOURCE:-auto}" == "sra" ]] && return 0
-    bytes="$(ena_run_bytes "$run")"
-    [[ "$bytes" =~ ^[0-9]+$ ]] || return 0
-    READ_BYTES="$bytes"
-    gb="$(awk -v b="$bytes" 'BEGIN { printf "%.1f", b / 1e9 }')"
-    log "  reads $run: $(human_bytes "$bytes") compressed (ENA)"
-    if [[ -n "${MAX_RUN_DOWNLOAD_GB:-}" ]] && awk -v b="$bytes" -v m="$MAX_RUN_DOWNLOAD_GB" 'BEGIN { exit !(m + 0 > 0 && b / 1e9 > m + 0) }'; then
-        warn "$sample: reads are $gb GB, above MAX_RUN_DOWNLOAD_GB=$MAX_RUN_DOWNLOAD_GB; skipping this isolate"
-        record_download "$sample" "failed" "skipped by choice: reads are $gb GB, above MAX_RUN_DOWNLOAD_GB=$MAX_RUN_DOWNLOAD_GB (raise or clear it to download this isolate)"
+    [[ "${READ_SOURCE:-auto}" == "sra" ]] && { READ_BYTES=""; return 0; }
+    read_plan "$run" "$ref"
+    [[ -n "$READ_BYTES" ]] || return 0
+    gb="$(awk -v b="$READ_BYTES" 'BEGIN { printf "%.1f", b / 1e9 }')"
+    log "  reads $run: $(human_bytes "$READ_FULL_BYTES") compressed (ENA)"
+    [[ "$READ_CAPPED" == "1" ]] && log "  $READ_PLAN_LINE"
+    if [[ -n "${MAX_RUN_DOWNLOAD_GB:-}" ]] && awk -v b="$READ_BYTES" -v m="$MAX_RUN_DOWNLOAD_GB" 'BEGIN { exit !(m + 0 > 0 && b / 1e9 > m + 0) }'; then
+        warn "$sample: $gb GB to download is above MAX_RUN_DOWNLOAD_GB=$MAX_RUN_DOWNLOAD_GB, a limit you set; skipping this isolate"
+        record_download "$sample" "failed" "skipped by choice: $gb GB to download, above MAX_RUN_DOWNLOAD_GB=$MAX_RUN_DOWNLOAD_GB, a limit set by you (clear it to download this isolate)"
         return 1
     fi
-    if awk -v b="$bytes" -v w="${WARN_RUN_DOWNLOAD_GB:-5}" 'BEGIN { exit !(w + 0 > 0 && b / 1e9 > w + 0) }'; then
-        warn "  $run is a large read set ($gb GB): it takes a while to download, needs about three times that on disk, and assembling reads this deep can be slow or run out of memory. Set MAX_RUN_DOWNLOAD_GB to skip isolates this large."
+    if awk -v b="$READ_BYTES" -v w="${WARN_RUN_DOWNLOAD_GB:-5}" 'BEGIN { exit !(w + 0 > 0 && b / 1e9 > w + 0) }'; then
+        warn "  $run is a large read set ($gb GB to download): it takes a while. PlasBench downloads it in resumable chunks, so a dropped connection costs one chunk and not the file, and a later run continues from what is on disk; this isolate is not skipped. Reads this deep can also be slow to trim and assemble; READ_DEPTH_CAP_X (default 150) limits the depth wherever the reference size is known."
     fi
     return 0
 }
 
-# SRA Toolkit failures that repeat. When prefetch has failed and ENA has worked for the last PREFETCH_FAIL_LIMIT isolates in a row (default 2), the
-# toolkit itself is the problem (TLS, proxy, an old version), not the isolate: stop spending about a minute per isolate on a call that will fail, and
-# go to ENA first for the rest of this run. READ_SOURCE=sra never skips prefetch; PREFETCH_FAIL_LIMIT=0 always tries it first. The history is reset each
-# time stage 1 starts, so a fixed toolkit is tried again on the next run.
-PREFETCH_HISTORY="$LOG_DIR/.prefetch_history"
-: > "$PREFETCH_HISTORY"
+# SRA Toolkit failures that repeat. prefetch's recent results are kept across runs in ~/.plasbench/prefetch_history.json (python/prefetch_history.py: entries expire after 24 hours and
+# are ignored when PlasBench or sra-tools changed). When its last PREFETCH_FAIL_LIMIT results (default 2) all failed, the toolkit itself is the problem (TLS, proxy, an old version),
+# not the isolate: it is not tried again, saving about a minute per isolate. PREFETCH_FAIL_LIMIT=0 always tries it; READ_SOURCE=sra never skips it.
+PREFETCH_SKIP_REASON=""
 prefetch_disabled() {
     local limit="${PREFETCH_FAIL_LIMIT:-2}"
-    [[ "$limit" =~ ^[0-9]+$ && "$limit" -gt 0 && -s "$PREFETCH_HISTORY" ]] || return 1
-    [[ "$(tail -n "$limit" "$PREFETCH_HISTORY" | grep -c '^fail$')" -ge "$limit" ]]
+    [[ "$limit" =~ ^[0-9]+$ && "$limit" -gt 0 ]] || return 1
+    PREFETCH_SKIP_REASON="$(python3 -I "$HERE/../python/prefetch_history.py" disabled --limit "$limit" 2>/dev/null)"
 }
+prefetch_note() { python3 -I "$HERE/../python/prefetch_history.py" record "$1" --reason "${2:-}" >/dev/null 2>&1 || true; }
 # The last line the SRA Toolkit printed, so the run log says why prefetch failed (the full output is in logs/<sample>.prefetch.log).
 prefetch_reason() {
     local line
     # retry_network's own "[time] WARNING: ... failed after N attempt(s)" lines land in the same log after the tool's output: skip them.
     line="$(grep -v '^[[:space:]]*$' "$1" 2>/dev/null | grep -v '^\[[0-9-]* [0-9:]*\]' | tail -n 1 | cut -c1-160 || true)"
     printf '%s' "${line:-no output}"
+}
+# Explain a prefetch failure in plain words, ONCE per run (python/download_diagnosis.py): what it means, what is used instead, what to check.
+PREFETCH_DIAGNOSED="$LOG_DIR/.prefetch_diagnosed"
+rm -f "$PREFETCH_DIAGNOSED"
+explain_prefetch_failure() {
+    [[ -e "$PREFETCH_DIAGNOSED" ]] && return 0
+    local text
+    text="$(python3 -I "$HERE/../python/download_diagnosis.py" "$1" 2>/dev/null)" || return 0
+    : > "$PREFETCH_DIAGNOSED"
+    warn "  $text"
 }
 # 9500000000 -> "9.5 GB"; below a GB it is shown in MB, so a small run does not read as 0.0 GB.
 human_bytes() {
@@ -227,7 +295,8 @@ download_sample() {
     # are generated locally by python/simulate_reads.py below), so it does
     # not need sra-tools installed.
     [[ "$HAS_REFERENCE" -eq 1 ]] && need datasets
-    if [[ "$TRUTH_SOURCE" != "simulated" ]]; then
+    # The SRA Toolkit is only needed when it will be used: always with READ_SOURCE=sra, otherwise only if ENA cannot supply a run (checked at that point).
+    if [[ "$TRUTH_SOURCE" != "simulated" && "${READ_SOURCE:-auto}" == "sra" ]]; then
         need prefetch
         need fasterq-dump
     fi
@@ -313,39 +382,48 @@ download_sample() {
             fi
             log "  simulated reads -> $R1 , $R2 , $LONG_READS"
         fi
-    elif [[ -s "$R1" && -s "$R2" ]] && verify_downloads "$SDIR"; then
+    elif [[ -s "$R1" && -s "$R2" ]] && verify_downloads "$SDIR" && reads_state_ok "$SDIR" "$SRA"; then
         log "  reads already present (checked against downloads.sha256 when present), skipping download"
-    elif ! read_size_gate "$SAMPLE" "$SRA"; then
-        return 0   # the isolate's reads are above MAX_RUN_DOWNLOAD_GB; read_size_gate recorded the skip
-    elif [[ "${READ_SOURCE:-auto}" == "ena" ]] && fetch_from_ena "$SAMPLE" "$SRA" "$SDIR" "$READ_BYTES"; then
-        log "  reads (ENA) -> $R1 , $R2"
+    elif ! read_size_gate "$SAMPLE" "$SRA" "$([[ -s "$REF" ]] && echo "$REF")"; then
+        return 0   # the person set MAX_RUN_DOWNLOAD_GB and this isolate is above it; read_size_gate recorded the skip
     else
-        local VIA_ENA=0
-        # READ_SOURCE=auto, and prefetch has just failed on the last PREFETCH_FAIL_LIMIT isolates while ENA worked: go to ENA first.
-        if [[ "${READ_SOURCE:-auto}" == "auto" ]] && prefetch_disabled; then
-            log "  SRA Toolkit prefetch failed on the last ${PREFETCH_FAIL_LIMIT:-2} isolates; fetching $SRA from ENA first (READ_SOURCE=ena always does this; PREFETCH_FAIL_LIMIT=0 always tries prefetch first)"
-            fetch_from_ena "$SAMPLE" "$SRA" "$SDIR" "$READ_BYTES" && VIA_ENA=1
+        # Reads. READ_SOURCE=auto tries ENA FIRST (checksum-verified, chunked and resumable, no .sra file and no FASTQ conversion) and uses the SRA Toolkit only when ENA has no
+        # paired FASTQ for the run or still fails after its retries. READ_SOURCE=ena uses ENA only, READ_SOURCE=sra the SRA Toolkit only.
+        local VIA="" ENA_RC=1
+        if [[ "${READ_SOURCE:-auto}" != "sra" ]]; then
+            fetch_from_ena "$SAMPLE" "$SRA" "$SDIR" "$READ_BYTES" "$([[ -s "$REF" ]] && echo "$REF")" && VIA=ena || ENA_RC=$?
+            if [[ -z "$VIA" && "${READ_SOURCE:-auto}" == "ena" ]]; then
+                warn "ENA download failed for $SAMPLE ($SRA); skipping this sample (READ_SOURCE=ena uses ENA only; the log is $LOG_DIR/${SAMPLE}.ena.log)"
+                record_download "$SAMPLE" "failed" "ENA download failed for $SRA; see $LOG_DIR/${SAMPLE}.ena.log (chunks already downloaded are kept; run the same command again to resume)"
+                return 0
+            fi
+            if [[ -z "$VIA" ]]; then
+                if [[ "$ENA_RC" -eq 4 ]]; then
+                    log "  ENA has no paired FASTQ for $SRA: using the SRA Toolkit (prefetch, fasterq-dump)"
+                else
+                    log "  ENA failed for $SRA after its retries: trying the SRA Toolkit (prefetch, fasterq-dump)"
+                fi
+            fi
         fi
-        if [[ "$VIA_ENA" -eq 0 ]]; then
+        if [[ -z "$VIA" ]]; then
+            if [[ "${READ_SOURCE:-auto}" == "auto" ]] && prefetch_disabled; then
+                warn "  not trying the SRA Toolkit for $SRA: $PREFETCH_SKIP_REASON. (PREFETCH_FAIL_LIMIT=0 tries it anyway; the record is ~/.plasbench/prefetch_history.json and expires after 24 hours.)"
+                record_download "$SAMPLE" "failed" "ENA could not supply $SRA and the SRA Toolkit is known not to work here: $PREFETCH_SKIP_REASON; see $LOG_DIR/${SAMPLE}.ena.log"
+                return 0
+            fi
+            need prefetch
+            need fasterq-dump
             log "  prefetching $SRA ..."
             if ! retry_network "prefetch $SRA" \
                     prefetch -O "$SDIR" "$SRA" > "$LOG_DIR/${SAMPLE}.prefetch.log" 2>&1; then
                 warn "  prefetch failed for $SAMPLE ($SRA): $(prefetch_reason "$LOG_DIR/${SAMPLE}.prefetch.log")"
-                # READ_SOURCE=auto: the same INSDC run from ENA, checksum-verified, when
-                # the SRA Toolkit cannot connect (for example an old toolkit failing TLS).
-                if [[ "${READ_SOURCE:-auto}" == "auto" ]] && fetch_from_ena "$SAMPLE" "$SRA" "$SDIR" "$READ_BYTES"; then
-                    VIA_ENA=1
-                    echo fail >> "$PREFETCH_HISTORY"
-                else
-                    warn "prefetch failed for $SAMPLE ($SRA); skipping this sample"
-                    record_download "$SAMPLE" "failed" "prefetch failed for $SRA: $(prefetch_reason "$LOG_DIR/${SAMPLE}.prefetch.log"); see $LOG_DIR/${SAMPLE}.prefetch.log"
-                    return 0
-                fi
-            else
-                echo ok >> "$PREFETCH_HISTORY"
+                prefetch_note fail "$(prefetch_reason "$LOG_DIR/${SAMPLE}.prefetch.log")"
+                explain_prefetch_failure "$LOG_DIR/${SAMPLE}.prefetch.log"
+                warn "prefetch failed for $SAMPLE ($SRA); skipping this sample"
+                record_download "$SAMPLE" "failed" "prefetch failed for $SRA: $(prefetch_reason "$LOG_DIR/${SAMPLE}.prefetch.log"); see $LOG_DIR/${SAMPLE}.prefetch.log"
+                return 0
             fi
-        fi
-        if [[ "$VIA_ENA" -eq 0 ]]; then
+            prefetch_note ok
             log "  extracting FASTQ (fasterq-dump) ..."
             if ! fasterq-dump --split-files --threads "$THREADS" -O "$SDIR" \
                     "$SDIR/$SRA/$SRA.sra" > "$LOG_DIR/${SAMPLE}.fasterq.log" 2>&1 \
@@ -365,9 +443,10 @@ download_sample() {
                 record_download "$SAMPLE" "failed" "paired FASTQ not produced for $SRA (single-end run?)"
                 return 0
             fi
-            log "  reads -> $R1 , $R2"
+            printf 'sra\n' > "$VIA_DIR/$SAMPLE.via"
+            log "  reads (SRA Toolkit) -> $R1 , $R2"
         else
-            log "  reads fetched from ENA instead of the SRA Toolkit -> $R1 , $R2"
+            log "  reads (ENA) -> $R1 , $R2"
         fi
     fi
 
@@ -452,7 +531,7 @@ require_downloads_online() {
         if [[ "$has_ref" -eq 1 && ! ( -s "$sdir/reference.fna" && -s "$sdir/sequence_report.jsonl" ) ]]; then
             need_ref=1; lacking+=" $sample:reference"
         fi
-        if [[ "$truth" != "simulated" ]] && ! { [[ -s "$sdir/${sra}_1.fastq.gz" && -s "$sdir/${sra}_2.fastq.gz" ]] && verify_downloads "$sdir"; }; then
+        if [[ "$truth" != "simulated" ]] && ! { [[ -s "$sdir/${sra}_1.fastq.gz" && -s "$sdir/${sra}_2.fastq.gz" ]] && verify_downloads "$sdir" && reads_state_ok "$sdir" "$sra" quiet; }; then
             need_reads=1; lacking+=" $sample:reads"
         fi
         if [[ "$truth" == "self_assembled_hybrid" && -n "$long_run" && ! -s "$sdir/${LONG_READS_FILE:-long_reads.fastq.gz}" ]]; then
@@ -485,18 +564,18 @@ while IFS=$'\t' read -r -u 3 SAMPLE ASM SRA; do
         DISK_STOP=1; DISK_STOP_AT="$SAMPLE"
         break
     fi
-    if [[ "$MAX_PARALLEL_SAMPLES" -le 1 ]]; then
+    if [[ "$PARALLEL_DOWNLOADS" -le 1 ]]; then
         # Not backgrounded: a die() inside download_sample aborts this whole
         # script immediately, exactly like before parallelism existed.
         download_sample "$SAMPLE" "$ASM" "$SRA"
     else
-        job_slot_wait "$MAX_PARALLEL_SAMPLES"
+        job_slot_wait "$PARALLEL_DOWNLOADS"
         download_sample "$SAMPLE" "$ASM" "$SRA" &
         PIDS["$SAMPLE"]=$!
     fi
 done 3< <(read_samples "$SAMPLE_SHEET")
 
-if [[ "$MAX_PARALLEL_SAMPLES" -gt 1 ]]; then
+if [[ "$PARALLEL_DOWNLOADS" -gt 1 ]]; then
     for sample in "${!PIDS[@]}"; do
         wait "${PIDS[$sample]}" || true
     done
@@ -532,4 +611,5 @@ if [[ "$DOWNLOADED" -eq 0 ]]; then
     die "no sample downloaded successfully; see $STATUS and logs/<sample>.*.log"
 fi
 
+log "$(python3 -I "$HERE/../python/download_progress.py" --summary --progress-file "$DOWNLOAD_PROGRESS_FILE" --via-dir "$VIA_DIR" --seconds "$(( SECONDS - STAGE1_START_SECONDS ))" 2>/dev/null || true)"
 log "Stage 1 (download) complete: $DOWNLOADED ok, $FAILED failed."

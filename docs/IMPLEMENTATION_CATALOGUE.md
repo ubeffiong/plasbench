@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 224 analysis modules, 28 registered tools and baselines (20 real tools), 220 registered
-outputs, 55 run switches, 501 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 230 analysis modules, 28 registered tools and baselines (20 real tools), 220 registered
+outputs, 55 run switches, 510 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -375,7 +375,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-224 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+230 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -613,9 +613,13 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `build_selection_report.py` | write cohorts/<name>.selection.json: how a cohort was selected. |
 | `check_prediction_fasta.py` | Stage-4 well-formedness check of a tool's prediction FASTA (audit AU-035). |
 | `data_nature.py` | Is this run made of synthetic (demo) data, real data, or a mix? A mix is refused, and a synthetic run says so inside its report. |
+| `depth_cap.py` | The read-depth cap: fetch only the first N read pairs of a very deep short-read run (READ_DEPTH_CAP_X, default 150; 0 or `off` = whole files). |
 | `docker_diagnosis.py` | Say WHY a docker pull, build or start failed, from the words docker printed, and what to do about it. Never guess. |
 | `docker_setup.py` | Docker in PlasBench's tools setup: detect the situation, diagnose it precisely, and install where a user-level process may, handing off where it may not. |
+| `download_diagnosis.py` | Say, in plain words, why the SRA Toolkit's `prefetch` failed, from what it printed. Never guesses; promises no cure. |
 | `download_progress.py` | How far a read download has got, for the run log. |
+| `download_scratch.py` | Where a read download is written and checked: a fast local scratch folder when the data folder is on a slow mount, then moved into place. |
+| `ena_download.py` | A resumable, chunked, parallel HTTP downloader for the big read files stage 1 fetches from ENA. |
 | `generate_install_audit.py` | Write docs/TOOL_INSTALL_AUDIT.md from the registries (config/tool_installers.tsv, config/metagenomic_tool_installers.tsv, config/source_tools.json). |
 | `install_diagnosis.py` | Say WHY a package install failed when the cause is a read-only environment, in the style of assembler_diagnosis.py. |
 | `intake.py` | Bring your own isolates: get the sheet right, point at your folders, check that PlasBench can see and use what you have. |
@@ -624,8 +628,10 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `make_demo_readqc.py` | SYNTHETIC short-read QC and assembly-candidate tables for the six isolates of the offline demonstration. Never for real data. |
 | `make_workflow_crate.py` | Build the Workflow RO-Crate that WorkflowHub registers: dist/plasbench-score.crate.zip. |
 | `multiqc_note.py` | The one plain-language note on MultiQC versus PlasBench's own QC panel, shared by every place that shows it. |
+| `net_bench.py` | plasbench net-bench: how fast does ENA deliver to THIS computer with 1, 4, 8 and 16 connections, and what should ENA_MAX_CONNECTIONS be? |
 | `performance_drivers.py` | What drives per-plasmid reconstruction accuracy? A multivariable, study-clustered regression per tool. |
 | `plsdb_novelty.py` | How novel is each truth plasmid against PLSDB, and does recovery depend on it? |
+| `prefetch_history.py` | Remember, across runs, that the SRA Toolkit's `prefetch` does not work on this computer, so stage 1 stops losing about a minute per isolate to a call that will  |
 | `preflight_resources.py` | Check, before the heavy stages, that the computer has what they need: disk, memory, CPUs and writable folders. |
 | `prereg_admin.py` | read, confirm and change PlasBench's pre-registered scoring decisions, and keep a record of who decided what and when. |
 | `qc_pilot.py` | A short-read QC pilot on real reads: the first part of each run's paired FASTQ files, measured with short_read_qc.py. |

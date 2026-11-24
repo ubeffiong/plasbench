@@ -67,6 +67,9 @@ _RUN = {
     "max_isolates": {"summary": "Run only N isolates of the cohort or sheet (any number you choose). The sheet itself is not changed: a copy with those rows is written next to the results.",
                      "choices": {"balanced": "The isolates are a balanced selection: spread across species and studies, and across recent and older genomes, so a small run is a fair miniature of the cohort."},
                      "when": "Leave empty to run all isolates."},
+    "read_depth_cap": {"summary": "Stage 1: for a short paired Illumina run deeper than this many x coverage over the reference, download only the first read pairs that give that depth (default 150). off (or 0) downloads whole files, MD5-checked as before.",
+                       "setting": "READ_DEPTH_CAP_X", "choices": {"off": "Whole read files, checksum-verified, exactly as before."},
+                       "when": "Leave empty for the default (150x). Use off to download the whole files. Reads already on disk are kept when you switch the cap on; reads that were capped are fetched again when you switch it off. The study remembers the choice."},
     "independent_truth_only": {"summary": "Run only isolates whose truth is independent of the benchmark's reads (long-read-only or long-read-first, polished with no reads or independent reads). The cohort file is not changed; a copy is written next to the results.",
                                "when": "Switch on to avoid truth that shares reads with the benchmark; combine with max isolates for a balanced N of them."},
     "isolate_order": {"summary": "With max isolates: which N isolates are chosen.",
@@ -269,11 +272,11 @@ WIZARD = {
                         "when": "The window always also passes --no-report-prompt, so the run never stops to ask a question."},
     "no_report_prompt": {"summary": "Always on in this window: the run never stops to ask whether to open the report.", "flag": "--no-report-prompt"},
     "read_source": {"default": "auto", "summary": "Where stage 1 gets short reads.", "setting": "READ_SOURCE",
-                    "choices": {"auto": "SRA Toolkit first, then ENA if prefetch fails.", "sra": "SRA Toolkit only.", "ena": "ENA only (python/fetch_ena_reads.py, MD5-verified)."},
-                    "when": "Leave on auto unless the SRA Toolkit keeps failing (use ena) or you want no ENA fallback (use sra)."},
-    "max_run_download_gb": {"summary": "The largest read download allowed for one isolate, in GB.", "setting": "MAX_RUN_DOWNLOAD_GB", "when": "Leave empty for no limit."},
+                    "choices": {"auto": "ENA first (resumable, checksum-verified, no conversion), the SRA Toolkit only when ENA has no paired FASTQ or fails.", "sra": "SRA Toolkit only.", "ena": "ENA only (python/fetch_ena_reads.py, MD5-verified)."},
+                    "when": "Leave on auto. Use sra only if you want no ENA at all; use ena if you never want the SRA Toolkit."},
+    "max_run_download_gb": {"summary": "An optional limit you can set: skip an isolate whose read download is above this many GB.", "setting": "MAX_RUN_DOWNLOAD_GB", "when": "Leave empty (the default): PlasBench never skips an isolate because of its size. Reads deeper than READ_DEPTH_CAP_X are cut at download instead."},
     "warn_run_download_gb": {"default": "5", "summary": "Warn when one isolate's read download is above this many GB.", "setting": "WARN_RUN_DOWNLOAD_GB", "when": "Leave empty for the default (5)."},
-    "prefetch_fail_limit": {"default": "2", "summary": "Stop using the SRA Toolkit after this many failures.", "setting": "PREFETCH_FAIL_LIMIT", "when": "Leave empty for the default (2)."},
+    "prefetch_fail_limit": {"default": "2", "summary": "Stop using the SRA Toolkit after this many failures in a row (remembered for 24 hours).", "setting": "PREFETCH_FAIL_LIMIT", "when": "Leave empty for the default (2)."},
     "tool_timeout_hours": {"summary": "Wall-time budget per tool per isolate, in hours (sent as TOOL_TIMEOUT_SECONDS = hours x 3600). A tool that exceeds it fails with exit 124 (resource failure).",
                            "setting": "TOOL_TIMEOUT_SECONDS", "when": "Leave empty for no limit, the default: a limit scores a slow tool zero. Set one only to stop a truly stuck run, and make it generous."},
     "allow_all_tools_failed": {"summary": "Stage 4 normally exits with code 4 when every tool run failed (nothing to score). Switched on, the run continues with a warning.",
@@ -289,8 +292,14 @@ WIZARD = {
     "log_retention_runs": {"default": "20", "summary": "How many console logs of earlier runs are kept in the study's logs folder; older ones are removed.",
                            "setting": "LOG_RETENTION_RUNS", "when": "Leave empty for the default (20)."},
     "network_retries": {"default": "3", "summary": "Stage 1 retries each fetch this many times before recording the sample as failed.", "setting": "NETWORK_RETRIES", "when": "Leave empty for the default (3)."},
-    "ena_download_connections": {"default": "4", "summary": "A large ENA read file is split into this many byte ranges fetched in parallel (aria2c is used when installed).",
-                                 "setting": "ENA_DOWNLOAD_CONNECTIONS", "when": "Leave empty for the default (4). Only affects ENA downloads."},
+    "ena_max_connections": {"default": "16", "summary": "The total number of ENA connections open at once, shared by the two mates of a run (and split between parallel downloads). The maximum is 24.",
+                            "setting": "ENA_MAX_CONNECTIONS", "when": "Leave empty for the default (16). More risks the address being throttled; `plasbench net-bench` measures what your link gains."},
+    "max_parallel_downloads": {"default": "1", "summary": "Isolates downloaded at the same time in stage 1. The connection budget is split between them.",
+                               "setting": "MAX_PARALLEL_DOWNLOADS", "when": "Leave at 1 while one isolate already fills your link; try 2 and compare the MB/s lines."},
+    "read_depth_cap_x": {"default": "150", "summary": "Read depth cap in x coverage: only the first read pairs that give this depth are downloaded for a deeper short paired run. off or 0 = whole files.",
+                         "setting": "READ_DEPTH_CAP_X", "when": "Leave empty for the default (150). Write off to download whole files."},
+    "ena_download_connections": {"default": "", "summary": "At most this many connections for each ENA file. Empty = each file gets its fair share of ENA_MAX_CONNECTIONS (16 in all).",
+                                 "setting": "ENA_DOWNLOAD_CONNECTIONS", "when": "Leave empty. `plasbench net-bench` measures what your link gains from more connections."},
 }
 
 # The Version control page's GitHub controls and the Online / Offline indicator (shown as tooltips by the page).
@@ -328,6 +337,7 @@ SETTINGS = {
     "TOOL_TIMEOUT_SECONDS": {"when": "Blank = no limit. Set a limit only to stop a truly stuck run, and make it generous (172800 = two days); a run that exceeds it fails with exit 124."},
     "MAX_RUN_DOWNLOAD_GB": WIZARD["max_run_download_gb"], "WARN_RUN_DOWNLOAD_GB": WIZARD["warn_run_download_gb"],
     "PREFETCH_FAIL_LIMIT": WIZARD["prefetch_fail_limit"], "ALLOW_ALL_TOOLS_FAILED": WIZARD["allow_all_tools_failed"],
+    "READ_DEPTH_CAP_X": WIZARD["read_depth_cap_x"], "ENA_MAX_CONNECTIONS": WIZARD["ena_max_connections"], "MAX_PARALLEL_DOWNLOADS": WIZARD["max_parallel_downloads"],
     "ENA_DOWNLOAD_CONNECTIONS": WIZARD["ena_download_connections"], "NETWORK_RETRIES": WIZARD["network_retries"],
     "RUN_CONSOLE_LOG": WIZARD["console_log"], "LOG_RETENTION_RUNS": WIZARD["log_retention_runs"],
 }
@@ -357,7 +367,7 @@ SETTINGS["MULTIQC_TIMEOUT_SECONDS"] = {"summary": "The limit, in seconds, for th
 REPORT_NOTES = {"qc": {"title": _MQ_TITLE, "text": _MQ_TEXT, "setting": "MULTIQC_REPORT"}}
 # Settings shown together in the "Reliability and downloads" group (only those config.sh defines).
 RELIABILITY_KEYS = ["READ_SOURCE", "MAX_RUN_DOWNLOAD_GB", "WARN_RUN_DOWNLOAD_GB", "PREFETCH_FAIL_LIMIT", "NETWORK_RETRIES", "NETWORK_RETRY_DELAY_SECONDS",
-                    "ENA_DOWNLOAD_CONNECTIONS", "PLASBENCH_OFFLINE", "PLASBENCH_ONLINE_TIMEOUT", "PRESERVE_DOWNLOADS", "TOOL_RETRIES", "TOOL_TIMEOUT_SECONDS", "ALLOW_ALL_TOOLS_FAILED", "PLASBENCH_DISK_RESERVE_GB", "PLASBENCH_VDISK_MIN_GB", "RUN_CONSOLE_LOG", "LOG_RETENTION_RUNS"]
+                    "ENA_DOWNLOAD_CONNECTIONS", "ENA_MAX_CONNECTIONS", "MAX_PARALLEL_DOWNLOADS", "READ_DEPTH_CAP_X", "PLASBENCH_OFFLINE", "PLASBENCH_ONLINE_TIMEOUT", "PRESERVE_DOWNLOADS", "TOOL_RETRIES", "TOOL_TIMEOUT_SECONDS", "ALLOW_ALL_TOOLS_FAILED", "PLASBENCH_DISK_RESERVE_GB", "PLASBENCH_VDISK_MIN_GB", "RUN_CONSOLE_LOG", "LOG_RETENTION_RUNS"]
 
 
 def _default_text(default, kind=None):
