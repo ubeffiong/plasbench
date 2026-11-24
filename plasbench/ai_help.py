@@ -355,9 +355,11 @@ def handle_callback(flows: "orr.AuthFlows", settings: Settings, query: dict, pat
 
 # -------------------------------------------------------------------------------------------------------------------- route glue
 FLOWS = orr.AuthFlows()
-ROUTES_GET = ("ai/status", "ai/models", "ai/auth/status", "ai/folder/list", "ai/files/progress")
+ROUTES_GET = ("ai/status", "ai/models", "ai/auth/status", "ai/folder/list", "ai/files/progress", "ai/intake/progress")
 ROUTES_POST = ("ai/consent", "ai/auth/start", "ai/key", "ai/signout", "ai/ask", "ai/validate", "ai/redact", "ai/folder/grant", "ai/folder/revoke", "ai/folder/scan", "ai/folder/share",
-               "ai/folder/resolve", "ai/folder/suggest", "ai/files/plan", "ai/files/apply", "ai/files/cancel", "ai/files/undo", "ai/ui/validate", "ai/flow/tool")
+               "ai/folder/resolve", "ai/folder/suggest", "ai/files/plan", "ai/files/apply", "ai/files/cancel", "ai/files/undo", "ai/ui/validate", "ai/flow/tool",
+               "ai/intake/options", "ai/intake/plan", "ai/intake/apply", "ai/intake/undo", "ai/intake/check", "ai/intake/fix", "ai/intake/labels", "ai/intake/labels/save",
+               "ai/intake/share", "ai/run/where", "ai/run/digest")
 
 
 def is_ai_route(route: str) -> bool:
@@ -382,7 +384,7 @@ def serve(handler, method: str, route: str, data: dict, q: dict, project) -> Non
         origin = handler.headers.get("Origin")          # POST was checked by the window; a GET from another origin is refused here too (it could not read the answer, but it could probe)
         if origin is not None and urlparse(origin).netloc != (handler.headers.get("Host") or ""):
             return handler.jsend(403, {"error": "request refused (not from this window)", "kind": "origin"})
-        if route.startswith(("ai/folder/", "ai/files/", "ai/ui/", "ai/flow/")):
+        if route.startswith(("ai/folder/", "ai/files/", "ai/ui/", "ai/flow/", "ai/intake/", "ai/run/")):
             from . import ai_routes2
             status, payload = ai_routes2.serve(route, data, q, project)
             return handler.jsend(status, payload)

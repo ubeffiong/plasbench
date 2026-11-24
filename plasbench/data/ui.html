@@ -590,6 +590,9 @@ body.gd-ai{--gdw:min(430px,92vw)}
 #ai_quick button{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:12px;padding:3px 10px;cursor:pointer;min-height:24px}
 #ai_quick button:hover,#ai_quick button:focus-visible{border-color:var(--primary);color:var(--primary)}
 .aipre-plain{white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;font-size:11.5px;background:var(--surface-2);padding:5px 7px;border-radius:3px;margin:4px 0}
+.aiisos{list-style:none;margin:6px 0;padding:0}.aiiso{border:1px solid var(--line);border-radius:4px;padding:6px 8px;margin:6px 0;font-size:12.5px}.aiiso-h{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.aiiso-f,.aidest{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:12px;margin:4px 0}.aiiso-f input,.aidest input,.aidest select,.aiask select,.aitab select{font:inherit;font-size:12px;max-width:100%}
+.aiissues{margin:3px 0;padding-left:18px}.aichk{border-top:1px solid var(--line-2);padding:5px 0}.aitab{border-collapse:collapse;font-size:12px;margin:6px 0;display:block;overflow:auto}.aitab td,.aitab th{border:1px solid var(--line);padding:3px 6px;text-align:left;vertical-align:top}
 .aiops{list-style:none;margin:6px 0;padding:0}.aiops li{margin:3px 0}.aiops label{display:flex;gap:6px;align-items:flex-start}
 .aicard2 progress{width:100%;max-width:240px}
 #ai_starters{display:flex;flex-wrap:wrap;gap:5px;padding:0 8px 6px;flex:none}
@@ -6354,7 +6357,7 @@ function aiRender() {
   const starters = $("#ai_starters");
   if (open && !AI.msgs.length) {
     const failed = aiContext().last_failure;
-    starters.innerHTML = (failed ? [`Why did my last run fail?`] : []).concat(["How do I install and run my first benchmark?", "How do I prepare my own isolates and sample sheet?", "What do F1, precision and recall mean here?", "My run looks stuck. What do I check?"])
+    starters.innerHTML = (failed ? `<button type="button" data-aiflow="why_failed">Why did my last run fail?</button>` : "") + ["How do I install and run my first benchmark?", "How do I prepare my own isolates and sample sheet?", "What do F1, precision and recall mean here?", "My run looks stuck. What do I check?"]
       .map(q => `<button type="button" data-aiq="${esc(q)}">${esc(q)}</button>`).join("");
     if (failed && !AI.pre) { AI.pre = null; api("ai/validate", {cmd: "plasbench diagnose", where: "window", risk: "safe"}).then(v => { v.why = "Reads the latest run and says what went wrong. It changes nothing."; AI.pre = v; aiRenderLog(); }).catch(() => {}); }
   } else starters.innerHTML = "";
@@ -6388,8 +6391,12 @@ function aiMsgHtml(m, mi) {
   if (m.kind === "scan") return aiScanCard(m, mi);
   if (m.kind === "plan") return aiPlanCard(m, mi);
   if (m.kind === "tool") return aiToolCard(m, mi);
+  if (m.kind === "intake") return aiIntakeCard(m, mi);
+  if (m.kind === "labels") return aiLabelsCard(m, mi);
+  if (m.kind === "check") return aiCheckCard(m, mi);
   if (m.role === "user") return `<div class="aimsg user">${esc(m.content)}</div>`;
   let h = `<div class="aimsg bot${m.error ? " err" : ""}" data-m="${mi}"><div class="aibody">${m.error ? `<p>${esc(m.content)}</p>` : md(m.content || "")}</div>`;
+  if (m.digest) h += aiDigestHtml(m);
   (m.actions || []).forEach((a, i) => { h += aiActionCard(a, mi, i); });
   (m.asks || []).forEach((a, i) => { h += aiAskCard(a, mi, i); });
   (m.ui || []).forEach((u, i) => { h += aiUiCard(u, mi, i); });
@@ -6542,6 +6549,10 @@ $("#ai_brief").onchange = e => aiLS("brief", e.target.checked ? "1" : "0");
 $("#ai_remember").onchange = e => { AI.remember = e.target.checked; aiLS("remember", AI.remember ? "1" : "0"); if (AI.remember) aiSaveChat(); else aiLS("chat", "[]"); };
 $("#ai_model").onchange = e => aiLS("model_" + aiProv(), e.target.value);
 $("#ai_prov").onchange = async e => { AI.prov = e.target.value; AI.note = ""; await aiStatus(true); fillProv(); await aiLoadModels(); aiRender(); };
+$("#gdp_ai").addEventListener("change", e => {
+  const w = e.target.closest && e.target.closest("[data-idest=where]"); if (!w) return;
+  const card = w.closest(".aicard2"), st = card && card.querySelector("[data-idest=study]"); if (st) st.closest("label").hidden = w.value !== "study";
+});
 $("#gdp_ai").addEventListener("click", async e => {
   const t = e.target;
   const id = t.closest("button") && t.closest("button").id;
@@ -6564,7 +6575,16 @@ $("#gdp_ai").addEventListener("click", async e => {
     if (k === "undo" && mm) return aiUndo(mm, af.dataset.j);
     if (k === "reviewplan") return aiReviewPlan(af, +af.dataset.i);
     if (k === "savetool" && mm) return aiSaveTool(mm);
-    if (k === "opentool") { go("addtool"); if (window.innerWidth < 1280) setDrawer(false); return; } }
+    if (k === "opentool") { go("addtool"); if (window.innerWidth < 1280) setDrawer(false); return; }
+    if (mm && ["iapply", "iplan", "ishare", "checkagain"].includes(k)) { const card = af.closest(".aicard2"); if (k === "iapply") return aiIntakeApply(mm, card); if (k === "ishare") return aiIntakeShare(mm, card);
+      if (k === "checkagain") { aiIntakeRead(card, mm); return aiCheckRun(mm); } aiIntakeRead(card, mm); return aiIntakePlan(mm); }
+    if (k === "iundo" && mm) { if (!await askConfirm({title: "Undo the staging?", confirmLabel: "Undo", body: "The files PlasBench placed are removed (only those unchanged since) and the sample sheet goes back to how it was. Your original files were never changed."})) return;
+      try { const r = await api("ai/intake/undo", {journal: mm.result.journal}); mm.undone = true; mm.actions = []; mm.note = r.ok ? `Undone: ${r.restored} step(s).` : `Undone as far as possible: ${r.restored} done, ${r.skipped} left alone because they changed since.`; } catch (e) { mm.note = e.message; } return aiRenderLog(); }
+    if (k === "ifix" && mm) return aiIntakeFix(mm);
+    if (k === "labels" && mm) return aiIntakeLabels(mm, af.dataset.sample);
+    if (k === "savelabels" && mm) return aiSaveLabels(mm, af.closest(".aicard2"));
+    if (k === "dsend" && mm) return aiDigestSend(mm);
+    if (k === "dresume" && mm) return aiDigestResume(mm); }
   const opx = t.closest("[data-aiop]"); if (opx) { const mm = AI.msgs[+opx.closest("[data-m]").dataset.m]; mm.sel = mm.sel || {}; mm.sel[+opx.dataset.aiop] = opx.checked; return; }
   const aui = t.closest("[data-aiui]"); if (aui) return aiRunUi(aui.closest(".aicard2"));
   const us = t.closest("[data-aiundoset]"); if (us) { try { await api("settings", {changes: {[us.dataset.aiundoset]: us.dataset.had === "1" ? us.dataset.old : null}}); S.settings = null; toast("Setting restored", "ok"); us.disabled = true; } catch (e) { toast(e.message, "bad"); } return; }
@@ -6588,7 +6608,7 @@ $("#gdp_ai").addEventListener("click", async e => {
    when "Share this summary" is pressed (the server makes the text again itself). A plan is executed by the server only after the dry run was shown and Apply was pressed; every window
    action is validated by the server (plasbench/ai_ui.py) and then done through the window's EXISTING functions (go, the settings API, confirmRun, the runtime route). ---- */
 AI.grant = null; AI.scan = null; AI.remember = AI.remember || false;
-const aiFlowQuick = [["setup_run", "Set up a run from my folder"], ["fix_sheet", "Fix my sample sheet"], ["install_tools", "Install the tools I need"], ["add_tool", "Add my own tool"], ["diagnose", "Why did my last run fail?"]];
+const aiFlowQuick = [["setup_isolates", "Set up my isolates from a folder"], ["check_sheet", "Check my sample sheet"], ["why_failed", "Why did my run fail?"], ["where_run", "Where is my run?"], ["install_tools", "Install the tools I need"], ["add_tool", "Add my own tool"]];
 function aiFolderHtml() {
   const g = AI.grant;
   if (!g) return `<div class="aifolder"><button type="button" class="btn sec sm" data-aif="choose" title="PlasBench itself reads names, sizes and the first lines of the folder and shows you what it found. Nothing goes to the assistant until you press Share.">${icon("folder")}Choose a folder</button>
@@ -6610,7 +6630,8 @@ const aiKb = n => n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " 
 async function aiChooseFolder() {
   const remember = !!($("#ai_remfolder") && $("#ai_remfolder").checked);
   pickPath(true, async p => {
-    try { AI.grant = await api("ai/folder/grant", {path: p, remember}); aiRenderFolder(); $("#ai_live").textContent = "Folder chosen: " + AI.grant.name; await aiScan(); }
+    try { AI.grant = await api("ai/folder/grant", {path: p, remember}); aiRenderFolder(); $("#ai_live").textContent = "Folder chosen: " + AI.grant.name;
+      const next = AI.afterGrant; AI.afterGrant = ""; if (next === "setup_isolates") return aiFlowIsolates(); if (next === "check_sheet_grant") return aiFlowSheet(); await aiScan(); }
     catch (e) { toast(e.message, "bad"); }
   }, "Choose the folder with your files");
 }
@@ -6728,31 +6749,241 @@ async function aiPrefill(fields, card) {
   aiRunNote(card, "The New benchmark form is filled in. Nothing has been started: review the command on the last step.");
 }
 /* ---- guided flows: the steps and the checks are code; they work without a model ---- */
+const AI_FLOW_ALIAS = {setup_run: "setup_isolates", fix_sheet: "check_sheet", diagnose: "why_failed"};
 async function aiStartFlow(name) {
   if (AI.busy) return toast("Wait for the answer to finish first", "");
-  if (name === "diagnose") { try { const v = await api("ai/validate", {cmd: "plasbench diagnose", where: "window", risk: "safe"}); v.why = "Reads the latest run and says what went wrong. It changes nothing."; aiPush({content: "This check is safe and changes nothing. After it runs you can send the result to the assistant.", actions: [v]}); } catch (e) { toast(e.message, "bad"); } return; }
+  name = AI_FLOW_ALIAS[name] || name;
+  if (name === "why_failed") return aiFlowWhy();
+  if (name === "where_run") return aiFlowWhere();
   if (name === "install_tools") { aiPush({content: "I will show the tools that are switched on but not installed, and ask before anything is installed."}); try { await installEnabled(); } catch (e) { toast(e.message, "bad"); } return; }
   if (name === "add_tool") return aiFlowAddTool();
-  if (!AI.grant) { aiPush({content: name === "fix_sheet" ? "Choose the folder that holds your sample sheet. PlasBench will look inside it; nothing goes to the assistant until you press Share." : "Choose the folder that holds your reads. PlasBench will look inside it; nothing goes to the assistant until you press Share."}); return aiChooseFolder(); }
-  const r = AI.scan || await aiScan(true); if (!r) return;
-  if (name === "setup_run") return aiFlowSetup();
-  if (name === "fix_sheet") return aiFlowSheet();
+  if (name === "check_sheet") return aiFlowCheckSheet();
+  if (name === "setup_isolates") {
+    if (!AI.grant) { aiPush({content: "Choose the folder that holds your reads (and the complete genomes, if you have them). PlasBench's own intake looks inside it; nothing goes to the assistant until you press Share."}); AI.afterGrant = "setup_isolates"; return aiChooseFolder(); }
+    return aiFlowIsolates();
+  }
 }
-async function aiFlowSetup() {
-  const r = await aiScan(true); if (!r) return; AI.scan = r;
-  aiPush({kind: "scan", scan: r.scan, summary: r.summary, tokens: r.tokens});
-  let s; try { s = await api("ai/folder/suggest", {id: AI.grant.id, what: "setup"}); } catch (e) { return toast(e.message, "bad"); }
-  if (!s.ops.length) return aiPush({content: "I could not find a complete, compressed read pair to set up. " + (s.skipped.length ? "Left out: " + s.skipped.join("; ") + "." : "PlasBench expects pairs named like sample_R1.fastq.gz and sample_R2.fastq.gz (or _1 and _2).")});
-  const study = await askText({title: "Name this study", label: "A short name for the study folder (letters, digits, . _ -)", confirmLabel: "Continue", value: "my_isolates", validate: v => /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(v) ? "" : "Use letters, digits, dot, dash and underscore"});
-  if (study == null) return;
-  const m = await aiShowPlan(s.ops, `Set up ${s.samples} sample(s)`, "Lays the reads out the way PlasBench looks for them (data/<sample>/<sample>_1.fastq.gz) and writes config/my_isolates.tsv with assembly_accession NA: reads only, so plasmids are reconstructed but not scored. Add a truth reference later to score them.", s.skipped);
-  if (m) { m.afterApply = {source: "sheet", samples: "config/my_isolates.tsv", study, local_inputs: true}; aiPush({content: "After you apply these changes, press the button below to fill in the New benchmark form with this sheet.", ui: [{ok: true, ui: "prefill", title: "Fill the New benchmark form", risk: "safe", desc: "Fills the source (my own sample sheet), the sheet, the study name " + study + " and local inputs only. Nothing is started: you review the exact plasbench command on the last step.", params: {fields: m.afterApply}, why: ""}]}); }
+/* Set up my isolates: PlasBench's intake (python/intake.py) scans the chosen folder and plans exactly what `plasbench intake stage` does; the person reviews it, answers what only
+   they can (which FASTA is the reference when two could be, the organism, the sample ids), applies it, sees the quick test, fixes what has one right answer, labels REVIEW rows,
+   and gets the run command as a Run-in-PlasBench card. */
+async function aiFlowIsolates() {
+  let opts; try { opts = await api("ai/intake/options", {}); } catch (e) { return toast(e.message, "bad"); }
+  const m = aiPush({kind: "intake", dest: {where: "shared", sheet: opts.default_sheet || "local", study: ""}, choices: {}, opts, busy: true});
+  return aiIntakePlan(m);
 }
+async function aiIntakePlan(m) {
+  if (!AI.grant) return toast("Choose a folder first", "bad");
+  m.busy = true; m.err = ""; aiRenderLog();
+  try { m.view = await api("ai/intake/plan", {id: AI.grant.id, dest: m.dest, choices: m.choices}); } catch (e) { m.err = e.message; }
+  m.busy = false; aiRenderLog();
+  $("#ai_live").textContent = m.err ? "The plan could not be made" : `Plan ready: ${m.view.staged} isolate(s) to stage`;
+}
+function aiIntakeRead(card, m) {
+  const val = s => { const el = card.querySelector(s); return el ? el.value.trim() : ""; };
+  m.dest = {where: val("[data-idest=where]") || "shared", study: val("[data-idest=study]"), sheet: val("[data-idest=sheet]") || "local"};
+  const v = m.view; if (!v) return;
+  const off = new Set([...card.querySelectorAll("[data-iinc]")].filter(x => !x.disabled && !x.checked).map(x => x.dataset.iinc));
+  const ch = {rename: {}, organism: {}, reference: {}};
+  if (off.size) ch.include = v.isolates.map(r => r.from).filter(f => !off.has(f));
+  card.querySelectorAll("[data-iren]").forEach(x => { if (x.value.trim() && x.value.trim() !== x.dataset.iren) ch.rename[x.dataset.iren] = x.value.trim(); });
+  card.querySelectorAll("[data-iorg]").forEach(x => { const r = v.isolates.find(i => i.from === x.dataset.iorg); if (r && x.value.trim() !== (r.organism_guess || "")) ch.organism[x.dataset.iorg] = x.value.trim(); });
+  card.querySelectorAll("[data-iref]").forEach(x => { if (x.value) ch.reference[x.dataset.iref] = x.value; });
+  m.choices = ch;
+}
+function aiDestHtml(m, locked) {
+  const d = m.dest || {}, dis = locked ? "disabled" : "";
+  return `<div class="aidest"><label>Put the isolates in <select data-idest="where" ${dis}><option value="shared" ${d.where !== "study" ? "selected" : ""}>PlasBench's data folder (shared)</option><option value="study" ${d.where === "study" ? "selected" : ""}>a study's own data folder</option></select></label>`
+    + `<label ${d.where === "study" ? "" : "hidden"}>study <input type="text" data-idest="study" value="${esc(d.study || "")}" placeholder="my_isolates" size="14" ${dis}></label>`
+    + `<label>sheet config/<input type="text" data-idest="sheet" value="${esc(d.sheet || "local")}" size="12" ${dis}>.tsv</label></div>`;
+}
+function aiIsoHtml(r, locked) {
+  const tag = r.stage ? (r.status === "ready" ? "ready" : "check the notes") : r.status === "blocked" ? "blocked" : "left out";
+  const canTick = !locked && (r.stage || /not ticked/.test(r.skip));
+  const askRef = r.candidates.length > 1 && !/^(confident|chosen)/.test(r.reference_how);
+  const iss = r.issues.map(i => `<li class="${i.level === "error" ? "bad-t" : i.level === "warn" ? "warn-t" : ""}"><b>${esc(i.level.toUpperCase())}</b> ${esc(i.text)}${i.code ? ` <span class="mut">[${esc(i.code)}]</span>` : ""}</li>`).join("");
+  const ops = r.ops.map(o => `<li><b>${esc(o.kind)}</b> ${o.from.length ? esc(o.from.join(" + ")) + " &rarr; " : ""}${esc(o.to)} <span class="mut">(${esc(o.how)})</span></li>`).join("");
+  return `<li class="aiiso"><div class="aiiso-h"><label><input type="checkbox" data-iinc="${esc(r.from)}" ${r.stage ? "checked" : ""} ${canTick ? "" : "disabled"}> <b>${esc(r.id)}</b></label>`
+    + `<span class="risk ${r.stage ? "safe" : "changes_files"}">${esc(tag)}</span><span class="small mut">${esc(r.mode === "scored" ? "scored (has a reference)" : "reads only (not scored)")}</span></div>`
+    + `<div class="small">Reads: ${esc(String(r.lanes))} lane(s)${r.lanes > 1 ? ", joined into one pair" : ""}${r.compressed ? "" : ", not compressed: compressed while staging"}. <span class="mut">${esc(r.reads.join(", "))}</span></div>`
+    + `<div class="small">Reference: ${r.reference ? `${esc(r.reference)} <span class="mut">(${esc(r.reference_how)}${r.reference_size ? ", " + esc(String(r.reference_records)) + " sequence(s), " + esc(r.reference_size.toLocaleString()) + " bp" : ""})</span>` : "none"}</div>`
+    + (askRef ? `<div class="aiask"><div class="q">Which file is the complete genome of ${esc(r.id)}? PlasBench will not guess.</div><select data-iref="${esc(r.from)}" ${locked ? "disabled" : ""}><option value="">(none: reads only)</option>${r.candidates.map(c => `<option value="${esc(c)}" ${c === r.reference ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>` : "")
+    + `<div class="small">Truth: ${esc(r.truth)}</div>`
+    + `<div class="aiiso-f"><label>Sample id <input type="text" data-iren="${esc(r.from)}" value="${esc(r.id)}" size="14" ${locked ? "disabled" : ""}></label><label>Organism <input type="text" data-iorg="${esc(r.from)}" value="${esc(r.organism)}" size="22" placeholder="Genus species" ${locked ? "disabled" : ""}></label></div>`
+    + (r.skip && !r.stage ? `<div class="warn-t small">${esc(r.skip)}</div>` : "")
+    + (iss ? `<ul class="small aiissues">${iss}</ul>` : "")
+    + (ops ? `<details><summary>What staging does for ${esc(r.id)}</summary><ul class="small aiissues">${ops}</ul></details>` : "") + `</li>`;
+}
+function aiCheckHtml(c) {
+  if (!c) return "";
+  if (c.error && !(c.samples || []).length) return `<div class="bad-t small">${esc(c.error)}</div>`;
+  const rep = (c.repaired || []).map(x => `<li>${esc(x.sample_id)}: ${esc(x.what)}</li>`).join("");
+  return `<div class="why">The quick test (plasbench intake check): ${c.ok ? `<span class="ok-t">every isolate can be read and used</span>` : `<span class="warn-t">not ready yet</span>`}</div>`
+    + (rep ? `<div class="small">Repaired:</div><ul class="small aiissues">${rep}</ul>` : "")
+    + (c.samples || []).map(s => `<div class="aichk"><b>${esc(s.sample_id)}</b> <span class="small mut">${esc(s.mode)}</span> ${s.ok ? `<span class="ok-t">OK</span>` : `<span class="bad-t">not usable yet</span>`}`
+      + `<ul class="small aiissues">${s.checks.filter(x => x.status !== "pass").map(x => `<li><b>${esc(String(x.status).toUpperCase())}</b> ${esc(x.name)}${x.detail ? ": " + esc(x.detail) : ""}${x.code ? ` <span class="mut">[${esc(x.code)}${x.auto ? "; Fix can repair this" : ""}]</span>` : ""}${x.fix && x.status !== "info" ? `<div class="mut">${esc(x.fix)}</div>` : ""}</li>`).join("")}</ul>`
+      + `<div class="small mut">${s.checks.filter(x => x.status === "pass").length} check(s) passed</div>`
+      + (s.checks.some(x => x.code === "truth-review") ? `<button type="button" class="btn sec sm" data-aif="labels" data-sample="${esc(s.sample_id)}">Label the sequences of ${esc(s.sample_id)}</button>` : "") + `</div>`).join("")
+    + (c.fixable ? `<div class="acts"><button type="button" class="btn sec sm" data-aif="ifix">Fix what has one right answer (${esc(String(c.fixable))})</button></div>` : "");
+}
+function aiIntakeCard(m, mi) {
+  const v = m.view, locked = !!(m.running || m.result);
+  let body = aiDestHtml(m, locked);
+  if (m.busy) body += `<div class="small mut">PlasBench's intake is looking at the folder…</div>`;
+  if (m.err) body += `<div class="bad-t small">${esc(m.err)}</div>`;
+  if (v) {
+    body += `<div class="small mut">Nothing has been changed yet. ${esc(String(v.isolates.length))} isolate(s) found in ${esc(v.folder)}; ${esc(String(v.staged))} will be placed in ${esc(v.destination.label)}, and ${esc(v.sheet.path)} is ${v.sheet.exists ? "added to" : "written"}. Your original files are only read.</div>`
+      + (v.notes.length ? `<ul class="small aiissues">${v.notes.map(n => `<li class="warn-t">${esc(n)}</li>`).join("")}</ul>` : "")
+      + `<ul class="aiisos">${v.isolates.map(r => aiIsoHtml(r, locked)).join("")}</ul>`
+      + (v.leftovers.fasta_unmatched.length || v.leftovers.long_read_files.length || v.leftovers.unpaired_fastq.length ? `<details><summary>Files not used</summary><ul class="small aiissues">`
+        + v.leftovers.fasta_unmatched.map(f => `<li>${esc(f)}: a FASTA file not matched to any isolate</li>`).join("") + v.leftovers.long_read_files.map(f => `<li>${esc(f)}: long reads (the hybrid route, set up by hand)</li>`).join("")
+        + v.leftovers.unpaired_fastq.map(f => `<li>${esc(f)}: no mate (single-end reads are not used)</li>`).join("") + `</ul></details>` : "")
+      + (v.refused.length ? `<details><summary>Refused (${esc(String(v.refused.length))}): never opened</summary><ul class="small aiissues">${v.refused.map(x => `<li>${esc(x.file)}: ${esc(x.reason)}</li>`).join("")}</ul></details>` : "")
+      + `<details ${v.sheet.problems.length ? "open" : ""}><summary>The sample sheet ${esc(v.sheet.path)}${v.sheet.problems.length ? ": the run would refuse it" : ": passes the run's sheet check"}</summary><pre class="aipre-plain">${esc(v.sheet.diff || v.sheet.after)}</pre>${v.sheet.problems.map(p => `<div class="bad-t small">${esc(p)}</div>`).join("")}</details>`
+      + `<details><summary>The same as this command</summary><div class="cmdbox">${esc(v.command)}</div></details>`;
+    if (!locked) body += `<div class="acts"><button type="button" class="btn sm" data-aif="iapply" ${v.can_apply ? "" : "disabled"}>Stage ${esc(String(v.staged))} isolate(s)</button><button type="button" class="btn sec sm" data-aif="iplan">Look again with my changes</button><button type="button" class="btn sec sm" data-aif="ishare">Share a summary with the assistant</button></div>`;
+  }
+  if (m.running) body += `<div class="small">${m.phase === "checking" ? "Staged. Running the quick test (plasbench intake check)…" : "Staging…"}</div>`;
+  const r = m.result;
+  if (r) {
+    body += r.ok ? `<div class="ok-t">Staged: ${esc(r.staged.join(", "))}.</div>` : `<div class="bad-t">${esc(r.error || "Nothing was staged.")}</div>`;
+    body += r.results.filter(x => !x.ok).map(x => `<div class="warn-t small">${esc(x.id)}: ${esc(x.messages.join(" "))}</div>`).join("");
+    body += aiCheckHtml(r.check);
+    body += `<div class="acts">${r.journal && !m.undone ? `<button type="button" class="btn ghost sm" data-aif="iundo">Undo the staging</button>` : ""}</div>`;
+  }
+  return `<div class="aimsg bot" data-m="${mi}"><div class="aicard2 intake"><div class="ch"><b>Set up my isolates (PlasBench's intake)</b><span class="risk changes_files">copies files</span></div><div class="cb">${body}<div class="runstate" aria-live="polite">${m.note ? esc(m.note) : ""}</div></div></div>`
+    + (m.actions || []).map((a, i) => aiActionCard(a, mi, i)).join("") + `</div>`;
+}
+async function aiIntakeApply(m, card) {
+  aiIntakeRead(card, m);
+  const v = m.view; if (!v || !v.can_apply) return;
+  const lines = v.isolates.filter(r => r.stage).map(r => `${r.id}: ` + r.ops.map(o => `${o.kind} ${o.to}`).join(", "));
+  if (!await askConfirm({title: "Stage these isolates?", confirmLabel: "Stage", body: `PlasBench's intake copies the files listed into ${v.destination.label} and writes ${v.sheet.path}, exactly as reviewed. Your original files are only read. You can undo it afterwards.`, detail: lines.join("\n")})) return;
+  let r; try { r = await api("ai/intake/apply", {id: AI.grant.id, dest: m.dest, choices: m.choices, fingerprint: v.fingerprint}); } catch (e) { m.note = e.message; aiRenderLog(); return; }
+  m.running = r.job; m.phase = "staging"; m.note = ""; aiRenderLog();
+  for (let n = 0; n < 20000; n++) {
+    await sleep(700);
+    let s; try { s = await api(`ai/intake/progress?job=${encodeURIComponent(r.job)}`); } catch (e) { m.note = e.message; break; }
+    if (s.phase !== m.phase) { m.phase = s.phase; aiRenderLog(); }
+    if (s.state === "done") { m.result = s.result; break; }
+  }
+  m.running = ""; aiRenderLog();
+  if (m.result && m.result.ok) await aiIntakeRunCard(m);
+  $("#ai_live").textContent = m.result && m.result.ok ? "Staged; the quick test is shown" : "Staging stopped";
+}
+async function aiIntakeRunCard(m) {
+  const c = (m.result || m).check || m.check;
+  if (!c || !(c.samples || []).length) return;
+  const cmd = (m.result && m.result.run) || m.run; if (!cmd) return;
+  try { const v = await api("ai/validate", {cmd, where: "window", risk: "changes_files"}); v.why = c.ok ? "Starts the benchmark on the isolates you just set up (local inputs only: nothing is downloaded)." : "Run it once the quick test above passes (label the REVIEW sequences first; the run refuses to start while any is left)."; m.actions = [v]; } catch {}
+  aiRenderLog();
+}
+async function aiIntakeFix(m) {
+  const c = (m.result && m.result.check) || m.check; if (!c) return;
+  const items = c.samples.flatMap(s => s.checks.filter(x => x.auto && x.status !== "pass").map(x => `${s.sample_id}: ${x.name} [${x.code}]`));
+  if (!await askConfirm({title: "Repair what has one right answer?", confirmLabel: "Repair", body: "plasbench intake check --fix: compression, file names, a draft or tidied truth table, the template's example row. It never decides plasmid or chromosome and never changes your original files. The sheet and truth tables are backed up first.", detail: items.join("\n")})) return;
+  let r; try { r = await api("ai/intake/fix", {dest: m.dest, only: c.samples.map(s => s.sample_id)}); } catch (e) { m.note = e.message; aiRenderLog(); return; }
+  if (m.result) m.result.check = r; else m.check = r;
+  m.note = r.repaired.length ? `Repaired ${r.repaired.length} thing(s).` : "Nothing needed repairing."; aiRenderLog(); await aiIntakeRunCard(m);
+}
+async function aiIntakeLabels(m, sample) {
+  let r; try { r = await api("ai/intake/labels", {dest: m.dest, sample}); } catch (e) { return toast(e.message, "bad"); }
+  aiPush({kind: "labels", dest: m.dest, data: r, parent: AI.msgs.indexOf(m)});
+}
+function aiLabelsCard(m, mi) {
+  const d = m.data, opt = (v, cur) => `<option value="${v}" ${cur === v ? "selected" : ""}>${v === "" ? "(decide)" : v}</option>`;
+  return `<div class="aimsg bot" data-m="${mi}"><div class="aicard2 labels"><div class="ch"><b>Which sequences of ${esc(d.sample)} are plasmids?</b><span class="risk changes_files">saves truth.tsv</span></div><div class="cb">`
+    + `<div class="small mut">Only you can decide a sequence whose header does not say. Every score is judged against these labels, so PlasBench never guesses them.</div>`
+    + `<table class="aitab"><tr><th>Sequence</th><th>Length</th><th>Header</th><th>Label</th></tr>${d.rows.map(x => `<tr><td>${esc(x.sequence_id)}</td><td>${esc(String(x.length))}</td><td>${esc(x.header)}</td><td><select data-ilab="${esc(x.raw_id)}" ${m.done ? "disabled" : ""}>${opt("", x.label === "REVIEW" ? "" : x.label)}${opt("PLASMID", x.label)}${opt("CHROMOSOME", x.label)}</select></td></tr>`).join("")}</table>`
+    + (m.done ? "" : `<div class="acts"><button type="button" class="btn sm" data-aif="savelabels">Save these labels</button></div>`)
+    + `<div class="runstate" aria-live="polite">${m.note ? esc(m.note) : ""}</div></div></div></div>`;
+}
+async function aiSaveLabels(m, card) {
+  const labels = {}; card.querySelectorAll("[data-ilab]").forEach(x => { labels[x.dataset.ilab] = x.value; });
+  if (Object.values(labels).some(v => !v)) { m.note = "Choose PLASMID or CHROMOSOME for every sequence first."; return aiRenderLog(); }
+  let r; try { r = await api("ai/intake/labels/save", {dest: m.dest, sample: m.data.sample, labels}); } catch (e) { m.note = e.message; return aiRenderLog(); }
+  if (!r.ok) { m.note = "Not saved: " + r.problems.join("; "); return aiRenderLog(); }
+  m.done = true; m.note = "Saved. Checking again…"; aiRenderLog();
+  const p = AI.msgs[m.parent];
+  try { const c = await api("ai/intake/check", {dest: m.dest, only: [m.data.sample], deep: false}); m.note = c.ok ? "Saved. The quick test now passes for " + m.data.sample + "." : "Saved. The quick test still reports: " + c.samples.flatMap(s => s.checks.filter(x => x.status === "fail").map(x => x.name)).join("; ");
+    if (p) { const cc = (p.result && p.result.check) || p.check; if (cc) { cc.samples = cc.samples.map(s => s.sample_id === m.data.sample ? c.samples[0] : s); cc.ok = cc.samples.every(s => s.ok); } await aiIntakeRunCard(p); } } catch (e) { m.note = "Saved. " + e.message; }
+  aiRenderLog();
+}
+async function aiIntakeShare(m, card) {
+  aiIntakeRead(card, m);
+  if (AI.busy) return toast("Wait for the answer to finish first", "");
+  let r; try { r = await api("ai/intake/share", {id: AI.grant.id, dest: m.dest, choices: m.choices}); } catch (e) { return toast(e.message, "bad"); }
+  if (!await askConfirm({title: "Share this summary with the assistant?", confirmLabel: "Share", body: "This exact text goes to the assistant with your next message: isolate ids, counts, how sure each reference match is and the check codes. Never a folder path, your user name or your files' contents.", detail: r.summary})) return;
+  aiSend("Here is the isolate set-up PlasBench's intake planned for my folder. What should I check or decide before I stage it?", {share: AI.grant.id});
+}
+/* Check my sample sheet: plasbench intake check on a sheet of your own isolates (config/<name>.tsv), or the mechanical fixes of a sheet inside the chosen folder. */
+async function aiFlowCheckSheet() {
+  let opts; try { opts = await api("ai/intake/options", {}); } catch (e) { return toast(e.message, "bad"); }
+  const choices = {}; (opts.sheets || []).forEach(s => { choices["s:" + s] = "config/" + s + ".tsv"; });
+  choices.grant = AI.grant ? "A sheet in my chosen folder (" + AI.grant.name + ")" : "A sheet in a folder I choose";
+  const keys = Object.keys(choices), pick = keys.length === 1 ? keys[0] : await aiChoose("Which sample sheet?", choices);
+  if (!pick) return;
+  if (pick === "grant") { if (!AI.grant) { AI.afterGrant = "check_sheet_grant"; return aiChooseFolder(); } return aiFlowSheet(); }
+  const m = aiPush({kind: "check", dest: {where: "shared", sheet: pick.slice(2), study: ""}, opts, busy: true});
+  return aiCheckRun(m);
+}
+async function aiCheckRun(m) {
+  m.busy = true; m.err = ""; aiRenderLog();
+  try { m.check = await api("ai/intake/check", {dest: m.dest, deep: false}); m.run = "plasbench run --samples config/" + m.dest.sheet + ".tsv --local-inputs" + (m.dest.where === "study" && m.dest.study ? " --study " + m.dest.study + " --keep-data-in-study" : ""); } catch (e) { m.err = e.message; }
+  m.busy = false; aiRenderLog(); if (m.check && m.check.ok) await aiIntakeRunCard(m);
+}
+function aiCheckCard(m, mi) {
+  return `<div class="aimsg bot" data-m="${mi}"><div class="aicard2 check"><div class="ch"><b>Check ${esc("config/" + (m.dest.sheet || "") + ".tsv")}</b><span class="risk safe">read only</span></div><div class="cb">`
+    + aiDestHtml(m, false) + (m.busy ? `<div class="small mut">Checking every row the way the run will read it…</div>` : "") + (m.err ? `<div class="bad-t small">${esc(m.err)}</div>` : "") + aiCheckHtml(m.check)
+    + `<div class="acts"><button type="button" class="btn sec sm" data-aif="checkagain">Check again</button></div><div class="runstate" aria-live="polite">${m.note ? esc(m.note) : ""}</div></div></div>`
+    + (m.actions || []).map((a, i) => aiActionCard(a, mi, i)).join("") + `</div>`;
+}
+/* Why did my run fail?: plasbench diagnose --json (the person confirms it like any command), then a redacted digest the person sees in full before Send, with the safe next steps. */
+async function aiFlowWhy() {
+  let v; try { v = await api("ai/validate", {cmd: "plasbench diagnose --json", where: "window", risk: "safe"}); } catch (e) { return toast(e.message, "bad"); }
+  const m = aiPush({content: "First PlasBench reads the latest run with `plasbench diagnose --json`. It is safe and changes nothing; you confirm it like any command. Then you see exactly what would be sent before anything goes to the assistant."});
+  confirmRun(v.argv, "AI help: plasbench diagnose --json", undefined, job => { if (job) aiWhyAfter(m, job.id); });
+}
+async function aiWhyAfter(m, id) {
+  m.content += "\n\nReading the run…"; aiRenderLog();
+  let j;
+  for (let n = 0; n < 600; n++) { await sleep(1000); try { j = await api(`jobs/${id}?offset=0`); } catch { continue; } if (j.state !== "running" && j.state !== "cancelling") break; }
+  if (!j) return;
+  let log = j.log || ""; if (j.size > 400000) { try { log = (await api(`jobs/${id}?offset=${j.size - 400000}`)).log; } catch {} }
+  try { await refreshJobs(); } catch {}
+  const f = (S.jobs || []).filter(x => x.id !== id && (x.state === "failed" || x.state === "interrupted")).sort((a, b) => (b.started || 0) - (a.started || 0))[0];
+  let failed = null;
+  if (f) { try { let fj = await api(`jobs/${f.id}?offset=0`); if (fj.size > 24000) fj = await api(`jobs/${f.id}?offset=${fj.size - 24000}`); failed = {command: "plasbench " + (f.argv || []).join(" "), exit: f.exit, tail: (fj.log || "").split(/\r?\n/).slice(-60).join("\n")}; } catch {} }
+  let d; try { d = await api("ai/run/digest", {diagnose: log, failed}); } catch (e) { m.content = "The diagnosis could not be read: " + e.message; return aiRenderLog(); }
+  m.digest = d; m.failedJob = f ? f.id : ""; m.failedExit = f ? f.exit : null; m.actions = d.actions || []; m.ui = d.settings || [];
+  m.content = d.causes.length ? "**What PlasBench found**\n\n" + d.causes.map(c => `- **${c.code}**: ${c.title}${c.advice ? "\n  " + c.advice : ""}`).join("\n") : "PlasBench's tables do not name a cause for this failure. The digest below has the stage, the step and the end of the log; send it to the assistant, or open an issue with `plasbench issue-report`.";
+  aiRenderLog(); $("#ai_live").textContent = "The diagnosis is ready";
+}
+function aiDigestHtml(m) {
+  const d = m.digest;
+  return `<div class="aicard2 digest"><div class="ch"><b>The diagnosis digest</b><span class="risk safe">nothing sent yet</span></div><div class="cb"><details><summary>Exactly what Send would send (about ${esc(String(d.tokens))} tokens, redacted)</summary><pre class="aipre-plain">${esc(d.text)}</pre></details>`
+    + `<div class="acts"><button type="button" class="btn sm" data-aif="dsend">Send to the assistant</button>${m.failedJob && d.resume ? `<button type="button" class="btn sec sm" data-aif="dresume">Resume the failed run</button>` : ""}</div><div class="runstate" aria-live="polite"></div></div></div>`;
+}
+async function aiDigestSend(m) {
+  if (AI.busy) return toast("Wait for the answer to finish first", "");
+  if (!await askConfirm({title: "Send this diagnosis to the assistant?", confirmLabel: "Send", body: "This exact text is sent with your question. Folder names, your user name, e-mail addresses, keys and IP addresses were removed. Nothing is sent unless you press Send.", detail: m.digest.text})) return;
+  aiSend("Why did my run fail? Give the cause, how to check it, and the fix, using this diagnosis.", {result: {command: "plasbench diagnose --json", exit: m.failedExit == null ? 0 : m.failedExit, output: m.digest.text}});
+}
+async function aiDigestResume(m) {
+  if (!await askConfirm({title: "Resume the failed run?", confirmLabel: "Resume", body: "The run starts again where it stopped: finished isolates and tool results are reused."})) return;
+  try { const j = await api(`jobs/${m.failedJob}/resume`, {}); toast("Resumed", "ok"); await refreshJobs(); showConsole(j.id, true); } catch (e) { toast(e.message, "bad"); }
+}
+/* Where is my run?: plasbench status as a card; no model. */
+async function aiFlowWhere() {
+  let r; try { r = await api("ai/run/where", {}); } catch (e) { return toast(e.message, "bad"); }
+  const ui = r.state === "stopped" || r.state === "running" ? [{ok: true, ui: "go", title: "Go to Runs", risk: "safe", desc: r.state === "stopped" ? "Opens the runs that need attention, where Resume is." : "Opens the running runs.", params: {target: "runs", sub: r.state === "stopped" ? "attention" : "ongoing"}, why: ""}] : [];
+  aiPush({content: "**Where is my run?** (from `plasbench status`)\n\n" + r.lines.map(l => "- " + l).join("\n") + (r.hints && r.hints.length ? "\n\n**What this means**\n\n" + r.hints.map(h => "- " + h).join("\n") : ""), actions: r.actions || [], ui});
+}
+async function aiFlowSetup() { return aiStartFlow("setup_isolates"); }
 async function aiFlowSheet() {
   const r = await aiScan(true); if (!r) return; AI.scan = r;
   aiPush({kind: "scan", scan: r.scan, summary: r.summary, tokens: r.tokens});
   const bad = r.scan.sheets.filter(x => x.problems.length);
-  if (!r.scan.sheets.length) return aiPush({content: "I found no sample sheet in this folder. Use 'Set up a run from my folder' to have one written for your reads."});
+  if (!r.scan.sheets.length) return aiPush({content: "I found no sample sheet in this folder. Use 'Set up my isolates from a folder' to have PlasBench's intake write one for your reads."});
   if (!bad.length) return aiPush({content: "The sample sheet(s) in this folder pass PlasBench's own checks: " + r.scan.sheets.map(x => x.rel).join(", ") + "."});
   const sheet = bad[0];
   let s; try { s = await api("ai/folder/suggest", {id: AI.grant.id, what: "sheet_fix", rel: sheet.rel}); } catch (e) { return toast(e.message, "bad"); }
