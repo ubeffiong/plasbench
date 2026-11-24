@@ -811,22 +811,55 @@ validate_sample_sheet() {
 # single dropped transfer should not end a multi-hour cohort download, so every
 # fetch goes through here. Attempts and delay are configurable via
 # NETWORK_RETRIES and NETWORK_RETRY_DELAY_SECONDS.
+# After a sleep: a computer that was asleep while an attempt (or the wait before the next one) was running comes back with dead connections, and Wi-Fi can
+# take a minute to return. Such an attempt is NOT counted against NETWORK_RETRIES: the wrapper says the computer was asleep, waits NETWORK_WAKE_GRACE_SECONDS
+# (default 20) for the network to come back and tries again, at most NETWORK_SUSPEND_RETRIES (default 3) extra times per command. A sleep is known from the
+# run's sleep record (RESULTS_DIR/.suspend_gaps, written by the sentinel and the heartbeat) or from the back-off wait itself taking far longer on the wall clock than
+# it should (the wait's clock stops during a suspend). Times printed are awake time.
 retry_network() {
     local what="$1"; shift
     local attempts="${NETWORK_RETRIES:-3}"
     local delay="${NETWORK_RETRY_DELAY_SECONDS:-15}"
-    local n=1
+    local grace="${NETWORK_WAKE_GRACE_SECONDS:-20}" free_max="${NETWORK_SUSPEND_RETRIES:-3}" min_gap="${SUSPEND_MIN_SECONDS:-60}"
+    local n=1 free=0 t0 t_start asleep wait_s before after slept
+    t_start="$(_pb_now)"
     while true; do
+        t0="$(_pb_now)"
         if "$@"; then
-            [[ "$n" -gt 1 ]] && log "  $what succeeded on attempt $n/$attempts"
+            if [[ "$free" -gt 0 ]]; then log "  $what succeeded on attempt $n/$attempts (plus $free not counted: the computer had been asleep)"
+            elif [[ "$n" -gt 1 ]]; then log "  $what succeeded on attempt $n/$attempts"; fi
             return 0
         fi
+        asleep="$(_pb_suspended_between "$t0" "$(_pb_now)")"
+        if [[ "$asleep" =~ ^[0-9]+$ && "$asleep" -gt 0 && "$free" -lt "$free_max" ]]; then
+            free=$((free + 1))
+            warn "  $what failed after the computer was asleep for about $(( (asleep + 59) / 60 )) min (its connection did not survive the sleep); this attempt is not counted, retrying in ${grace}s once the network is back"
+            run_event network_retry_after_sleep "what=$what" "asleep_seconds=$asleep" 2>/dev/null || true
+            sleep "$grace"
+            continue
+        fi
         if [[ "$n" -ge "$attempts" ]]; then
-            warn "  $what failed after $n attempt(s)"
+            local total=$(( $(_pb_now) - t_start )) zz
+            zz="$(_pb_suspended_between "$t_start" "$(_pb_now)")"; [[ "$zz" =~ ^[0-9]+$ ]] || zz=0
+            warn "  $what failed after $n attempt(s) ($(( total - zz )) s awake)"
             return 1
         fi
-        warn "  $what failed (attempt $n/$attempts); retrying in $((delay * n))s"
-        sleep $((delay * n))
+        wait_s=$((delay * n))
+        warn "  $what failed (attempt $n/$attempts); retrying in ${wait_s}s"
+        before="$(_pb_now)"
+        sleep "$wait_s"
+        after="$(_pb_now)"
+        slept=$(( after - before - wait_s ))
+        if [[ "$slept" -gt "$min_gap" ]]; then
+            # the wait took far longer on the wall clock than asked: the computer slept during it. Record the gap (so elapsed times leave it out) and do not count the attempt.
+            _pb_note_suspend "$(( before + 1 ))" "$after" 2>/dev/null || true
+            if [[ "$free" -lt "$free_max" ]]; then
+                free=$((free + 1))
+                log "  the computer was asleep during the wait; the next attempt of $what is not counted (waiting ${grace}s for the network)"
+                sleep "$grace"
+                continue
+            fi
+        fi
         n=$((n + 1))
     done
 }

@@ -94,3 +94,5 @@ KEEP_AWAKE	flag	0|1	Keep the computer awake while a run is active (the screen ma
 RUN_PROFILE	choice	standard|fast|thorough	Run profile: standard, fast (skips optional analyses that never change the leaderboard) or thorough	low
 ISESCAN_SCOPE	choice	plasmids|all	ISEScan searches only the plasmids (default) or every sequence	low
 ANNOTATION_RETRY_TIMED_OUT	flag	0|1	Retry an annotation caller once (alone, twice the time) before recording it as timed out	low
+NETWORK_SUSPEND_RETRIES	int	0..10	Extra network retries after the computer was asleep (not counted as failures)	low
+NETWORK_WAKE_GRACE_SECONDS	int	0..300	Seconds to wait for the network after the computer wakes up	low

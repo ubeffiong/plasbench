@@ -186,6 +186,11 @@ export ANALYSIS_TRACK_FILTER="${ANALYSIS_TRACK_FILTER:-}"
 # retries each fetch this many times before recording the sample as failed.
 export NETWORK_RETRIES="${NETWORK_RETRIES:-3}"
 export NETWORK_RETRY_DELAY_SECONDS="${NETWORK_RETRY_DELAY_SECONDS:-15}"
+# After a sleep (a laptop lid, Windows standby) a network command finds its connections dead. An attempt that overlapped a recorded sleep, or whose back-off wait the
+# computer slept through, is not counted against NETWORK_RETRIES: PlasBench waits NETWORK_WAKE_GRACE_SECONDS for the network to come back and tries again, at most
+# NETWORK_SUSPEND_RETRIES extra times per command (scripts/lib.sh retry_network).
+export NETWORK_WAKE_GRACE_SECONDS="${NETWORK_WAKE_GRACE_SECONDS:-20}"
+export NETWORK_SUSPEND_RETRIES="${NETWORK_SUSPEND_RETRIES:-3}"
 # An OPT-IN limit, blank by default: PlasBench never skips an isolate because its reads are big. If YOU set a number (GB), an isolate whose reads to download (after the
 # READ_DEPTH_CAP_X cut below) are above it is skipped and recorded as failed with the reason; re-running stage 1 retries it once the limit is raised or cleared.
 export MAX_RUN_DOWNLOAD_GB="${MAX_RUN_DOWNLOAD_GB:-}"

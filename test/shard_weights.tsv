@@ -507,6 +507,7 @@ test_ena_real_network.py	0.3
 test_run_profile.py	1.0
 test_suspend_awake.py	3.0
 test_keep_awake.py	8.0
+test_retry_network_sleep.sh	3.0
 test_suspend_heartbeat.sh	8.0
 test_isescan_scope.py	1.0
 test_run_profiles.py	5.0
