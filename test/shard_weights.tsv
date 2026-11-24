@@ -476,6 +476,7 @@ test_resource_adapt.py	12.0
 test_stop_all.py	40.0
 test_publishing.py	3.0
 test_no_conflict_markers.py	1.0
+test_console_scroll.py	2.0
 test_support_tools.py	2.0
 test_ai_kb.py	25.0
 test_ai_prompt.py	1.5

@@ -2307,7 +2307,7 @@ document.addEventListener("click", e => {
 });
 const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted", stalled:"No new output (may still be working)", working_quiet:"Working (quiet log)", retrying:"Retrying a failed tool", completed_with_warnings:"Completed with warnings", manual_step:"Manual step needed", consent_needed:"Consent needed", waiting_for_you:"Waiting for you to finish"})[s] || s;
 function showConsole(id, expand) {
-  if (id && id !== S.consJob) { S.consJob = id; S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; }
+  if (id && id !== S.consJob) { S.consJob = id; S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; setFollow(true); }
   $("#cjob").value = S.consJob || "";
   if (expand) setConsole(true);
   pollConsole(true);
@@ -2331,6 +2331,16 @@ function colorize(text) {
       v === "ok" || /complete|Wrote/i.test(raw) ? `<span class="c-ok">${l}</span>` :
       raw.startsWith("$ ") ? `<span class="c-cmd">${l}</span>` : raw.startsWith("[you] ") ? `<span class="c-you">${l}</span>` : l; }).join("\n");
 }
+/* The console follows new output only while you are at the bottom. Scroll up to read and it stays exactly where you are (the button then says "Jump to latest"); scroll back to the
+   bottom, or press the button, and it follows again. A scroll the page makes itself is not mistaken for yours. */
+const SCROLL_NEAR = 40;
+const nearBottom = el => el.scrollHeight - el.scrollTop - el.clientHeight <= SCROLL_NEAR;
+function toBottom(el) { S._progScroll = true; el.scrollTop = el.scrollHeight; requestAnimationFrame(() => { S._progScroll = false; }); }
+function setFollow(on) {
+  S.follow = !!on; const b = $("#cfollow"); if (!b) return;
+  b.setAttribute("aria-pressed", S.follow); b.style.opacity = S.follow ? 1 : .8; b.textContent = S.follow ? "Follow" : "Jump to latest ↓";
+  b.title = S.follow ? "Following new output. Scroll up to read; the console will stay where you are." : "You scrolled up, so the console stays where you are. Press to jump to the latest output and follow it again.";
+}
 let polling = false;
 async function pollConsole(force) {
   if (S.conn) return;
@@ -2353,7 +2363,7 @@ async function pollConsole(force) {
     if (j.display_state === "stalled") { const fresh = !S._stallJob || S._stallJob.id !== j.id; S._stallJob = {id: j.id, idle: j.idle_seconds, results: j.results || ""}; if (j.results && !S.rs[j.results]) rsFetch(j.results).then(() => paintStall()); if (fresh && !S.act[j.id]) checkActivity(j.id); paintStall(); }
     else if (S._stallJob) { S._stallJob = null; paintStall(); }
     $("#ccancel").hidden = j.state !== "running";
-    if (S.follow) $("#clog").scrollTop = $("#clog").scrollHeight;
+    if (S.follow) toBottom($("#clog"));
     const wasRunning = S._lastState === "running"; S._lastState = j.state;
     const shown = j.display_state || j.state;
     if (shown === "completed_with_warnings") st.title = WARN_EXPLAIN;
@@ -2389,7 +2399,9 @@ $("#cin").addEventListener("click", e => { const b = e.target.closest("[data-ans
 $("#cinsec").onchange = e => { $("#cintx").type = e.target.checked ? "password" : "text"; };
 $("#ccancel").onclick = async () => { try { if (!await askCancelRun(S.consJob)) return; await api(`jobs/${S.consJob}/cancel`, {}); toast("Cancelling…"); } catch (e) { toast(e.message, "bad"); } };
 $("#ccopy").onclick = () => copyText(({term: $("#tlog"), sess: $("#slog")}[S.ctab] || $("#clog")).innerText, "Copied");
-$("#cfollow").onclick = e => { S.follow = !S.follow; e.currentTarget.setAttribute("aria-pressed", S.follow); e.currentTarget.style.opacity = S.follow ? 1 : .55; };
+$("#cfollow").onclick = () => { if (S.follow) { setFollow(false); } else { setFollow(true); toBottom($("#clog")); } };
+$("#clog").addEventListener("scroll", () => { if (!S._progScroll) setFollow(nearBottom($("#clog"))); }, {passive: true});
+setFollow(true);
 // The console is a fixed footer, open from the start at a quarter of the window (never under 160 px); it remembers
 // its height and whether you closed it.
 let consH = +(localStorage.getItem("pb_consh") || Math.max(160, Math.round(innerHeight * .25)));
@@ -2459,7 +2471,7 @@ $("#sscript").onclick = async () => {
 
 /* ---- terminal: your own commands, in the PlasBench folder (or the workspace) ---- */
 const T = {hist: [], at: 0, loaded: false};
-function tPrint(html) { const b = $("#tlog"); b.insertAdjacentHTML("beforeend", html); b.scrollTop = b.scrollHeight; }
+function tPrint(html) { const b = $("#tlog"), stay = nearBottom(b) || html.indexOf('class="t-cmd"') >= 0; b.insertAdjacentHTML("beforeend", html); if (stay) b.scrollTop = b.scrollHeight; }   // a command you just typed is always shown; other output follows only while you are at the bottom
 function tShow(st) {
   $("#tpr").textContent = st.prompt || ""; $("#tpr").title = st.cwd || ""; $("#tcwd").textContent = st.shown_cwd || "";
   $("#tcmd").disabled = !st.enabled; $("#trun").disabled = !st.enabled;
