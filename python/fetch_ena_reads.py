@@ -21,8 +21,9 @@ default 16, never above 24) shared by the two mates; ENA_DOWNLOAD_CONNECTIONS ca
 When the data folder is on a slow mount (a Windows drive seen from WSL, a network share) the
 .part files and the MD5 check live in a local scratch folder (DOWNLOAD_TMP_DIR, python/download_scratch.py)
 and the verified file is moved into place. aria2c is used only when ENA_USE_ARIA2=1.
-Progress is bytes actually received, printed every ENA_PROGRESS_SECONDS (default 30) and written
-to --progress-file (results/download_progress.json).
+Progress is bytes actually received. The live detail is written every 2 seconds to --progress-file
+(results/download_progress.json); the log gets the first line, then at most one short line per 10% and
+5 minutes (ENA_LOG_STEP_PERCENT, ENA_LOG_INTERVAL_SECONDS), and a line when something changes.
 """
 
 import argparse
@@ -170,8 +171,7 @@ def main():
     ena_download.log(f"{args.run}: {len(pairs)} files, {ena_download.human_bytes(total_bytes)}, at most {budget.limit} connections in total"
                      + (f" ({ena_download.settings()['per_file']} per file)" if ena_download.settings()["per_file"] else ""))
     started = time.time()
-    interval = max(1.0, float(os.environ.get("ENA_PROGRESS_SECONDS", "30") or 30))
-    json_every = min(2.0, interval)
+    json_every = 2.0
     stop = threading.Event()
 
     gate = ena_download.LogGate()
