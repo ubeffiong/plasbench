@@ -30,7 +30,7 @@ jobs:
       # plasmidSPAdes is checked on its own real isolate (see 'Fetch real reads'); the others on the known plasmid pBR322.
       ACCESSION: ${{ github.event.inputs.accession || (matrix.tool == 'plasmidspades' && 'NZ_CP054231.1' || 'J01749.1') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: mamba-org/setup-micromamba@v3
         with:
           environment-name: real
