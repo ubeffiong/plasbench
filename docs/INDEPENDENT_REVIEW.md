@@ -423,10 +423,10 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E5 | Scorer CLI default minimum identity is 0 | `python/score_plasmids.py:582` | `--min-alignment-identity` |
 | E6 | Scorer CLI default minimum MAPQ is 0 | `python/score_plasmids.py:584` | `--min-alignment-mapq` |
 | E7 | Scorer CLI default query coverage is 0 | `python/score_plasmids.py:586` | `--min-alignment-query-coverage` |
-| E8 | Pipeline default minimum alignment length is 200 | `config/config.sh:707` | `MIN_ALIGNMENT_LENGTH` |
-| E9 | Pipeline default identity is 0.90 | `config/config.sh:708` | `MIN_ALIGNMENT_IDENTITY` |
-| E10 | Pipeline default MAPQ is 20 | `config/config.sh:709` | `MIN_ALIGNMENT_MAPQ` |
-| E11 | Pipeline default query coverage is 0.20 | `config/config.sh:710` | `MIN_ALIGNMENT_QUERY_COVERAGE` |
+| E8 | Pipeline default minimum alignment length is 200 | `config/config.sh:745` | `MIN_ALIGNMENT_LENGTH` |
+| E9 | Pipeline default identity is 0.90 | `config/config.sh:746` | `MIN_ALIGNMENT_IDENTITY` |
+| E10 | Pipeline default MAPQ is 20 | `config/config.sh:747` | `MIN_ALIGNMENT_MAPQ` |
+| E11 | Pipeline default query coverage is 0.20 | `config/config.sh:748` | `MIN_ALIGNMENT_QUERY_COVERAGE` |
 | E12 | A fixed 0.99995 completeness band | `python/score_plasmids.py:733` | `0.99995` |
 | E13 | Bin purity gate default 0.9 | `python/score_bins.py:367` | `--min-bin-purity` |
 | E14 | Split threshold default 0.1 | `python/score_bins.py:368` | `--split-threshold` |
@@ -449,7 +449,7 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E31 | Power analysis uses a normal approximation | `python/power_analysis.py:69` | `NormalDist().inv_cdf` |
 | E32 | Plasmid replicons under the long-read depth floor become ambiguous (default 5x) | `python/label_truth_evidence.py:154` | `--min-long-read-depth` |
 | E33 | Tier is decided from strategy, polish and cohort tier | `python/truth_provenance.py:334` | `reference_tier, tier_reason = tier(` |
-| E34 | Circularity guard for long-read tools | `scripts/lib.sh:838` | `truth_independent_of_long_reads` |
+| E34 | Circularity guard for long-read tools | `scripts/lib.sh:911` | `truth_independent_of_long_reads` |
 | E35 | Date-based overlap screen | `python/flag_database_overlap.py:101` | `possible_overlap` |
 | E36 | Mash screen is marked experimental and unvalidated | `python/classify_operational_plasmid.py:4` | `EXPERIMENTAL AND UNVALIDATED` |
 | E37 | The recommender's ridge penalty is chosen on the folds it reports | `python/fit_recommendation_model.py:242` | `lambda was selected on the same LOSO folds` |
@@ -457,7 +457,7 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E39 | CI installs minimap2 so the aligner test runs for real | `.github/workflows/ci.yml:76` | `apt-get install -y -qq minimap2` |
 | E40 | Base-level metrics valid only without same-read polishing | `python/truth_provenance.py:16` | `base_level_metrics_valid` |
 | E41 | Tool database dates (first row) | `config/tool_database_releases.tsv:2` | `mob_recon` |
-| E42 | Exclusion of possible overlaps is off by default | `config/config.sh:715` | `EXCLUDE_DATABASE_OVERLAP` |
+| E42 | Exclusion of possible overlaps is off by default | `config/config.sh:753` | `EXCLUDE_DATABASE_OVERLAP` |
 | E43 | barrnap is in the environment file | `env/environment.yml:25` | `barrnap` |
 | E44 | minimap2 is a hard requirement of scoring | `scripts/05_score.sh:21` | `need minimap2` |
 | E52 | Unresolvable truth sequences are labelled REVIEW | `python/make_truth.py:50` | `REVIEW = "REVIEW"` |

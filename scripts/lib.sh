@@ -162,7 +162,7 @@ sys_stats() {
         [[ -n "$avail" ]] && out+="mem_avail=${avail}MB"
         [[ -n "$swap" ]] && out+="${out:+ }swap_used=${swap}MB"
     fi
-    free="$(df -Pk "${1:-.}" 2>/dev/null | awk 'NR == 2 { printf "%.0f", $4 / 1048576 }')"
+    free="$(df -Pk "${1:-.}" 2>/dev/null </dev/null | awk 'NR == 2 { printf "%.0f", $4 / 1048576 }')"
     [[ -n "$free" ]] && out+="${out:+ }disk_free=${free}GB"
     printf '%s' "$out"
 }
@@ -192,7 +192,7 @@ heartbeat_report() {
     run_event heartbeat "what=$description" "elapsed=$elapsed" "stats=${stats}" "system=${sysstats}" "log_idle=${idle}" "phase=${phase}"
     avail="$(sed -n 's/.*mem_avail=\([0-9]*\)MB.*/\1/p' <<< "$sysstats")"
     if [[ "$avail" =~ ^[0-9]+$ && "$avail" -lt 300 ]]; then
-        heartbeat_log "WARNING: only ${avail} MB of memory is available: $description may be killed (exit 137) or crawl in swap. Lower THREADS or ASSEMBLY_MEMORY_GB, or skip isolates with very large read sets (MAX_RUN_DOWNLOAD_GB)."
+        heartbeat_log "WARNING: only ${avail} MB of memory is available: $description may be killed (exit 137) or crawl in swap. Lower THREADS or ASSEMBLY_MEMORY_GB, or lower READ_DEPTH_CAP_X (reads deeper than it are cut at download)."
         run_event warning "what=$description" "kind=low_memory" "mem_avail_mb=$avail"
     fi
     cpu="$(sed -n 's/.*cpu=\([0-9]*\)%.*/\1/p' <<< "$stats")"
@@ -216,6 +216,33 @@ slow_step_note() {   # slow_step_note DESCRIPTION ELAPSED TYPICAL
     local what="$1" elapsed="$2" typical="$3"
     heartbeat_log "NOTE: $what is still running after $(( elapsed / 60 )) min (typical about $(( typical / 60 )) min here, ${STEP_SLOW_FACTOR:-3}x or more). If its log has not changed and the CPU is near 0% it may be stuck: run 'plasbench diagnose'. A big isolate can simply take this long."
     run_event slow_step "what=$what" "elapsed=$elapsed" "typical=$typical" "factor=${STEP_SLOW_FACTOR:-3}"
+}
+
+# awake_timeout SECONDS COMMAND...: like `timeout`, but the limit counts time the computer was awake (exit 124 at the limit). A wall-clock `timeout` kills a tool for the time the
+# computer slept (TOOL_TIMEOUT_SECONDS would score a tool as failed because the lid was closed). The command's own exit code is passed through.
+awake_timeout() {
+    local limit="$1"; shift
+    local pid rc=0 started now prev asleep=0 gsize gsize_seen="" min_gap="${SUSPEND_MIN_SECONDS:-60}"
+    started="$(_pb_now)"; prev="$started"
+    "$@" & pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        sleep 1
+        now="$(_pb_now)"
+        if [[ "$min_gap" =~ ^[0-9]+$ && $(( now - prev )) -gt $(( min_gap + 1 )) ]]; then _pb_note_suspend "$(( prev + 1 ))" "$now"; fi
+        prev="$now"
+        gsize="$(stat -c %s "${RESULTS_DIR:-/nonexistent}/.suspend_gaps" 2>/dev/null || stat -f %z "${RESULTS_DIR:-/nonexistent}/.suspend_gaps" 2>/dev/null || echo 0)"
+        if [[ "$gsize" != "$gsize_seen" ]]; then asleep="$(_pb_suspended_between "$started" "$now")"; gsize_seen="$gsize"; fi
+        if (( now - started - asleep >= limit )); then
+            asleep="$(_pb_suspended_between "$started" "$now")"      # look once more before killing anything: the sentinel may have just recorded a sleep
+            (( now - started - asleep >= limit )) || continue
+            pkill -TERM -P "$pid" 2>/dev/null || true
+            kill -TERM "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+            return 124
+        fi
+    done
+    wait "$pid" || rc=$?
+    return "$rc"
 }
 
 # ---- computer sleep (suspend): time the computer was asleep is not time the step took -------------------------------------------------
@@ -362,6 +389,40 @@ report_crashed_sample_jobs() {
 }
 
 # --- parallel job pool --------------------------------------------------
+# auto_parallel_apply STAGE: AUTO_PARALLEL (config/config.sh, python/parallel_plan.py). When MAX_PARALLEL_SAMPLES was not set by you, size it for THIS stage from the CPUs and
+# the free memory, and divide the thread budget between the isolates (THREADS and the per-step thread settings that followed it), unless you set THREADS. Prints the plan
+# once and records a parallel_plan event. A no-op with AUTO_PARALLEL=0, an explicit MAX_PARALLEL_SAMPLES, or one isolate.
+auto_parallel_apply() {
+    local stage="$1" n cpus mb line slots threads mem why old_threads v
+    [[ "${AUTO_PARALLEL:-1}" == "1" && "${PLASBENCH_SAMPLES_EXPLICIT:-0}" != "1" ]] || return 0
+    have python3 || return 0
+    n="$(read_samples "$SAMPLE_SHEET" 2>/dev/null | awk 'NF' | wc -l | tr -d '[:space:]')"
+    [[ "$n" =~ ^[0-9]+$ && "$n" -gt 1 ]] || return 0
+    cpus="${PLASBENCH_TEST_CPUS:-$(plasbench_detect_cores)}"
+    mb="${PLASBENCH_TEST_AVAILABLE_MB:-$(plasbench_detect_memory_mb)}"
+    line="$(python3 -I "${PROJECT_ROOT:-$HERE/..}/python/parallel_plan.py" plan --stage "$stage" --cpus "$cpus" --available-mb "$mb" --isolates "$n"         --slot-gb "${ASSEMBLY_SLOT_GB:-8}" --profile "${RESULTS_DIR:-.}/resource_profile.tsv" 2>/dev/null </dev/null)" || return 0
+    IFS=$'\t' read -r slots threads mem why <<< "$line"
+    [[ "$slots" =~ ^[0-9]+$ && "$threads" =~ ^[0-9]+$ ]] || return 0
+    export MAX_PARALLEL_SAMPLES="$slots"
+    if [[ "${PLASBENCH_THREADS_EXPLICIT:-0}" != "1" && "$slots" -gt 1 ]]; then
+        old_threads="$THREADS"
+        export THREADS="$threads"
+        # the per-step thread settings that simply followed THREADS follow the share too (one you set yourself differs from THREADS and is kept)
+        for v in HYBRID_TRUTH_THREADS PROTEIN_ANNOTATION_THREADS QUAST_DIAGNOSTICS_THREADS DIFFICULTY_FEATURES_THREADS; do
+            [[ "${!v:-}" == "$old_threads" ]] && export "$v=$threads"
+        done
+    fi
+    if [[ "$stage" == "3" && "$slots" -gt 1 && "$mem" =~ ^[0-9]+$ && "${ASSEMBLY_MEMORY_GB:-0}" -gt "$mem" ]]; then
+        export ASSEMBLY_MEMORY_GB="$mem"          # the assembler memory budget is shared between the assemblies running at once
+    fi
+    if [[ "$slots" -gt 1 ]]; then
+        log "AUTO_PARALLEL: stage $stage is running $slots isolates at a time: $cpus CPUs, $(awk -v m="$mb" 'BEGIN { printf "%.1f", m / 1024 }') GB free ($THREADS threads each${mem:+, ${ASSEMBLY_MEMORY_GB} GB memory budget each}). AUTO_PARALLEL=0 or MAX_PARALLEL_SAMPLES=1 runs one at a time."
+    else
+        log "AUTO_PARALLEL: stage $stage runs one isolate at a time ($why)"
+    fi
+    run_event parallel_plan "stage_no=$stage" "slots=$slots" "threads=$THREADS" "cpus=$cpus" "available_mb=$mb" "reason=$why"
+}
+
 # Block until fewer than MAX background jobs of this shell are running, then
 # return so the caller can start one more with `&`. MAX=1 (every stage's
 # default) waits for every previously started job to finish before letting a
@@ -648,7 +709,7 @@ record_stage_timing() {
 check_free_disk() {
     local dir="$1" min_gb="${2:-${MIN_FREE_DISK_GB:-20}}" kb
     [[ "$min_gb" =~ ^[0-9]+$ && "$min_gb" -gt 0 ]] || return 0
-    kb="$(df -Pk "$dir" 2>/dev/null | awk 'NR == 2 { print $4 }')"
+    kb="$(df -Pk "$dir" 2>/dev/null </dev/null | awk 'NR == 2 { print $4 }')"
     [[ "$kb" =~ ^[0-9]+$ ]] || return 0
     if (( kb / 1048576 < min_gb )); then
         warn "only about $(( kb / 1048576 )) GB is free where $dir is (below the ${min_gb} GB threshold, MIN_FREE_DISK_GB): downloads and assemblies may fill the disk."
@@ -714,7 +775,7 @@ diagnose_failed_step() {
     DIAG_CAUSE="unknown"; DIAG_CONFIDENCE="low"; DIAG_RETRY="-"; DIAG_ENV="0"; DIAG_TITLE="the cause is not recognised"
     DIAG_EVIDENCE="see $logfile"; DIAG_ADVICE="Read the end of the log: tail -30 $logfile"
     have python3 || return 0
-    free_gb="$(df -Pk "${DATA_DIR:-.}" 2>/dev/null | awk 'NR == 2 && $4 ~ /^[0-9]+$/ { printf "%.2f", $4 / 1048576 }')"
+    free_gb="$(df -Pk "${DATA_DIR:-.}" 2>/dev/null </dev/null | awk 'NR == 2 && $4 ~ /^[0-9]+$/ { printf "%.2f", $4 / 1048576 }')"
     line="$(python3 -I "${PROJECT_ROOT:-.}/python/assembler_diagnosis.py" "$logfile" --format tsv --exit-code "$code" --sample "$sample" \
         --threads "${THREADS:-}" --memory-gb "${ASSEMBLY_MEMORY_GB:-}" --tmpdir "${TMPDIR:-/tmp}" ${free_gb:+--free-gb "$free_gb"} 2>/dev/null </dev/null)" || return 0
     [[ -n "$line" ]] || return 0
@@ -815,11 +876,23 @@ retry_network() {
     local what="$1"; shift
     local attempts="${NETWORK_RETRIES:-3}"
     local delay="${NETWORK_RETRY_DELAY_SECONDS:-15}"
-    local n=1
+    local n=1 free=0 t0 asleep
     while true; do
+        t0="$(_pb_now)"
         if "$@"; then
             [[ "$n" -gt 1 ]] && log "  $what succeeded on attempt $n/$attempts"
             return 0
+        fi
+        # A connection that was open when the computer went to sleep is dead on waking: the call fails at once, which is the sleep's fault, not the network's. Such a failure does not
+        # use up an attempt (up to NETWORK_RESUME_RETRIES = 3 times), and the retry waits a little for the network to come back. (The run's sentinel writes the sleep within a few
+        # seconds of waking, so the check waits NETWORK_SUSPEND_CHECK_DELAY = 6 s before it looks.)
+        sleep "${NETWORK_SUSPEND_CHECK_DELAY:-6}"
+        asleep="$(_pb_suspended_between "$t0" "$(_pb_now)")"
+        if [[ "$asleep" -gt 0 && "$free" -lt "${NETWORK_RESUME_RETRIES:-3}" ]]; then
+            free=$(( free + 1 ))
+            warn "  $what was interrupted: the computer was asleep for about ${asleep}s while it ran, so its connections are dead. Retrying without counting this attempt, after a short wait for the network"
+            sleep "${NETWORK_RESUME_WAIT_SECONDS:-15}"
+            continue
         fi
         if [[ "$n" -ge "$attempts" ]]; then
             warn "  $what failed after $n attempt(s)"

@@ -79,5 +79,24 @@ with tempfile.TemporaryDirectory() as tmp:
     check("the count is reported", files == 3 and total > 0, (files, total))
     check("finish on a missing source moves nothing", wd.finish(tmp / "nope", tmp / "d2") == (0, 0))
 
+    # copy-in (inputs into the work folder once) and put (one file back, atomically), both keeping the modification time
+    src = tmp / "inputs" / "SRR_1.trim.fastq.gz"
+    src.parent.mkdir()
+    src.write_bytes(b"reads" * 1000)
+    os.utime(str(src), (1_600_000_000, 1_600_000_000))
+    copied = wd.copy_in([src], tmp / "work" / "reads")
+    local = Path(copied[0])
+    check("copy-in keeps the name, the bytes and the time (stage 4's reuse fingerprint reads size:mtime)",
+          local.name == src.name and local.read_bytes() == src.read_bytes() and int(local.stat().st_mtime) == 1_600_000_000, copied)
+    back = tmp / "inputs" / "back.fastq.gz"
+    wd.put(local, back)
+    check("put copies back byte-identical, keeps the time, leaves no .partial", back.read_bytes() == src.read_bytes() and int(back.stat().st_mtime) == 1_600_000_000
+          and not list((tmp / "inputs").glob("*.partial.*")))
+    try:
+        wd.put(tmp / "missing", back)
+        check("put of a missing file raises and leaves the destination alone", False)
+    except OSError:
+        check("put of a missing file raises and leaves the destination alone", back.read_bytes() == src.read_bytes() and not list((tmp / "inputs").glob("*.partial.*")))
+
 print("ALL WORK DIRECTORY TESTS PASSED" if ok else "WORK DIRECTORY TESTS FAILED")
 sys.exit(0 if ok else 1)

@@ -60,7 +60,7 @@ def main():
     check("auto = SRA Toolkit then ENA; sra = SRA Toolkit only; ena = ENA only, MD5-verified",
           "ENA" in choices["auto"] and "SRA Toolkit" in choices["auto"] and "only" in choices["sra"] and "ENA only" in choices["ena"] and "MD5" in choices["ena"], choices)
     config = (ROOT / "config" / "config.sh").read_text(encoding="utf-8")
-    check("config.sh still says what the tooltip says", "auto (SRA Toolkit, then ENA if prefetch fails)" in config and "ena (ENA only" in config)
+    check("config.sh still says what the tooltip says", "auto (ENA first" in config and "the SRA Toolkit only when ENA has no paired FASTQ" in config and "ena (ENA only" in config)
     check("READ_SOURCE: default auto and the setting name are shown", rs["default"] == "auto" and rs["setting"] == "READ_SOURCE")
 
     print("wizard controls")

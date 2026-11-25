@@ -7,8 +7,8 @@ const results = [];
 const check = (name, ok, detail = "") => { results.push(ok); console.log((ok ? "  ok    " : "  FAIL  ") + name + (ok ? "" : `  [${detail}]`)); };
 const grabFn = name => { const i = html.indexOf(`\nfunction ${name}(`); if (i < 0) throw new Error("missing " + name); const j = html.indexOf("\n}\n", i); return html.slice(i + 1, j + 2); };
 const grabConst = name => { const m = html.match(new RegExp(`^const ${name} = .*$`, "m")); if (!m) throw new Error("missing const " + name); return m[0]; };
-const src = [grabConst("esc"), grabConst("icon"), grabConst("aiKb"), "const AI_WHERE = {window: 'w', terminal: 't'}; const AI_PLAIN_WHERE = 'x';", ...["md", "aiActionCard", "aiAskCard", "aiScanCard", "aiPlanCard", "aiUiCard", "aiToolCard", "aiMsgHtml"].map(grabFn),
-  "globalThis.T = {esc, md, aiActionCard, aiAskCard, aiScanCard, aiPlanCard, aiUiCard, aiToolCard, aiMsgHtml, aiKb};"].join("\n");
+const src = [grabConst("esc"), grabConst("icon"), grabConst("aiKb"), "const AI_WHERE = {window: 'w', terminal: 't'}; const AI_PLAIN_WHERE = 'x';", ...["md", "aiActionCard", "aiAskCard", "aiScanCard", "aiPlanCard", "aiUiCard", "aiToolCard", "aiMsgHtml", "aiDestHtml", "aiIsoHtml", "aiCheckHtml", "aiIntakeCard", "aiLabelsCard", "aiCheckCard", "aiDigestHtml"].map(grabFn),
+  "globalThis.T = {esc, md, aiActionCard, aiAskCard, aiScanCard, aiPlanCard, aiUiCard, aiToolCard, aiMsgHtml, aiKb, aiIntakeCard, aiLabelsCard, aiCheckCard};"].join("\n");
 const ctx = vm.createContext({console}); vm.runInContext(src, ctx);
 const T = ctx.T;
 const corpus = ["<script>PWN()</script>", "<img src=x onerror=PWN()>", "\"><b id=PWN>", "' onmouseover='PWN()", "\" onfocus=\"PWN()\" autofocus x=\"", "<svg onload=PWN()>", "<iframe src=javascript:PWN()>", "javascript:PWN()",
@@ -18,7 +18,7 @@ const corpus = ["<script>PWN()</script>", "<img src=x onerror=PWN()>", "\"><b id
   "<scr<script>ipt>PWN()</script>", "x".repeat(100000), "<".repeat(5000), "\"".repeat(5000)];
 // A strict reading of the HTML a card produced: every "<" must start a tag of a known name whose attributes are plain (no on* handler, no style, href only http(s) or #), and no
 // attribute value may contain a raw quote or "<" (esc() writes &quot; and &lt;). Anything else is injected markup.
-const TAGS = new Set("div span p b i code pre ul ol li a h1 h2 h3 h4 h5 h6 table tr th td blockquote hr button label input details summary progress svg use br dl dt dd em strong".split(" "));
+const TAGS = new Set("div span p b i code pre ul ol li a h1 h2 h3 h4 h5 h6 table tr th td blockquote hr button label input details summary progress svg use br dl dt dd em strong select option".split(" "));
 const TAG = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:\s+[a-zA-Z:_-][\w:.-]*(?:\s*=\s*(?:"[^"<]*"|'[^'<]*'|[^\s"'<>=`]+))?)*)\s*\/?>/g;
 const ATTR = /\s+([a-zA-Z:_-][\w:.-]*)(?:\s*=\s*(?:"([^"<]*)"|'([^'<]*)'|([^\s"'<>=`]+)))?/g;
 const bad = out => {
@@ -49,6 +49,15 @@ for (const p of corpus) {
     tool: T.aiToolCard({tool: {ok: false, problems: [p], warnings: [p], text: p, name: p}, note: p}, 0),
     msg: T.aiMsgHtml({role: "bot", content: p, sources: [{n: 1, src: p, anchor: p, title: p}], actions: [Object.assign({}, act, {cmd: p})], asks: [{q: p, options: [p]}], usage: {total: 1}, model: p, provider: p, link: "https://x.example/" + p}, 0),
     user: T.aiMsgHtml({role: "user", content: p}, 0),
+    intake: T.aiIntakeCard({dest: {where: "study", study: p, sheet: p}, note: p, err: p, actions: [Object.assign({}, act, {cmd: p})], result: {ok: true, staged: [p], results: [{id: p, ok: false, messages: [p]}], journal: p,
+      check: {ok: false, error: "", fixable: 1, repaired: [{sample_id: p, what: p}], samples: [{sample_id: p, mode: p, ok: false, checks: [{status: p, name: p, detail: p, fix: p, code: "truth-review", auto: true}]}]}},
+      view: {folder: p, staged: 1, needs_review: 1, destination: {label: p}, notes: [p], can_apply: true, fingerprint: p, command: p, run: p, refused: [{file: p, reason: p}],
+        leftovers: {fasta_unmatched: [p], long_read_files: [p], unpaired_fastq: [p]}, sheet: {path: p, exists: true, diff: p, after: p, problems: [p]},
+        isolates: [{id: p, from: p, stage: false, skip: p + " not ticked", status: "blocked", lanes: 2, reads: [p], compressed: false, mode: p, reference: p, reference_how: p, reference_size: 5, reference_records: 2,
+          candidates: [p, p], organism: p, organism_guess: p, truth: p, needs_review: 1, issues: [{level: "warn", text: p, code: p}], ops: [{kind: p, from: [p], to: p, how: p}]}]}}, 0),
+    labels: T.aiLabelsCard({data: {sample: p, rows: [{sequence_id: p, raw_id: p, length: 3, header: p, label: "REVIEW"}]}, note: p}, 0),
+    check: T.aiCheckCard({dest: {where: "shared", sheet: p}, check: {ok: false, error: p, samples: [], fixable: 0, repaired: []}, err: p, note: p}, 0),
+    digest: T.aiMsgHtml({role: "bot", content: p, digest: {text: p, tokens: 3, resume: true}, failedJob: p}, 0),
   };
   for (const [k, o] of Object.entries(outs)) {
     if (p.length > 20000 && k !== "md" && k !== "user") { continue; }

@@ -340,14 +340,45 @@ def _truth_for(reference: Path, isolate_id: str):
     return "", None
 
 
-def scan(roots, depth: int = 3, sample_reads: bool = True) -> dict:
-    """Find isolates under the folders. Returns a plain dict (JSON-able): isolates, leftovers and notes. Changes nothing on disk."""
+WINDOWS_DEVICE = re.compile(r"^(CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|COM[0-9]|LPT[0-9])(\..*)?$", re.IGNORECASE)
+META_HINT = re.compile(r"(metagenom|microbiome|stool|f(a)?ecal|faeces|feces|wastewater|sewage|soil|zymo|mock[_-]?community|community)", re.IGNORECASE)
+
+
+def id_problem(sample_id: str) -> str:
+    """'' when a sample id can be used as a folder name everywhere, else the reason (it becomes data/<sample_id>/ on Windows too)."""
+    if not SAFE_ID.match(sample_id or ""):
+        return f"'{sample_id}' is not a usable sample id (letters, digits . _ - only)"
+    if WINDOWS_DEVICE.match(sample_id):
+        return f"'{sample_id}' is a Windows device name (CON, NUL, COM1 ...) and cannot be a folder name; choose another sample id"
+    return ""
+
+
+def scan(roots, depth: int = 3, sample_reads: bool = True, accept=None, references=None) -> dict:
+    """Find isolates under the folders. Returns a plain dict (JSON-able): isolates, leftovers and notes. Changes nothing on disk.
+
+    `accept(path) -> reason` (optional) is asked about every file BEFORE it is opened; a file with a reason is left out and listed under `refused` (the AI help uses it to keep the scan
+    inside the folder the person chose: no links, no hidden or device names). `references` maps an isolate id to the FASTA the PERSON chose as its reference (`--reference ID=FILE`);
+    it replaces the name-based guess for that isolate."""
     roots = [Path(r).expanduser() for r in roots]
+    references = {k: str(Path(v)) for k, v in (references or {}).items()}
     notes, missing = [], [str(r) for r in roots if not r.exists()]
     roots = [r for r in roots if r.exists()]
     for m in missing:
         notes.append(f"{m} does not exist or cannot be seen from here")
     pairs, singles = find_pairs(roots, depth)
+    refused = []
+
+    def _ok(path) -> bool:
+        if accept is None:
+            return True
+        why = accept(Path(path))
+        if why:
+            refused.append({"path": str(path), "reason": why})
+        return not why
+
+    if accept is not None:
+        pairs = [p for p in pairs if _ok(p["r1"]) & _ok(p["r2"])]
+        singles = [p for p in singles if _ok(p)]
 
     fasta_files, seen = [], set()
     for root in roots:
@@ -362,7 +393,8 @@ def scan(roots, depth: int = 3, sample_reads: bool = True) -> dict:
         for path in candidates:
             if FASTA_NAME.search(path.name) and path not in seen:
                 seen.add(path)
-                fasta_files.append(path)
+                if _ok(path):
+                    fasta_files.append(path)
 
     # one isolate = the read pairs of one folder that share an isolate name (several lanes are one isolate)
     groups: dict = {}
@@ -395,7 +427,15 @@ def scan(roots, depth: int = 3, sample_reads: bool = True) -> dict:
     for item in isolates:
         issues, top = [], item["_scored"]
         chosen, how = None, ""
-        if top:
+        item["candidates"] = [str(f) for _, f in top[:6]]
+        forced = references.get(item["id"])
+        if forced is not None:
+            match = [f for f in fasta_files if str(f) == forced or os.path.normcase(str(f.resolve())) == os.path.normcase(str(Path(forced).resolve()))]
+            if match:
+                chosen, how = match[0], "chosen by you"
+            else:
+                issues.append(("error", f"The reference chosen for {item['id']} ({Path(forced).name}) is not one of the FASTA files found here.", "Choose one of the FASTA files the scan lists."))
+        elif top:
             best = top[0]
             runner = top[1] if len(top) > 1 else None
             if best[0][0] >= 4 and (runner is None or best[0][0] - runner[0][0] >= 2):
@@ -414,10 +454,18 @@ def scan(roots, depth: int = 3, sample_reads: bool = True) -> dict:
         item["issues"] = issues
     # a FASTA that is the best match for several isolates belongs to none of them until a person says which: giving it to all would score every isolate
     # against a genome that is at most one of theirs, and giving it to the first would be a coin toss
+    by_id = {i["id"]: i for i in isolates}
     for item in isolates:
         if item["reference"] is not None and len(claimed[str(item["reference"])]) > 1:
-            item["issues"].append(("error", f"{Path(item['reference']).name} could be the reference of {len(claimed[str(item['reference'])])} isolates "
-                                   f"({', '.join(claimed[str(item['reference'])])}) and its name does not say which.",
+            owners = claimed[str(item["reference"])]
+            if any(by_id[o]["reference_how"] == "chosen by you" for o in owners) and item["reference_how"] != "chosen by you":
+                item["issues"].append(("info", f"{Path(item['reference']).name} was chosen as the reference of another isolate, so it is not used for {item['id']}.", ""))
+                item["reference"], item["reference_how"] = None, ""
+                continue
+            if item["reference_how"] == "chosen by you" and sum(1 for o in owners if by_id[o]["reference_how"] == "chosen by you") == 1:
+                continue
+            item["issues"].append(("error", f"{Path(item['reference']).name} could be the reference of {len(owners)} isolates "
+                                   f"({', '.join(owners)}) and its name does not say which.",
                                    "Name each reference after its isolate (for example <isolate>.fna) or put it in the isolate's own folder."))
             item["reference"], item["reference_how"] = None, ""
 
@@ -429,9 +477,9 @@ def scan(roots, depth: int = 3, sample_reads: bool = True) -> dict:
         rec = {"id": isolate_id, "folder": item["folder"], "lanes": len(pairs_here),
                "r1": [str(p["r1"]) for p in pairs_here], "r2": [str(p["r2"]) for p in pairs_here],
                "reads_gzipped": gz_ok, "prefix": isolate_id, "reads": {}, "reference": None, "reference_how": item["reference_how"],
-               "truth": {"kind": "", "path": ""}, "organism_guess": "", "mode": "reads-only"}
-        if SAFE_ID.match(isolate_id) is None:
-            issues.append(("error", f"'{isolate_id}' is not a usable sample id (letters, digits . _ - only).", "Rename it in the list."))
+               "truth": {"kind": "", "path": ""}, "organism_guess": "", "mode": "reads-only", "candidates": item.get("candidates", [])}
+        if id_problem(isolate_id):
+            issues.append(("error", id_problem(isolate_id) + ".", "Rename it in the list."))
         if len(pairs_here) > 1:
             issues.append(("info", f"{len(pairs_here)} lanes found; they will be joined in name order into one read pair.", ""))
         if not gz_ok:
@@ -471,6 +519,8 @@ def scan(roots, depth: int = 3, sample_reads: bool = True) -> dict:
                 if f["empty"]:
                     issues.append(("warn", f"Reference header(s) with no sequence: {', '.join(f['empty'][:5])}.", ""))
             kind, truth = _truth_for(ref, isolate_id)
+            if truth is not None and not _ok(truth):
+                kind, truth = "", None
             rec["truth"] = {"kind": kind, "path": str(truth) if truth else ""}
             if not kind:
                 issues.append(("info", "No truth table or sequence report found beside the reference. A draft table will be written from the FASTA headers; "
@@ -492,11 +542,23 @@ def scan(roots, depth: int = 3, sample_reads: bool = True) -> dict:
         notes.append("Long-read files were found. They are not staged here (the self-built hybrid route is set up by hand: README 'Route C').")
     if leftovers["unpaired_fastq"]:
         notes.append("FASTQ files with no mate were ignored: PlasBench needs paired-end reads (one file for read 1 and one for read 2).")
+    meta = sorted({part for r in roots for p in list(fasta_files) + [x for pr in pairs for x in (pr["r1"], pr["r2"])] + list(singles)
+                   for part in _rel_parts(p, r) if META_HINT.search(part)})
+    if meta:
+        notes.append("Some names suggest metagenomic (community) data (" + ", ".join(meta[:3]) + "). This intake is for single isolates. If these are community samples, they take "
+                     "a different route: plasbench run --mode metagenomics with a community manifest (docs/METAGENOMICS.md).")
     if not out:
         notes.append("No paired read files were found. Paired reads are named like  name_1.fastq.gz / name_2.fastq.gz  or  name_R1.fastq.gz / name_R2.fastq.gz.")
-    return {"roots": [str(r) for r in roots], "isolates": out, "leftovers": leftovers, "notes": notes,
+    return {"roots": [str(r) for r in roots], "isolates": out, "leftovers": leftovers, "notes": notes, "refused": refused[:200],
             "summary": {"isolates": len(out), "scored": sum(1 for i in out if i["mode"] == "scored"), "ready": sum(1 for i in out if i["status"] == "ready"),
                         "attention": sum(1 for i in out if i["status"] == "attention"), "blocked": sum(1 for i in out if i["status"] == "blocked")}}
+
+
+def _rel_parts(path, root) -> list:
+    try:
+        return list(Path(path).relative_to(root).parts)
+    except ValueError:
+        return [Path(path).name]
 
 
 # --------------------------------------------------------------------------------------------- stage
@@ -522,54 +584,177 @@ def _gunzip_to(path: Path, directory: Path) -> Path:
     return target
 
 
-def stage(found: dict, data_dir: Path, samples: Path, only=None, rename=None, organism=None, link: str = "copy", include_blocked: bool = False) -> dict:
-    """Place every selected isolate with the same code `plasbench init-local` uses, and write the sheet. Returns what happened, per isolate."""
+def _draft_preview(reference: Path) -> dict:
+    """How many sequences the drafted truth table will have and how many of them stay REVIEW: the same classify() on the same headers stage_isolate reads."""
+    import init_local_sample as init
+    rows = review = 0
+    try:
+        with open_text(reference) as handle:
+            for line in handle:
+                if line.startswith(">"):
+                    parts = line[1:].strip().split(None, 1)
+                    rows += 1
+                    review += init.classify(parts[1] if len(parts) > 1 else "") == "REVIEW"
+    except (OSError, EOFError):
+        pass
+    return {"sequences": rows, "review": review}
+
+
+SHEET_NEEDS = ("sample_id", "assembly_accession", "sra_run")
+
+
+def validate_sheet_text(text: str) -> list:
+    """What stage 0 (scripts/lib.sh validate_sample_sheet, with REQUIRE_CURATED_METADATA=0 as for a sheet of your own isolates) and the local-input check would refuse in a
+    sheet, from its text. [] when the run would accept it. Used on a sheet BEFORE it is written."""
+    body = [l for l in text.splitlines() if l.strip() and not l.lstrip().startswith("#")]
+    if not body:
+        return ["the sheet has no header line"]
+    header = [h.strip() for h in body[0].split("\t")]
+    out = [f"the header has no {c} column (columns must be separated by a TAB)" for c in SHEET_NEEDS if c not in header]
+    if out:
+        return out
+    rows = list(csv.DictReader(body, delimiter="\t"))
+    seen = set()
+    for n, r in enumerate(rows, start=2):
+        sid = (r.get("sample_id") or "").strip()
+        if not sid or not (r.get("assembly_accession") or "").strip() or not (r.get("sra_run") or "").strip():
+            out.append(f"row {n}: sample_id, assembly_accession and sra_run must all be filled")
+            continue
+        if id_problem(sid):
+            out.append(f"row {n}: " + id_problem(sid))
+        if sid in seen:
+            out.append(f"row {n}: duplicate sample_id '{sid}'")
+        seen.add(sid)
+        if sid.startswith("EXAMPLE_"):
+            out.append(f"row {n}: the template's example row is still there")
+    if not rows:
+        out.append("the sheet has no sample rows")
+    return out
+
+
+def plan_stage(found: dict, data_dir: Path, samples: Path, only=None, rename=None, organism=None, link: str = "copy", include_blocked: bool = False) -> dict:
+    """What `stage` will do, decided once, here: per isolate whether it is staged (or why not) and every file it will place, and the sample sheet as it will be afterwards
+    (checked with validate_sheet_text). `stage` executes exactly this plan; `stage --dry-run` and the AI help show it, so there is one source of truth. Writes nothing."""
     import init_local_sample as init
     rename, organism, only = rename or {}, organism or {}, set(only) if only else None
+    data_dir, samples = Path(data_dir), Path(samples)
+    entries, lines, used = [], init.read_sheet_lines(samples), set()
+    before = "\n".join(lines) + ("\n" if lines else "")
+    for item in found["isolates"]:
+        old = item["id"]
+        if only is not None and old not in only:
+            continue
+        new = rename.get(old, old)
+        target = data_dir / new
+        e = {"id": new, "from": old, "stage": False, "skip": "", "status": item["status"], "dir": str(target), "ops": [], "needs_review": 0}
+        entries.append(e)
+        if id_problem(new):
+            e["skip"] = id_problem(new)
+            continue
+        if new.lower() in used:
+            e["skip"] = f"skipped: another isolate of this plan is already called '{new}'. Choose another name for this isolate."
+            continue
+        if item["status"] == "blocked" and not include_blocked:
+            e["skip"] = "skipped: " + "; ".join(i["text"] for i in item["issues"] if i["level"] == "error")
+            continue
+        existing = target / f"{new}_1.fastq.gz"
+        if existing.exists() and not any(Path(r).resolve() == existing.resolve() for r in item["r1"]):
+            e["skip"] = f"skipped: {target} already holds different reads for '{new}'. Choose another name for this isolate."
+            continue
+        used.add(new.lower())
+        for n, key in ((1, "r1"), (2, "r2")):
+            to = target / f"{new}_{n}.fastq.gz"
+            sources = [str(p) for p in item[key]]
+            compress = [not is_gzip(Path(p)) for p in sources]
+            how = ("join %d lanes" % len(sources) if len(sources) > 1 else link) + (" after compressing" if any(compress) else "")
+            e["ops"].append({"kind": "reads", "mate": n, "from": sources, "to": str(to), "how": how, "compress": compress, "replaces": to.exists()})
+        reference = item["reference"]["path"] if item["reference"] else None
+        kind, truth = item["truth"]["kind"], item["truth"]["path"]
+        if reference:
+            to = target / "reference.fna"
+            e["ops"].append({"kind": "reference", "from": [reference], "to": str(to), "how": "decompress" if item["reference"]["gzipped"] else link,
+                             "replaces": to.exists()})
+            if kind == "sequence_report":
+                to = target / "sequence_report.jsonl"
+                e["ops"].append({"kind": "truth", "from": [truth], "to": str(to), "how": "NCBI sequence report: the labels are built from it", "replaces": to.exists()})
+            elif kind == "truth_table":
+                to = target / "truth.tsv"
+                e["ops"].append({"kind": "truth", "from": [truth], "to": str(to), "how": "your truth table, copied as it is", "replaces": to.exists()})
+            elif (target / "truth.tsv").is_file():
+                e["ops"].append({"kind": "truth", "from": [], "to": str(target / "truth.tsv"), "how": "already there: left unchanged", "replaces": False})
+            else:
+                d = _draft_preview(Path(reference))
+                e["needs_review"] = d["review"]
+                e["ops"].append({"kind": "truth", "from": [], "to": str(target / "truth.tsv"), "replaces": False,
+                                 "how": f"draft from the FASTA headers: {d['sequences']} sequence(s), {d['review']} left as REVIEW for you to decide", **d})
+        accession = "LOCAL" if reference else "NA"
+        extra = {"organism": organism.get(old) or item.get("organism_guess", "")} if reference or organism.get(old) else None
+        lines, _changed, note = init.sheet_after(lines, new, new, accession, extra)
+        values = {"sample_id": new, "assembly_accession": accession, "sra_run": new}
+        values.update({k: v for k, v in (extra or {}).items() if v})
+        e["ops"].append({"kind": "sheet_row", "from": [], "to": str(samples), "how": note, "values": values, "replaces": False})
+        e["exec"] = {"r1": [str(p) for p in item["r1"]], "r2": [str(p) for p in item["r2"]], "reference": reference,
+                     "reference_gz": bool(item["reference"] and item["reference"]["gzipped"]), "truth_kind": kind, "truth": truth, "accession": accession, "extra": extra}
+        e["stage"] = True
+    after = "\n".join(lines) + ("\n" if lines else "")
+    staged = [e for e in entries if e["stage"]]
+    return {"isolates": entries, "data_dir": str(data_dir), "samples": str(samples), "link": link, "sheet_before": before, "sheet_after": after,
+            "sheet_exists": samples.is_file(), "sheet_problems": validate_sheet_text(after) if staged else [], "staged": len(staged),
+            "needs_review": sum(e["needs_review"] for e in staged)}
+
+
+def plan_lines(plan: dict) -> list:
+    """The plan in plain lines (what `stage --dry-run` prints)."""
+    out = []
+    for e in plan["isolates"]:
+        if not e["stage"]:
+            out.append(f"SKIP    {e['id']}: {e['skip']}")
+            continue
+        out.append(f"STAGE   {e['id']}" + (f"  (renamed from {e['from']})" if e["from"] != e["id"] else ""))
+        for op in e["ops"]:
+            src = " + ".join(Path(f).name for f in op["from"])
+            out.append(f"    {op['kind']:<10} {src + ' -> ' if src else ''}{op['to']}  [{op['how']}]" + ("  (replaces the file there)" if op.get("replaces") else ""))
+    for p in plan["sheet_problems"]:
+        out.append(f"SHEET   problem: {p}")
+    return out
+
+
+def stage(found: dict, data_dir: Path, samples: Path, only=None, rename=None, organism=None, link: str = "copy", include_blocked: bool = False, plan: dict = None) -> dict:
+    """Place every selected isolate with the same code `plasbench init-local` uses, and write the sheet: exactly the operations of plan_stage(). Returns what happened, per isolate."""
+    import init_local_sample as init
+    plan = plan or plan_stage(found, data_dir, samples, only, rename, organism, link, include_blocked)
     results = []
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
-        for item in found["isolates"]:
-            old = item["id"]
-            if only is not None and old not in only:
-                continue
-            new = rename.get(old, old)
-            entry = {"id": new, "from": old, "ok": False, "messages": [], "needs_review": 0}
+        for e in plan["isolates"]:
+            entry = {"id": e["id"], "from": e["from"], "ok": False, "messages": [], "needs_review": 0}
             results.append(entry)
-            if not SAFE_ID.match(new):
-                entry["messages"].append(f"'{new}' is not a usable sample id (letters, digits . _ - only)")
+            if not e["stage"]:
+                entry["messages"].append(e["skip"])
                 continue
-            if item["status"] == "blocked" and not include_blocked:
-                entry["messages"].append("skipped: " + "; ".join(i["text"] for i in item["issues"] if i["level"] == "error"))
-                continue
-            target = Path(data_dir) / new
-            existing = target / f"{item['prefix'] if new == old else new}_1.fastq.gz"
-            if existing.exists() and not any(Path(r).resolve() == existing.resolve() for r in item["r1"]):
-                entry["messages"].append(f"skipped: {target} already holds different reads for '{new}'. Choose another name for this isolate.")
-                continue
+            x, new = e["exec"], e["id"]
             work = tmp / new
             work.mkdir(parents=True, exist_ok=True)
             side = {1: [], 2: []}
             for n, key in ((1, "r1"), (2, "r2")):
-                for path in item[key]:
+                for path in x[key]:
                     path = Path(path)
                     side[n].append(path if is_gzip(path) else _gzip_to(path, work))
-            reference = item["reference"]["path"] if item["reference"] else None
-            if reference and item["reference"]["gzipped"]:
+            reference = x["reference"]
+            if reference and x["reference_gz"]:
                 reference = str(_gunzip_to(Path(reference), work))
-            kind, truth = item["truth"]["kind"], item["truth"]["path"]
+            kind, truth = x["truth_kind"], x["truth"]
             captured = io.StringIO()
             try:
                 with contextlib.redirect_stdout(captured):
                     entry["needs_review"] = init.stage_isolate(
-                        new, new, side[1], side[2], reference, truth if kind == "sequence_report" else None, Path(data_dir), Path(samples),
-                        "LOCAL" if reference else "NA", link, False, truth if kind == "truth_table" else None,
-                        extra={"organism": organism.get(old) or item.get("organism_guess", "")} if reference or organism.get(old) else None)
+                        new, new, side[1], side[2], reference, truth if kind == "sequence_report" else None, Path(plan["data_dir"]), Path(plan["samples"]),
+                        x["accession"], plan["link"], False, truth if kind == "truth_table" else None, extra=x["extra"])
                 entry["ok"] = True
             except SystemExit as exc:
                 entry["messages"].append(str(exc))
             entry["messages"].extend(line.strip() for line in captured.getvalue().splitlines() if line.strip())
-    return {"staged": [r for r in results if r["ok"]], "results": results, "data_dir": str(data_dir), "samples": str(samples),
+    return {"staged": [r for r in results if r["ok"]], "results": results, "data_dir": str(plan["data_dir"]), "samples": str(plan["samples"]),
             "needs_review": sum(r["needs_review"] for r in results)}
 
 
@@ -1002,6 +1187,8 @@ def main(argv=None) -> int:
         s.add_argument("folders", nargs="+", help="Folder(s) (or files) to look in. Sub-folders are searched.")
         s.add_argument("--depth", type=int, default=3, help="How many folder levels down to look (default 3).")
         s.add_argument("--json", action="store_true", help="Machine-readable output.")
+        s.add_argument("--reference", action="append", default=[], metavar="ID=FILE",
+                       help="Use FILE as the reference of isolate ID instead of the name-based guess (repeatable; for when two FASTA files could belong to it).")
         if name == "stage":
             s.add_argument("--data-dir", default=str(root / "data"))
             s.add_argument("--samples", default=str(root / "config" / "local.tsv"))
@@ -1010,6 +1197,7 @@ def main(argv=None) -> int:
             s.add_argument("--organism", action="append", default=[], metavar="ID=NAME", help="Organism for an isolate, e.g. iso1='Escherichia coli' (repeatable).")
             s.add_argument("--link", choices=("copy", "symlink", "hardlink"), default="copy")
             s.add_argument("--include-blocked", action="store_true", help="Stage isolates the scan marked BLOCKED anyway.")
+            s.add_argument("--dry-run", action="store_true", help="Show exactly what would be placed where, and the sample sheet as it would be; change nothing.")
     c = sub.add_parser("check", help="The quick test: can PlasBench read these files and use them?")
     c.add_argument("--samples", default=str(root / "config" / "local.tsv"))
     c.add_argument("--data-dir", default=str(root / "data"))
@@ -1031,18 +1219,28 @@ def main(argv=None) -> int:
         else:
             sys.stdout.write(text)
         return 0
+    references = dict(x.split("=", 1) for x in getattr(args, "reference", []) if "=" in x)
     if args.action == "scan":
-        found = scan(args.folders, args.depth)
+        found = scan(args.folders, args.depth, references=references)
         print(json.dumps(found, indent=1)) if args.json else print_scan(found)
         return 0 if found["isolates"] else 2
     if args.action == "stage":
-        found = scan(args.folders, args.depth)
+        found = scan(args.folders, args.depth, references=references)
         if not found["isolates"]:
             print_scan(found)
             return 2
         rename = dict(x.split("=", 1) for x in args.rename if "=" in x)
         organism = dict(x.split("=", 1) for x in args.organism if "=" in x)
-        done = stage(found, Path(args.data_dir), Path(args.samples), args.only, rename, organism, args.link, args.include_blocked)
+        plan = plan_stage(found, Path(args.data_dir), Path(args.samples), args.only, rename, organism, args.link, args.include_blocked)
+        if args.dry_run:
+            if args.json:
+                print(json.dumps(plan, indent=1))
+            else:
+                print("\n".join(plan_lines(plan)))
+                print(f"\nSample sheet {plan['samples']} would become:\n" + plan["sheet_after"])
+                print("Nothing was changed (--dry-run).")
+            return 0 if plan["staged"] and not plan["sheet_problems"] else 2
+        done = stage(found, Path(args.data_dir), Path(args.samples), plan=plan)
         if args.json:
             print(json.dumps(done, indent=1))
         else:

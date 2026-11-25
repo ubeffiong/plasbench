@@ -10,11 +10,11 @@ hints:
     envDef:
       PLASBENCH_HOME: /opt/plasbench   # where the v0.5.6 image keeps the pipeline; a path that does not exist is ignored outside the container
   DockerRequirement:
-    dockerPull: ghcr.io/ubeffiong/plasbench:v0.5.6
+    dockerPull: ghcr.io/ubeffiong/plasbench:v0.5.7
   SoftwareRequirement:
     packages:
       - package: plasbench
-        version: ["0.5.6"]
+        version: ["0.5.7"]
 inputs:
   scores:
     type: File
