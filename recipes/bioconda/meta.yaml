@@ -1,5 +1,5 @@
 {% set name = "plasbench" %}
-{% set version = "0.5.6" %}
+{% set version = "0.5.7" %}
 
 package:
   name: {{ name|lower }}
@@ -9,7 +9,7 @@ source:
   # The release archive (attached to the GitHub Release together with its .sha256 file), not GitHub's auto-generated tag tarball: its checksum is published and checked
   # by the Release workflow. For a new version: download plasbench-<version>.tar.gz and read the value from plasbench-<version>.tar.gz.sha256.
   url: https://github.com/ubeffiong/plasbench/releases/download/v{{ version }}/plasbench-{{ version }}.tar.gz
-  sha256: a5748de2f72e8f2aaa039f689eff08e9e8c302601bb09c8a951cf377b2bf7703
+  sha256: 17f2fd142897a84acbf2fe263a8f42832ba26ef9a0e2571231f2be40b9409750
 
 build:
   noarch: generic
