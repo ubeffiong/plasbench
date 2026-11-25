@@ -102,11 +102,19 @@ jobs:
           echo "lint=$LINT checks=$CHECKS shard=$SHARD (all Python versions)"
           [ "$LINT" = "success" ] || { echo "lint did not succeed"; exit 1; }
           # needs.<matrix job>.result covers every Python version; the jobs API says which version failed.
-          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" --jq '.jobs[] | [.name, .conclusion // .status] | @tsv' > jobs.tsv
-          cat jobs.tsv
+          # The jobs API can lag behind the jobs themselves (a finished shard still listed as in_progress, or a request timing out), so ask again a few times before
+          # deciding; a shard that really failed stays failed on every attempt.
+          [ "$SHARD" = "success" ] || { echo "a test shard did not succeed (every shard of every Python version must)"; exit 1; }
+          [ "$CHECKS" = "success" ] || { echo "a checks job did not succeed"; exit 1; }
           expected_shards=5
-          good_shards="$(grep -F -e "shard ($VERSION, " jobs.tsv | awk -F'	' '$2 == "success"' | wc -l)"
-          good_checks="$(awk -F'	' -v n="checks ($VERSION)" '$1 == n && $2 == "success"' jobs.tsv | wc -l)"
+          for attempt in 1 2 3 4 5 6; do
+            gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" --jq '.jobs[] | [.name, .conclusion // .status] | @tsv' > jobs.tsv || : > jobs.tsv
+            good_shards="$(grep -F -e "shard ($VERSION, " jobs.tsv | awk -F'	' '$2 == "success"' | wc -l)"
+            good_checks="$(awk -F'	' -v n="checks ($VERSION)" '$1 == n && $2 == "success"' jobs.tsv | wc -l)"
+            [ "$good_shards" = "$expected_shards" ] && [ "$good_checks" = "1" ] && break
+            [ "$attempt" = "6" ] || { echo "attempt $attempt: $good_shards/$expected_shards shards, checks $good_checks; asking again"; sleep 15; }
+          done
+          cat jobs.tsv
           echo "Python $VERSION: $good_shards/$expected_shards shards succeeded, checks succeeded: $good_checks"
           [ "$good_shards" = "$expected_shards" ] || { echo "not every shard succeeded"; exit 1; }
           [ "$good_checks" = "1" ] || { echo "the checks job did not succeed"; exit 1; }
