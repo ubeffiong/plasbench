@@ -96,8 +96,9 @@ with tempfile.TemporaryDirectory() as tmp:
     took = time.time() - t0
     check("the run completes (a failing caller never stops it)", done.returncode == 0, done.stderr[-400:])
     record = json.loads(prov.read_text(encoding="utf-8"))["callers"]
-    check("the hanging ISEScan is stopped and recorded timed_out", record["isescan"]["status"] == "timed_out" and "timed out after 3 s" in record["isescan"]["reason"], record["isescan"])
-    check("the log line says timed_out with the reason", "isescan finished" in done.stdout and "(timed_out, 0 feature(s)): timed out after 3 s" in done.stdout, done.stdout)
+    check("the hanging ISEScan is stopped and recorded timed_out", record["isescan"]["status"] == "timed_out" and record["isescan"].get("retried") is True and "timed out twice" in record["isescan"]["reason"]
+          and "timed out after 3 s" in record["isescan"]["reason"] and "timed out after 6 s" in record["isescan"]["reason"], record["isescan"])   # deliberately changed: a hanging caller is retried ONCE (alone, twice the time) before it is recorded
+    check("the log line says timed_out with the reason", "isescan finished" in done.stdout and "(timed_out, 0 feature(s)): timed out after 3 s" in done.stdout and "isescan timed out twice" in done.stdout, done.stdout)   # first attempt line, then the plain "timed out twice" line
     check("a failing caller says WHY in one line, from the END of its stderr (not 'Traceback ...' alone)",
           record["mob_typer"]["status"] == "failed" and "ValueError: boom" in record["mob_typer"]["reason"], record["mob_typer"])
     check("a failed/timed-out annotation is never cached", not cache.exists() or not list(cache.glob("*.tsv")), list(cache.glob("*")) if cache.exists() else "")

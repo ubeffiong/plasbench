@@ -677,6 +677,7 @@ def main():
             print(f"  annotation: {name} second attempt finished in {time.time() - started[name]:.0f} s ({status2.get('status')}, {len(found2)} feature(s))", flush=True)
             if status2.get("status") == "timed_out":
                 status2 = dict(status2, retried=True, reason=f"timed out twice (first attempt: {first}; second attempt alone with twice the time: {status2.get('reason', '')})")
+                print(f"  annotation: {name} timed out twice (a second try, alone and with twice the time, did not finish either): its result is not used and not cached", flush=True)
                 found = []
             else:
                 status2 = dict(status2, retried=True, first_attempt=first)
