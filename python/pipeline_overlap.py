@@ -120,11 +120,15 @@ def run_one(sample, line, header, work, script, log):
                MAX_PARALLEL_SAMPLES="1", PLASBENCH_SAMPLES_EXPLICIT="1", AUTO_PARALLEL="0", PIPELINE_OVERLAP_FOLLOWER="1", KEEP_AWAKE="0")
     (work / "results").mkdir(parents=True, exist_ok=True)
     (work / "tmp").mkdir(parents=True, exist_ok=True)
+    script = Path(script).resolve()
+    if not script.is_file():                      # the stage-2 script is a file path given by run_all.sh (never a command line or shell text)
+        raise OSError("stage-2 script not found: %s" % script)
     cmd = (["nice", "-n", "10"] if os.name == "posix" else []) + ["bash", str(script)]
     with open(log, "a", encoding="utf-8") as out:
         out.write("=== %s: stage 2 for %s, started while stage 1 continues (PIPELINE_OVERLAP=1)\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), sample))
         out.flush()
-        proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT, env=env, start_new_session=(os.name == "posix"))
+        # An argument list, no shell: bash runs the one script file checked above with no further arguments.
+        proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT, env=env, start_new_session=(os.name == "posix"))  # nosemgrep  # nosec
         _CHILD["proc"] = proc
         rc = proc.wait()
         _CHILD["proc"] = None
