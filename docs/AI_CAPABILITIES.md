@@ -77,7 +77,7 @@ Pages: Home, Setup, Workspace and studies, Cohorts, Your own isolates, New bench
 - Propose a command with where to run it. It runs only after you press a button and confirm.
 - Take you somewhere: open a page, a tab, a Guides section. One click.
 - Change a Setting (a card shows the old and new value, you confirm, it can be undone), fill in the New benchmark form (nothing starts), open the report, type a command in the Terminal tab (you press Enter), start the tool install (the usual consent dialog) or switch conda and Docker (confirmation).
-- Guide you step by step, without needing the model: set up a run from a folder, fix a sample sheet, install the tools you need, add your own tool, find out why the last run failed.
+- Guide you step by step, without needing the model: set up your isolates from a folder (through PlasBench's intake), check a sample sheet, find out why a run failed, say where a run is, install the tools you need, add your own tool.
 - If you choose a folder, PlasBench itself (not the assistant) reads names, sizes and the first lines, and shows you what it found. A summary goes to the assistant only when you press Share. The assistant can then propose a file plan (create folders, copy, move or rename files, write or repair a sample sheet). You see exactly what would change, with a diff for sheets, and only Apply does it. Undo restores the earlier state.
 
 ## What the assistant cannot do
@@ -92,7 +92,16 @@ Pages: Home, Setup, Workspace and studies, Cohorts, Your own isolates, New bench
 
 ## Your own isolates, sample sheets and troubleshooting (assistant flows)
 
-<!-- placeholder: filled with the description of the assistant's isolate set-up, sheet check and run-troubleshooting flows -->
+<!-- source: plasbench/ai_intake.py, plasbench/ai_diagnose.py, python/intake.py, docs/AI_HELP.md -->
+**Set up my isolates from a folder.** PlasBench's own intake (`plasbench intake scan`, then `plasbench intake stage --dry-run`) runs on the folder you chose and shows a card per isolate: the reads it found (Illumina lanes joined, uncompressed reads compressed), the reference and how sure the match is (by name, by folder, or the only FASTA), the organism read from the header, the truth status (a draft from the FASTA headers with `REVIEW` where a header does not say, your own truth table, or an NCBI sequence report), the warnings with their codes, and the sample sheet before and after. You choose where the isolates go (PlasBench's data folder or a study's own data folder). **Stage** does exactly what the card shows (the same planner as `plasbench intake stage`), then the quick test (`plasbench intake check`) is shown, **Fix** repairs what has one right answer (`--fix`), a form asks you to label the `REVIEW` sequences, and the `plasbench run --samples config/<name>.tsv --local-inputs` command appears as a card. Undo removes what was staged. It never guesses which sequences are plasmids or which genome belongs to which isolate: it asks.
+
+**The sample sheet it writes** is the one the run reads for your own isolates: `sample_id`, `assembly_accession` (`LOCAL` when you supplied a complete reference, so the isolate is scored; `NA` for reads only, reconstructed but not scored), `sra_run` (the start of the read file names, the same as the sample id) and `organism`. Files go to `data/<sample_id>/<sample_id>_1.fastq.gz`, `_2.fastq.gz`, `reference.fna` and `truth.tsv`. The sheet is checked with the run's own rules before anything is written. With `--local-inputs` such a sheet needs no `REQUIRE_CURATED_METADATA=0`.
+
+**Check my sample sheet** runs `plasbench intake check` on a sheet of your own isolates and explains each problem by its code (`reads-not-gzip`, `reads-misnamed`, `reads-missing`, `reads-empty`, `reads-corrupt`, `reads-mates`, `reads-long`, `reads-unpaired`, `folder-missing`, `reference-missing`, `reference-unreadable`, `reference-duplicate-ids`, `reference-protein`, `reference-draft`, `reference-size`, `reference-ambiguous`, `reference-wrong-isolate`, `truth-review`, `truth-missing`, `truth-mismatch`, `truth-no-plasmid`, `sample-id-unsafe`, `sheet-example`), each a section of docs/INPUT_GUIDE.md.
+
+**Why did my run fail?** runs `plasbench diagnose --json` (you confirm it), then shows a digest of at most 700 tokens: the stage, isolate and step, the failed command and its exit code in words, the cause codes from PlasBench's tables (failure signatures, the assembler, Docker and intake diagnoses), the evidence lines and the end of the log, all redacted. It offers Resume, safe next commands and setting changes as cards, and sends the digest to the assistant only when you press Send. **Where is my run?** answers from `plasbench status` without a model.
+
+**Limits.** It handles paired short reads of single isolates. Long reads go to the hybrid route (set up by hand), single-end reads cannot be used, and community samples take the metagenomics route (docs/METAGENOMICS.md). It does not replace files that are already in the destination, and it does not read folders over 3,000 entries.
 
 ## Action blocks the assistant can write
 

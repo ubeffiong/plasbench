@@ -6820,7 +6820,7 @@ function aiIsoHtml(r, locked) {
   const canTick = !locked && (r.stage || /not ticked/.test(r.skip));
   const askRef = r.candidates.length > 1 && !/^(confident|chosen)/.test(r.reference_how);
   const iss = r.issues.map(i => `<li class="${i.level === "error" ? "bad-t" : i.level === "warn" ? "warn-t" : ""}"><b>${esc(i.level.toUpperCase())}</b> ${esc(i.text)}${i.code ? ` <span class="mut">[${esc(i.code)}]</span>` : ""}</li>`).join("");
-  const ops = r.ops.map(o => `<li><b>${esc(o.kind)}</b> ${o.from.length ? esc(o.from.join(" + ")) + " &rarr; " : ""}${esc(o.to)} <span class="mut">(${esc(o.how)})</span></li>`).join("");
+  const ops = r.ops.map(op => `<li><b>${esc(op.kind)}</b> ${op.from.length ? esc(op.from.join(" + ")) + " &rarr; " : ""}${esc(op.to)} <span class="mut">(${esc(op.how)})</span></li>`).join("");
   return `<li class="aiiso"><div class="aiiso-h"><label><input type="checkbox" data-iinc="${esc(r.from)}" ${r.stage ? "checked" : ""} ${canTick ? "" : "disabled"}> <b>${esc(r.id)}</b></label>`
     + `<span class="risk ${r.stage ? "safe" : "changes_files"}">${esc(tag)}</span><span class="small mut">${esc(r.mode === "scored" ? "scored (has a reference)" : "reads only (not scored)")}</span></div>`
     + `<div class="small">Reads: ${esc(String(r.lanes))} lane(s)${r.lanes > 1 ? ", joined into one pair" : ""}${r.compressed ? "" : ", not compressed: compressed while staging"}. <span class="mut">${esc(r.reads.join(", "))}</span></div>`
