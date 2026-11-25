@@ -59,7 +59,7 @@ run_stage() {   # run_stage ENV=VALUE... ; prints the exit code
     local rc=0
     ( PATH="$TMP/bin:$PATH" DATA_DIR="$P/data" RESULTS_DIR="$P/results" LOG_DIR="$P/logs" TMP_DIR="$P/tmp" SAMPLE_SHEET="$P/sheet.tsv" REQUIRE_CURATED_METADATA=0 \
       THREADS=4 ASSEMBLY_MEMORY_GB=4 CAP_THREADS_TO_CPUS=0 PLASBENCH_SKIP_RESOURCE_CHECK=1 SHORT_READ_QC_MODE=off NO_COLOR=1 HUNGRY=s1 \
-      env "$@" bash "$ROOT/scripts/03_assemble.sh" > "$P/stage.log" 2>&1 ) || rc=$?
+      env "$@" bash "$ROOT/scripts/03_assemble.sh" > "$P/stage.log" 2>&1 < /dev/null ) || rc=$?   # stdin at EOF: the stdin-eating fake df must not wait on a terminal or an open pipe
     echo "$rc"
 }
 col() { awk -F'\t' -v s="$1" -v c="$2" 'NR == 1 { for (i = 1; i <= NF; i++) if ($i == c) k = i } $1 == s { print $k }' "$P/results/assembly_status.tsv"; }

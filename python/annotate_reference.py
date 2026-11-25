@@ -572,18 +572,29 @@ def main():
     timeouts = {"*": args.timeout} if args.timeout else ({} if args.timeout == 0 else annotation_timeouts(total_bp))
     threads = max(1, args.threads)
     small, amr_threads, isescan_threads = thread_plan(threads)
-    calls = (
-        ("mob_typer", lambda: call_mob_typer(args.reference, timeout_for(timeouts, "mob_typer"), sequences, small)),
-        ("abricate_amr", lambda: call_abricate(args.reference, args.amr_database, timeout_for(timeouts, "abricate"), sequences, threads=small)),
-        *[("abricate_replicon" if index == 0 else f"abricate_replicon_{name}",
-           lambda name=name: call_abricate(args.reference, name, timeout_for(timeouts, "abricate"), sequences, kind="replicon", threads=small))
-          for index, name in enumerate([n for n in args.replicon_database.replace(",", " ").split() if n]
-                                       or ["plasmidfinder"])],
-        ("amrfinder", lambda: call_amrfinder(args.reference, timeout_for(timeouts, "amrfinder"), sequences, amr_threads)),
-        ("isescan", lambda: call_isescan(args.reference, timeout_for(timeouts, "isescan"), sequences, workdir, isescan_threads, isescan_plan_)),
-        ("isfinder", lambda: call_isfinder(args.reference, args.isfinder_fasta, timeout_for(timeouts, "isfinder"), sequences)),
-        ("barrnap", lambda: call_barrnap(args.reference, timeout_for(timeouts, "barrnap"), sequences, small)),
-    )
+
+    def build_calls(timeouts, small, amr_threads, isescan_threads):
+        return (
+            ("mob_typer", lambda: call_mob_typer(args.reference, timeout_for(timeouts, "mob_typer"), sequences, small)),
+            ("abricate_amr", lambda: call_abricate(args.reference, args.amr_database, timeout_for(timeouts, "abricate"), sequences, threads=small)),
+            *[("abricate_replicon" if index == 0 else f"abricate_replicon_{name}",
+               lambda name=name: call_abricate(args.reference, name, timeout_for(timeouts, "abricate"), sequences, kind="replicon", threads=small))
+              for index, name in enumerate([n for n in args.replicon_database.replace(",", " ").split() if n]
+                                           or ["plasmidfinder"])],
+            ("amrfinder", lambda: call_amrfinder(args.reference, timeout_for(timeouts, "amrfinder"), sequences, amr_threads)),
+            ("isescan", lambda: call_isescan(args.reference, timeout_for(timeouts, "isescan"), sequences, workdir, isescan_threads, isescan_plan_)),
+            ("isfinder", lambda: call_isfinder(args.reference, args.isfinder_fasta, timeout_for(timeouts, "isfinder"), sequences)),
+            ("barrnap", lambda: call_barrnap(args.reference, timeout_for(timeouts, "barrnap"), sequences, small)),
+        )
+
+    # The callers run at the same time, so together they may ask for more threads than there are CPUs (a real run: 13 threads on 6 CPUs, and three callers hit a limit
+    # that assumed they had a CPU each). The time limits grow with that oversubscription, and a caller that still hits its limit is run ONCE more, alone, with twice the limit.
+    n_abricate = len([n for n in args.replicon_database.replace(",", " ").split() if n] or ["plasmidfinder"]) + 1
+    demanded = 2 * small + n_abricate * small + amr_threads + isescan_threads
+    oversub = max(1.0, demanded / float(os.cpu_count() or threads or 1)) if threads > 0 else 1.0
+    if timeouts and oversub > 1.0:
+        timeouts = {key: (int(value * oversub) if value else value) for key, value in timeouts.items()}
+    calls = build_calls(timeouts, small, amr_threads, isescan_threads)
     off = callers_switched_off()
 
     def gated(name, call):
@@ -592,7 +603,11 @@ def main():
             return lambda: ([], {"status": "not_evaluated", "reason": "switched off (%s=0)" % CALLER_SWITCHES[base]})
         return call
 
-    calls = tuple((name, gated(name, call)) for name, call in calls)
+    def gated_calls(items):
+        return tuple((name, gated(name, call)) for name, call in items)
+
+    calls = gated_calls(calls)
+    off_names = {name for name, _ in calls if ("abricate" if name.startswith("abricate") else name) in off}
     cache_id = fingerprint = None
     if args.cache_dir:
         try:
@@ -648,10 +663,28 @@ def main():
                         slow_noted.add(name)
                         print(f"  annotation: NOTE {name} has run {ran / 60:.0f} min; typical is about {typical / 60:.0f} min for this genome size (estimated, 6-CPU laptop). "
                               f"It is stopped at its limit ({timeout_for(timeouts, name) or 'none'} s) unless ANNOTATION_TIMEOUT_SECONDS says otherwise.", flush=True)
-        for name, future in futures:                  # collected in the original order: output stays the same
-            found, status = future.result()
-            features.extend(found)
-            provenance[name] = status
+        results = {name: future.result() for name, future in futures}
+    # One more try, alone and with twice the time, for a caller that hit its limit: a quick tool that was only starved by its neighbours then finishes and its evidence is kept.
+    # A caller that fails again stays timed_out (honest), with both attempts in its reason.
+    retry_calls = dict(gated_calls(build_calls({key: (value * 2 if value else value) for key, value in timeouts.items()}, min(4, threads), threads, threads))) if timeouts else {}
+    for name, _ in futures:
+        found, status = results[name]
+        if status.get("status") == "timed_out" and name in retry_calls and name not in off_names:
+            print(f"  annotation: {name} hit its limit; trying once more, alone, with twice the time", flush=True)
+            first = status.get("reason", "")
+            started[name] = time.time()
+            found2, status2 = retry_calls[name]()
+            print(f"  annotation: {name} second attempt finished in {time.time() - started[name]:.0f} s ({status2.get('status')}, {len(found2)} feature(s))", flush=True)
+            if status2.get("status") == "timed_out":
+                status2 = dict(status2, retried=True, reason=f"timed out twice (first attempt: {first}; second attempt alone with twice the time: {status2.get('reason', '')})")
+                print(f"  annotation: {name} timed out twice (a second try, alone and with twice the time, did not finish either): its result is not used and not cached", flush=True)
+                found = []
+            else:
+                status2 = dict(status2, retried=True, first_attempt=first)
+                found = found2
+            status = status2
+        features.extend(found)
+        provenance[name] = status
 
     # Deduplicate identical calls from overlapping databases, keeping provenance.
     seen, unique = set(), []

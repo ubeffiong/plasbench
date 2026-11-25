@@ -547,6 +547,8 @@ Set `PLASBENCH_NO_LAUNCHER=1` to skip it. After an upgrade, `plasbench` checks t
 
 ## Troubleshooting
 
+- **My downloads are slow or restart** -> see the User Guide, [My downloads are slow or restart](docs/USER_GUIDE.md#my-downloads-are-slow-or-restart): keep the data folder on Ubuntu's own disk when you can (a Windows drive seen as `/mnt/c` is slow; PlasBench then downloads in `~/.plasbench/downloads` and moves the file), check `plasbench net-bench`, and run the same command again after a failure (finished chunks are kept).
+
 Something failed and it is not listed here? See [Reporting an issue](README.md#reporting-an-issue) (or [SUPPORT.md](SUPPORT.md)): copy the **complete** error text, then run
 `plasbench issue-report` for one paste of your versions, computer and the last lines of the run's logs, with secrets removed, and open a
 [New issue](https://github.com/ubeffiong/plasbench/issues/new/choose). If `plasbench` itself will not start, paste the output of `python -m plasbench --version`, your operating
