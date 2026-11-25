@@ -90,6 +90,12 @@ with tempfile.TemporaryDirectory() as tmp:
     out = tmp / "features.tsv"
     prov = tmp / "prov.json"
     env = dict(os.environ, PATH=f"{bin_}{os.pathsep}{old_path}", ANNOTATION_TIMEOUT_SECONDS="3", PLASBENCH_TOOL_READINESS="off", AMR_DB_OK=str(tmp / "dbok"))
+    # the limit is the 3 s asked for, scaled up when the callers' thread plan oversubscribes this machine's CPUs (fair limits), so read the seconds from the reason
+    import re
+
+    def secs(reason):
+        found = [int(x) for x in re.findall(r"timed out after (\d+) s", reason)]
+        return found if len(found) == 2 else None
     t0 = time.time()
     done = subprocess.run([sys.executable, "-I", str(ROOT / "python" / "annotate_reference.py"), "--reference", str(ref), "--out", str(out), "--provenance", str(prov),
                            "--threads", "2", "--cache-dir", str(cache), "--workdir", str(tmp / "work")], capture_output=True, text=True, env=env, timeout=120)
@@ -97,8 +103,8 @@ with tempfile.TemporaryDirectory() as tmp:
     check("the run completes (a failing caller never stops it)", done.returncode == 0, done.stderr[-400:])
     record = json.loads(prov.read_text(encoding="utf-8"))["callers"]
     check("the hanging ISEScan is stopped and recorded timed_out", record["isescan"]["status"] == "timed_out" and record["isescan"].get("retried") is True and "timed out twice" in record["isescan"]["reason"]
-          and "timed out after 3 s" in record["isescan"]["reason"] and "timed out after 6 s" in record["isescan"]["reason"], record["isescan"])   # deliberately changed: a hanging caller is retried ONCE (alone, twice the time) before it is recorded
-    check("the log line says timed_out with the reason", "isescan finished" in done.stdout and "(timed_out, 0 feature(s)): timed out after 3 s" in done.stdout and "isescan timed out twice" in done.stdout, done.stdout)   # first attempt line, then the plain "timed out twice" line
+          and secs(record["isescan"]["reason"]) and secs(record["isescan"]["reason"])[1] == 2 * secs(record["isescan"]["reason"])[0], record["isescan"])   # deliberately changed: a hanging caller is retried ONCE (alone, twice the time) before it is recorded
+    check("the log line says timed_out with the reason", "isescan finished" in done.stdout and "(timed_out, 0 feature(s)): timed out after" in done.stdout and "isescan timed out twice" in done.stdout, done.stdout)   # first attempt line, then the plain "timed out twice" line
     check("a failing caller says WHY in one line, from the END of its stderr (not 'Traceback ...' alone)",
           record["mob_typer"]["status"] == "failed" and "ValueError: boom" in record["mob_typer"]["reason"], record["mob_typer"])
     check("a failed/timed-out annotation is never cached", not cache.exists() or not list(cache.glob("*.tsv")), list(cache.glob("*")) if cache.exists() else "")
