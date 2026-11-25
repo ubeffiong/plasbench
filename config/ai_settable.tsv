@@ -85,6 +85,14 @@ NETWORK_RETRIES	int	0..20	Times a failed network fetch is retried	low
 WARN_RUN_DOWNLOAD_GB	int	0..1000	Warn when one isolate's reads are larger than this many GB	low
 MIN_FREE_DISK_GB	int	0..100000	Warn before stage 1 when less than this many GB is free	low
 MULTIQC_TIMEOUT_SECONDS	int	10..86400	Seconds allowed for the MultiQC companion	low
+ENA_MAX_CONNECTIONS	int	1..24	Total ENA connections open at once (default 16; more risks the address being throttled)	medium
+MAX_PARALLEL_DOWNLOADS	int	1..4	Isolates downloaded at the same time in stage 1 (default 1)	medium
+READ_DEPTH_CAP_X	choice	off|50|75|100|150|200|300|500|1000	Read depth cap in x for short paired runs: only the first read pairs are downloaded (default 150; off = whole files)	medium
+ENA_CHUNK_MIB	int	1..256	Size in MiB of the pieces an ENA file is fetched in (default 32)	low
+ENA_USE_ARIA2	flag	0|1	Use aria2c for ENA downloads instead of the built-in resumable downloader (default 0)	low
 KEEP_AWAKE	flag	0|1	Keep the computer awake while a run is active (the screen may still turn off)	low
 RUN_PROFILE	choice	standard|fast|thorough	Run profile: standard, fast (skips optional analyses that never change the leaderboard) or thorough	low
 ISESCAN_SCOPE	choice	plasmids|all	ISEScan searches only the plasmids (default) or every sequence	low
+AUTO_PARALLEL	flag	0|1	Size isolates-at-a-time to this computer (threads divided; assembly only when memory allows)	medium
+ASSEMBLY_SLOT_GB	int	2..512	Memory one assembly is assumed to need when AUTO_PARALLEL decides how many run at once	medium
+PIPELINE_OVERLAP	flag	0|1	Start stage 2 for an isolate while stage 1 downloads the others (opt-in)	medium

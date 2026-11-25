@@ -33,46 +33,31 @@ await ev("(async () => { AI.prov = 'local'; await aiStatus(true); fillProv(); aw
 if (await ev("!!document.querySelector('#ai_consent')")) { await click("#ai_consent"); await sleep(600); }   // the notice is accepted once per provider
 check("sign-in", "the local provider needs no sign-in: the pane opens", await until("!document.querySelector('#ai_form').hidden", 20000));
 check("pane", "the declaration line under the chat names the Share rule", /press Share/.test(await ev("document.querySelector('#ai_decl').innerText")));
-check("pane", "five quick-action chips are shown", await ev("document.querySelectorAll('#ai_quick button').length === 5"));
+check("pane", "six quick-action chips are shown", await ev("document.querySelectorAll('#ai_quick button').length === 6"));
 check("pane", "the folder bar offers Choose a folder (the native picker is not driven here)", await ev("!!document.querySelector('#ai_folder [data-aif=choose]')"));
 // grant through the same API the picker's callback uses
 await ev(`api("ai/folder/grant", {path: ${JSON.stringify(dataDir)}, remember: false}).then(g => { AI.grant = g; aiRenderFolder(); })`);
 check("grant", "the chip shows only the folder's own name, with Revoke", await ev("(() => { const t = document.querySelector('#ai_folder').innerText; return /mydata/.test(t) && /Revoke/.test(t) && !/:\\\\|\\//.test(t.replace('Look inside','')); })()"));
 await shot("02-folder-chip");
-// Set up a run flow
-await click("#ai_quick [data-aiflow=setup_run]");
-check("setup flow", "it asks for a study name in a dialog", await until("!!document.querySelector('dialog[open] input')", 20000));
-await ev("(() => { const d = document.querySelector('dialog[open]'); d.querySelector('input').value = 'ai_study'; d.querySelector('input').dispatchEvent(new Event('input', {bubbles: true})); })()");
-await shot("03-study-name");
-await ev("[...document.querySelectorAll('dialog[open] button')].find(b => /Continue/.test(b.textContent)).click(); 1");
-check("setup flow", "a scan card shows what PlasBench found (read only), with problems", await until("!!document.querySelector('#ai_log .aicard2.scan')", 20000) && /Problems found/.test(await ev("document.querySelector('#ai_log .aicard2.scan').innerText")));
-check("setup flow", "a file plan card lists the operations with check boxes, nothing applied yet", await until("!!document.querySelector('#ai_log .aicard2.plan')", 20000) && await ev("document.querySelectorAll('#ai_log .aicard2.plan input[type=checkbox]').length >= 4"));
-check("setup flow", "nothing has been written yet", await ev(`api("ai/folder/scan", {id: AI.grant.id}).then(r => r.scan.counts.files)`) === await ev("AI.scan.scan.counts.files"));
-await ev("document.querySelector('#ai_log').scrollTop = 0; 1");
-await shot("04-scan-card");
-await ev("document.querySelector('#ai_log .aicard2.plan').scrollIntoView(); 1");
-await shot("05-file-plan-preview");
-check("setup flow", "the share summary is shown in full, exactly, before anything is sent", await ev("/Folder summary made by PlasBench/.test(document.querySelector('#ai_log .aicard2.scan details pre').textContent)"));
-check("setup flow", "a form-prefill card follows (Nothing is started)", await ev("/Nothing is started/.test(document.querySelector('#ai_log').innerText)"));
-await click("#ai_log .aicard2.plan [data-aif=apply]");
-check("apply", "Apply asks for confirmation and lists what it will do", await until("!!document.querySelector('dialog[open]') && /mkdir|create folder|copy/i.test(document.querySelector('dialog[open]').innerText)"));
+// Set up my isolates from a folder: PlasBench's intake, a review card, Stage, the quick test, Undo
+await click("#ai_quick [data-aiflow=setup_isolates]");
+check("setup flow", "the intake's review card lists the isolates with their reads, reference and truth status", await until("!!document.querySelector('#ai_log .aicard2.intake .aiiso')", 30000) && /Reference:/.test(await ev("document.querySelector('#ai_log .aicard2.intake').innerText")));
+check("setup flow", "the card offers the destination, the sheet diff and the equivalent plasbench intake stage command", await ev("!!document.querySelector('#ai_log [data-idest=where]') && /plasbench intake stage/.test(document.querySelector('#ai_log .aicard2.intake').textContent)"));
+await ev("document.querySelector('#ai_log .aicard2.intake').scrollIntoView(); 1");
+await shot("04-intake-review");
+await click("#ai_log [data-aif=iapply]");
+check("apply", "Stage asks for confirmation and lists what it will do", await until("!!document.querySelector('dialog[open]')"));
 await shot("06-apply-confirm");
-await ev("[...document.querySelectorAll('dialog[open] button')].find(b => /^Apply$/.test(b.textContent.trim())).click(); 1");
-check("apply", "the plan is applied and an Undo button appears", await until("!!document.querySelector('#ai_log [data-aif=undo]')", 30000));
-await shot("07-applied-undo");
-// prefill card
-await ev("document.querySelector('#ai_log [data-aiui=run]').scrollIntoView(); 1");
-await click("#ai_log [data-aiui=run]");
-check("prefill", "the New benchmark form is filled in and nothing was started", await until("location.hash === '#wizard'", 15000) && await ev("S.wiz.values.study === 'ai_study' && S.wiz.source === 'sheet'") && await ev("api('jobs').then(r => r.jobs.filter(j => /ai_study/.test(j.label || '')).length === 0)"));
-await shot("08-wizard-prefilled");
-await ev("go('home'); 1"); await ev("document.querySelector('#gdbtn') && !document.body.classList.contains('gd-open') && aiOpen(); 1"); await sleep(400);
-await click("#ai_log [data-aif=undo]");
+await ev("[...document.querySelectorAll('dialog[open] button')].find(b => /^Stage$/.test(b.textContent.trim())).click(); 1");
+check("apply", "the isolates are staged, the quick test is shown and an Undo button appears", await until("!!document.querySelector('#ai_log [data-aif=iundo]')", 120000));
+await shot("07-applied-check");
+await click("#ai_log [data-aif=iundo]");
 await until("!!document.querySelector('dialog[open]')"); await ev("[...document.querySelectorAll('dialog[open] button')].find(b => /^Undo$/.test(b.textContent.trim())).click(); 1");
-check("undo", "Undo restores the folder and says so", await until("/Undone/.test(document.querySelector('#ai_log').innerText)", 20000));
+check("undo", "Undo removes what was staged and says so", await until("/Undone/.test(document.querySelector('#ai_log').innerText)", 20000));
 // sheet fix flow
 fs.writeFileSync(dataDir + "/bad.tsv", "id,accession,run,organism\nS 1,NA,S1,E. coli\nS2,NA,S2,K. pneumoniae\n");
 await ev("AI.msgs = []; aiRenderLog(); 1");
-await click("#ai_quick [data-aiflow=fix_sheet]");
+await ev("aiFlowSheet(); 1");
 check("sheet fix", "the plan shows a diff and flags the sample-id change", await until("!!document.querySelector('#ai_log .aicard2.plan details pre')", 25000) && /Sample ids change/.test(await ev("document.querySelector('#ai_log .aicard2.plan').innerText")));
 await ev("document.querySelector('#ai_log .aicard2.plan details').open = true; document.querySelector('#ai_log .aicard2.plan').scrollIntoView(); 1");
 await shot("09-sheet-fix-diff");
@@ -129,7 +114,7 @@ await ev("document.documentElement.removeAttribute('data-theme'); document.docum
 await ev("document.querySelector('#ai_in').focus(); 1");
 await send("Input.dispatchKeyEvent", {type: "keyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9}); await send("Input.dispatchKeyEvent", {type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9});
 check(A, "Tab from the composer reaches the next control (no keyboard trap)", await ev("document.activeElement.id !== 'ai_in'"));
-check(A, "a card's button is activated by keyboard: Enter on a focused quick chip starts the flow", await ev("(() => { const b = document.querySelector('#ai_quick [data-aiflow=diagnose]'); b.focus(); return document.activeElement === b && b.tagName === 'BUTTON'; })()"));
+check(A, "a card's button is activated by keyboard: Enter on a focused quick chip starts the flow", await ev("(() => { const b = document.querySelector('#ai_quick [data-aiflow=why_failed]'); b.focus(); return document.activeElement === b && b.tagName === 'BUTTON'; })()"));
 // double click on a one-shot button
 await ev("AI.msgs = []; aiRenderLog(); 1");
 await ev(`(async () => { const v = await api("ai/ui/validate", {ui: {ui: "go", target: "runs"}}); AI.msgs.push({role: "bot", content: "x", ui: [v]}); aiRenderLog(); })()`);
