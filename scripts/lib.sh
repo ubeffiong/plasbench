@@ -162,7 +162,7 @@ sys_stats() {
         [[ -n "$avail" ]] && out+="mem_avail=${avail}MB"
         [[ -n "$swap" ]] && out+="${out:+ }swap_used=${swap}MB"
     fi
-    free="$(df -Pk "${1:-.}" 2>/dev/null | awk 'NR == 2 { printf "%.0f", $4 / 1048576 }')"
+    free="$(df -Pk "${1:-.}" 2>/dev/null </dev/null | awk 'NR == 2 { printf "%.0f", $4 / 1048576 }')"
     [[ -n "$free" ]] && out+="${out:+ }disk_free=${free}GB"
     printf '%s' "$out"
 }
@@ -709,7 +709,7 @@ record_stage_timing() {
 check_free_disk() {
     local dir="$1" min_gb="${2:-${MIN_FREE_DISK_GB:-20}}" kb
     [[ "$min_gb" =~ ^[0-9]+$ && "$min_gb" -gt 0 ]] || return 0
-    kb="$(df -Pk "$dir" 2>/dev/null | awk 'NR == 2 { print $4 }')"
+    kb="$(df -Pk "$dir" 2>/dev/null </dev/null | awk 'NR == 2 { print $4 }')"
     [[ "$kb" =~ ^[0-9]+$ ]] || return 0
     if (( kb / 1048576 < min_gb )); then
         warn "only about $(( kb / 1048576 )) GB is free where $dir is (below the ${min_gb} GB threshold, MIN_FREE_DISK_GB): downloads and assemblies may fill the disk."
@@ -775,7 +775,7 @@ diagnose_failed_step() {
     DIAG_CAUSE="unknown"; DIAG_CONFIDENCE="low"; DIAG_RETRY="-"; DIAG_ENV="0"; DIAG_TITLE="the cause is not recognised"
     DIAG_EVIDENCE="see $logfile"; DIAG_ADVICE="Read the end of the log: tail -30 $logfile"
     have python3 || return 0
-    free_gb="$(df -Pk "${DATA_DIR:-.}" 2>/dev/null | awk 'NR == 2 && $4 ~ /^[0-9]+$/ { printf "%.2f", $4 / 1048576 }')"
+    free_gb="$(df -Pk "${DATA_DIR:-.}" 2>/dev/null </dev/null | awk 'NR == 2 && $4 ~ /^[0-9]+$/ { printf "%.2f", $4 / 1048576 }')"
     line="$(python3 -I "${PROJECT_ROOT:-.}/python/assembler_diagnosis.py" "$logfile" --format tsv --exit-code "$code" --sample "$sample" \
         --threads "${THREADS:-}" --memory-gb "${ASSEMBLY_MEMORY_GB:-}" --tmpdir "${TMPDIR:-/tmp}" ${free_gb:+--free-gb "$free_gb"} 2>/dev/null </dev/null)" || return 0
     [[ -n "$line" ]] || return 0
