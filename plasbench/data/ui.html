@@ -592,7 +592,8 @@ body.gd-ai{--gdw:min(430px,92vw)}
 .aipre-plain{white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;font-size:11.5px;background:var(--surface-2);padding:5px 7px;border-radius:3px;margin:4px 0}
 .aiisos{list-style:none;margin:6px 0;padding:0}.aiiso{border:1px solid var(--line);border-radius:4px;padding:6px 8px;margin:6px 0;font-size:12.5px}.aiiso-h{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .aiiso-f,.aidest{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:12px;margin:4px 0}.aiiso-f input,.aidest input,.aidest select,.aiask select,.aitab select{font:inherit;font-size:12px;max-width:100%}
-.aiissues{margin:3px 0;padding-left:18px}.aichk{border-top:1px solid var(--line-2);padding:5px 0}.aitab{border-collapse:collapse;font-size:12px;margin:6px 0;display:block;overflow:auto}.aitab td,.aitab th{border:1px solid var(--line);padding:3px 6px;text-align:left;vertical-align:top}
+#gdp_ai .btn:not(.sec):not(.ghost):not(.danger){color:var(--on-primary,#fff)}:root[data-theme=dark] #gdp_ai{--on-primary:#0d1b2a}@media (prefers-color-scheme:dark){:root:not([data-theme=light]) #gdp_ai{--on-primary:#0d1b2a}}
+.aiissues{margin:3px 0;padding-left:18px}.aichk{border-top:1px solid var(--line-2);padding:5px 0}.aitab{border-collapse:collapse;font-size:12px;margin:6px 0;display:block;overflow:auto}.aitab td:nth-child(-n+2),.aitab th{white-space:nowrap}.aitab td,.aitab th{border:1px solid var(--line);padding:3px 6px;text-align:left;vertical-align:top}
 .aiops{list-style:none;margin:6px 0;padding:0}.aiops li{margin:3px 0}.aiops label{display:flex;gap:6px;align-items:flex-start}
 .aicard2 progress{width:100%;max-width:240px}
 #ai_starters{display:flex;flex-wrap:wrap;gap:5px;padding:0 8px 6px;flex:none}
@@ -6429,7 +6430,7 @@ function aiMsgHtml(m, mi) {
 }
 function aiDecorate(root) {
   $$("pre", root).forEach(pre => {
-    if (pre.dataset.dec) return; pre.dataset.dec = "1";
+    if (pre.dataset.dec || pre.classList.contains("aipre-plain")) return; pre.dataset.dec = "1";
     const hd = document.createElement("div"); hd.className = "aipre-hd";
     hd.innerHTML = `<span>${AI_PLAIN_WHERE}</span><button class="btn sec sm" data-aicopy="1">${icon("copy")}Copy</button>`;
     pre.parentNode.insertBefore(hd, pre);
@@ -6921,7 +6922,7 @@ async function aiSaveLabels(m, card) {
   if (Object.values(labels).some(v => !v)) { m.note = "Choose PLASMID or CHROMOSOME for every sequence first."; return aiRenderLog(); }
   let r; try { r = await api("ai/intake/labels/save", {dest: m.dest, sample: m.data.sample, labels}); } catch (e) { m.note = e.message; return aiRenderLog(); }
   if (!r.ok) { m.note = "Not saved: " + r.problems.join("; "); return aiRenderLog(); }
-  m.done = true; m.note = "Saved. Checking again…"; aiRenderLog();
+  m.data.rows.forEach(x => { x.label = labels[x.raw_id] || x.label; }); m.done = true; m.note = "Saved. Checking again…"; aiRenderLog();
   const p = AI.msgs[m.parent];
   try { const c = await api("ai/intake/check", {dest: m.dest, only: [m.data.sample], deep: false}); m.note = c.ok ? "Saved. The quick test now passes for " + m.data.sample + "." : "Saved. The quick test still reports: " + c.samples.flatMap(s => s.checks.filter(x => x.status === "fail").map(x => x.name)).join("; ");
     if (p) { const cc = (p.result && p.result.check) || p.check; if (cc) { cc.samples = cc.samples.map(s => s.sample_id === m.data.sample ? c.samples[0] : s); cc.ok = cc.samples.every(s => s.ok); } await aiIntakeRunCard(p); } } catch (e) { m.note = "Saved. " + e.message; }
@@ -6974,7 +6975,7 @@ async function aiWhyAfter(m, id) {
   if (f) { try { let fj = await api(`jobs/${f.id}?offset=0`); if (fj.size > 24000) fj = await api(`jobs/${f.id}?offset=${fj.size - 24000}`); failed = {command: "plasbench " + (f.argv || []).join(" "), exit: f.exit, tail: (fj.log || "").split(/\r?\n/).slice(-60).join("\n")}; } catch {} }
   let d; try { d = await api("ai/run/digest", {diagnose: log, failed}); } catch (e) { m.content = "The diagnosis could not be read: " + e.message; return aiRenderLog(); }
   m.digest = d; m.failedJob = f ? f.id : ""; m.failedExit = f ? f.exit : null; m.actions = d.actions || []; m.ui = d.settings || [];
-  m.content = d.causes.length ? "**What PlasBench found**\n\n" + d.causes.map(c => `- **${c.code}**: ${c.title}${c.advice ? "\n  " + c.advice : ""}`).join("\n") : "PlasBench's tables do not name a cause for this failure. The digest below has the stage, the step and the end of the log; send it to the assistant, or open an issue with `plasbench issue-report`.";
+  m.content = d.causes.length ? "**What PlasBench found**\n\n" + d.causes.map(c => `- **${c.code}**: ${c.title}.${c.advice ? " What to do: " + c.advice : ""}`).join("\n") : "PlasBench's tables do not name a cause for this failure. The digest below has the stage, the step and the end of the log; send it to the assistant, or open an issue with `plasbench issue-report`.";
   aiRenderLog(); $("#ai_live").textContent = "The diagnosis is ready";
 }
 function aiDigestHtml(m) {

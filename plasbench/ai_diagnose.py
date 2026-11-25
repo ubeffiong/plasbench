@@ -205,6 +205,11 @@ def digest(project, diagnose_output: str = "", failed: dict = None) -> dict:
     if cmd or code is not None:
         lines.append("Failed command: %s%s" % (cmd or "(unknown)", " exit %s: %s" % (code, exitcodes.explain(code, (cmd.split() + ["", ""])[1])) if code is not None else ""))
     causes = classify(project, raw_tail + "\n" + "\n".join(str(h) for h in (s.get("hints") or [])), code)
+    for item in ((s.get("assembly_failures") or {}).get("items") or [])[:2]:      # the cause stage 3 itself recorded (assembly_status.tsv)
+        if item.get("cause") and not any(c["code"] == item["cause"] for c in causes):
+            causes.insert(0, {"source": "assembly_status.tsv", "code": str(item["cause"]), "title": "assembly of %s failed" % _line(item.get("sample"), 40),
+                              "evidence": item.get("evidence") or "", "advice": item.get("advice") or ""})
+    causes = causes[:4]
     for c in causes:
         lines.append("Cause [%s] %s: %s%s" % (c["source"], c["code"], _line(c["title"], 140), (" | evidence: " + _line(c["evidence"], 160)) if c.get("evidence") else ""))
     marked = [x for x in ai_actions.redact_output(raw_tail, 400, 20000).splitlines() if EVIDENCE.search(x)]
