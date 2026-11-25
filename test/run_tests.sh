@@ -66,6 +66,7 @@ pb_run bash test_assembly_selection_stage.sh
 pb_run bash test_only_tool_gating.sh
 pb_run bash test_failed_tool_exit_code.sh
 pb_run bash test_tool_result_fingerprint.sh
+pb_run bash test_stage4_local_work.sh
 pb_run bash test_capability_cache.sh
 pb_run bash test_thread_budget.sh
 pb_run bash test_plsmd_adapter.sh

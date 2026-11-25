@@ -137,7 +137,7 @@ def _is_result(path):
     return True
 
 
-def finish(src, dst):
+def finish(src, dst, keep_all=False):
     """Move the results of an assembly from `src` (scratch) to `dst` (the isolate's assembly folder), atomically: everything is copied into a sibling folder of `dst`
     first (same file system as `dst`), checked by size, and renamed into place, so `dst` is either absent or complete. Returns (files, bytes)."""
     src, dst = Path(src), Path(dst)
@@ -148,7 +148,7 @@ def finish(src, dst):
     part.mkdir(parents=True)
     files = total = 0
     for item in sorted(src.iterdir()):
-        if not _is_result(item):
+        if not keep_all and not _is_result(item):        # keep_all: a tool's whole output folder (stage 4), byte for byte as if it had run in place
             continue
         target = part / item.name
         if item.is_dir():
@@ -216,6 +216,7 @@ def main(argv=None):
     f = sub.add_parser("finish")
     f.add_argument("--src", required=True)
     f.add_argument("--dst", required=True)
+    f.add_argument("--all", action="store_true", help="copy every file and folder (a tool's output folder), not only an assembly's results")
     pt = sub.add_parser("put")
     pt.add_argument("--src", required=True)
     pt.add_argument("--dst", required=True)
@@ -243,7 +244,7 @@ def main(argv=None):
             print(name)
         return 0
     try:
-        files, total = finish(args.src, args.dst)
+        files, total = finish(args.src, args.dst, keep_all=args.all)
     except OSError as exc:
         print("ERROR: %s" % exc, file=sys.stderr)
         return 1

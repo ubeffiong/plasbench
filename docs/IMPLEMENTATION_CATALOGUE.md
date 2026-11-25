@@ -9,7 +9,7 @@ a methods file, a changelog and the code. This catalogue is the index to all of 
 explains the method in depth.
 
 **Size at the time of writing:** 231 analysis modules, 28 registered tools and baselines (20 real tools), 220 registered
-outputs, 55 run switches, 513 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+outputs, 55 run switches, 514 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -651,7 +651,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `sync_publishing_versions.py` | Bring the version written in the publishing files up to the version in pyproject.toml (run it in the version-bump commit of a release). |
 | `tool_install_proof.py` | Prove, on a clean Linux runner, that every tool PlasBench installs really installs (.github/workflows/tool-install-proof.yml). |
 | `tool_readiness.py` | Is an annotation tool READY to work, not just present on PATH? |
-| `work_dir.py` | A fast work folder for assemblies when the data folder is on a slow file system. |
+| `work_dir.py` | A fast work folder for stage 3 (fastp output and the assembly) when the data folder is on a slow file system. |
 
 
 ## 7. Every output file and where the report shows it

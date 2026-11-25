@@ -382,9 +382,10 @@ export AUTO_RESOURCES="${AUTO_RESOURCES:-1}"
 # assembly_status.tsv, assembly_memory.tsv and run_manifest.json.
 export ASSEMBLER_ALLOW_ONLY_ASSEMBLER="${ASSEMBLER_ALLOW_ONLY_ASSEMBLER:-0}"
 # --- Work folder, annotation time limits and the slow-step note ------------------------------------
-# WORK_DIR: where assemblies run. auto (default) = a scratch folder under ~/.plasbench/scratch/<study> when the data folder is on a slow mount (a Windows drive seen from WSL,
-# NTFS/exFAT, a network share, a cloud-synced folder), else the data folder itself; data = always the data folder; any other value = that folder. Finished results are
-# always moved back to the isolate's folder. Takes effect at the next stage 3 start.
+# WORK_DIR: where stages 3 and 4 do their file-heavy work. auto (default) = a local folder under ~/.plasbench/scratch/<study> when the data (or results) folder is on a slow
+# mount (a Windows drive seen from WSL, NTFS/exFAT, a network share, a cloud-synced folder), else in place; data = always in place; any other value = that folder. Stage 3:
+# SPAdes works there on a local copy of the trimmed reads and its results are moved back atomically. Stage 4: a tool's output folder is made there and copied back whole
+# when the tool ends (results folder slow); plasmidSPAdes reads a local copy of the trimmed reads (data folder slow). Takes effect at the next stage start.
 export WORK_DIR="${WORK_DIR:-auto}"
 # ANNOTATION_TIMEOUT_SECONDS: per annotation caller (mob_typer, abricate, AMRFinder, ISEScan, barrnap). Blank = max(300, 150 s per Mbp of the reference), ISEScan three times that;
 # a number = that many seconds; 0 or off = no limit. A caller that hits the limit is stopped and recorded as timed_out (never cached); the others are kept.
