@@ -374,7 +374,7 @@ auto_parallel_apply() {
     cpus="${PLASBENCH_TEST_CPUS:-$(plasbench_detect_cores)}"
     mb="${PLASBENCH_TEST_AVAILABLE_MB:-$(plasbench_detect_memory_mb)}"
     line="$(python3 -I "${PROJECT_ROOT:-$HERE/..}/python/parallel_plan.py" plan --stage "$stage" --cpus "$cpus" --available-mb "$mb" --isolates "$n"         --slot-gb "${ASSEMBLY_SLOT_GB:-8}" --profile "${RESULTS_DIR:-.}/resource_profile.tsv" 2>/dev/null </dev/null)" || return 0
-    IFS=$'	' read -r slots threads mem why <<< "$line"
+    IFS=$'\t' read -r slots threads mem why <<< "$line"
     [[ "$slots" =~ ^[0-9]+$ && "$threads" =~ ^[0-9]+$ ]] || return 0
     export MAX_PARALLEL_SAMPLES="$slots"
     if [[ "${PLASBENCH_THREADS_EXPLICIT:-0}" != "1" && "$slots" -gt 1 ]]; then

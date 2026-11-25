@@ -342,14 +342,14 @@ db_preflight_fail() {
 # once, times kept, so the reuse fingerprint is unchanged). WORK_DIR=data turns both off. Leftovers of a run that died are removed (their pid is gone).
 STAGE4_LOCAL_ROOT="" STAGE4_RESULTS_SLOW=0 STAGE4_DATA_SLOW=0 STAGE4_SAMPLE_WORK=""
 stage4_local_setup() {
-    local study line dir reason fs kind name
+    local study line dir reason kind name
     have python3 || return 0
     study="$(basename "$(dirname "${RESULTS_DIR:-./results}")")"
     line="$(python3 -I "$PROJECT_ROOT/python/work_dir.py" resolve --data-dir "$RESULTS_DIR" --study "$study" --mode "${WORK_DIR:-auto}" --need-gb 2 2>/dev/null </dev/null)" || return 0
-    IFS=$'	' read -r dir reason fs kind <<< "$line"
+    IFS=$'\t' read -r dir reason _ kind <<< "$line"
     [[ "$kind" == "scratch" ]] && { STAGE4_RESULTS_SLOW=1; STAGE4_LOCAL_ROOT="$dir"; log "  tool work folders: local ($dir; $reason); each tool's folder is copied back to $RESULTS_DIR when it ends"; }
     line="$(python3 -I "$PROJECT_ROOT/python/work_dir.py" resolve --data-dir "$DATA_DIR" --study "$study" --mode "${WORK_DIR:-auto}" --need-gb 2 2>/dev/null </dev/null)" || line=""
-    IFS=$'	' read -r dir reason fs kind <<< "$line"
+    IFS=$'\t' read -r dir reason _ kind <<< "$line"
     [[ "$kind" == "scratch" ]] && { STAGE4_DATA_SLOW=1; STAGE4_LOCAL_ROOT="${STAGE4_LOCAL_ROOT:-$dir}"; }
     if [[ -n "$STAGE4_LOCAL_ROOT" ]]; then
         mkdir -p "$STAGE4_LOCAL_ROOT" 2>/dev/null || { STAGE4_LOCAL_ROOT="" STAGE4_RESULTS_SLOW=0 STAGE4_DATA_SLOW=0; return 0; }
