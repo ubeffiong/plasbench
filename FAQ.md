@@ -1083,3 +1083,7 @@ the Windows and WSL2 paths are tested with fakes, so run `plasbench runtime chec
 
 It was paused, not slow. A real run showed a 4-minute fastp trim as 10,096 s because Windows slept for 2 h 47 min inside it. PlasBench now keeps the computer awake while a run is active (`KEEP_AWAKE=1`, the screen may still turn off, no administrator rights), records any sleep that still happens
 (`system_suspend`), leaves it out of every step time and time limit, and says so in `plasbench status`. Windows "Modern Standby" laptops can still sleep on a lid close or battery saver; for long runs set the power plan or use `powercfg /change standby-timeout-ac 0`. See `docs/PERFORMANCE_AUDIT.md`.
+
+### Q79. Stage 0 stopped with "uncurated sample-sheet row 2; require organism, truth_technology, truth_quality_tier" for my own isolates. What is wrong?
+
+Nothing in your files. A sheet for your own isolates has only `sample_id`, `assembly_accession` (`LOCAL` or `NA`) and `sra_run` (and optionally `organism`), while stage 0 by default requires the curated cohort columns (`REQUIRE_CURATED_METADATA=1`) that a publishable public cohort carries. For your own isolates run `REQUIRE_CURATED_METADATA=0 plasbench run --samples config/local.tsv --local-inputs` (this is the command `plasbench intake check` prints when everything passes), or set `REQUIRE_CURATED_METADATA=0` in Settings. Keep it at 1 for a public cohort sheet. See `docs/INPUT_GUIDE.md`.
