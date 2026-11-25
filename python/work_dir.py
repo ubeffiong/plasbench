@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A fast work folder for assemblies when the data folder is on a slow file system.
+"""A fast work folder for stage 3 (fastp output and the assembly) when the data folder is on a slow file system.
 
 SPAdes writes tens of thousands of small files. On a Windows drive seen from WSL (9p/drvfs), on an NTFS/exFAT volume, a network share or a cloud-synced folder
 every small file costs milliseconds: measured on the machine this was written on, 2000 tiny files took 0.06 s on Ubuntu's own disk and 16.4 s on /mnt/f (9p), about 280 times
@@ -8,6 +8,8 @@ longer to create. So when the data folder is on such a mount the assembler works
   python3 -I python/work_dir.py resolve --data-dir D --study NAME [--mode auto|data|PATH] [--need-gb N]   -> prints  <dir>\\t<reason>\\t<fstype>
   python3 -I python/work_dir.py clean   --root DIR                                           remove scratch folders of runs that are gone (their pid is dead)
   python3 -I python/work_dir.py finish  --src DIR --dst DIR                                  move the finished results back, atomically
+  python3 -I python/work_dir.py put     --src FILE --dst FILE                                copy one finished file back, atomically, keeping its time
+  python3 -I python/work_dir.py copy-in --dst DIR FILE...                                    copy inputs into the work folder once, keeping their times
 
 WORK_DIR (config/config.sh): `auto` (default) = a scratch folder under ~/.plasbench/scratch/<study> when the data folder is on a slow mount, else the data folder itself;
 `data` = always the data folder (the old behaviour); any other value = that folder. Inputs are never moved or deleted; only the scratch folder is removed, after the
@@ -167,6 +169,39 @@ def finish(src, dst):
     return files, total
 
 
+def put(src, dst):
+    """Copy one finished file from the work folder to its place in the data folder, atomically: into `dst`.partial.<pid> beside it (same file system), checked by size, then
+    renamed over `dst`; the modification time is kept (stage 4's reuse fingerprint reads the trimmed reads' size and time). Returns the bytes copied."""
+    src, dst = Path(src), Path(dst)
+    part = dst.parent / (dst.name + ".partial.%d" % os.getpid())
+    try:
+        shutil.copy2(str(src), str(part))
+        if part.stat().st_size != src.stat().st_size:
+            raise OSError("copy of %s is incomplete (the destination may be full)" % src.name)
+        os.replace(str(part), str(dst))
+    except OSError:
+        try:
+            part.unlink()
+        except OSError:
+            pass
+        raise
+    return dst.stat().st_size
+
+
+def copy_in(files, dst_dir):
+    """Copy input files into the work folder once (modification times kept, so a fingerprint that reads them sees the same file). Returns the new paths."""
+    dst_dir = Path(dst_dir)
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    out = []
+    for f in files:
+        target = dst_dir / Path(f).name
+        shutil.copy2(str(f), str(target))
+        if target.stat().st_size != Path(f).stat().st_size:
+            raise OSError("copy of %s into the work folder is incomplete (the work folder's disk may be full)" % Path(f).name)
+        out.append(str(target))
+    return out
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -181,7 +216,24 @@ def main(argv=None):
     f = sub.add_parser("finish")
     f.add_argument("--src", required=True)
     f.add_argument("--dst", required=True)
+    pt = sub.add_parser("put")
+    pt.add_argument("--src", required=True)
+    pt.add_argument("--dst", required=True)
+    ci = sub.add_parser("copy-in")
+    ci.add_argument("--dst", required=True)
+    ci.add_argument("files", nargs="+")
     args = ap.parse_args(argv)
+    if args.cmd in ("put", "copy-in"):
+        try:
+            if args.cmd == "put":
+                print("%.1f MB" % (put(args.src, args.dst) / 1e6))
+            else:
+                for path in copy_in(args.files, args.dst):
+                    print(path)
+        except OSError as exc:
+            print("ERROR: %s" % exc, file=sys.stderr)
+            return 1
+        return 0
     if args.cmd == "resolve":
         res = resolve(args.mode, args.data_dir, args.study, args.home, int(args.need_gb * 1e9))
         print("\t".join((res["dir"], res["reason"], res["fs"] or "-", "scratch" if res["scratch"] else "data")))
