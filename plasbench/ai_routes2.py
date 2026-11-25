@@ -17,13 +17,25 @@ copy of a plan or action is never trusted), is rate limited, and leaves one line
     POST ai/files/undo       {id, journal}
     POST ai/ui/validate      {ui}                    a window action, checked
     POST ai/flow/tool        {...answers}            the manifest `plasbench tools new` would write, validated
+    POST ai/intake/options   {}                      where the isolates can go (PlasBench's data folder, a study's data folder) and the sheets of your own isolates
+    POST ai/intake/plan      {id, dest, choices}     `plasbench intake scan` + `stage --dry-run` on the chosen folder (python/intake.py): the review card and its fingerprint
+    POST ai/intake/apply     {id, dest, choices, fingerprint}   re-plan, refuse a changed plan, stage, then `intake check` (a job)
+    GET  ai/intake/progress  ?job=
+    POST ai/intake/undo      {journal}               remove what a set-up created (unchanged files only) and put the sheet back
+    POST ai/intake/check     {dest, only?, deep?}    `plasbench intake check` on a sheet of your own isolates
+    POST ai/intake/fix       {dest, only?}           `plasbench intake check --fix` (the sheet and truth tables are backed up first)
+    POST ai/intake/labels    {dest, sample}          the sequences of a reference with their labels (REVIEW rows are the person's decision)
+    POST ai/intake/labels/save {dest, sample, labels}
+    POST ai/intake/share     {id, dest, choices}     mark a summary of the plan as the one the next question may carry
+    POST ai/run/where        {study?}                "Where is my run?": plasbench status as a card (no model)
+    POST ai/run/digest       {diagnose, failed}      "Why did my run fail?": the redacted, capped digest and the safe next steps
 """
 from __future__ import annotations
 
 import time
 
-from . import ai_files, ai_flows, ai_folder, ai_ui
-from .ai_folder import FolderError, GRANTS
+from . import ai_diagnose, ai_files, ai_flows, ai_folder, ai_intake, ai_ui
+from .ai_folder import FolderError, GRANTS, clean
 
 SHARES = {}            # grant id -> (time, summary text made by this server)
 SHARE_TTL = 1800
@@ -90,8 +102,8 @@ def serve(route: str, data: dict, q: dict, project):
             g = GRANTS.get(data.get("id"))
             what = data.get("what")
             if what == "setup":
-                s = ai_flows.suggest_setup(ai_folder.scan(g))
-            elif what == "sheet_fix":
+                raise FolderError("isolate set-up now goes through PlasBench's intake: use ai/intake/plan")
+            if what == "sheet_fix":
                 s = ai_flows.suggest_sheet_fix(g, str(data.get("rel") or ""))
             else:
                 raise FolderError("unknown suggestion")
@@ -125,9 +137,55 @@ def serve(route: str, data: dict, q: dict, project):
         if route == "ai/flow/tool":
             _limit("plan")
             return 200, ai_flows.tool_manifest(project, data if isinstance(data, dict) else {})
+        if route == "ai/intake/options":
+            return 200, ai_intake.destinations(project)
+        if route == "ai/intake/plan":
+            _limit("plan")
+            g = GRANTS.get(data.get("id"))
+            v = ai_intake.make_plan(project, g, data.get("dest"), data.get("choices"))[0]
+            ai_files.audit("intake.plan", "ok" if v["can_apply"] else "refused", isolates=len(v["isolates"]), staged=v["staged"])
+            return 200, v
+        if route == "ai/intake/share":
+            _limit("scan")
+            g = GRANTS.get(data.get("id"))
+            text = ai_intake.summary_text(ai_intake.make_plan(project, g, data.get("dest"), data.get("choices"))[0])     # made again here: the page's copy is not trusted
+            SHARES[g.id] = (time.time(), text)
+            ai_files.audit("intake.share", "ok", chars=len(text))
+            return 200, {"summary": text, "tokens": int(len(text) / 3.6) + 1}
+        if route == "ai/intake/apply":
+            _limit("apply")
+            g = GRANTS.get(data.get("id"))
+            return 200, {"job": ai_intake.start_apply(project, g, data.get("dest"), data.get("choices"), str(data.get("fingerprint") or ""))}
+        if route == "ai/intake/progress":
+            return 200, ai_intake.job_status(str(q.get("job") or ""))
+        if route == "ai/intake/undo":
+            _limit("undo")
+            return 200, ai_intake.undo(str(data.get("journal") or ""))
+        if route in ("ai/intake/check", "ai/intake/fix", "ai/intake/labels", "ai/intake/labels/save"):
+            _limit("plan" if route != "ai/intake/fix" else "apply")
+            d = ai_intake.resolve_dest(project, data.get("dest"))
+            only = [str(x) for x in data.get("only")][:200] if isinstance(data.get("only"), list) else None
+            if route == "ai/intake/check":
+                return 200, ai_intake.check_dest(project, d, only, deep=bool(data.get("deep", False)))
+            if route == "ai/intake/fix":
+                return 200, ai_intake.fix_dest(project, d, only)
+            if route == "ai/intake/labels":
+                return 200, ai_intake.labels(project, d, str(data.get("sample") or ""))
+            return 200, ai_intake.save_labels(project, d, str(data.get("sample") or ""), data.get("labels"))
+        if route == "ai/run/where":
+            _limit("ui")
+            return 200, ai_diagnose.where(project, str(data.get("study") or ""))
+        if route == "ai/run/digest":
+            _limit("ui")
+            out = ai_diagnose.digest(project, str(data.get("diagnose") or "")[:400000], data.get("failed") if isinstance(data.get("failed"), dict) else None)
+            ai_files.audit("run.digest", "ok", chars=len(out["text"]), causes=len(out["causes"]))
+            return 200, out
     except FolderError as exc:
         ai_files.audit(route.replace("/", "."), "refused")
         return 400, {"error": str(exc), "kind": "folder"}
+    except OSError as exc:
+        ai_files.audit(route.replace("/", "."), "oserror")
+        return 400, {"error": "a file could not be read or written (%s)" % clean(getattr(exc, "strerror", None) or type(exc).__name__, 80), "kind": "folder"}
     except (TypeError, ValueError, AttributeError, KeyError) as exc:
         ai_files.audit(route.replace("/", "."), "badrequest")
         return 400, {"error": "the request was not understood (%s)" % type(exc).__name__, "kind": "bad_request"}

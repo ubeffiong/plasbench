@@ -7,7 +7,8 @@ headings) that plasbench/ai_kb.py ranks with BM25 and the window sends, three to
 
 Sources: the guides (README, FAQ, INSTALL, SUPPORT, docs/*), the workflow table (config/workflow_steps.tsv), the tool table (config/tool_capabilities.tsv), the Settings
 of config/config.sh (key, default, comment), the metric and window help texts, the command line (built from the argparse parser of plasbench/cli.py, so it cannot drift),
-the failure signatures (config/resource_signatures.tsv, the Docker and assembler diagnosis rules) and the exit codes.
+the failure signatures (config/resource_signatures.tsv, the Docker and assembler diagnosis rules), the exit codes, the run profiles (config/run_profiles.tsv)
+and the messages of `plasbench status` (python/run_status.py).
 
 Deterministic: the same sources give the same bytes (sorted keys, gzip without a time stamp), so test/test_ai_kb.py can require that the shipped file is current:
     python python/build_ai_kb.py            # rebuild plasbench/data/ai_kb.json.gz
@@ -310,21 +311,27 @@ def help_chunks() -> list:
     return out
 
 
+def readable_regex(rx: str) -> str:
+    """A log-matching regular expression as words a person would paste: named groups, escapes and quantifiers dropped, alternatives joined with ' or '."""
+    t = re.sub(r"\(\?P<\w+>[^)]*\)", "N", rx)
+    t = re.sub(r"\(\?<?[!=][^)]*\)", "", t)
+    t = re.sub(r"\.\{\d*,?\d*\}|\{\d*,?\d*\}|(?<![\\])[?*+]", " ", t)
+    t = re.sub(r"(?<![\\])\[([A-Za-z])([a-z])\]", r"\2", t)
+    t = t.replace(chr(92) + "s", " ")
+    t = re.sub(r"[\\](.)", r"\1", t)
+    t = t.replace("(", " ").replace(")", " ").replace("|", " or ")
+    return re.sub(r"\s+", " ", t).strip()
+
+
 def signature_chunks() -> list:
     out = []
     rel = "config/resource_signatures.tsv"
-    rows = tsv_rows(ROOT / rel)
-    cur, n = [], 0
-    for r in rows:
-        line = re.sub(r"\s+", " ", f"Failure signature {r['id']} ({r['tool']}): log text matching /{r['message_regex']}/ means a {r['cause']} problem. Exit codes {r['exit_codes']}. "
-                                   f"What PlasBench tries: {r['ladder']}. {r['note']}")
-        if cur and n + words(line) > MAX_WORDS:
-            out.append(one(rel, f"Failure signatures in tool logs (part {len(out) + 1})", "\n".join(cur), "troubleshooting"))
-            cur, n = [], 0
-        cur.append(line)
-        n += words(line)
-    if cur:
-        out.append(one(rel, f"Failure signatures in tool logs (part {len(out) + 1})", "\n".join(cur), "troubleshooting"))
+    # One chunk per signature: a pasted log line then meets a short chunk that is about it, not one line in a table of eighteen.
+    for r in tsv_rows(ROOT / rel):
+        text = (f"Failure signature {r['id']} ({r['cause'].replace('_', ' ')} problem; tools: {r['tool']}). Log text that shows it: {readable_regex(r['message_regex'])}"
+                + (f". Exit codes {r['exit_codes']}" if r["exit_codes"] not in ("", "-") else "")
+                + f". What PlasBench tries automatically: {r['ladder'].replace(',', ', then ').replace('_', ' ')}. Example or source: {r['note']}. See docs/RESOURCE_ADAPTATION.md.")
+        out.append(one(rel, f"Failure signature: {r['id'].replace('_', ' ')} ({r['cause'].replace('_', ' ')})", re.sub(r"\s+", " ", text), "troubleshooting"))
     import assembler_diagnosis as ad
     rel = "python/assembler_diagnosis.py"
     for rule in ad.RULES:
@@ -344,6 +351,60 @@ def signature_chunks() -> list:
     return out
 
 
+def profile_chunks() -> list:
+    """The run profiles (config/run_profiles.tsv): what fast switches off, what thorough adds, and that none of them touches the leaderboard."""
+    rel = "config/run_profiles.tsv"
+    rows = tsv_rows(ROOT / rel)
+    fast = [f"- {r['key']} = {r['fast']}: {r['label']} (saves {r['saving']}; {r['basis']})" for r in rows if r["fast"]]
+    thorough = [f"- {r['key']} = {r['thorough']}: {r['label']}" for r in rows if r["thorough"]]
+    head = ("Run profiles: fast, standard and thorough. Choose one with `plasbench run --profile fast|standard|thorough`, RUN_PROFILE, the New benchmark form or Settings. "
+            "standard is the default and changes nothing. A profile only sets a key you did not set yourself, and it never changes the leaderboard, the scoring or the "
+            "truth-label evidence (affects_headline is no for every key); the profile is recorded in the run manifest and the report.")
+    nl = "\n"
+    return [one(rel, "Run profiles: what fast switches off", head + nl + "The fast profile switches off:" + nl + nl.join(fast), "settings"),
+            one(rel, "Run profiles: what thorough adds", head + nl + "The thorough profile turns on:" + nl + nl.join(thorough), "settings")]
+
+
+def _literal_strings(node) -> str:
+    """The text of a string or f-string node, with each {placeholder} shown as N."""
+    import ast
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.JoinedStr):
+        return "".join(v.value if isinstance(v, ast.Constant) else "N" for v in node.values)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        return _literal_strings(node.left) + _literal_strings(node.right)
+    return ""
+
+
+def status_chunks() -> list:
+    """The sentences `plasbench status` / `plasbench diagnose` (python/run_status.py hints) and the window print, taken from the code so they cannot drift: people paste them."""
+    import ast
+    rel = "python/run_status.py"
+    tree = ast.parse((ROOT / rel).read_text(encoding="utf-8"))
+    lines = []
+    for fn in tree.body:
+        if isinstance(fn, ast.FunctionDef) and fn.name == "hints":
+            for node in ast.walk(fn):
+                if isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "append" and node.args:
+                    text = re.sub(r"\s+", " ", _literal_strings(node.args[0])).strip()
+                    if len(text) > 25 and text not in lines:
+                        lines.append(text)
+    head = ("What `plasbench status` and `plasbench diagnose` say about a run (python/run_status.py), and what each message means. N stands for a number or a name. "
+            "States: RUNNING, FINISHED, STOPPED (cut off, no record of why), not running, no run found here. A stopped run is resumed by running the same command again: "
+            "finished isolates and tool results are reused.")
+    out, cur, n, nl = [], [], 0, "\n"
+    for l in lines:
+        if cur and n + words(l) > MAX_WORDS - 60:
+            out.append(one(rel, f"Run status messages and what they mean (part {len(out) + 1})", head + nl + nl.join(cur), "troubleshooting"))
+            cur, n = [], 0
+        cur.append("- " + l)
+        n += words(l)
+    if cur:
+        out.append(one(rel, f"Run status messages and what they mean (part {len(out) + 1})", head + nl + nl.join(cur), "troubleshooting"))
+    return out
+
+
 def exit_chunks() -> list:
     from plasbench import exitcodes
     lines = [f"Exit code {k}: {v}" for k, v in sorted(exitcodes._MEANING.items())]
@@ -357,7 +418,7 @@ def build_chunks() -> list:
         p = ROOT / rel
         if p.is_file():
             chunks.extend(markdown_chunks(rel, p.read_text(encoding="utf-8", errors="replace")))
-    chunks += workflow_chunks() + tool_chunks() + settings_chunks() + cli_chunks() + help_chunks() + signature_chunks() + exit_chunks()
+    chunks += workflow_chunks() + tool_chunks() + settings_chunks() + cli_chunks() + help_chunks() + signature_chunks() + exit_chunks() + profile_chunks() + status_chunks()
     for i, c in enumerate(chunks):
         c["id"] = i
     return chunks

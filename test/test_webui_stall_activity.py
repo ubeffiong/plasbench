@@ -160,13 +160,13 @@ def main():
     html = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
     check("plain-words stall text", "No new output for ${stallMinutes(secs)} minute" in html and "This is often normal while reads download or a tool assembles. Closing this window does NOT stop the run." in html)
     check("Check activity and Cancel are offered in the console and on the run card", html.count("Check activity") >= 2 and 'data-st-act="cancel"' in html and 'data-sa="cancel"' in html)
-    check("the chip is relabelled when the check finds writes", "Working (quiet log)" in html and 'status === "active"' in html)
+    check("the chip is relabelled when the check finds writes", "Working, console quiet" in html and 'status === "active"' in html)
     check("the page shows 'Working, console quiet' for a quiet console with busy tools (display_state working_quiet), and the activity answer says why", 's.display_state === "working_quiet" ? "Working, console quiet"' in html and "a.evidence.why" in html and "run's processes are idle" in html)
     check("the old 'Stalled: no output' wording is gone", "Stalled: no output" not in html and "Stalled (no output" not in html)
     check("the cohort picker hides ledgers and says so if one is chosen", "!c.metagenomic && !c.ledger" in html and "Not a cohort sheet." in html)
     check("the Cohorts page tags the ledger", 'c.ledger ? `<span class="tag warn"' in html)
     check("the Quit dialog says in one sentence what each choice does", "Quit and keep running closes this window and PlasBench but leaves the run going in the background, while plain Quit (Stop and quit) cancels the run first" in html)
-    check("the Runs list shows the current stage and isolate for ongoing runs", "Stage ${idx + 1} of ${n}: ${pr.current_name}" in html and "isolate ${pr.isolates_in_stage} of ${pr.isolates}" in html)
+    check("the Runs list shows the current stage and isolate for ongoing runs", "Stage ${pr.stages[idx].id}: ${pr.current_name} (step ${idx + 1} of ${n})" in html and "Stage ${idx + 1} of" not in html and "isolate ${pr.isolates_in_stage} of ${pr.isolates}" in html)
     print("FAILED: " + ", ".join(FAILED) if FAILED else "ALL PASS")
     return 1 if FAILED else 0
 

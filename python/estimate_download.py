@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -74,12 +75,28 @@ def lock_bases(sheet: Path) -> dict:
     return {}
 
 
-def ena_sizes(runs: dict, report=None, workers: int = 8, deadline: float = 40.0):
+def sheet_genomes(rows) -> dict:
+    """{sample: genome bases} from the sheet's genome_size column (cohorts that record it); the read-depth cap needs it before the reference is downloaded."""
+    out = {}
+    for row in rows:
+        try:
+            value = int(float((row.get("genome_size") or row.get("genome_size_bp") or "").strip()))
+        except ValueError:
+            continue
+        if value >= 100_000 and (row.get("sample_id") or "").strip():
+            out[row["sample_id"].strip()] = value
+    return out
+
+
+def ena_sizes(runs: dict, report=None, workers: int = 8, deadline: float = 40.0, genomes=None, notes=None):
     """{sample: total FASTQ bytes} from ENA's file report for the runs the lock has no base count for, plus the samples ENA gave no size for.
 
     A bare cohort sheet (a first-N copy, your own isolates) has no lock, so every read set used to print 'size unknown' and a single 9.5 GB run could hide in a
     20-isolate 'quick' test. ENA reports each file's exact compressed size, so this asks it, a few runs at a time, within `deadline` seconds in all.
     `report(run, timeout)` returns ENA's record for one run; it defaults to python/fetch_ena_reads.file_report.
+
+    With `genomes` ({sample: genome bases}) a run deeper than READ_DEPTH_CAP_X (python/depth_cap.py) is counted at the size of the prefix that will actually be downloaded, and
+    `notes` (a dict, when given) receives {sample: (whole bytes, capped bytes)} for them.
     """
     import time
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -93,7 +110,15 @@ def ena_sizes(runs: dict, report=None, workers: int = 8, deadline: float = 40.0)
         sizes = [x for x in (record.get("fastq_bytes") or "").split(";") if x.strip()]
         if not sizes or not all(x.strip().isdigit() for x in sizes):
             raise ValueError("no sizes")
-        return sample, sum(int(x) for x in sizes)
+        whole = sum(int(x) for x in sizes)
+        if genomes and genomes.get(sample):
+            import depth_cap
+            plan = depth_cap.plan(depth_cap.parse_cap(os.environ.get("READ_DEPTH_CAP_X", "")), genomes[sample], record, [int(x) for x in sizes])
+            if plan.get("capped"):
+                if notes is not None:
+                    notes[sample] = (whole, plan["fetch_bytes"])
+                return sample, plan["fetch_bytes"]
+        return sample, whole
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(one, s, r): s for s, r in runs.items()}
@@ -160,6 +185,8 @@ def main() -> int:
         return 0
 
     bases = lock_bases(sheet)
+    genomes = sheet_genomes(rows)
+    cap_notes = {}
     pending_refs = pending_reads = 0
     known_bases = 0
     unknown = []
@@ -194,7 +221,7 @@ def main() -> int:
     exact, largest = 0, None
     offline_note = ena_unreachable() if unknown_runs and lookup_enabled() else ""
     if unknown_runs and lookup_enabled() and not offline_note:
-        found, unknown_after = ena_sizes(unknown_runs)
+        found, unknown_after = ena_sizes(unknown_runs, genomes=genomes, notes=cap_notes)
         exact = sum(found.values())
         if found:
             top = max(found, key=found.get)
@@ -215,7 +242,12 @@ def main() -> int:
         print(f"  Illumina read sets   : {pending_reads:>4}  size unknown")
     if largest:
         print(f"  LARGEST READ SET     : {largest[1]} ({largest[0]}) {human(largest[2])} compressed"
-              + ("  <- very large: slow to download, ~3x on disk, heavy to assemble (MAX_RUN_DOWNLOAD_GB skips such isolates)" if largest[2] > 5e9 else ""))
+              + ("  <- large: it is downloaded in resumable chunks (an interruption costs one chunk) and is not skipped; trimming and assembly of reads this deep are slow" if largest[2] > 5e9 else ""))
+    if cap_notes:
+        whole = sum(w for w, _ in cap_notes.values())
+        kept = sum(k for _, k in cap_notes.values())
+        print(f"  READ DEPTH CAP       : {len(cap_notes)} read set(s) are deeper than READ_DEPTH_CAP_X={os.environ.get('READ_DEPTH_CAP_X') or 150}x: only their first read pairs are "
+              f"downloaded ({human(kept)} instead of {human(whole)}); the totals above use the smaller figure. READ_DEPTH_CAP_X=off downloads whole files.")
     if offline_note:
         print("  NOTE: ENA read sizes were not looked up, so the total above leaves them out.")
         print(f"        {offline_note}")

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """The AI help's knowledge index: it is current with its sources, built the same every time, shipped as package data, and finds the right guide for realistic questions.
 
-The gold set (test/fixtures/ai_gold.tsv) has more than 40 support questions across installing, Docker, WSL, commands, inputs, metrics, the workflow, troubleshooting, exit codes
-and error messages quoted from logs, some of them misspelt. A question passes when one of the top three chunks comes from an acceptable source."""
+The gold set (test/fixtures/ai_gold.tsv) has more than 40 in-sample support questions across installing, Docker, WSL, commands, inputs, metrics, the workflow, troubleshooting, exit codes
+and error messages quoted from logs, some of them misspelt, and more than 40 HELD-OUT ones (column 4 `heldout`: pasted errors and console tails, intake rule names, failure
+signatures, run profiles, sleep and quiet-console messages) written before the retrieval was tuned for them. A question passes when one of the top three chunks comes from an
+acceptable source; the two hit rates are reported separately."""
 import fnmatch
 import gzip
 import json
@@ -37,7 +39,8 @@ check("an index of several hundred chunks", len(chunks) > 500, len(chunks))
 srcs = {c["src"] for c in chunks}
 for need in ("README.md", "FAQ.md", "INSTALL.md", "SUPPORT.md", "docs/USER_GUIDE.md", "docs/METHODS.md", "docs/SCIENTIFIC_GUIDE.md", "docs/METAGENOMICS.md", "docs/ADDING_TOOLS.md",
              "docs/RESOURCE_ADAPTATION.md", "docs/TOOL_INSTALL_AUDIT.md", "docs/publishing/README.md", "config/workflow_steps.tsv", "config/tool_capabilities.tsv", "config/config.sh",
-             "python/report_help_text.py", "plasbench/ui_help.py", "plasbench/cli.py", "config/resource_signatures.tsv", "python/docker_diagnosis.py", "python/assembler_diagnosis.py", "plasbench/exitcodes.py"):
+             "python/report_help_text.py", "plasbench/ui_help.py", "plasbench/cli.py", "config/resource_signatures.tsv", "python/docker_diagnosis.py", "python/assembler_diagnosis.py", "plasbench/exitcodes.py",
+             "config/run_profiles.tsv", "python/run_status.py", "docs/AI_CAPABILITIES.md"):
     check(f"source in the index: {need}", need in srcs)
 check("every chunk has id, source, title, text", all({"id", "src", "title", "anchor", "kind", "text"} <= set(c) and c["text"].strip() for c in chunks))
 sizes = [len(c["text"].split()) for c in chunks]
@@ -47,6 +50,8 @@ from plasbench import ui_schema  # noqa: E402
 check("every plasbench command of the real parser is in the index", all(f"plasbench {c['name']}" in cli for c in ui_schema.schema()["commands"]))
 check("a settings chunk gives key, default and comment", any("MEMORY_GB" in c["text"] and "default" in c["text"] for c in chunks if c["kind"] == "settings"))
 check("the workflow has stages 0 to 8", all(any(f"Workflow stage {n}" in c["title"] for c in chunks) for n in range(0, 9)))
+check("each failure signature is its own chunk, written as readable log text", any(c["src"] == "config/resource_signatures.tsv" and "OutOfMemoryError: Java heap space" in c["text"] for c in chunks))
+check("the run status messages are indexed from the code (python/run_status.py)", any(c["src"] == "python/run_status.py" and "Partial assembly" in c["text"] for c in chunks))
 check("no secret-looking text in the index", not re.search(r"sk-or-v1-|GOCSPX-|hf_[A-Za-z0-9]{30,}", gzip.decompress(fresh).decode("utf-8")))
 
 print("package data")
@@ -74,19 +79,33 @@ except ImportError:
 print("retrieval gold set")
 kb = ai_kb.load()
 rows = [l.rstrip("\n").split("\t") for l in (ROOT / "test" / "fixtures" / "ai_gold.tsv").read_text(encoding="utf-8").splitlines() if l.strip() and not l.startswith("#")]
-check("at least 40 gold questions", len(rows) >= 40, len(rows))
-hits, misses = 0, []
-for row in rows:
-    q, src = row[0], row[1].split("|")
-    need = row[2].lower() if len(row) > 2 else ""
-    top = kb.search(q, 3)
-    good = any(any(a in r["src"] for a in src) and (not need or need in (r["title"] + " " + r["text"]).lower()) for r in top)
-    hits += good
-    if not good:
-        misses.append(q)
-rate = hits / len(rows)
-print(f"  retrieval hit rate in the top 3: {hits}/{len(rows)} = {rate:.0%}")
-check("hit rate is at least 90%", rate >= 0.9, misses)
+insample = [r for r in rows if not (len(r) > 3 and r[3] == "heldout")]
+heldout = [r for r in rows if len(r) > 3 and r[3] == "heldout"]
+check("at least 40 in-sample gold questions", len(insample) >= 40, len(insample))
+check("at least 40 held-out gold questions (written before the retrieval was tuned for them)", len(heldout) >= 40, len(heldout))
+
+
+def hit_rate(group):
+    hits, misses = 0, []
+    for row in group:
+        q, src = row[0], row[1].split("|")
+        need = row[2].lower() if len(row) > 2 else ""
+        top = kb.search(q, 3)
+        good = any(any(a in r["src"] for a in src) and (not need or need in (r["title"] + " " + r["text"]).lower()) for r in top)
+        hits += good
+        if not good:
+            misses.append(q)
+    return hits, misses
+
+
+hits, misses = hit_rate(insample)
+rate = hits / len(insample)
+print(f"  in-sample retrieval hit rate in the top 3: {hits}/{len(insample)} = {rate:.0%}")
+check("in-sample hit rate is at least 90%", rate >= 0.9, misses)
+hits, misses = hit_rate(heldout)
+rate = hits / len(heldout)
+print(f"  held-out retrieval hit rate in the top 3: {hits}/{len(heldout)} = {rate:.0%}" + (f" (misses: {misses})" if misses else ""))
+check("held-out hit rate is at least 80%", rate >= 0.8, misses)
 for q, src in (("You need approx 5.2 GB of free RAM", "config/resource_signatures.tsv|python/assembler_diagnosis.py|docs/USER_GUIDE.md"), ("Could not open lockfile", "python/docker_diagnosis.py|FAQ.md")):
     top = kb.search(q, 3)
     check(f"error string: {q}", any(any(a in r["src"] for a in src.split("|")) for r in top))

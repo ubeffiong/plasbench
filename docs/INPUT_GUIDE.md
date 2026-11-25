@@ -2,15 +2,17 @@
 
 This guide is for you if you sequenced the isolates yourself and want PlasBench to benchmark plasmid tools on them. You do not need to know the file layout in advance: point PlasBench at the folder where your files are, and it finds what it needs, tells you what it cannot use and why, and repairs what it safely can.
 
-Everything here is also in the window: **plasbench ui** then **Your own isolates**.
+Everything here is also in the window: **plasbench ui** then **Your own isolates**. The AI help pane does the same steps with the same code: **Set up my isolates from a folder** runs this intake on a folder you choose, shows the plan as a card (it is `plasbench intake stage --dry-run`), stages it when you press Stage, shows the quick test, offers Fix and the labelling of `REVIEW` sequences, and ends with the `plasbench run` command as a card. **Check my sample sheet** runs `plasbench intake check` on a sheet of your own isolates. See [AI help](AI_HELP.md#your-isolates-through-the-intake).
 
 ## The short version
+
+How to prepare your own isolates and their sample sheet, in six steps:
 
 (One mixed folder with sub-folders? `plasbench scan-isolates FOLDER` finds each isolate's reads and reference by itself; see the [User Guide](USER_GUIDE.md#add-isolates-from-a-folder). The steps below are the sheet-first route, and stay as they are.)
 
 1. **Get the sheet** (only if you want to write it yourself): `plasbench intake template local --out config/local.tsv`, or press **Download template** in the window.
 2. **Find your files:** `plasbench intake scan /path/to/your/folder` (the window: **Find my files**, then choose the folder). Nothing is copied or changed.
-3. **Place them:** `plasbench intake stage /path/to/your/folder`. This copies (or links) the files to where PlasBench expects them and writes the sheet.
+3. **Place them:** `plasbench intake stage /path/to/your/folder`. This copies (or links) the files to where PlasBench expects them and writes the sheet. Add `--dry-run` to see exactly what would be placed where, and the sheet as it would be, without changing anything. When two FASTA files could be an isolate's reference, say which with `--reference ID=FILE`.
 4. **Quick test:** `plasbench intake check`. It opens every file the way a run will and says pass, warning or fail for each thing. Add `--fix` to repair what can be repaired.
 5. **Decide the one thing only you can decide:** which sequences of the reference are plasmids (see [truth-review](#truth-review)).
 6. **Run:** the command printed at the end of the check.
@@ -33,6 +35,7 @@ Without a reference the isolate is still useful: PlasBench reconstructs its plas
 * **Which FASTA is whose reference:** by name (`KP01.fna` for `KP01`), by folder (a FASTA in the isolate's own folder), or because it is the only isolate and the only FASTA. PlasBench shows how sure it is (`confident` or `likely`) and why. If two isolates could own the same file it gives it to **neither** and asks you to name it after its isolate.
 * **Labels:** a `truth.tsv` or `<isolate>.truth.tsv` beside the reference, or an NCBI `sequence_report.jsonl`.
 * Folders are searched three levels down (`--depth` changes that). Hidden folders are skipped.
+* **Not for this route:** single-end reads (one file per isolate, no mate) are listed and not used; long reads (Nanopore, PacBio) belong to the hybrid route; a folder whose names suggest community samples (metagenome, stool, wastewater, soil, mock community) gets a note that metagenomic samples take the `plasbench run --mode metagenomics` route ([METAGENOMICS.md](METAGENOMICS.md)). A sample id that Windows reserves for a device (`CON`, `NUL`, `COM1` ...) is refused, because it becomes a folder name.
 
 ## What PlasBench will not do
 
@@ -91,7 +94,7 @@ Each message the scan or the check can show has a code and a section here. "Fix"
 **These are long reads, not paired short reads.** The short-read route needs paired Illumina reads. *Fix: no.* Long reads belong to the self-built hybrid route (README, Route C). Do not rename them to `_1`/`_2`.
 
 ### reads-unpaired <a id="reads-unpaired"></a>
-**A read file has no mate.** PlasBench needs paired-end reads. *Fix: no.* Find the other file, or leave the isolate out.
+**A read file has no mate** (single-end reads, or one file of a pair is missing). PlasBench needs paired-end reads: single-end data cannot be used for the short-read route. *Fix: no.* Find the other file, or leave the isolate out.
 
 ### folder-missing <a id="folder-missing"></a>
 **The isolate's folder does not exist.** *Fix: no.* Run `plasbench intake stage <your folder>`, which creates it.
@@ -118,7 +121,7 @@ Each message the scan or the check can show has a code and a section here. "Fix"
 **More than one reference could belong to this isolate**, or one FASTA fits several isolates. PlasBench will not pick. *Fix: no.* Name each reference after its isolate (`KP01.fna`) or put it in that isolate's folder, then scan again.
 
 ### reference-wrong-isolate <a id="reference-wrong-isolate"></a>
-**The reads do not match the reference.** Scores mean something only if the reference is the genome of the isolate the reads came from; a relative does not count. *Fix: no.* Find the right reference (check sample names against the lab record). With only the reads, run the isolate reads-only.
+**The reads do not match the reference** (the quick test's "Reads come from this reference's isolate" is FAIL, or a warning, with the share of sampled reads found in the reference). Scores mean something only if the reference is the genome of the isolate the reads came from; a relative does not count. *Fix: no.* Find the right reference (check sample names against the lab record). With only the reads, run the isolate reads-only.
 
 ### truth-review <a id="truth-review"></a>
 **Some sequences are still marked REVIEW.** *Fix: no, because this is the one decision that is yours.* Open **Label sequences** in the window (it shows each sequence, its length, its FASTA header and what the header says), or edit `data/<sample_id>/truth.tsv`, and set each to `PLASMID` or `CHROMOSOME`. Never infer the type from size.
@@ -142,6 +145,8 @@ Each message the scan or the check can show has a code and a section here. "Fix"
 **Long-read files were found.** Not an error. They are not staged here: the self-built hybrid route is set up by hand (README, Route C).
 
 ## The sample sheet, column by column
+
+The columns are separated by a TAB. A comma-separated (CSV) sheet or an Excel workbook will not work: save it as tab-separated text (`.tsv`). The AI help's sheet fix can convert the separator for you.
 
 ```
 sample_id    assembly_accession    sra_run    organism    gram_group    sample_origin    collection_country    source_study

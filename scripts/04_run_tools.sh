@@ -155,7 +155,7 @@ classify_failure() {
 with_budget() {
     if [[ -n "${TOOL_TIMEOUT_SECONDS:-}" ]]; then
         if command -v timeout >/dev/null 2>&1; then
-            timeout "$TOOL_TIMEOUT_SECONDS" "$@"
+            awake_timeout "$TOOL_TIMEOUT_SECONDS" "$@"      # the limit counts awake time: a sleep is not the tool's slowness
             return
         fi
         # A limit was asked for but cannot be applied: say so (once per process) instead of silently running without it, which would break "the same budget for every tool".
@@ -334,6 +334,59 @@ db_preflight_fail() {
     return 0
 }
 
+# ---- local working copy (WORK_DIR, python/work_dir.py) ----------------------------------------------------------------------------------
+# On a slow mount (a Windows drive seen from WSL, NTFS/exFAT, a network share, a cloud-synced folder) every small file costs milliseconds. When the RESULTS folder is on
+# one, each tool that writes a folder of files (mob_recon, platon, plasmidSPAdes, geNomad, PLASMe, RFPlasmid, PlasmidHunter, Plasmer, PlaScope) works in a local
+# per-isolate folder and its folder is copied back atomically when it ends (finished or failed, so a failure can still be inspected); the prediction FASTA, the
+# markers and the status rows are written where they always were. When the DATA folder is on one, plasmidSPAdes reads a local copy of the trimmed reads (copied
+# once, times kept, so the reuse fingerprint is unchanged). WORK_DIR=data turns both off. Leftovers of a run that died are removed (their pid is gone).
+STAGE4_LOCAL_ROOT="" STAGE4_RESULTS_SLOW=0 STAGE4_DATA_SLOW=0 STAGE4_SAMPLE_WORK=""
+stage4_local_setup() {
+    local study line dir reason kind name
+    have python3 || return 0
+    study="$(basename "$(dirname "${RESULTS_DIR:-./results}")")"
+    line="$(python3 -I "$PROJECT_ROOT/python/work_dir.py" resolve --data-dir "$RESULTS_DIR" --study "$study" --mode "${WORK_DIR:-auto}" --need-gb 2 2>/dev/null </dev/null)" || return 0
+    IFS=$'\t' read -r dir reason _ kind <<< "$line"
+    [[ "$kind" == "scratch" ]] && { STAGE4_RESULTS_SLOW=1; STAGE4_LOCAL_ROOT="$dir"; log "  tool work folders: local ($dir; $reason); each tool's folder is copied back to $RESULTS_DIR when it ends"; }
+    line="$(python3 -I "$PROJECT_ROOT/python/work_dir.py" resolve --data-dir "$DATA_DIR" --study "$study" --mode "${WORK_DIR:-auto}" --need-gb 2 2>/dev/null </dev/null)" || line=""
+    IFS=$'\t' read -r dir reason _ kind <<< "$line"
+    [[ "$kind" == "scratch" ]] && { STAGE4_DATA_SLOW=1; STAGE4_LOCAL_ROOT="${STAGE4_LOCAL_ROOT:-$dir}"; }
+    if [[ -n "$STAGE4_LOCAL_ROOT" ]]; then
+        mkdir -p "$STAGE4_LOCAL_ROOT" 2>/dev/null || { STAGE4_LOCAL_ROOT="" STAGE4_RESULTS_SLOW=0 STAGE4_DATA_SLOW=0; return 0; }
+        while IFS= read -r name; do
+            [[ -n "$name" ]] && log "  removed a leftover work folder from an earlier run: $STAGE4_LOCAL_ROOT/$name"
+        done < <(python3 -I "$PROJECT_ROOT/python/work_dir.py" clean --root "$STAGE4_LOCAL_ROOT" 2>/dev/null </dev/null)
+    fi
+    return 0
+}
+# tool_local_out (in a runner, after OUT is set): OUT becomes the tool's local folder; OUT_FINAL keeps where it belongs.
+tool_local_out() {
+    [[ "$STAGE4_RESULTS_SLOW" == "1" && -n "$STAGE4_SAMPLE_WORK" ]] || return 0
+    OUT_FINAL="$OUT"; OUT="$STAGE4_SAMPLE_WORK/$TOOL"
+}
+# tool_local_finish: copy the tool's local folder back to OUT_FINAL (atomic: the whole folder or nothing) and point OUT at it again. Fails when the copy fails.
+tool_local_finish() {
+    [[ -n "${OUT_FINAL:-}" ]] || return 0
+    local moved rc=0
+    if [[ -d "$OUT" ]]; then
+        moved="$(python3 -I "$PROJECT_ROOT/python/work_dir.py" finish --all --src "$OUT" --dst "$OUT_FINAL" 2>&1 </dev/null)" || rc=$?
+        if [[ "$rc" -ne 0 ]]; then warn "  $TOOL ($SAMPLE): could not copy its folder back from $OUT to $OUT_FINAL: $moved"; return 1; fi
+        rm -rf "$OUT"
+    fi
+    OUT="$OUT_FINAL"; OUT_FINAL=""
+    return 0
+}
+# stage4_local_reads: plasmidSPAdes (and nothing else) reads the trimmed reads several times; on a slow data folder it gets a local copy. Sets T1/T2 (the caller's locals).
+stage4_local_reads() {
+    [[ "$STAGE4_DATA_SLOW" == "1" && -n "$STAGE4_SAMPLE_WORK" && -s "$T1" && -s "$T2" ]] || return 0
+    local copied
+    if copied="$(python3 -I "$PROJECT_ROOT/python/work_dir.py" copy-in --dst "$STAGE4_SAMPLE_WORK/reads" "$T1" "$T2" 2>&1 </dev/null)"; then
+        T1="$(sed -n 1p <<< "$copied")"; T2="$(sed -n 2p <<< "$copied")"
+    else
+        warn "  could not copy the trimmed reads of $SAMPLE into the local work folder ($copied); $TOOL reads them from the data folder"
+    fi
+}
+
 # run_adapter ADAPTER TOOL_OUTPUT_DIR ARGS... : run an adapter only when the tool actually wrote something into its output directory.
 # The adapters turn "no output found" into an empty prediction (the right answer for a tool that ran and found no plasmid), so a tool that
 # exited 0 after crashing silently, or wrote somewhere else, used to be recorded as "completed" with no plasmids. Exit 3 sends it to the
@@ -356,6 +409,7 @@ run_mob_recon() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
     if tool_enabled RUN_MOB_RECON mob_recon && have mob_recon; then
         local TOOL="mob_recon" OUT="$RDIR/mob_recon" PRED="$RDIR/pred_mob_recon.plasmid.fasta" DONE="$RDIR/.mob_recon.complete" mob_db=""
+        local OUT_FINAL=""; tool_local_out      # a local work folder when the results folder is on a slow mount (WORK_DIR)
         if is_complete "$DONE" "$PRED"; then
             log "  mob_recon: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
         elif mob_db="$(mobsuite_db_dir 2>/dev/null)"; [[ -n "$mob_db" ]] && ! mobsuite_db_complete "$mob_db" && db_preflight_fail "$SAMPLE" "$TOOL" "$mob_db/ncbi_plasmid_full_seqs.fas (incomplete MOB-suite database; run: bash env/download_mobsuite_db.sh)"; then
@@ -366,10 +420,10 @@ run_mob_recon() {
             local START; START=$(profile_start)
             local MOB_DB_ARGS=(); mapfile -t MOB_DB_ARGS < <(mobsuite_db_args)
             if profile_exec mob_recon ${MOB_DB_ARGS[@]+"${MOB_DB_ARGS[@]}"} --infile "$CONTIGS" --outdir "$OUT" --num_threads "$MOB_RECON_THREADS" --force > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                run_adapter adapt_mob_recon.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_mob_recon.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log" && tool_local_finish; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "mob_recon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+                tool_local_finish || true; rm -f "$PRED" "$DONE"; warn "mob_recon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
     elif tool_enabled RUN_MOB_RECON mob_recon; then
@@ -541,6 +595,7 @@ run_platon() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
     if tool_enabled RUN_PLATON platon && have platon; then
         local TOOL="platon" OUT="$RDIR/platon" PRED="$RDIR/pred_platon.plasmid.fasta" DONE="$RDIR/.platon.complete"
+        local OUT_FINAL=""; tool_local_out      # a local work folder when the results folder is on a slow mount (WORK_DIR)
         if is_complete "$DONE" "$PRED"; then
             log "  platon: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
         elif db_preflight_fail "$SAMPLE" "$TOOL" "${PLATON_DB:-}"; then
@@ -550,10 +605,10 @@ run_platon() {
             log "  platon ($SAMPLE) ..."
             local START; START=$(profile_start)
             if profile_exec platon --db "$PLATON_DB" --threads "$PLATON_THREADS" --output "$OUT" --prefix "$SAMPLE" "$CONTIGS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                run_adapter adapt_platon.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_platon.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log" && tool_local_finish; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "platon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+                tool_local_finish || true; rm -f "$PRED" "$DONE"; warn "platon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
     elif tool_enabled RUN_PLATON platon; then
@@ -566,17 +621,19 @@ run_plasmidspades() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3" T1="$4" T2="$5"
     if tool_enabled RUN_PLASMIDSPADES plasmidspades && have plasmidspades.py; then
         local TOOL="plasmidspades" OUT="$RDIR/plasmidspades" PRED="$RDIR/pred_plasmidspades.plasmid.fasta" DONE="$RDIR/.plasmidspades.complete"
+        local OUT_FINAL=""; tool_local_out      # a local work folder when the results folder is on a slow mount (WORK_DIR)
         if is_complete "$DONE" "$PRED"; then
             log "  plasmidSPAdes: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
         else
             rm -rf "$OUT" "$PRED" "$DONE"
+            stage4_local_reads
             log "  plasmidSPAdes ($SAMPLE) ..."
             local START; START=$(profile_start)
             if profile_exec plasmidspades.py -1 "$T1" -2 "$T2" -o "$OUT" --threads "$PLASMIDSPADES_THREADS" --memory "$PLASMIDSPADES_MEMORY_GB" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                run_adapter adapt_plasmidspades.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_plasmidspades.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log" && tool_local_finish; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "plasmidSPAdes failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+                tool_local_finish || true; rm -f "$PRED" "$DONE"; warn "plasmidSPAdes failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
     elif tool_enabled RUN_PLASMIDSPADES plasmidspades; then
@@ -618,6 +675,7 @@ run_genomad() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
     if tool_enabled RUN_GENOMAD genomad && have genomad; then
         local TOOL="genomad" OUT="$RDIR/genomad" PRED="$RDIR/pred_genomad.plasmid.fasta" DONE="$RDIR/.genomad.complete"
+        local OUT_FINAL=""; tool_local_out      # a local work folder when the results folder is on a slow mount (WORK_DIR)
         if is_complete "$DONE" "$PRED"; then
             log "  genomad: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
         elif db_preflight_fail "$SAMPLE" "$TOOL" "${GENOMAD_DB:-}"; then
@@ -627,10 +685,10 @@ run_genomad() {
             log "  genomad ($SAMPLE) ..."
             local START; START=$(profile_start)
             if profile_exec genomad end-to-end --threads "$GENOMAD_THREADS" "$CONTIGS" "$OUT" "$GENOMAD_DB/genomad_db" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                run_adapter adapt_genomad.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_genomad.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log" && tool_local_finish; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "genomad failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+                tool_local_finish || true; rm -f "$PRED" "$DONE"; warn "genomad failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
     elif tool_enabled RUN_GENOMAD genomad; then
@@ -643,6 +701,7 @@ run_plasme() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
     if tool_enabled RUN_PLASME plasme && have PLASMe.py; then
         local TOOL="plasme" OUT="$RDIR/plasme" PRED="$RDIR/pred_plasme.plasmid.fasta" DONE="$RDIR/.plasme.complete"
+        local OUT_FINAL=""; tool_local_out      # a local work folder when the results folder is on a slow mount (WORK_DIR)
         if is_complete "$DONE" "$PRED"; then
             log "  plasme: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
         elif db_preflight_fail "$SAMPLE" "$TOOL" "${PLASME_DB:-}"; then
@@ -653,10 +712,10 @@ run_plasme() {
             local START; START=$(profile_start)
             if profile_exec PLASMe.py "$CONTIGS" "$OUT/plasme_output.fasta" -d "$PLASME_DB" \
                     -p "$PLASME_PROBABILITY" -t "$PLASME_THREADS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                run_adapter adapt_plasme.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_plasme.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log" && tool_local_finish; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "plasme failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+                tool_local_finish || true; rm -f "$PRED" "$DONE"; warn "plasme failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
     elif tool_enabled RUN_PLASME plasme; then
@@ -669,6 +728,7 @@ run_rfplasmid() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
     if tool_enabled RUN_RFPLASMID rfplasmid && have rfplasmid; then
         local TOOL="rfplasmid" OUT="$RDIR/rfplasmid" PRED="$RDIR/pred_rfplasmid.plasmid.fasta" DONE="$RDIR/.rfplasmid.complete"
+        local OUT_FINAL=""; tool_local_out      # a local work folder when the results folder is on a slow mount (WORK_DIR)
         local STAGE="$RDIR/rfplasmid_input"
         if is_complete "$DONE" "$PRED"; then
             log "  rfplasmid: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
@@ -686,10 +746,10 @@ run_rfplasmid() {
             local jelly_flag=(); [[ "$RFPLASMID_JELLY" == "1" ]] && jelly_flag=(--jelly)
             if profile_exec rfplasmid --species "$RFPLASMID_SPECIES" --input "$STAGE" --out "$OUT" \
                     --threads "$RFPLASMID_THREADS" "${jelly_flag[@]}" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                run_adapter adapt_rfplasmid.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_rfplasmid.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log" && tool_local_finish; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "rfplasmid failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+                tool_local_finish || true; rm -f "$PRED" "$DONE"; warn "rfplasmid failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
             rm -rf "$STAGE"
         fi
@@ -703,6 +763,7 @@ run_plasmidhunter() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
     if tool_enabled RUN_PLASMIDHUNTER plasmidhunter && have plasmidhunter; then
         local TOOL="plasmidhunter" OUT="$RDIR/plasmidhunter" PRED="$RDIR/pred_plasmidhunter.plasmid.fasta" DONE="$RDIR/.plasmidhunter.complete"
+        local OUT_FINAL=""; tool_local_out      # a local work folder when the results folder is on a slow mount (WORK_DIR)
         if is_complete "$DONE" "$PRED"; then
             log "  plasmidhunter: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
         else
@@ -711,10 +772,10 @@ run_plasmidhunter() {
             log "  plasmidhunter ($SAMPLE) ..."
             local START; START=$(profile_start)
             if profile_exec plasmidhunter -i "$CONTIGS" -o "$OUT" -c "$PLASMIDHUNTER_THREADS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                run_adapter adapt_plasmidhunter.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_plasmidhunter.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log" && tool_local_finish; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "plasmidhunter failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+                tool_local_finish || true; rm -f "$PRED" "$DONE"; warn "plasmidhunter failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
     elif tool_enabled RUN_PLASMIDHUNTER plasmidhunter; then
@@ -727,6 +788,7 @@ run_plasmer() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
     if tool_enabled RUN_PLASMER plasmer && have Plasmer; then
         local TOOL="plasmer" OUT="$RDIR/plasmer" PRED="$RDIR/pred_plasmer.plasmid.fasta" DONE="$RDIR/.plasmer.complete"
+        local OUT_FINAL=""; tool_local_out      # a local work folder when the results folder is on a slow mount (WORK_DIR)
         if is_complete "$DONE" "$PRED"; then
             log "  plasmer: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
         elif [[ ! -d "$PLASMER_DB" ]]; then
@@ -744,10 +806,10 @@ run_plasmer() {
             local START; START=$(profile_start)
             if profile_exec Plasmer -g "$CONTIGS" -p "$SAMPLE" -d "$PLASMER_DB" -t "$PLASMER_THREADS" \
                     -m "$PLASMER_MIN_LENGTH" -l "$PLASMER_LENGTH" -o "$OUT" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                run_adapter adapt_plasmer.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_plasmer.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log" && tool_local_finish; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "database: $PLASMER_DB" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "plasmer failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+                tool_local_finish || true; rm -f "$PRED" "$DONE"; warn "plasmer failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
     elif tool_enabled RUN_PLASMER plasmer; then
@@ -760,6 +822,7 @@ run_plascope() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
     if tool_enabled RUN_PLASCOPE plascope && have plaScope.sh; then
         local TOOL="plascope" OUT="$RDIR/plascope" PRED="$RDIR/pred_plascope.plasmid.fasta" DONE="$RDIR/.plascope.complete"
+        local OUT_FINAL=""; tool_local_out      # a local work folder when the results folder is on a slow mount (WORK_DIR)
         # PlaScope needs a species-specific Centrifuge database; only E. coli
         # and Klebsiella pre-built databases exist (see config/config.sh), so
         # every other organism is a structural, not a tool-install, gap.
@@ -786,10 +849,10 @@ run_plascope() {
             if profile_exec plaScope.sh --fasta "$CONTIGS" -a "$ASSEMBLER" -o "$OUT" --sample "$SAMPLE" \
                     --db_dir "$(dirname "$db")" --db_name "$(basename "$db")" -t "$PLASCOPE_THREADS" \
                     > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                run_adapter adapt_plascope.sh "$OUT/${SAMPLE}_PlaScope" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_plascope.sh "$OUT/${SAMPLE}_PlaScope" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log" && tool_local_finish; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "database: $db" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+                tool_local_finish || true; rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
     elif tool_enabled RUN_PLASCOPE plascope; then
@@ -1063,6 +1126,10 @@ process_sample() {
         return 0
     fi
     log "=== Run tools on $SAMPLE ==="
+    if [[ -n "$STAGE4_LOCAL_ROOT" ]]; then
+        STAGE4_SAMPLE_WORK="$STAGE4_LOCAL_ROOT/$SAMPLE.tools.$BASHPID"
+        mkdir -p "$STAGE4_SAMPLE_WORK" || STAGE4_SAMPLE_WORK=""
+    fi
 
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_mob_recon "$SAMPLE" "$RDIR" "$CONTIGS" &
     local mob_recon_pid=$!
@@ -1094,6 +1161,7 @@ process_sample() {
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_gplas2_mob "$SAMPLE" "$SDIR" "$RDIR" "$CONTIGS" &
 
     wait
+    if [[ -n "$STAGE4_SAMPLE_WORK" ]]; then rm -rf "$STAGE4_SAMPLE_WORK"; STAGE4_SAMPLE_WORK=""; fi
 }
 
 warn_resource_oversubscription "stage 4 (reconstruction)" "$(( MAX_PARALLEL_SAMPLES * MAX_PARALLEL_TOOLS ))" \
@@ -1107,6 +1175,7 @@ if [[ "${RUN_PLASMER:-0}" -eq 1 ]]; then
     warn_resource_oversubscription "stage 4 (plasmer)" "$(( MAX_PARALLEL_SAMPLES * MAX_PARALLEL_TOOLS ))" "$PLASMER_THREADS" "$PLASMER_MEMORY_GB"
 fi
 
+stage4_local_setup
 reset_shard_dir "run_tools_crashed"
 CRASHED_DIR="$(shard_dir "run_tools_crashed")"
 while IFS=$'\t' read -r -u 3 SAMPLE ASM SRA; do

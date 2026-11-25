@@ -96,33 +96,22 @@ def place(source, destination: Path, mode: str) -> None:
         shutil.copy2(source, destination)
 
 
-def append_sheet_row(sheet: Path, sample: str, prefix: str, accession: str, extra: dict | None = None) -> str:
-    """Add the sample's row, creating the sheet if needed. Returns a note.
-
-    `extra` holds optional columns (organism, gram_group, ...). They are written under the sheet's own header names; a column the sheet does not have yet is
-    added to the header (earlier rows get an empty value), so a sheet made by `init-local` and a sheet downloaded from the template both accept them.
-    The template's EXAMPLE_ row is dropped the first time a real isolate is added.
-    """
+def sheet_after(lines: list, sample: str, prefix: str, accession: str, extra: dict | None = None) -> tuple:
+    """(new_lines, changed, note) of a sheet's lines after adding the sample's row: the exact text append_sheet_row writes, computed without touching the disk (the AI help
+    and `plasbench intake stage --dry-run` show it, and check it, before anything is written)."""
     values = {"sample_id": sample, "assembly_accession": accession, "sra_run": prefix}
     values.update({k: v for k, v in (extra or {}).items() if v})
-    lines = []
-    if sheet.is_file():
-        with open(sheet, newline="", encoding="utf-8") as handle:
-            lines = [line.rstrip("\r\n") for line in handle]
     data = [(i, line) for i, line in enumerate(lines) if line.strip() and not line.lstrip().startswith("#")]
     if not data:
-        sheet.parent.mkdir(parents=True, exist_ok=True)
         header = list(SHEET_COLUMNS) + [k for k in values if k not in SHEET_COLUMNS]
         out = [line for line in lines if line.lstrip().startswith("#")]
         out += ["\t".join(header), "\t".join(values.get(c, "") for c in header)]
-        with open(sheet, "w", newline="", encoding="utf-8") as handle:
-            handle.write("\n".join(out) + "\n")
-        return f"created {sheet} with one row"
+        return out, True, "created with one row"
     header_at, header_line = data[0]
     header = header_line.split("\t")
     for _, line in data[1:]:
         if line.split("\t")[0].strip() == sample:
-            return f"{sheet} already has a row for '{sample}'; left unchanged"
+            return list(lines), False, f"already has a row for '{sample}'; left unchanged"
     new_columns = [k for k in values if k not in header]
     keep = []
     for i, line in enumerate(lines):
@@ -136,9 +125,32 @@ def append_sheet_row(sheet: Path, sample: str, prefix: str, accession: str, extr
             keep.append(line)
     header = header + new_columns
     keep.append("\t".join(values.get(c, "") for c in header))
+    return keep, True, "appended a row"
+
+
+def read_sheet_lines(sheet: Path) -> list:
+    """The sheet's lines without their line endings ([] when there is no sheet)."""
+    if not Path(sheet).is_file():
+        return []
+    with open(sheet, newline="", encoding="utf-8") as handle:
+        return [line.rstrip("\r\n") for line in handle]
+
+
+def append_sheet_row(sheet: Path, sample: str, prefix: str, accession: str, extra: dict | None = None) -> str:
+    """Add the sample's row, creating the sheet if needed. Returns a note.
+
+    `extra` holds optional columns (organism, gram_group, ...). They are written under the sheet's own header names; a column the sheet does not have yet is
+    added to the header (earlier rows get an empty value), so a sheet made by `init-local` and a sheet downloaded from the template both accept them.
+    The template's EXAMPLE_ row is dropped the first time a real isolate is added.
+    """
+    lines = read_sheet_lines(sheet)
+    new, changed, note = sheet_after(lines, sample, prefix, accession, extra)
+    if not changed:
+        return f"{sheet} {note}"
+    sheet.parent.mkdir(parents=True, exist_ok=True)
     with open(sheet, "w", newline="", encoding="utf-8") as handle:
-        handle.write("\n".join(keep) + "\n")
-    return f"appended a row to {sheet}"
+        handle.write("\n".join(new) + "\n")
+    return f"created {sheet} with one row" if note.startswith("created") else f"appended a row to {sheet}"
 
 
 def stage_isolate(sample, prefix, reads1, reads2, reference_arg, report_arg, data_dir, samples, accession, link, force, truth_arg=None, extra=None) -> int:

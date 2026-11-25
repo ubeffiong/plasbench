@@ -1,135 +1,68 @@
 #!/usr/bin/env python3
-"""Parallel ENA downloads (python/fetch_ena_reads.py) against a real local HTTP server.
+"""Parallel ENA downloads through python/fetch_ena_reads.py (the whole command) against the fake ENA (test/ena_range_server.py).
 
-The server honours HTTP Range and limits each connection's speed, as public mirrors
-effectively do. Checks: both mates arrive MD5-verified through parallel byte ranges;
-a server that ignores Range still yields correct files (single-stream fallback); a
-corrupted range is caught by the MD5 check and re-fetched. `serve()` and `fetch()`
-are reused by test/bench/bench_downloads.py.
+Both mates arrive MD5-verified through ranged chunks; a server that ignores Range still yields correct files (single stream); a corrupted chunk is caught by the whole-file MD5 and the
+file is fetched again. (Rewritten with the chunked downloader: the old version drove the removed all-or-nothing segment code. The fault-injection cases are in test_ena_download.py.)
+`serve()`, `fetch()` and `verify()` are reused by test/bench/bench_downloads.py.
 """
-import hashlib
-import http.server
 import os
-import random
-import re
+import subprocess
 import sys
 import tempfile
-import threading
-import time
-import types
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "test"))
+from ena_range_server import FakeENA  # noqa: E402
+
+MIB = 1 << 20
 
 
-class Handler(http.server.BaseHTTPRequestHandler):
-    files = {}            # path -> bytes
-    rate = 4 << 20        # bytes per second per connection
-    honour_range = True
-    corrupt_once = set()  # paths whose next ranged response gets one flipped byte
-    log = []
-
-    def log_message(self, *args):
-        pass
-
-    def do_GET(self):
-        if self.path.startswith("/filereport"):
-            run = re.search(r"accession=([^&]+)", self.path).group(1)
-            host = f"http://127.0.0.1:{self.server.server_port}"
-            names = [f"{run}_1.fastq.gz", f"{run}_2.fastq.gz"]
-            body = ("run_accession\tfastq_ftp\tfastq_md5\tfastq_bytes\tlibrary_layout\n"
-                    f"{run}\t{';'.join(f'{host}/{n}' for n in names)}\t"
-                    f"{';'.join(hashlib.md5(self.files['/' + n]).hexdigest() for n in names)}\t"
-                    f"{';'.join(str(len(self.files['/' + n])) for n in names)}\tPAIRED\n").encode()
-            self.send_response(200)
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-            return
-        data = self.files[self.path]
-        start, end = 0, len(data) - 1
-        ranged = self.honour_range and self.headers.get("Range")
-        if ranged:
-            a, b = ranged.split("=")[1].split("-")
-            start, end = int(a), int(b) if b else len(data) - 1
-            self.send_response(206)
-            self.send_header("Content-Range", f"bytes {start}-{end}/{len(data)}")
-        else:
-            self.send_response(200)
-        payload = bytearray(data[start:end + 1])
-        if ranged and self.path in self.corrupt_once and start == 0:
-            self.corrupt_once.discard(self.path)
-            payload[0] ^= 0xFF
-        self.log.append((self.path, bool(ranged)))
-        self.send_header("Content-Length", str(len(payload)))
-        self.end_headers()
-        chunk = 64 << 10
-        try:
-            for i in range(0, len(payload), chunk):     # throttle each connection
-                self.wfile.write(payload[i:i + chunk])
-                time.sleep(chunk / self.rate)
-        except (BrokenPipeError, ConnectionResetError):
-            # Expected: when this server ignores Range, the fetcher drops its
-            # parallel connections and falls back to one stream. Without this the
-            # server thread prints a traceback per dropped connection, which reads
-            # like a failure although the test passes.
-            return
+def serve(size=8 * MIB, run="SRR1", rate=None):
+    server = FakeENA(rate=rate)
+    server.add_run(run, size=size)
+    return server.start()
 
 
-def serve(size=8 << 20, run="SRR1"):
-    rng = random.Random(3)
-    Handler.files = {f"/{run}_{m}.fastq.gz": rng.randbytes(size) for m in (1, 2)}
-    Handler.log = []
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    return server
+def fetch(python_dir, server, out_dir, run="SRR1", extra_env=None):
+    env = dict(os.environ, ENA_PORTAL_URL=server.portal(), ENA_SEGMENT_MIN_BYTES=str(MIB), ENA_CHUNK_MIB="1", ENA_USE_ARIA2="0", ENA_CHUNK_BACKOFF_SECONDS="0",
+               ENA_RETRY_DELAY_SECONDS="0", DOWNLOAD_TMP_DIR="data", **(extra_env or {}))
+    r = subprocess.run([sys.executable, "-I", str(Path(python_dir) / "fetch_ena_reads.py"), "--run", run, "--out-dir", str(out_dir)], env=env, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr[-800:]
+    return r
 
 
-def fetch(python_dir, server, out_dir, run="SRR1"):
-    """Import fetch_ena_reads from python_dir, point it at the local server, fetch a run."""
-    sys.path.insert(0, str(python_dir))
-    import fetch_ena_reads as fer
-    fer.PORTAL = f"http://127.0.0.1:{server.server_port}/filereport"
-    # No retry back-off, without touching the real time module (the server sleeps to throttle).
-    fer.time = types.SimpleNamespace(sleep=lambda *_: None)
-    argv, sys.argv = sys.argv, ["fetch_ena_reads.py", "--run", run, "--out-dir", str(out_dir)]
-    try:
-        fer.main()
-    finally:
-        sys.argv = argv
-        sys.path.remove(str(python_dir))
-    return fer
-
-
-def verify(out_dir, run="SRR1"):
+def verify(server, out_dir, run="SRR1"):
     for m in (1, 2):
-        got = Path(out_dir, f"{run}_{m}.fastq.gz").read_bytes()
-        assert got == Handler.files[f"/{run}_{m}.fastq.gz"], f"mate {m} differs"
+        path = f"/f/{run}_{m}.fastq.gz"
+        got = Path(out_dir, f"{run}_{m}.fastq.gz")
+        assert got.stat().st_size == server.files[path].size, f"mate {m} has the wrong size"
+        import hashlib
+        assert hashlib.md5(got.read_bytes()).hexdigest() == server.files[path].md5(), f"mate {m} differs"
 
 
 def main():
-    os.environ.update(ENA_SEGMENT_MIN_BYTES=str(1 << 20), ENA_DOWNLOAD_CONNECTIONS="4", ENA_USE_ARIA2="0")
     server = serve()
     with tempfile.TemporaryDirectory() as tmp:
         fetch(ROOT / "python", server, tmp)
-        verify(tmp)
-        ranged = [r for _, r in Handler.log if True]
-        assert sum(ranged) == 8, f"expected 4 ranges per mate, got {Handler.log}"
-    print("  PASS: both mates arrive MD5-verified as 4 parallel byte ranges each")
-
-    Handler.honour_range, Handler.log = False, []
+        verify(server, tmp)
+        st = server.stats()
+        assert all(r[3] == 206 for r in st["requests"]) and len({r[1] for r in st["requests"]}) > 2, st["requests"]
+        assert st["max_active"] > 2, st["max_active"]
+    print("  PASS: both mates arrive MD5-verified as ranged chunks over several connections")
+    server.honour_range = False
+    server.reset_stats()
     with tempfile.TemporaryDirectory() as tmp:
         fetch(ROOT / "python", server, tmp)
-        verify(tmp)
-    Handler.honour_range = True
-    print("  PASS: a server that ignores Range falls back to one stream per file, still verified")
-
-    Handler.corrupt_once = {"/SRR1_1.fastq.gz"}
+        verify(server, tmp)
+    server.honour_range = True
+    print("  PASS: a server that ignores Range gives one stream per file, still verified")
+    server.faults.append({"kind": "corrupt", "start": MIB, "times": 1})
     with tempfile.TemporaryDirectory() as tmp:
         fetch(ROOT / "python", server, tmp)
-        verify(tmp)
-    print("  PASS: a corrupted range fails the MD5 check and the file is fetched again")
-    server.shutdown()
+        verify(server, tmp)
+    print("  PASS: a corrupted chunk fails the MD5 check and the file is fetched again")
+    server.stop()
     print("ALL PARALLEL ENA FETCH TESTS PASSED")
 
 

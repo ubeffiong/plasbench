@@ -3,6 +3,7 @@
 report and the FASTQ downloads are served from memory. A paired run is written
 under <run>_1/_2.fastq.gz with a provenance file; an MD5 mismatch fails and
 leaves no file under the final name; a single-end run is refused."""
+import contextlib
 import hashlib
 import io
 import json
@@ -20,6 +21,7 @@ R1, R2 = b"@r1\nACGT\n+\nIIII\n" * 10, b"@r1\nTGCA\n+\nIIII\n" * 10
 
 class Response(io.BytesIO):
     status = 200
+    headers = {}
 
     def __enter__(self):
         return self
@@ -53,6 +55,7 @@ def server(layout="PAIRED", md5_1=None):
             start = int(request.get_header("Range").split("=")[1].rstrip("-"))
             response = Response(R1[start:])
             response.status = 206
+            response.headers = {"Content-Range": f"bytes {start}-{len(R1) - 1}/{len(R1)}", "Content-Length": str(len(R1) - start)}   # every resumed response is validated now
             return response
         return urlopen(request, timeout)
     return flaky if layout == "FLAKY" else urlopen
@@ -87,12 +90,15 @@ def main():
         assert not (tmp / "SRR1_1.fastq.gz").exists() and not list(tmp.glob("*.part"))
         print("  PASS: an MD5 mismatch fails after retries and leaves no file under the final name")
     with tempfile.TemporaryDirectory() as tmp:
+        err = io.StringIO()
         try:
-            run(Path(tmp), server(layout="SINGLE"))
+            with contextlib.redirect_stderr(err):
+                run(Path(tmp), server(layout="SINGLE"))
             raise AssertionError("single-end run accepted")
         except SystemExit as exc:
-            assert "not a paired run" in str(exc)
-        print("  PASS: a single-end run is refused")
+            # exit 4 = "ENA has no usable paired FASTQ for this run": stage 1 then goes on to the SRA Toolkit (it used to be exit 1 with the message in the exit text)
+            assert exc.code == 4 and "not a paired run" in err.getvalue(), (exc.code, err.getvalue())
+        print("  PASS: a single-end run is refused with exit 4 (stage 1 then uses the SRA Toolkit)")
     print("ALL ENA FETCH TESTS PASSED")
 
 
