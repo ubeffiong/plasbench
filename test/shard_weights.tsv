@@ -514,3 +514,5 @@ test_keep_awake.py	8.0
 test_suspend_heartbeat.sh	8.0
 test_isescan_scope.py	1.0
 test_run_profiles.py	5.0
+test_annotation_retry.py	1.0
+test_resume_retry.sh	12.0

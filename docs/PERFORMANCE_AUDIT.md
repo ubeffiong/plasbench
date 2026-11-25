@@ -460,6 +460,12 @@ still ran one after another. The measured case and design for each:
 
 Tests: `test_run_profile.py`, `test_suspend_awake.py`, `test_keep_awake.py`, `test_suspend_heartbeat.sh`, `test_isescan_scope.py`, `test_run_profiles.py`.
 
+## Annotation limits, retries after a sleep, and the calmer window (follow-up, 24 November 2026)
+
+* **Annotation callers (measured case: mob_typer stopped on 3 of 4 isolates).** The time limits now grow with how far the callers' thread plan oversubscribes the CPUs, never count the time the computer slept, and a caller that still hits its limit is run ONCE more, alone, with twice the time. If it then finishes its evidence is kept (the record says `retried` and keeps the first reason); if it times out again it stays `timed_out` with both attempts in the reason and nothing from it is used or cached. Tested with fake callers (`test_annotation_retry.py`); not re-measured on the real laptop.
+* **Review of the retry wrappers after a resume from sleep.** `retry_network` (stage 1 fetches, `scripts/lib.sh`) retried any failure 3 times with 15 s and 30 s waits (45 s in all): after a wake a dead connection fails at once and Wi-Fi often needs longer than that, so a sleep could use up all three attempts. A failure that happened while the computer was asleep (a recorded sleep inside the attempt) now does not use an attempt (up to `NETWORK_RESUME_RETRIES`, 3), with a short wait for the network. A hung connection that never resets is not covered: the fetch tools have no time limit of their own here. Stage 4's `TOOL_TIMEOUT_SECONDS` used the wall-clock `timeout`, so a sleep killed a tool with exit 124 and scored it failed; it now uses `awake_timeout` (awake time only). `retry_exec` (TOOL_RETRIES) does not retry 124/137, unchanged. The download code of the other agent (`python/fetch_ena_reads.py`, stage 1's loop) was not read or changed. Tested with `test_resume_retry.sh`.
+* **Window.** One vocabulary everywhere (Working / Working, console quiet / Needs attention / Done / Failed, in the run card, Jobs rows, toasts and the console chip), the script's stage number and name ("Stage 3: Assemble"), a Done card no longer restates "All 6 stages done", the card's action is "Run info" so it is not confused with the status panel's Details, and the run-profile selector is in the New benchmark wizard ("How thorough") and in Settings (RUN_PROFILE). The live download bar keeps its place.
+
 ## Round 2: local working copy, AUTO_PARALLEL, stage overlap (25 November 2026)
 
 | Change | Default | Evidence |

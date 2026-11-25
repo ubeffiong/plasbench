@@ -218,6 +218,33 @@ slow_step_note() {   # slow_step_note DESCRIPTION ELAPSED TYPICAL
     run_event slow_step "what=$what" "elapsed=$elapsed" "typical=$typical" "factor=${STEP_SLOW_FACTOR:-3}"
 }
 
+# awake_timeout SECONDS COMMAND...: like `timeout`, but the limit counts time the computer was awake (exit 124 at the limit). A wall-clock `timeout` kills a tool for the time the
+# computer slept (TOOL_TIMEOUT_SECONDS would score a tool as failed because the lid was closed). The command's own exit code is passed through.
+awake_timeout() {
+    local limit="$1"; shift
+    local pid rc=0 started now prev asleep=0 gsize gsize_seen="" min_gap="${SUSPEND_MIN_SECONDS:-60}"
+    started="$(_pb_now)"; prev="$started"
+    "$@" & pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        sleep 1
+        now="$(_pb_now)"
+        if [[ "$min_gap" =~ ^[0-9]+$ && $(( now - prev )) -gt $(( min_gap + 1 )) ]]; then _pb_note_suspend "$(( prev + 1 ))" "$now"; fi
+        prev="$now"
+        gsize="$(stat -c %s "${RESULTS_DIR:-/nonexistent}/.suspend_gaps" 2>/dev/null || stat -f %z "${RESULTS_DIR:-/nonexistent}/.suspend_gaps" 2>/dev/null || echo 0)"
+        if [[ "$gsize" != "$gsize_seen" ]]; then asleep="$(_pb_suspended_between "$started" "$now")"; gsize_seen="$gsize"; fi
+        if (( now - started - asleep >= limit )); then
+            asleep="$(_pb_suspended_between "$started" "$now")"      # look once more before killing anything: the sentinel may have just recorded a sleep
+            (( now - started - asleep >= limit )) || continue
+            pkill -TERM -P "$pid" 2>/dev/null || true
+            kill -TERM "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+            return 124
+        fi
+    done
+    wait "$pid" || rc=$?
+    return "$rc"
+}
+
 # ---- computer sleep (suspend): time the computer was asleep is not time the step took -------------------------------------------------
 # The run's sentinel (python/run_sentinel.py, started by run_all.sh) and the polling loop below both notice a jump of the wall clock that the loop did not cause and
 # record it in RESULTS_DIR/.suspend_gaps (plus a system_suspend run event). Elapsed times, the slow-step note and the "no new output" figure leave those gaps out.
@@ -849,11 +876,23 @@ retry_network() {
     local what="$1"; shift
     local attempts="${NETWORK_RETRIES:-3}"
     local delay="${NETWORK_RETRY_DELAY_SECONDS:-15}"
-    local n=1
+    local n=1 free=0 t0 asleep
     while true; do
+        t0="$(_pb_now)"
         if "$@"; then
             [[ "$n" -gt 1 ]] && log "  $what succeeded on attempt $n/$attempts"
             return 0
+        fi
+        # A connection that was open when the computer went to sleep is dead on waking: the call fails at once, which is the sleep's fault, not the network's. Such a failure does not
+        # use up an attempt (up to NETWORK_RESUME_RETRIES = 3 times), and the retry waits a little for the network to come back. (The run's sentinel writes the sleep within a few
+        # seconds of waking, so the check waits NETWORK_SUSPEND_CHECK_DELAY = 6 s before it looks.)
+        sleep "${NETWORK_SUSPEND_CHECK_DELAY:-6}"
+        asleep="$(_pb_suspended_between "$t0" "$(_pb_now)")"
+        if [[ "$asleep" -gt 0 && "$free" -lt "${NETWORK_RESUME_RETRIES:-3}" ]]; then
+            free=$(( free + 1 ))
+            warn "  $what was interrupted: the computer was asleep for about ${asleep}s while it ran, so its connections are dead. Retrying without counting this attempt, after a short wait for the network"
+            sleep "${NETWORK_RESUME_WAIT_SECONDS:-15}"
+            continue
         fi
         if [[ "$n" -ge "$attempts" ]]; then
             warn "  $what failed after $n attempt(s)"
