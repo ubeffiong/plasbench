@@ -177,6 +177,8 @@ pb_run python3 test_keep_awake.py
 pb_run bash test_suspend_heartbeat.sh
 pb_run python3 test_isescan_scope.py
 pb_run python3 test_run_profiles.py
+pb_run python3 test_annotation_retry.py
+pb_run bash test_resume_retry.sh
 for t in test_run_isolation_lock.sh test_stage4_outcomes.sh test_adapter_no_output.sh test_stage8_fresh_prediction.sh test_score_failure_reason.sh test_stage4_preflight_and_fasta.sh test_run_lock_race.sh test_run_lock_heartbeat.sh test_tool_timeout_preset.sh test_disk_guard.sh; do pb_run bash "$t"; done
 if [ "${PB_LIST:-0}" = "1" ]; then exit 0; fi
 sleep 1
