@@ -116,3 +116,14 @@ how do I resume a run that stopped	docs/USER_GUIDE.md|FAQ.md|plasbench/cli.py	re
 my sample sheet is comma separated, will it work	docs/INPUT_GUIDE.md	tab	heldout
 ERROR: uncurated sample-sheet row 2; require organism, truth_technology, truth_quality_tier	FAQ.md|docs/INPUT_GUIDE.md|config/config.sh	require_curated_metadata	heldout
 the assistant set up my isolates from a folder, what does it do	docs/AI_HELP.md|docs/AI_CAPABILITIES.md	folder	heldout
+what does AUTO_PARALLEL do and will it change my results	docs/AI_CAPABILITIES.md|config/config.sh	auto_parallel	heldout
+the run printed a parallel plan at the start of stage 2, where does that come from	docs/AI_CAPABILITIES.md|config/config.sh	auto_parallel	heldout
+why does stage 3 only assemble one isolate at a time when I have 32 GB	docs/AI_CAPABILITIES.md|config/config.sh	assembly_slot_gb	heldout
+what is ASSEMBLY_SLOT_GB	docs/AI_CAPABILITIES.md|config/config.sh	assembly_slot_gb	heldout
+my data folder is on the Windows drive under WSL, is assembly slow because of that	docs/AI_CAPABILITIES.md|config/config.sh	work_dir	heldout
+what is the local working copy in ~/.plasbench/scratch	docs/AI_CAPABILITIES.md|config/config.sh	work_dir	heldout
+can stage 2 start while the downloads are still running	docs/AI_CAPABILITIES.md|config/config.sh	pipeline_overlap	heldout
+status still shows stage 1 but pipeline_overlap.log is growing	docs/AI_CAPABILITIES.md|config/config.sh	pipeline_overlap	heldout
+ISEScan timed out, did PlasBench try it again	docs/AI_CAPABILITIES.md|CHANGELOG.md|config/config.sh	retried once	heldout
+the console stopped scrolling and the button says Jump to latest	docs/AI_CAPABILITIES.md|docs/USER_GUIDE.md|plasbench/ui_help.py	jump to latest	heldout
+what is the difference between the fast and thorough profiles	docs/AI_CAPABILITIES.md|config/run_profiles.tsv	fast	heldout

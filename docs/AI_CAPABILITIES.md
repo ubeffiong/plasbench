@@ -50,6 +50,17 @@ Each stage has a core step that always runs and optional items, each tied to one
 - `LOCAL_INPUTS_ONLY` / `--local-inputs`: use your own staged files and never download. `REQUIRE_CURATED_METADATA=0` lets stage 0 accept a sheet that has only `sample_id`, `assembly_accession` and `sra_run` (your own isolates).
 - Scoring thresholds (`CPRR_*`, `HEADLINE_*`, `*_THRESHOLD`) are pre-registered decisions: the assistant never changes them.
 
+## Speed and robustness: parallel stages, the local working copy, overlap, retries, the console
+
+<!-- source: config/config.sh (Parallelism; Work folder, annotation time limits), python/parallel_plan.py, python/pipeline_overlap.py, CHANGELOG.md -->
+- `AUTO_PARALLEL` (default 1; 0 = off): when you have not set `MAX_PARALLEL_SAMPLES`, stages 2 (truth and reference annotation) and 5 (scoring) run several isolates at once, sized to the CPUs and free memory, with the threads divided between them. The plan is printed at the start of the run and of each stage. Results are identical. An explicit `MAX_PARALLEL_SAMPLES` always wins.
+- `ASSEMBLY_SLOT_GB` (default 8): the memory one assembly is assumed to need until the run has learned it. Stage 3 runs two assemblies at once only when two of these (plus 15% and 0.5 GB each) fit in 85% of the free memory; otherwise it assembles one isolate at a time, even on a large computer.
+- `WORK_DIR` (default auto), the local working copy. A data folder on the Windows drive under WSL makes assembly slow (every file goes through 9p); so when the data or results folder is on a slow mount (a Windows drive seen from WSL, NTFS or exFAT, a network share, a cloud-synced folder), stages 3 and 4 work in a local folder under `~/.plasbench/scratch/<study>` and move the results back when each step ends. `data` = always in place; a path = that folder.
+- `PIPELINE_OVERLAP` (default 0, opt-in): 1 starts stage 2 for an isolate as soon as stage 1 has downloaded it, while the other downloads go on. Stage 2 reuses that work, so results are the same. `plasbench status` still shows stage 1 meanwhile; the progress is in `logs/pipeline_overlap.log`.
+- Annotation callers (mob_typer, abricate, AMRFinder, ISEScan, barrnap), for example when ISEScan timed out: each has a time limit (`ANNOTATION_TIMEOUT_SECONDS`) that never counts time asleep. A caller that times out is retried once, alone, with twice the time, before it is recorded `timed_out`. A tool killed for memory (exit 137) in stage 4 is retried once with half the threads; an assembly out of memory is retried once at the stated need.
+- Run profiles: `--profile fast` switches off optional analyses that never change the leaderboard (ISEScan, the ranking-stability and rank-sensitivity sweeps, performance drivers, MultiQC ...) and says what it turned off; `standard` is the default; `thorough` turns the optional extras on (config/run_profiles.tsv).
+- The console follows new output only while you are at the bottom. Scroll up to read and it stays where you are; the button then reads **Jump to latest**: press it (or scroll down) and it follows again. A new job starts following.
+
 ## Evidence, independence and tracks
 
 <!-- source: README.md "Read support", "Limits", docs/COHORTS.md (tiers), docs/SCIENTIFIC_GUIDE.md sections 9 and 10 -->
