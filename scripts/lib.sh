@@ -389,6 +389,40 @@ report_crashed_sample_jobs() {
 }
 
 # --- parallel job pool --------------------------------------------------
+# auto_parallel_apply STAGE: AUTO_PARALLEL (config/config.sh, python/parallel_plan.py). When MAX_PARALLEL_SAMPLES was not set by you, size it for THIS stage from the CPUs and
+# the free memory, and divide the thread budget between the isolates (THREADS and the per-step thread settings that followed it), unless you set THREADS. Prints the plan
+# once and records a parallel_plan event. A no-op with AUTO_PARALLEL=0, an explicit MAX_PARALLEL_SAMPLES, or one isolate.
+auto_parallel_apply() {
+    local stage="$1" n cpus mb line slots threads mem why old_threads v
+    [[ "${AUTO_PARALLEL:-1}" == "1" && "${PLASBENCH_SAMPLES_EXPLICIT:-0}" != "1" ]] || return 0
+    have python3 || return 0
+    n="$(read_samples "$SAMPLE_SHEET" 2>/dev/null | awk 'NF' | wc -l | tr -d '[:space:]')"
+    [[ "$n" =~ ^[0-9]+$ && "$n" -gt 1 ]] || return 0
+    cpus="${PLASBENCH_TEST_CPUS:-$(plasbench_detect_cores)}"
+    mb="${PLASBENCH_TEST_AVAILABLE_MB:-$(plasbench_detect_memory_mb)}"
+    line="$(python3 -I "${PROJECT_ROOT:-$HERE/..}/python/parallel_plan.py" plan --stage "$stage" --cpus "$cpus" --available-mb "$mb" --isolates "$n"         --slot-gb "${ASSEMBLY_SLOT_GB:-8}" --profile "${RESULTS_DIR:-.}/resource_profile.tsv" 2>/dev/null </dev/null)" || return 0
+    IFS=$'\t' read -r slots threads mem why <<< "$line"
+    [[ "$slots" =~ ^[0-9]+$ && "$threads" =~ ^[0-9]+$ ]] || return 0
+    export MAX_PARALLEL_SAMPLES="$slots"
+    if [[ "${PLASBENCH_THREADS_EXPLICIT:-0}" != "1" && "$slots" -gt 1 ]]; then
+        old_threads="$THREADS"
+        export THREADS="$threads"
+        # the per-step thread settings that simply followed THREADS follow the share too (one you set yourself differs from THREADS and is kept)
+        for v in HYBRID_TRUTH_THREADS PROTEIN_ANNOTATION_THREADS QUAST_DIAGNOSTICS_THREADS DIFFICULTY_FEATURES_THREADS; do
+            [[ "${!v:-}" == "$old_threads" ]] && export "$v=$threads"
+        done
+    fi
+    if [[ "$stage" == "3" && "$slots" -gt 1 && "$mem" =~ ^[0-9]+$ && "${ASSEMBLY_MEMORY_GB:-0}" -gt "$mem" ]]; then
+        export ASSEMBLY_MEMORY_GB="$mem"          # the assembler memory budget is shared between the assemblies running at once
+    fi
+    if [[ "$slots" -gt 1 ]]; then
+        log "AUTO_PARALLEL: stage $stage is running $slots isolates at a time: $cpus CPUs, $(awk -v m="$mb" 'BEGIN { printf "%.1f", m / 1024 }') GB free ($THREADS threads each${mem:+, ${ASSEMBLY_MEMORY_GB} GB memory budget each}). AUTO_PARALLEL=0 or MAX_PARALLEL_SAMPLES=1 runs one at a time."
+    else
+        log "AUTO_PARALLEL: stage $stage runs one isolate at a time ($why)"
+    fi
+    run_event parallel_plan "stage_no=$stage" "slots=$slots" "threads=$THREADS" "cpus=$cpus" "available_mb=$mb" "reason=$why"
+}
+
 # Block until fewer than MAX background jobs of this shell are running, then
 # return so the caller can start one more with `&`. MAX=1 (every stage's
 # default) waits for every previously started job to finish before letting a

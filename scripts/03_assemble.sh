@@ -30,6 +30,7 @@ source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 need fastp
 stage_timing_begin 3        # stage_start/stage_end events, so `plasbench status` knows this is stage 3
+auto_parallel_apply 3       # AUTO_PARALLEL: one assembly at a time unless the free memory holds more (python/parallel_plan.py)
 preflight_resources 3 quiet
 warn_resource_oversubscription "stage 3 (assembly)" "$MAX_PARALLEL_SAMPLES" "$THREADS" "$ASSEMBLY_MEMORY_GB"
 
@@ -168,7 +169,7 @@ run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SD
             fi
         fi
     fi
-    scratch="$(assembly_scratch_dir "$sample" "$t1" "$t2")" || scratch=""
+    scratch="${STAGE3_WORK:-}"          # the isolate's local work folder (assemble_sample); it also holds the local copy of the trimmed reads
     [[ -n "$scratch" ]] && out="$scratch/asm"
     while :; do
         rc=0
@@ -177,10 +178,11 @@ run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SD
         if [[ "$rc" -eq 0 ]]; then
             [[ -n "$note" ]] && ASM_RETRY_NOTE="retried once after $first: $note"
             if [[ -n "$scratch" ]] && ! assembly_scratch_finish "$scratch" "$out" "$asmdir"; then
+                STAGE3_KEEP_WORK=1
                 record_assembly_status "$sample" "failed" "" "SPAdes: the finished assembly could not be moved back from the scratch folder $scratch (see the message above; the scratch folder is kept)" "$(( $(date +%s) - start ))" "scratch_move_failed" "Free space where the data folder is, or set WORK_DIR=data, then run the same plasbench run command again."
                 return 1
             fi
-            [[ -n "$scratch" ]] && rm -rf "$scratch"
+            [[ -n "$scratch" ]] && rm -rf "$out"
             ASM_MEM_USED="$mem" ASM_NEEDED_GB="$needed" ASM_ATTEMPTS="$attempt" ASM_MODE="$mode"
             [[ -n "$sig" && "$auto" == "1" && ( -n "$needed" || "$mode" != "spades" ) ]] && python3 -I "${PROJECT_ROOT:-.}/python/resource_adapt.py" record --dir "$memdir" --sample "$sample" --sig "$sig" \
                 --needed "${needed:-0}" --budget "$mem" --attempts "$attempt" --mode "$mode" --status completed 2>/dev/null </dev/null || true
@@ -233,7 +235,7 @@ run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SD
         rm -rf "$asmdir" "$out"
         attempt=$((attempt + 1))
     done
-    [[ -n "$scratch" ]] && rm -rf "$scratch"
+    [[ -n "$scratch" ]] && rm -rf "$out"
     # The need does not fit in the free memory: --only-assembler only when the user allowed it (one attempt), else THIS isolate is skipped and the others go on.
     if [[ -n "$MEMORY_REFUSAL" && "$attempt" -lt 2 ]]; then
         if [[ "${ASSEMBLER_ALLOW_ONLY_ASSEMBLER:-0}" == "1" ]]; then
@@ -265,7 +267,7 @@ run_spades_checked() {   # run_spades_checked SAMPLE T1 T2 ASMDIR START R1 R2 SD
     fi
     # Memory belongs to this isolate's read set, not to the computer: the stage goes on with the next isolate (only disk, Python, CPU or folder causes stop it).
     if [[ "$DIAG_RETRY" == "reads" ]]; then
-        verify_reads "$sdir" "$r1" "$r2" "$t1" "$t2"
+        verify_reads "$sdir" "$r1" "$r2" "$sdir/$(basename "$t1")" "$sdir/$(basename "$t2")"   # the data folder's trimmed pair, not the local copy
         extra="$READS_NOTE"
     fi
     ASM_MEM_USED="$mem" ASM_NEEDED_GB="$needed" ASM_ATTEMPTS="$attempt" ASM_MODE="$mode"
@@ -396,7 +398,18 @@ select_assembly() {   # select_assembly SAMPLE SDIR T1 T2
     return 0
 }
 
+# The isolate's local work folder (WORK_DIR, python/work_dir.py): set by assemble_sample_inner when the data folder is on a slow mount, removed here on every way out
+# (kept only when finished results could not be copied back). A crash leaves it behind; the next run removes it (its pid is dead).
 assemble_sample() {
+    STAGE3_WORK="" STAGE3_KEEP_WORK=0
+    local rc=0
+    assemble_sample_inner "$@" || rc=$?
+    if [[ -n "$STAGE3_WORK" && "$STAGE3_KEEP_WORK" != "1" ]]; then rm -rf "$STAGE3_WORK"; fi
+    STAGE3_WORK=""
+    return "$rc"
+}
+
+assemble_sample_inner() {
     local SAMPLE="$1" ASM="$2" SRA="$3"
     ASM_MEM_USED="" ASM_NEEDED_GB="" ASM_ATTEMPTS="" ASM_MODE=""
     local SDIR="$DATA_DIR/$SAMPLE"
@@ -499,9 +512,21 @@ assemble_sample() {
     rm -rf "$ASMDIR" "$CONTIGS.partial" "$GRAPH.partial"
     if [[ "$ASSEMBLER" == "spades" ]]; then
         need spades.py
+        # On a slow data folder SPAdes works in a local folder and reads a local copy of the trimmed reads (it reads them several times); copied once, times kept.
+        local L1="$T1" L2="$T2" copied
+        if STAGE3_WORK="$(assembly_scratch_dir "$SAMPLE" "$T1" "$T2")"; then
+            if copied="$(python3 -I "${PROJECT_ROOT:-$HERE/..}/python/work_dir.py" copy-in --dst "$STAGE3_WORK/reads" "$T1" "$T2" 2>&1 </dev/null)"; then
+                L1="$(sed -n 1p <<< "$copied")"; L2="$(sed -n 2p <<< "$copied")"
+                heartbeat_log "  trimmed reads copied to the local work folder once ($STAGE3_WORK/reads); SPAdes reads them there"
+            else
+                warn "  could not copy the trimmed reads into the local work folder ($copied); SPAdes reads them from the data folder"
+            fi
+        else
+            STAGE3_WORK=""
+        fi
         log "  SPAdes assembling ($SAMPLE) ..."
         run_event sample_start "sample=$SAMPLE" "step=spades"
-        run_spades_checked "$SAMPLE" "$T1" "$T2" "$ASMDIR" "$START" "$R1" "$R2" "$SDIR" || return 0
+        run_spades_checked "$SAMPLE" "$L1" "$L2" "$ASMDIR" "$START" "$R1" "$R2" "$SDIR" || return 0
         if [[ -f "$ASMDIR/assembly_graph_with_scaffolds.gfa" ]]; then
             cp "$ASMDIR/assembly_graph_with_scaffolds.gfa" "$GRAPH.partial" && mv -f "$GRAPH.partial" "$GRAPH" || true
         fi

@@ -22,8 +22,11 @@ EOS
 cat > "$TMP/bin/spades.py" <<'EOS'
 #!/usr/bin/env bash
 outdir=""
-while [[ $# -gt 0 ]]; do case "$1" in -o) outdir="$2"; shift 2;; *) shift;; esac; done
+r1=""
+while [[ $# -gt 0 ]]; do case "$1" in -o) outdir="$2"; shift 2;; -1) r1="$2"; shift 2;; *) shift;; esac; done
 echo "$outdir" >> "$CALLS"
+echo "$r1" >> "$CALLS.reads"
+[[ -s "$r1" ]] || { echo "reads not found: $r1"; exit 1; }
 mkdir -p "$outdir/K21" "$outdir/corrected"
 echo intermediate > "$outdir/K21/big.bin"; echo reads > "$outdir/corrected/r.fastq"
 echo "SPAdes log line" > "$outdir/spades.log"
@@ -40,7 +43,7 @@ new_case() {
     printf '@r\nACGT\n+\nIIII\n' | gzip > "$P/data/s1/SRR_1.fastq.gz"
     printf '@r\nACGT\n+\nIIII\n' | gzip > "$P/data/s1/SRR_2.fastq.gz"
     printf 'sample_id\tassembly_accession\tsra_run\ns1\tNA\tSRR\n' > "$P/sheet.tsv"
-    CALLS="$P/calls.log"; export CALLS; : > "$CALLS"
+    CALLS="$P/calls.log"; export CALLS; : > "$CALLS"; : > "$CALLS.reads"
     LAST_LOG="$P/stage.log"
 }
 run_stage() {
@@ -56,6 +59,7 @@ new_case
 rc="$(run_stage PLASBENCH_FORCE_FS_TYPE=9p WORK_DIR=data)"
 [[ "$rc" == "0" ]] || fail "exit $rc"
 [[ "$(cat "$CALLS")" == "$P/data/s1/assembly" ]] || fail "WORK_DIR=data must assemble in the data folder: $(cat "$CALLS")"
+[[ "$(cat "$CALLS.reads")" == "$P/data/s1/SRR_1.trim.fastq.gz" ]] || fail "WORK_DIR=data reads the trimmed reads in place: $(cat "$CALLS.reads")"
 grep -q "assembly work folder: $P/data/s1 (WORK_DIR=data" "$P/stage.log" || fail "the log must say where the assembly runs"
 cp "$P/data/s1/contigs.fasta" "$TMP/contigs.data"; cp "$P/data/s1/assembly_graph.gfa" "$TMP/graph.data"
 echo "WORK_DIR=data: assembled in the data folder, logged -> PASS"
@@ -72,6 +76,10 @@ cmp "$P/data/s1/contigs.fasta" "$TMP/contigs.data" && cmp "$P/data/s1/assembly_g
 [[ -s "$P/data/s1/assembly/contigs.fasta" && -s "$P/data/s1/assembly/spades.log" && ! -e "$P/data/s1/assembly/K21" ]] || fail "results (contigs, log) are moved back, intermediate K21 is not"
 grep -q "completed" "$P/study/results/assembly_status.tsv" || fail "status must be completed"
 echo "slow data folder: assembled in scratch, results byte-identical, scratch removed, intermediates left behind -> PASS"
+[[ "$(cat "$CALLS.reads")" == "$P/home/.plasbench/scratch/study/s1."*"/reads/SRR_1.trim.fastq.gz" ]] || fail "SPAdes must read the local copy of the trimmed reads: $(cat "$CALLS.reads")"
+grep -q "trimmed reads copied to the local work folder once" "$P/stage.log" || fail "the copy-in is logged"
+[[ -s "$P/data/s1/SRR_1.trim.fastq.gz" && -f "$P/data/s1/.fastp.complete" ]] || fail "the trimmed reads stay in the data folder (stage 4 and a resume use them)"
+echo "slow data folder: SPAdes reads a local copy of the trimmed reads, copied once; the data folder keeps its own -> PASS"
 
 # 3. a fast data folder: no scratch (auto)
 new_case

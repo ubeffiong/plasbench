@@ -351,6 +351,9 @@ plasbench_default_budget_gb() {
 # the slots cannot make every job ask for every core at once (oversubscription:
 # context switching and cache thrashing, slower than fewer jobs). With the default
 # single slot this is all cores, as before; an explicit THREADS always wins.
+# Which of these YOU set (AUTO_PARALLEL never changes an explicit value). Recorded once, by the first config.sh of a run, and inherited by every stage.
+export PLASBENCH_THREADS_EXPLICIT="${PLASBENCH_THREADS_EXPLICIT:-$([[ -n "${THREADS:-}" ]] && echo 1 || echo 0)}"
+export PLASBENCH_SAMPLES_EXPLICIT="${PLASBENCH_SAMPLES_EXPLICIT:-$([[ -n "${MAX_PARALLEL_SAMPLES:-}" ]] && echo 1 || echo 0)}"
 if [[ -z "${THREADS:-}" ]]; then
     PLASBENCH_JOB_SLOTS=$(( ${MAX_PARALLEL_SAMPLES:-1} * ${MAX_PARALLEL_TOOLS:-1} ))
     [[ "$PLASBENCH_JOB_SLOTS" -ge 1 ]] || PLASBENCH_JOB_SLOTS=1
@@ -379,9 +382,10 @@ export AUTO_RESOURCES="${AUTO_RESOURCES:-1}"
 # assembly_status.tsv, assembly_memory.tsv and run_manifest.json.
 export ASSEMBLER_ALLOW_ONLY_ASSEMBLER="${ASSEMBLER_ALLOW_ONLY_ASSEMBLER:-0}"
 # --- Work folder, annotation time limits and the slow-step note ------------------------------------
-# WORK_DIR: where assemblies run. auto (default) = a scratch folder under ~/.plasbench/scratch/<study> when the data folder is on a slow mount (a Windows drive seen from WSL,
-# NTFS/exFAT, a network share, a cloud-synced folder), else the data folder itself; data = always the data folder; any other value = that folder. Finished results are
-# always moved back to the isolate's folder. Takes effect at the next stage 3 start.
+# WORK_DIR: where stages 3 and 4 do their file-heavy work. auto (default) = a local folder under ~/.plasbench/scratch/<study> when the data (or results) folder is on a slow
+# mount (a Windows drive seen from WSL, NTFS/exFAT, a network share, a cloud-synced folder), else in place; data = always in place; any other value = that folder. Stage 3:
+# SPAdes works there on a local copy of the trimmed reads and its results are moved back atomically. Stage 4: a tool's output folder is made there and copied back whole
+# when the tool ends (results folder slow); plasmidSPAdes reads a local copy of the trimmed reads (data folder slow). Takes effect at the next stage start.
 export WORK_DIR="${WORK_DIR:-auto}"
 # ANNOTATION_TIMEOUT_SECONDS: per annotation caller (mob_typer, abricate, AMRFinder, ISEScan, barrnap). Blank = max(300, 150 s per Mbp of the reference), ISEScan three times that;
 # a number = that many seconds; 0 or off = no limit. A caller that hits the limit is stopped and recorded as timed_out (never cached); the others are kept.
@@ -402,6 +406,17 @@ export SUSPEND_MIN_SECONDS="${SUSPEND_MIN_SECONDS:-60}"
 # machine's core/RAM budget below can actually support it -- e.g. 2 parallel
 # samples x 2 parallel tools x THREADS=4 wants 16 CPU threads at once.
 export MAX_PARALLEL_SAMPLES="${MAX_PARALLEL_SAMPLES:-1}"   # stages 2, 3, 4, 5
+# AUTO_PARALLEL (default 1; 0 = off): when you have not set MAX_PARALLEL_SAMPLES, stages 2 (truth and reference annotation) and 5 (scoring) run several isolates at once,
+# sized to this computer's CPUs and free memory, and the threads are DIVIDED between them (never more threads than CPUs); stage 3 (assembly) stays at one isolate unless the
+# free memory holds two assemblies or more; stage 4 is unchanged. The plan is printed at the start of the run and of each stage. Results are identical (python/parallel_plan.py).
+export AUTO_PARALLEL="${AUTO_PARALLEL:-1}"
+# ASSEMBLY_SLOT_GB (default 8): the memory one assembly is assumed to need when the run has not learned it yet; AUTO_PARALLEL runs two assemblies at once only when
+# two of these (plus 15% and 0.5 GB each) fit in 85% of the free memory.
+export ASSEMBLY_SLOT_GB="${ASSEMBLY_SLOT_GB:-8}"
+# PIPELINE_OVERLAP (default 0 = off): 1 starts stage 2 for an isolate as soon as stage 1 has downloaded it in this run, while stage 1 goes on with the others (one isolate at a
+# time, low priority, its own status files; python/pipeline_overlap.py). Stage 2 still runs afterwards over every isolate and reuses that work, so results are the same.
+# Opt-in: it adds CPU and disk work during the downloads, and `plasbench status` still shows stage 1 while it runs (its progress is in logs/pipeline_overlap.log).
+export PIPELINE_OVERLAP="${PIPELINE_OVERLAP:-0}"
 # Isolates downloaded at the same time in stage 1 (default 1). Keep 1 while one isolate already fills your link (see the MB/s lines or `plasbench net-bench`); to try 2 or 3 raise it
 # and compare the MB/s. ENA_MAX_CONNECTIONS is still the total: each download gets its share.
 export MAX_PARALLEL_DOWNLOADS="${MAX_PARALLEL_DOWNLOADS:-1}"

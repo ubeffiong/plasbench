@@ -93,3 +93,6 @@ ENA_USE_ARIA2	flag	0|1	Use aria2c for ENA downloads instead of the built-in resu
 KEEP_AWAKE	flag	0|1	Keep the computer awake while a run is active (the screen may still turn off)	low
 RUN_PROFILE	choice	standard|fast|thorough	Run profile: standard, fast (skips optional analyses that never change the leaderboard) or thorough	low
 ISESCAN_SCOPE	choice	plasmids|all	ISEScan searches only the plasmids (default) or every sequence	low
+AUTO_PARALLEL	flag	0|1	Size isolates-at-a-time to this computer (threads divided; assembly only when memory allows)	medium
+ASSEMBLY_SLOT_GB	int	2..512	Memory one assembly is assumed to need when AUTO_PARALLEL decides how many run at once	medium
+PIPELINE_OVERLAP	flag	0|1	Start stage 2 for an isolate while stage 1 downloads the others (opt-in)	medium
