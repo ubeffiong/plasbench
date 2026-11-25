@@ -29,7 +29,7 @@ mkdir -p "\$outdir"; printf '>c1\nACGT\n' > "\$outdir/\${prefix}.plasmid.fasta"
 EOF
 cat > "$TMP/bin/plasmidspades.py" <<'EOF'
 #!/usr/bin/env bash
-sleep 5
+sleep 60
 EOF
 # plasmidhunter runs out of memory without a SIGKILL (SPAdes/mimalloc style, exit 250):
 # a resource failure, not the tool's result.
@@ -53,7 +53,7 @@ printf '@r1\nACGT\n+\nIIII\n' | gzip > "$TMP/data/s1/SRR1_2.trim.fastq.gz"
 printf 'sample_id\tassembly_accession\tsra_run\ns1\tNA\tSRR1\n' > "$TMP/config/accessions.tsv"
 
 export DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" SAMPLE_SHEET="$TMP/config/accessions.tsv"
-export REQUIRE_CURATED_METADATA=0 TOOL_RETRIES=1 TOOL_TIMEOUT_SECONDS=2 PLATON_DB="$TMP"
+export REQUIRE_CURATED_METADATA=0 TOOL_RETRIES=1 TOOL_TIMEOUT_SECONDS=6 PLATON_DB="$TMP"
 export RUN_BASELINE_COVERAGE=0 RUN_BASELINE_REFERENCE=0 RUN_GENOMAD=1 GENOMAD_DB="$TMP" RUN_PLASMIDHUNTER=1
 PATH="$TMP/bin:$PATH" bash "$ROOT/scripts/04_run_tools.sh" > "$TMP/stage.log" 2>&1 || {
     echo "FAIL: stage 4 must finish" >&2; tail -20 "$TMP/stage.log" >&2; exit 1; }
