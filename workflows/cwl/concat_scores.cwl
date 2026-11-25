@@ -7,7 +7,7 @@ requirements:
   ShellCommandRequirement: {}
 hints:
   DockerRequirement:
-    dockerPull: ghcr.io/ubeffiong/plasbench:v0.5.6
+    dockerPull: ghcr.io/ubeffiong/plasbench:v0.5.7
 baseCommand: awk
 arguments:
   - 'FNR==1 && NR!=1 {next} {print}'

@@ -13,6 +13,10 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-11-25
+
+Faster, calmer runs; a resumable ENA-first downloader with `READ_DEPTH_CAP_X`; per-caller annotation switches and installs; an AI help that prepares isolates, checks sample sheets and troubleshoots runs; interactive report sections; publishing files for Galaxy, bio.tools, WorkflowHub and F1000Research. Details are in the entries below.
+
 ### Docs -- the AI help can explain the faster-runs settings (25 November 2026)
 - docs/AI_CAPABILITIES.md gains a section on `AUTO_PARALLEL`, `ASSEMBLY_SLOT_GB`, the local working copy (`WORK_DIR`), `PIPELINE_OVERLAP`, the one retry of annotation callers, the run profiles and the console's *Jump to latest*; 11 new held-out gold questions (8/11 found in the top 3 before the section, 11/11 after, no longer strictly held out once fixed with them in view; in-sample 56/56).
 
