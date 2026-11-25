@@ -1936,6 +1936,14 @@ def main(argv=None):
             env["TMP_DIR"] = study_tmp
         if args.local_inputs:
             env["LOCAL_INPUTS_ONLY"] = "1"
+            # A sheet of your own isolates (written by `plasbench intake stage` or init-local) has sample_id, assembly_accession, sra_run and perhaps organism: none of the
+            # curated columns of a public cohort. Stage 0 would refuse every row of it unless REQUIRE_CURATED_METADATA=0, which the guides told people to type in front of the
+            # command. With --local-inputs and such a sheet that is now the default; a sheet with any curated column is still checked in full, and an explicit setting wins.
+            if "REQUIRE_CURATED_METADATA" not in os.environ and args.samples and Path(args.samples).is_file():
+                from . import sheetcheck
+                cols = sheetcheck.header(args.samples)
+                if cols and "sample_id" in cols and not any(c in cols for c in sheetcheck.CURATED_COLUMNS if c != "organism"):
+                    env["REQUIRE_CURATED_METADATA"] = "0"
         if args.long_reads_file:
             env["LONG_READS_FILE"] = args.long_reads_file
         if getattr(args, "profile", None):

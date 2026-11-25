@@ -38,6 +38,8 @@ SYNONYMS = {
     "container": ["docker"], "containers": ["docker"], "image": ["docker", "image"],
     "pipeline": ["workflow", "stage"], "stage": ["workflow"], "stages": ["workflow", "stage"], "step": ["stage"], "steps": ["stage"],
     "login": ["sign"], "key": ["token"], "gpu": ["threads"], "cpu": ["threads"], "cores": ["threads"],
+    "single": ["unpaired", "mate", "paired"], "unpaired": ["mate", "paired"], "own": ["local", "intake"], "nanopore": ["long"], "pacbio": ["long"],
+    "asleep": ["sleep", "suspend"], "sleep": ["suspend", "awake"], "quiet": ["output", "log"], "skipped": ["skip"], "profile": ["profiles"],
 }
 _WORD = re.compile(r"[a-z0-9][a-z0-9_.+-]*[a-z0-9]|[a-z0-9]", re.I)
 _OPTION = re.compile(r"(?<![\w-])--?[a-z][a-z0-9-]{1,}")

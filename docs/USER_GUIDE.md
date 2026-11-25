@@ -811,6 +811,8 @@ Exit codes of a stage: `0` success, `3` an adapter found no output from its tool
 
 See also `plasbench intake scan` / `intake stage` ([Input guide](INPUT_GUIDE.md)): the sheet-first route to the same placement, which stays available.
 
+The AI help pane can do this for you through the same intake: press **Set up my isolates from a folder**, choose the folder, review the card (each isolate's reads, its reference and how sure the match is, the organism, the truth status, the warnings, and the sample sheet before and after), press **Stage**, and follow the quick test to the `plasbench run` card. It is the same plan as `plasbench intake stage --dry-run`; nothing goes to the assistant unless you press Share ([AI help](AI_HELP.md#your-isolates-through-the-intake)).
+
 If your reads and reference genomes are in one folder (with sub-folders, and other files mixed in), you do not have to name each file. In the window, **Your own isolates > Scan a folder**; on the command line:
 
 ```

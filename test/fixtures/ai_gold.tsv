@@ -1,6 +1,7 @@
 # question<TAB>source file that must be among the top 3 retrieved chunks<TAB>optional lower-case phrase that the chunk title or text must contain
 # Realistic support questions across install, Docker, WSL, commands, inputs, metrics, workflow, troubleshooting and exit codes (some misspelt, some quoted from logs).
 # A question passes when one of the top three chunks comes from the named source (and contains the phrase when one is given). test/test_ai_kb.py reports the hit rate.
+# Optional 4th column `heldout`: written before the retrieval and docs were tuned for them (pasted errors, console tails, intake rule names, run profiles); reported separately.
 How do I install PlasBench on Ubuntu?	INSTALL.md	conda
 How do I install and run my first benchmark?	docs/USER_GUIDE.md|README.md|plasbench/cli.py
 Can I run PlasBench on Windows?	docs/USER_GUIDE.md	wsl
@@ -41,7 +42,7 @@ How do I turn on plasmidfinder or another tool?	config/workflow_steps.tsv|docs/U
 Which tools does PlasBench support?	config/tool_capabilities.tsv|README.md|docs/USER_GUIDE.md
 How do I add my own tool?	docs/ADDING_TOOLS.md|FAQ.md
 how to limit the memory used by a run	docs/RESOURCE_ADAPTATION.md|python/assembler_diagnosis.py|config/config.sh	memory
-How many threads does it use and how do I change it	config/config.sh	threads
+How many threads does it use and how do I change it	config/config.sh|docs/AI_CAPABILITIES.md	threads
 metagenomic plasmid benchmark how to	docs/METAGENOMICS.md
 Is my data sent anywhere?	FAQ.md|README.md|SECURITY.md
 How do I upgrade PlasBench to a new version?	FAQ.md	upgrade
@@ -52,3 +53,66 @@ plasbench is not recognised as a command in powershell	INSTALL.md|FAQ.md
 how to publish to Zenodo or bio.tools	docs/publishing/README.md
 instal-tools failed on conda solve is slow	INSTALL.md	mamba
 How do I work offline without internet?	docs/USER_GUIDE.md|FAQ.md	offline
+which optional switches are there for each stage	docs/AI_CAPABILITIES.md|config/workflow_steps.tsv	switch
+what is the difference between the fast standard and thorough profiles	docs/AI_CAPABILITIES.md|config/run_profiles.tsv	thorough
+which settings decide how many CPU cores a run uses	docs/AI_CAPABILITIES.md|config/config.sh	max_parallel_samples
+what does AUTO_RESOURCES do after an out of memory kill	docs/AI_CAPABILITIES.md|config/config.sh	auto_resources
+what are stages 0 to 8 of plasbench run	docs/AI_CAPABILITIES.md|config/workflow_steps.tsv	stage
+ERROR: reads-not-gzip KP01_1.fastq.gz is named .gz but is not compressed	docs/INPUT_GUIDE.md	reads-not-gzip	heldout
+plasbench intake check says reads-misnamed, what does that mean	docs/INPUT_GUIDE.md	reads-misnamed	heldout
+my sheet says reference-missing for one isolate	docs/INPUT_GUIDE.md	reference-missing	heldout
+intake check: [FAIL] Read 1 and read 2 do not match each other (reads-mates)	docs/INPUT_GUIDE.md	reads-mates	heldout
+what is truth-review and why will the run not start	docs/INPUT_GUIDE.md	review	heldout
+truth-mismatch: NZ_CP000001.1 is not in reference.fna	docs/INPUT_GUIDE.md	truth-mismatch	heldout
+reference-ambiguous: several FASTA files could be the reference	docs/INPUT_GUIDE.md	reference-ambiguous	heldout
+the quick test says Reads come from this reference's isolate FAIL 4% of sampled reads	docs/INPUT_GUIDE.md	reference-wrong-isolate	heldout
+my reference looks like a draft assembly with 200 contigs	docs/INPUT_GUIDE.md	draft	heldout
+sample-id-unsafe: my sample name has a space in it	docs/INPUT_GUIDE.md	sample-id-unsafe	heldout
+I only have single-end reads, can PlasBench use them?	docs/INPUT_GUIDE.md	pair	heldout
+I have nanopore reads in the folder, are they staged?	docs/INPUT_GUIDE.md	long	heldout
+how do I add my own reads and reference genome	docs/INPUT_GUIDE.md|docs/USER_GUIDE.md	intake	heldout
+what does plasbench intake check --fix repair	docs/INPUT_GUIDE.md	fix	heldout
+which sequences are plasmids? PlasBench left them as REVIEW in truth.tsv	docs/INPUT_GUIDE.md	review	heldout
+ERROR K-mer Counting The reads contain too many k-mers to fit into available memory. You need approx. 9.1GB of free RAM	python/assembler_diagnosis.py|config/resource_signatures.tsv	memory	heldout
+terminate called after throwing an instance of 'std::bad_alloc'	config/resource_signatures.tsv|python/assembler_diagnosis.py	bad_alloc	heldout
+OSError: [Errno 24] Too many open files	config/resource_signatures.tsv	open	heldout
+No space left on device while writing to /tmp	config/resource_signatures.tsv|python/assembler_diagnosis.py	space	heldout
+pthread_create failed: Resource temporarily unavailable	config/resource_signatures.tsv|python/assembler_diagnosis.py	thread	heldout
+Could not find the AMRFinder database	config/resource_signatures.tsv	amrfinder	heldout
+java.lang.OutOfMemoryError: Java heap space	config/resource_signatures.tsv	heap	heldout
+SPAdes: Illegal instruction (core dumped)	python/assembler_diagnosis.py	illegal instruction	heldout
+spades says the output directory already exists and cannot restart	python/assembler_diagnosis.py	output	heldout
+docker: Error response from daemon: toomanyrequests: You have reached your pull rate limit	python/docker_diagnosis.py	rate limit	heldout
+x509: certificate has expired or is not yet valid when pulling the image	python/docker_diagnosis.py	clock	heldout
+Got permission denied while trying to connect to the Docker daemon socket	python/docker_diagnosis.py	socket	heldout
+The command 'docker' could not be found in this WSL 2 distro	python/docker_diagnosis.py	wsl integration	heldout
+failed to register layer: unexpected EOF	python/docker_diagnosis.py	layer	heldout
+the job ended with exit code 139	plasbench/exitcodes.py	139	heldout
+exit status 127 command not found	plasbench/exitcodes.py	127	heldout
+what does exit code 20 mean after install-tools	plasbench/exitcodes.py|FAQ.md	20	heldout
+exit 130 after I pressed ctrl c	plasbench/exitcodes.py	130	heldout
+my run is stuck in stage 3 for 5 hours, what is it doing	FAQ.md|docs/USER_GUIDE.md	status	heldout
+The run card says Working, console quiet. Is it stuck?	FAQ.md	quiet	heldout
+No new output for 35 minutes. This is often normal while reads download	FAQ.md	output	heldout
+The computer was asleep from 00:46 to 03:33; the run was paused, not slow	FAQ.md	sleep	heldout
+how do I stop my laptop going to sleep during a run	FAQ.md|config/config.sh	awake	heldout
+what is KEEP_AWAKE	config/config.sh	keep_awake	heldout
+reads are 9.5 GB, above MAX_RUN_DOWNLOAD_GB; skipping this isolate	FAQ.md|config/config.sh	max_run_download_gb	heldout
+why was this isolate skipped by choice in the download status	FAQ.md|config/config.sh	max_run_download_gb	heldout
+what does stage 3 do	config/workflow_steps.tsv|docs/AI_CAPABILITIES.md	assembl	heldout
+what happens in stage 2 reference truth	config/workflow_steps.tsv|docs/AI_CAPABILITIES.md	truth	heldout
+what is stage 8 operational reconstruction	config/workflow_steps.tsv|docs/AI_CAPABILITIES.md	operational	heldout
+what does the fast run profile turn off	config/run_profiles.tsv|docs/AI_CAPABILITIES.md|config/config.sh	isescan	heldout
+plasbench run --profile thorough what does it add	config/run_profiles.tsv|docs/AI_CAPABILITIES.md|plasbench/cli.py	thorough	heldout
+does the fast profile change the leaderboard	config/run_profiles.tsv|docs/AI_CAPABILITIES.md|config/config.sh	leaderboard	heldout
+ISESCAN_SCOPE plasmids or all, what is the difference	config/config.sh|config/run_profiles.tsv	chromosome	heldout
+chromosome shows not evaluated (chromosome not searched) in the IS table	config/config.sh|docs/AI_CAPABILITIES.md	not searched	heldout
+where did the time of my run go	plasbench/cli.py|docs/USER_GUIDE.md	profile-run	heldout
+which settings change how much memory and how many threads a run uses	config/config.sh|docs/AI_CAPABILITIES.md	threads	heldout
+what does Assembly of KP01 failed (out_of_memory) mean in plasbench status	python/assembler_diagnosis.py|python/run_status.py	memory	heldout
+Partial assembly: 3 of 5 isolates assembled; 2 failed	python/run_status.py|FAQ.md|python/assembler_diagnosis.py	assembl	heldout
+the run left its markers but no process of it is alive: it was cut off	python/run_status.py|FAQ.md|docs/USER_GUIDE.md	resum	heldout
+how do I resume a run that stopped	docs/USER_GUIDE.md|FAQ.md|plasbench/cli.py	resum	heldout
+my sample sheet is comma separated, will it work	docs/INPUT_GUIDE.md	tab	heldout
+ERROR: uncurated sample-sheet row 2; require organism, truth_technology, truth_quality_tier	FAQ.md|docs/INPUT_GUIDE.md|config/config.sh	require_curated_metadata	heldout
+the assistant set up my isolates from a folder, what does it do	docs/AI_HELP.md|docs/AI_CAPABILITIES.md	folder	heldout

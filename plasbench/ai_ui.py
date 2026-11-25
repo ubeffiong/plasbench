@@ -12,7 +12,7 @@ describes it; the server runs `validate()` again on every request.
 | open      | open the report, or type a validated command in the Terminal tab      | safe          | none (the command still needs Enter) | -                       |
 | install   | install tools of one known profile                                    | destructive   | the existing install dialog   | plasbench tools remove, by hand|
 | runtime   | switch conda or Docker                                                | changes_files | dialog                        | switch back                    |
-| flow      | start a guided flow (set up a run, fix a sheet, install, add, why failed) | safe      | each step asks               | -                              |
+| flow      | start a guided flow (set up isolates, check a sheet, why failed, where is my run, install, add) | safe | each step asks | -              |
 """
 from __future__ import annotations
 
@@ -24,7 +24,10 @@ VIEWS = ("home", "setup", "tools", "addtool", "prereg", "settings", "workspace",
 VIEW_NAMES = {"home": "Home", "setup": "Setup", "tools": "Tools", "addtool": "Add a tool", "prereg": "Pre-registration", "settings": "Settings", "workspace": "Workspace and studies",
               "git": "Version control", "wizard": "New benchmark", "isolates": "Your own isolates", "cohorts": "Cohorts", "runs": "Runs", "jobs": "Jobs", "commands": "Commands", "help": "Guides"}
 SUBS = {"runs": ("ongoing", "attention", "completed", "all")}
-FLOWS = {"setup_run": "Set up a run from my folder", "fix_sheet": "Fix my sample sheet", "install_tools": "Install the tools I need", "add_tool": "Add my own tool", "diagnose": "Why did my last run fail?"}
+FLOWS = {"setup_isolates": "Set up my isolates from a folder", "check_sheet": "Check my sample sheet", "why_failed": "Why did my run fail?", "where_run": "Where is my run?",
+         "install_tools": "Install the tools I need", "add_tool": "Add my own tool",
+         # the earlier names, still accepted (the pane maps them to the flows above)
+         "setup_run": "Set up my isolates from a folder", "fix_sheet": "Check my sample sheet", "diagnose": "Why did my run fail?"}
 WIZ_SOURCES = ("demo", "cohort", "sheet", "meta")
 STUDY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 RUNTIMES = ("conda", "docker")
