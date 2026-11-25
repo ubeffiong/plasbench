@@ -76,13 +76,42 @@ for s in "${STAGES[@]}"; do
     # rerun from an existing scores.tsv, even after the original sheet moved.
     [[ "$s" =~ ^[1-5]$|^7$ ]] && { validate_sample_sheet "$SAMPLE_SHEET"; break; }
 done
+# PIPELINE_OVERLAP=1 (default 0; python/pipeline_overlap.py): while stage 1 downloads, stage 2 runs for each isolate stage 1 has finished in this run (one at a time, low priority,
+# private status files); stage 2 then runs as always and reuses that work. Only when this run has both stages 1 and 2.
+_PB_OVERLAP_PID="" _PB_OVERLAP_SINCE="$(date +%s)" _PB_OVERLAP_WORK="$RESULTS_DIR/.pipeline_overlap"
+_pb_overlap_stop() {
+    [[ -n "$_PB_OVERLAP_PID" ]] || return 0
+    kill "$_PB_OVERLAP_PID" 2>/dev/null || true
+    wait "$_PB_OVERLAP_PID" 2>/dev/null || true
+    _PB_OVERLAP_PID=""
+}
+_pb_overlap_wanted=0
+if [[ "${PIPELINE_OVERLAP:-0}" == "1" && " ${STAGES[*]} " == *" 1 "* && " ${STAGES[*]} " == *" 2 "* ]]; then _pb_overlap_wanted=1; fi
 for s in "${STAGES[@]}"; do
     scr="${SCRIPT[$s]:-}"
     [[ -z "$scr" ]] && die "unknown stage '$s'"
     log ">>>>> STAGE $s : $scr"
     printf 'started %s, stage %s (%s), pid %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$s" "$scr" "$$" > "$RUN_MARK"
     rc=0
+    if [[ "$s" == "1" && "$_pb_overlap_wanted" == "1" ]]; then
+        rm -rf "$_PB_OVERLAP_WORK"; mkdir -p "$_PB_OVERLAP_WORK"
+        log "PIPELINE_OVERLAP=1: stage 2 starts for each isolate as soon as stage 1 has it (one at a time, low priority; log: $LOG_DIR/pipeline_overlap.log)"
+        python3 -I "$HERE/../python/pipeline_overlap.py" follow --events "${RUN_EVENTS_FILE:-$RESULTS_DIR/run_events.jsonl}" --since "$_PB_OVERLAP_SINCE"             --sheet "$SAMPLE_SHEET" --work "$_PB_OVERLAP_WORK" --stop "$_PB_OVERLAP_WORK/stage1.done" --log "$LOG_DIR/pipeline_overlap.log"             --poll "${PIPELINE_OVERLAP_POLL_SECONDS:-20}" < /dev/null &
+        _PB_OVERLAP_PID=$!
+        on_exit_add _pb_overlap_stop
+    fi
     bash "$HERE/$scr" || rc=$?
+    if [[ "$s" == "1" && -n "$_PB_OVERLAP_PID" ]]; then
+        if [[ "$rc" -eq 0 ]]; then
+            : > "$_PB_OVERLAP_WORK/stage1.done"
+            log "PIPELINE_OVERLAP: stage 1 is done; waiting for the stage 2 already started to finish its current isolate"
+            wait "$_PB_OVERLAP_PID" 2>/dev/null || warn "PIPELINE_OVERLAP: the early stage 2 ended with an error; stage 2 does every isolate it did not finish (see $LOG_DIR/pipeline_overlap.log)"
+            _PB_OVERLAP_PID=""
+        else
+            _pb_overlap_stop
+        fi
+        rm -rf "$_PB_OVERLAP_WORK"
+    fi
     if [[ "$rc" -ne 0 ]]; then
         rm -f "$RUN_MARK"
         _plasbench_record_error "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: the run stopped in stage $s ($scr): $(explain_exit "$rc") (exit $rc). The messages above say why; logs are in $LOG_DIR."

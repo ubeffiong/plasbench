@@ -413,6 +413,10 @@ export AUTO_PARALLEL="${AUTO_PARALLEL:-1}"
 # ASSEMBLY_SLOT_GB (default 8): the memory one assembly is assumed to need when the run has not learned it yet; AUTO_PARALLEL runs two assemblies at once only when
 # two of these (plus 15% and 0.5 GB each) fit in 85% of the free memory.
 export ASSEMBLY_SLOT_GB="${ASSEMBLY_SLOT_GB:-8}"
+# PIPELINE_OVERLAP (default 0 = off): 1 starts stage 2 for an isolate as soon as stage 1 has downloaded it in this run, while stage 1 goes on with the others (one isolate at a
+# time, low priority, its own status files; python/pipeline_overlap.py). Stage 2 still runs afterwards over every isolate and reuses that work, so results are the same.
+# Opt-in: it adds CPU and disk work during the downloads, and `plasbench status` still shows stage 1 while it runs (its progress is in logs/pipeline_overlap.log).
+export PIPELINE_OVERLAP="${PIPELINE_OVERLAP:-0}"
 # Isolates downloaded at the same time in stage 1 (default 1). Keep 1 while one isolate already fills your link (see the MB/s lines or `plasbench net-bench`); to try 2 or 3 raise it
 # and compare the MB/s. ENA_MAX_CONNECTIONS is still the total: each download gets its share.
 export MAX_PARALLEL_DOWNLOADS="${MAX_PARALLEL_DOWNLOADS:-1}"
