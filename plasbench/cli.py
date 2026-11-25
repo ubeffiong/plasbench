@@ -639,6 +639,14 @@ def build_parser():
     net_parser.add_argument("--service", action="append", default=[], metavar="NAME",
                             help="Check only this service (repeatable; names are in config/network_services.tsv). Default: all.")
     net_parser.add_argument("--json", action="store_true", help="Print the answer as JSON, for scripts and the window.")
+    bench_parser = sub.add_parser(
+        "net-bench", help="Measure how fast ENA delivers to this computer with 1, 4, 8 and 16 connections (small time-boxed ranges, nothing saved) and recommend ENA_MAX_CONNECTIONS.")
+    bench_parser.add_argument("--run", default="SRR36114699", help="The ENA run whose first FASTQ file is read (default SRR36114699).")
+    bench_parser.add_argument("--url", help="A file URL that honours HTTP Range, instead of looking one up.")
+    bench_parser.add_argument("--mib", type=float, default=32.0, help="MiB fetched per setting (default 32).")
+    bench_parser.add_argument("--seconds", type=float, default=20.0, help="Time limit per setting (default 20).")
+    bench_parser.add_argument("--settings", default="1,4,8,16", help="Connection counts to try (default 1,4,8,16; at most 16).")
+    bench_parser.add_argument("--json", action="store_true", help="Print the result as JSON.")
     upgrade_parser = sub.add_parser(
         "upgrade",
         help="Download the latest release and reuse this install's shared reads and databases.",
@@ -1091,6 +1099,9 @@ def build_parser():
                             help="Score only tools declared under this track this run (each tool's own "
                                  "track is still stamped correctly regardless); leave unset to score "
                                  "every enabled tool under its own correct track in one run.")
+        inputs.add_argument("--read-depth-cap", metavar="off|N",
+                            help="Stage 1: for a short paired Illumina run deeper than N x coverage over the reference, download only the first read pairs that give N x "
+                                 "(default 150, config READ_DEPTH_CAP_X). 'off' (also 0, none, false) downloads whole files, MD5-checked as before. Recorded for the study.")
         inputs.add_argument("--decision-profile", choices=("accuracy_first", "amr_surveillance", "rapid_screening"),
                             help="Named decision_score weight set for operational recommendations (default: "
                                  "accuracy_first, today's original formula). A different profile only changes "
@@ -1104,7 +1115,8 @@ def build_parser():
         resources.add_argument("--memory-gb", type=int, help="SPAdes memory limit in GB (default: config value, normally 16).")
         resources.add_argument("--parallel-samples", type=int,
                                help="Samples to download/assemble/reconstruct/score concurrently "
-                                    "(default: config value, normally 1 = sequential).")
+                                    "(default: AUTO_PARALLEL sizes stages 2 and 5 to this computer with the threads divided, "
+                                    "assembly one at a time unless memory allows; a number given here is used as set).")
         resources.add_argument("--parallel-tools", type=int,
                                help="Independent reconstruction tools to run concurrently per sample in "
                                     "stage 4 -- mob_recon, platon, plasmidspades, gplas2_external; "
@@ -1551,6 +1563,13 @@ def main(argv=None):
         if args.api_key:
             command.extend(["--api-key", args.api_key])
         code = run(command, root)
+    elif args.command == "net-bench":
+        command = [sys.executable, "python/net_bench.py", "--run", args.run, "--mib", str(args.mib), "--seconds", str(args.seconds), "--settings", args.settings]
+        if args.url:
+            command.extend(["--url", args.url])
+        if args.json:
+            command.append("--json")
+        code = run(command, root)
     elif args.command == "discover-design-cohort":
         command = [sys.executable, "python/discover_design_cohort.py", "--out", str(args.out),
                    "--evidence-out", str(args.evidence_out), "--ledger", str(args.ledger),
@@ -1857,6 +1876,11 @@ def main(argv=None):
                 folder = studies.prepare(root, study_name, args.samples if args.command == "run" else None,
                                          args.cohort, argv or sys.argv[1:], location=getattr(args, "study_location", None))
                 if args.command == "run":
+                    depth_cap, depth_note = studies.resolve_depth_cap(folder, getattr(args, "read_depth_cap", None))
+                    if depth_cap is not None:
+                        args.read_depth_cap = depth_cap
+                    if depth_note:
+                        print(f"[plasbench] {depth_note}")
                     data_folder, data_note = studies.resolve_data(root, folder, getattr(args, "keep_data_in_study", False), args.data_dir, configured_data_dir(root))
                     if data_folder is not None:
                         args.data_dir = data_folder
@@ -1913,6 +1937,14 @@ def main(argv=None):
             env["TMP_DIR"] = study_tmp
         if args.local_inputs:
             env["LOCAL_INPUTS_ONLY"] = "1"
+            # A sheet of your own isolates (written by `plasbench intake stage` or init-local) has sample_id, assembly_accession, sra_run and perhaps organism: none of the
+            # curated columns of a public cohort. Stage 0 would refuse every row of it unless REQUIRE_CURATED_METADATA=0, which the guides told people to type in front of the
+            # command. With --local-inputs and such a sheet that is now the default; a sheet with any curated column is still checked in full, and an explicit setting wins.
+            if "REQUIRE_CURATED_METADATA" not in os.environ and args.samples and Path(args.samples).is_file():
+                from . import sheetcheck
+                cols = sheetcheck.header(args.samples)
+                if cols and "sample_id" in cols and not any(c in cols for c in sheetcheck.CURATED_COLUMNS if c != "organism"):
+                    env["REQUIRE_CURATED_METADATA"] = "0"
         if args.long_reads_file:
             env["LONG_READS_FILE"] = args.long_reads_file
         if getattr(args, "profile", None):
@@ -1921,6 +1953,12 @@ def main(argv=None):
             env["ANALYSIS_TRACK_FILTER"] = args.analysis_track
         if args.decision_profile:
             env["DECISION_PROFILE"] = args.decision_profile
+        if getattr(args, "read_depth_cap", None):
+            from . import studies as _studies
+            try:
+                env["READ_DEPTH_CAP_X"] = _studies.parse_depth_cap(args.read_depth_cap)
+            except ValueError as exc:
+                parser.error(str(exc))
         positive_options = {"threads": "THREADS", "memory_gb": "MEMORY_GB", "min_read_len": "MIN_READ_LEN",
                             "parallel_samples": "MAX_PARALLEL_SAMPLES", "parallel_tools": "MAX_PARALLEL_TOOLS",
                             "trycycler_assembly_count": "TRYCYCLER_ASSEMBLY_COUNT"}

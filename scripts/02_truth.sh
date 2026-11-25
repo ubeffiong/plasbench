@@ -8,6 +8,7 @@ source "$HERE/lib.sh"
 need python3
 preflight_resources 2 quiet
 stage_timing_begin 2        # stage_start/stage_end events, so `plasbench status` knows this is stage 2
+auto_parallel_apply 2       # AUTO_PARALLEL: several isolates at once, threads divided (python/parallel_plan.py)
 
 # --- per-step timing: every sample's stage-2 steps are timed into data/<sample>/stage2_timing.tsv, and the log
 # names the slow ones, so a long stage 2 says where its time went.

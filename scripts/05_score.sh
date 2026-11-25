@@ -23,6 +23,7 @@ need python3
 mkdir -p "$RESULTS_DIR" "$LOG_DIR"
 acquire_run_lock "stage 5 (score)"
 stage_timing_begin 5
+auto_parallel_apply 5       # AUTO_PARALLEL: several isolates scored at once, threads divided (python/parallel_plan.py)
 [[ -f "$SAMPLE_SHEET" ]] || die "stage 5: the sample sheet $SAMPLE_SHEET does not exist"
 [[ -n "$(read_samples "$SAMPLE_SHEET")" ]] || die "stage 5: the sample sheet $SAMPLE_SHEET lists no samples, so there is nothing to score (fill in the cohort, or run stages 1-4 first)"
 

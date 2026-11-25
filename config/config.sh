@@ -95,8 +95,8 @@ export TRUTH_LONG_READ_PRESET="${TRUTH_LONG_READ_PRESET:-map-ont}"
 # replicon but the main chromosome is a plasmid) and evidence (Scheme 2,
 # evidence-confirmed labels with AMBIGUOUS replicons excluded, truth.scored.tsv).
 export TRUTH_LABEL_SCHEME="${TRUTH_LABEL_SCHEME:-ncbi}"
-# Where stage 1 gets short reads: auto (SRA Toolkit, then ENA if prefetch fails),
-# sra (SRA Toolkit only), ena (ENA only; python/fetch_ena_reads.py, MD5-verified).
+# Where stage 1 gets short reads: auto (ENA first: chunked, resumable, MD5-verified, no .sra file or FASTQ conversion; the SRA Toolkit only when ENA has no paired FASTQ for the run
+# or fails after its retries), sra (SRA Toolkit only), ena (ENA only; python/fetch_ena_reads.py).
 export READ_SOURCE="${READ_SOURCE:-auto}"
 # Does the window look for a newer PlasBench release by itself? auto (default): when it starts and then at most once a day, one public
 # request to GitHub's release list (nothing about you or this computer is sent); off: only when you press Check for updates.
@@ -186,22 +186,42 @@ export ANALYSIS_TRACK_FILTER="${ANALYSIS_TRACK_FILTER:-}"
 # retries each fetch this many times before recording the sample as failed.
 export NETWORK_RETRIES="${NETWORK_RETRIES:-3}"
 export NETWORK_RETRY_DELAY_SECONDS="${NETWORK_RETRY_DELAY_SECONDS:-15}"
-# Largest read download per isolate, in GB (the compressed FASTQ of its run, as ENA reports it). An isolate above it is skipped and recorded as failed with the
-# reason, the rest of the run goes on, and re-running stage 1 retries it once this is raised. Blank (default) = no limit. A 9.5 GB run of an 8.8 Mb genome is over
-# a thousand-fold coverage: slow to download and heavy to assemble. A limit of 5 to 10 keeps a quick test quick.
+# An OPT-IN limit, blank by default: PlasBench never skips an isolate because its reads are big. If YOU set a number (GB), an isolate whose reads to download (after the
+# READ_DEPTH_CAP_X cut below) are above it is skipped and recorded as failed with the reason; re-running stage 1 retries it once the limit is raised or cleared.
 export MAX_RUN_DOWNLOAD_GB="${MAX_RUN_DOWNLOAD_GB:-}"
 # Warn (never stop) when one isolate's reads are larger than this many GB (default 5; 0 = never warn). The warning says what a read set that size costs in time, disk
 # (about three times its size) and assembly memory.
 export WARN_RUN_DOWNLOAD_GB="${WARN_RUN_DOWNLOAD_GB:-5}"
+# Read-depth cap, in x coverage (default 150; 0 or off = whole files). For a short paired Illumina run deeper than this, stage 1 downloads only the first read pairs of both mates
+# (HTTP Range prefix, cut at a complete record, recompressed): the number of pairs that gives this depth over the reference genome's size. Depth beyond about 100-150x costs hours
+# of download, trimming and assembly (and gigabytes of memory) and buys nothing. The prefix is the start of the sequencer's output, not a random sample, and has no whole-file MD5
+# (its structure is checked instead); both facts are recorded in <run>.ena_provenance.json and the run manifest. Long-read and unpaired runs, runs within the cap, and isolates
+# without a reference size are always fetched whole. Files already on disk are kept: delete them to fetch again under a different cap.
+export READ_DEPTH_CAP_X="${READ_DEPTH_CAP_X:-150}"
 # With READ_SOURCE=auto: once the SRA Toolkit's prefetch has failed, and ENA has worked, for this many isolates in a row, stage 1 fetches from ENA first for the rest of
 # the run. That saves about a minute per isolate when the toolkit cannot connect. 0 = always try prefetch first. The count restarts each time stage 1 starts.
 export PREFETCH_FAIL_LIMIT="${PREFETCH_FAIL_LIMIT:-2}"
-# While reads download, the run log gets one progress line (percent of each mate, GB done) this often, in seconds, so a long download is not mistaken for a stall.
-# 0 = no progress lines.
-export DOWNLOAD_PROGRESS_SECONDS="${DOWNLOAD_PROGRESS_SECONDS:-60}"
-# Parallel connections per ENA file when reads come from ENA (python/fetch_ena_reads.py; aria2c does the transfer when it is installed). More can be faster on a
-# fast link; fewer is kinder to a slow or shared one. Default 4.
-export ENA_DOWNLOAD_CONNECTIONS="${ENA_DOWNLOAD_CONNECTIONS:-4}"
+# While reads download, stage 1 looks at the download this often (seconds). The run log stays quiet: the first line, then at most one short line per 10% and per 5 minutes, and a
+# line when something changes (a retry, a stall, a lower connection budget, a restart). The live detail is in results/download_progress.json. 0 = no progress lines.
+export DOWNLOAD_PROGRESS_SECONDS="${DOWNLOAD_PROGRESS_SECONDS:-30}"
+# ENA connections. ENA_MAX_CONNECTIONS is the TOTAL number of connections open at once (default 16, hard maximum 24), shared fairly by the two mates (and split between
+# parallel downloads). 16 is what aria2c itself allows per server and what a measured speed test (docs/USER_GUIDE.md, "My downloads are slow or restart") kept gaining from;
+# more risks the address being throttled. If ENA answers 429/503 or refuses connections, the budget is lowered for the rest of the run. ENA_DOWNLOAD_CONNECTIONS (blank by default)
+# caps the connections of each FILE. `plasbench net-bench` measures 1, 4, 8 and 16 connections and recommends a figure.
+export ENA_MAX_CONNECTIONS="${ENA_MAX_CONNECTIONS:-16}"
+export ENA_DOWNLOAD_CONNECTIONS="${ENA_DOWNLOAD_CONNECTIONS:-}"
+# Size in MiB of the pieces a file is fetched in (default 32). A failed connection costs at most one piece; finished pieces are recorded in <file>.part.state and kept for the
+# next attempt or the next run.
+export ENA_CHUNK_MIB="${ENA_CHUNK_MIB:-32}"
+# Seconds without a single byte after which a connection is abandoned and its piece retried (default 45).
+export ENA_STALL_SECONDS="${ENA_STALL_SECONDS:-45}"
+# 1 uses aria2c (when installed) for the transfer instead of the built-in downloader. Off by default: the built-in one resumes by piece, reports honest progress and keeps to
+# the connection budget.
+export ENA_USE_ARIA2="${ENA_USE_ARIA2:-0}"
+# Where reads are downloaded and checksummed. auto (default): a folder under ~/.plasbench/downloads/<study> on the local disk when the data folder is on a slow mount (a Windows
+# drive seen from WSL, NTFS/exFAT, a network share, FUSE), then the verified file is moved into place; otherwise the data folder itself. data = always the data folder. Any other
+# value = that folder (never a memory-backed one). Free space (file size plus a margin) is checked first.
+export DOWNLOAD_TMP_DIR="${DOWNLOAD_TMP_DIR:-auto}"
 # Show the estimated download size and ask before stage 1 fetches anything (1, the default). 0 skips the question. It is never asked when there is no terminal
 # (the window, CI, a container), so those runs proceed.
 export DOWNLOAD_CONFIRM="${DOWNLOAD_CONFIRM:-1}"
@@ -331,6 +351,9 @@ plasbench_default_budget_gb() {
 # the slots cannot make every job ask for every core at once (oversubscription:
 # context switching and cache thrashing, slower than fewer jobs). With the default
 # single slot this is all cores, as before; an explicit THREADS always wins.
+# Which of these YOU set (AUTO_PARALLEL never changes an explicit value). Recorded once, by the first config.sh of a run, and inherited by every stage.
+export PLASBENCH_THREADS_EXPLICIT="${PLASBENCH_THREADS_EXPLICIT:-$([[ -n "${THREADS:-}" ]] && echo 1 || echo 0)}"
+export PLASBENCH_SAMPLES_EXPLICIT="${PLASBENCH_SAMPLES_EXPLICIT:-$([[ -n "${MAX_PARALLEL_SAMPLES:-}" ]] && echo 1 || echo 0)}"
 if [[ -z "${THREADS:-}" ]]; then
     PLASBENCH_JOB_SLOTS=$(( ${MAX_PARALLEL_SAMPLES:-1} * ${MAX_PARALLEL_TOOLS:-1} ))
     [[ "$PLASBENCH_JOB_SLOTS" -ge 1 ]] || PLASBENCH_JOB_SLOTS=1
@@ -359,9 +382,10 @@ export AUTO_RESOURCES="${AUTO_RESOURCES:-1}"
 # assembly_status.tsv, assembly_memory.tsv and run_manifest.json.
 export ASSEMBLER_ALLOW_ONLY_ASSEMBLER="${ASSEMBLER_ALLOW_ONLY_ASSEMBLER:-0}"
 # --- Work folder, annotation time limits and the slow-step note ------------------------------------
-# WORK_DIR: where assemblies run. auto (default) = a scratch folder under ~/.plasbench/scratch/<study> when the data folder is on a slow mount (a Windows drive seen from WSL,
-# NTFS/exFAT, a network share, a cloud-synced folder), else the data folder itself; data = always the data folder; any other value = that folder. Finished results are
-# always moved back to the isolate's folder. Takes effect at the next stage 3 start.
+# WORK_DIR: where stages 3 and 4 do their file-heavy work. auto (default) = a local folder under ~/.plasbench/scratch/<study> when the data (or results) folder is on a slow
+# mount (a Windows drive seen from WSL, NTFS/exFAT, a network share, a cloud-synced folder), else in place; data = always in place; any other value = that folder. Stage 3:
+# SPAdes works there on a local copy of the trimmed reads and its results are moved back atomically. Stage 4: a tool's output folder is made there and copied back whole
+# when the tool ends (results folder slow); plasmidSPAdes reads a local copy of the trimmed reads (data folder slow). Takes effect at the next stage start.
 export WORK_DIR="${WORK_DIR:-auto}"
 # ANNOTATION_TIMEOUT_SECONDS: per annotation caller (mob_typer, abricate, AMRFinder, ISEScan, barrnap). Blank = max(300, 150 s per Mbp of the reference), ISEScan three times that;
 # a number = that many seconds; 0 or off = no limit. A caller that hits the limit is stopped and recorded as timed_out (never cached); the others are kept.
@@ -381,7 +405,21 @@ export SUSPEND_MIN_SECONDS="${SUSPEND_MIN_SECONDS:-60}"
 # sample at a time, one tool at a time. Raise them only after checking your
 # machine's core/RAM budget below can actually support it -- e.g. 2 parallel
 # samples x 2 parallel tools x THREADS=4 wants 16 CPU threads at once.
-export MAX_PARALLEL_SAMPLES="${MAX_PARALLEL_SAMPLES:-1}"   # stages 1, 2, 3, 4, 5
+export MAX_PARALLEL_SAMPLES="${MAX_PARALLEL_SAMPLES:-1}"   # stages 2, 3, 4, 5
+# AUTO_PARALLEL (default 1; 0 = off): when you have not set MAX_PARALLEL_SAMPLES, stages 2 (truth and reference annotation) and 5 (scoring) run several isolates at once,
+# sized to this computer's CPUs and free memory, and the threads are DIVIDED between them (never more threads than CPUs); stage 3 (assembly) stays at one isolate unless the
+# free memory holds two assemblies or more; stage 4 is unchanged. The plan is printed at the start of the run and of each stage. Results are identical (python/parallel_plan.py).
+export AUTO_PARALLEL="${AUTO_PARALLEL:-1}"
+# ASSEMBLY_SLOT_GB (default 8): the memory one assembly is assumed to need when the run has not learned it yet; AUTO_PARALLEL runs two assemblies at once only when
+# two of these (plus 15% and 0.5 GB each) fit in 85% of the free memory.
+export ASSEMBLY_SLOT_GB="${ASSEMBLY_SLOT_GB:-8}"
+# PIPELINE_OVERLAP (default 0 = off): 1 starts stage 2 for an isolate as soon as stage 1 has downloaded it in this run, while stage 1 goes on with the others (one isolate at a
+# time, low priority, its own status files; python/pipeline_overlap.py). Stage 2 still runs afterwards over every isolate and reuses that work, so results are the same.
+# Opt-in: it adds CPU and disk work during the downloads, and `plasbench status` still shows stage 1 while it runs (its progress is in logs/pipeline_overlap.log).
+export PIPELINE_OVERLAP="${PIPELINE_OVERLAP:-0}"
+# Isolates downloaded at the same time in stage 1 (default 1). Keep 1 while one isolate already fills your link (see the MB/s lines or `plasbench net-bench`); to try 2 or 3 raise it
+# and compare the MB/s. ENA_MAX_CONNECTIONS is still the total: each download gets its share.
+export MAX_PARALLEL_DOWNLOADS="${MAX_PARALLEL_DOWNLOADS:-1}"
 export MAX_PARALLEL_TOOLS="${MAX_PARALLEL_TOOLS:-1}"       # independent tools within one sample, stage 4
 # Stage 6's advisory analyses (stratified recovery, truth audits, copy number, repeat
 # content, bin agreement, the dimension tables, rank sensitivity) are independent

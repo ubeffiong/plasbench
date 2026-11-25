@@ -57,8 +57,9 @@ def call(path, body=None, headers=None, tok=True, host=None):
             return e.code, {"raw": str(raw[:100])}
 
 
-GETS = ["ai/folder/list", "ai/files/progress?job=x", "ai/status", "ai/models", "ai/auth/status"]
-POSTS = ["ai/folder/grant", "ai/folder/revoke", "ai/folder/scan", "ai/folder/share", "ai/folder/resolve", "ai/folder/suggest", "ai/files/plan", "ai/files/apply", "ai/files/cancel",
+GETS = ["ai/folder/list", "ai/files/progress?job=x", "ai/intake/progress?job=x", "ai/status", "ai/models", "ai/auth/status"]
+POSTS = ["ai/intake/options", "ai/intake/plan", "ai/intake/apply", "ai/intake/undo", "ai/intake/check", "ai/intake/fix", "ai/intake/labels", "ai/intake/labels/save", "ai/intake/share", "ai/run/where", "ai/run/digest",
+         "ai/folder/grant", "ai/folder/revoke", "ai/folder/scan", "ai/folder/share", "ai/folder/resolve", "ai/folder/suggest", "ai/files/plan", "ai/files/apply", "ai/files/cancel",
          "ai/files/undo", "ai/ui/validate", "ai/flow/tool"]
 print("token, Host and origin on every route")
 for r in GETS:
@@ -84,8 +85,10 @@ check("grant returns a chip with the folder's own name and no path", c == 200 an
 check("granting a drive root is refused", call("/api/ai/folder/grant", {"path": os.path.abspath(os.sep)})[0] == 400)
 c, s = call("/api/ai/folder/scan", {"id": gid})
 check("scan returns the card data and the exact summary text with a token estimate", c == 200 and s["scan"]["counts"]["fastq"] == 2 and s["tokens"] < 900 and str(tmp) not in s["summary"], s.get("error"))
-c, sg = call("/api/ai/folder/suggest", {"id": gid, "what": "setup"})
-check("setup is proposed without a model", c == 200 and sg["samples"] == 1, sg)
+c, old = call("/api/ai/folder/suggest", {"id": gid, "what": "setup"})
+check("the old in-pane isolate planner is gone: set-up goes through PlasBench's intake (ai/intake/plan)", c == 400 and "intake" in old.get("error", ""), old)
+sg = {"ops": [{"op": "mkdir", "path": "data/S1"}, {"op": "copy", "from": "reads/S1_R1.fastq.gz", "to": "data/S1/S1_1.fastq.gz"}, {"op": "copy", "from": "reads/S1_R2.fastq.gz", "to": "data/S1/S1_2.fastq.gz"},
+              {"op": "write_sheet", "path": "config/my_isolates.tsv", "columns": ["sample_id", "assembly_accession", "sra_run"], "rows": [["S1", "NA", "S1"]]}]}
 c, pl = call("/api/ai/files/plan", {"id": gid, "ops": sg["ops"]})
 check("the dry run is returned without file contents", c == 200 and pl["ok"] and all("new_text" not in o for o in pl["ops"]), pl)
 c, a = call("/api/ai/files/apply", {"id": gid, "ops": [{"op": "delete", "path": "x"}]})
