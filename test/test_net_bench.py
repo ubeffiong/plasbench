@@ -39,7 +39,10 @@ def main():
         parts = line.split()
         if "MB/s" in parts and parts[1].startswith("connection"):
             rates[int(parts[0])] = float(parts[parts.index("MB/s") - 1])
-    check("with a per-connection throttle, more connections give more throughput (1 < 4 < 8)", rates.get(1, 0) < rates.get(4, 0) < rates.get(8, 0), rates)
+    # Wall-clock rates on a shared CI runner are noisy (4 and 8 connections came out 4.22 and 4.19 MB/s once), so only what a per-connection throttle guarantees is asserted, with tolerance:
+    # several connections are clearly faster than one, and more connections are never clearly slower. The choice of the recommended figure is tested below with fixed numbers.
+    check("with a per-connection throttle, several connections beat one, and more are not clearly slower (1 < 4, 4 <= 8 x 1.15 and 8 <= 16 x 1.15 in spirit: no drop over 15%)",
+          rates.get(1, 0) * 1.5 < rates.get(4, 0) and rates.get(8, 0) >= rates.get(4, 0) * 0.85 and rates.get(16, 0) >= rates.get(8, 0) * 0.85 and rates.get(16, 0) > rates.get(1, 0) * 2, rates)
     check("it recommends a total ENA_MAX_CONNECTIONS (and never above 16)", "Recommended: ENA_MAX_CONNECTIONS=" in out and int(out.split("ENA_MAX_CONNECTIONS=")[1].split()[0]) <= 16, out)
     check("it warns about noise and says to run it twice", "noisy" in out and "twice" in out, out)
     check("nothing larger than the request was read: at most the time box and the byte budget per setting", s.stats()["ranged_bytes"] < 4 * 4 * 16 * MIB)
