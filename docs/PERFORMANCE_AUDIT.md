@@ -446,8 +446,8 @@ What changed because of this (all in this change):
 | Run profiles `fast`, `standard`, `thorough` | fast drops ISEScan and the advisory sweeps; thorough adds extras. Only ISEScan has a measured time; the rest is "not measured" in `config/run_profiles.tsv`. |
 | `config/step_typical.tsv` and the annotation callers' typical times re-based | measured on this laptop 2026-11-22 (upper figures: taken while oversubscribed). |
 
-What stayed the same: `MAX_PARALLEL_SAMPLES` and `MAX_PARALLEL_TOOLS` still default to 1, the scratch folder is still SPAdes-only (`python/work_dir.py`), and stages
-still run one after another. These are NOT done in this change; the measured case and design for each:
+What stayed the same in that change (all three were done in round 2, below): `MAX_PARALLEL_SAMPLES` and `MAX_PARALLEL_TOOLS` still defaulted to 1, the scratch folder was SPAdes-only (`python/work_dir.py`), and stages
+still ran one after another. The measured case and design for each:
 
 * **Local working copy for stages 3 and 4 (and annotation).** The quick callers' 10x slowdown points at the 9p drive (or the oversubscription; the two are not separated), but no ext4-versus-9p timing of fastp, SPAdes or mob_recon
   was taken: the real run was using every CPU, and a benchmark would have slowed it. Next step: extend `WORK_DIR` to fastp output and every tool's output folder with copy-in once and an atomic copy back, then measure on an idle machine.
@@ -459,3 +459,12 @@ still run one after another. These are NOT done in this change; the measured cas
   logic, disk use. Not implemented: the download code is changing concurrently and a half-tested overlap in `run_all.sh` is worse than none.
 
 Tests: `test_run_profile.py`, `test_suspend_awake.py`, `test_keep_awake.py`, `test_suspend_heartbeat.sh`, `test_isescan_scope.py`, `test_run_profiles.py`.
+
+## Round 2: local working copy, AUTO_PARALLEL, stage overlap (25 November 2026)
+
+| Change | Default | Evidence |
+|---|---|---|
+| **Local working copy, stage 3.** On a slow data folder SPAdes reads a local copy of the trimmed reads (copied once, modification time kept) and writes in the local folder; the results are moved back atomically as before. fastp stays in place. | on (`WORK_DIR=auto`) | Byte-identical contigs and graph (`test_stage3_scratch.sh`). Measured on the owner's laptop while idle (nice 19, 4 threads, first 300,000 read pairs of the 3 Mbp *S. aureus* isolate, 24 MB per mate): fastp 6.3 s on ext4 against 3.6 s on /mnt/f (9p), so fastp is not moved; SPAdes 159.1 s on ext4 (126 files, identical contigs on both). SPAdes in place on 9p is **not measured**: the computer slept during that run (14,726 s on the clock, about 5 min of uptime), and the second round was stopped so as not to load the machine. |
+| **Local working copy, stage 4.** When the results folder is slow, the nine tools that write a folder of files work in a local per-isolate folder copied back whole when the tool ends (also after a failure); when the data folder is slow, plasmidSPAdes reads a local copy of the trimmed reads. | on (`WORK_DIR=auto`) | Byte-identical results folder against an in-place run, reuse fingerprint unchanged (`test_stage4_local_work.sh`). mob_recon on the same assembly: 52.1 s writing to ext4, 58.4 s writing to 9p (one measurement each, idle). The default study folder is on ext4, so in the usual WSL set-up only the reads side applies. |
+| **`AUTO_PARALLEL=1`.** Stages 2 and 5 run several isolates at once, threads divided (`python/parallel_plan.py`); assembly only when two assemblies fit in memory; stage 4 unchanged; explicit settings win. | on | `test_auto_parallel.sh`: stage 5 on 4 isolates, 3 at a time x 2 threads, all 70 result files byte-identical to the sequential run; `test_parallel_plan.py`: no plan over the CPU count in 6,400 cases. Wall-time gain on a real cohort: **not measured** (the 22 November profile showed 3 to 4 of 6 cores busy in annotation, which is the room it uses). |
+| **`PIPELINE_OVERLAP=1`.** Stage 2 per isolate while stage 1 downloads the rest (`python/pipeline_overlap.py`): ready = this run's `download_end ok` event; one isolate at a time, nice 10, private results/events/temporary folders; stage 2 then runs over every isolate and reuses the work. | **off** (opt-in) | `test_pipeline_overlap.sh`: per-isolate files byte-identical to stage 2 alone; stopping the run stops the child; a failing isolate does not stop the others. Off by default because it adds CPU and disk load during downloads, `plasbench status` still shows stage 1 while it works (its progress is in `logs/pipeline_overlap.log` and `overlap_stage2` events), and the saving (estimated 1 h 20 min on the 22 November run) is **not measured**. |
