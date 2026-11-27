@@ -306,9 +306,12 @@ class Project:
         """settings(), each location default also resolved to the path it means on this computer."""
         rows = self.settings()
         ranges = self.setting_ranges().load(self.root)
+        options = self.setting_options().load(self.root)
         carried, prev_group = "", None
         for row in rows:
             row.update(self.resolve_setting_default(row))
+            if row["key"] in options:         # a dropdown (or a keywords-plus-number combo) instead of a text box; the same list everywhere
+                row["options"], row["kind"] = options[row["key"]], options[row["key"]]["kind"]
             if row.get("group") != prev_group:
                 carried, prev_group = "", row.get("group")
             row["tooltip"] = ui_help.setting_tooltip(row, carried)
@@ -352,6 +355,8 @@ class Project:
         # A numeric Scoring-decision setting outside the range the code accepts is refused with a plain sentence (config/setting_ranges.tsv). Clearing, and a value
         # equal to the one already saved, always pass, so an existing saved value never blocks a save.
         self.setting_ranges().validate_changes(changes, self.local_env(), self.root)
+        # A setting with a known set of values (config/setting_options.tsv) refuses a NEW value outside it; an already saved value, a clearing and an unchanged value always pass.
+        self.setting_options().validate_changes(changes, self.local_env(), self.root)
         path = self.local_env_path()
         lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else \
             ["# PlasBench settings for this computer (read by config/config.sh). Written by `plasbench ui`; edit freely."]
@@ -394,6 +399,14 @@ class Project:
     def intake_paths(self, data) -> tuple:
         d = self.intake_defaults()
         return Path(str(data.get("data_dir") or d["data_dir"])).expanduser(), Path(str(data.get("samples") or d["samples"])).expanduser()
+
+    def setting_options(self):
+        """python/setting_options.py: the one registry of settings with a finite known set of values (config/setting_options.tsv)."""
+        import importlib
+        python_dir = str(self.root / "python")
+        if python_dir not in sys.path:
+            sys.path.insert(0, python_dir)
+        return importlib.import_module("setting_options")
 
     def setting_ranges(self):
         import importlib
