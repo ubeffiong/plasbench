@@ -487,9 +487,15 @@ def decode_output(raw: bytes, kind: str = "utf8", oem: str | None = None, ansi: 
     return raw.decode("utf-8", errors="replace")
 
 
-def clean_output(text: str) -> str:
-    """Terminal noise out (NUL, colour and cursor codes, window-title codes), Windows line ends as \\n."""
-    return ANSI.sub("", text.replace("\x00", "")).replace("\r\n", "\n")
+SGR = re.compile(r"\x1b\[[0-9;:]*m")
+
+
+def clean_output(text: str, keep_colour: bool = False) -> str:
+    """Terminal noise out (NUL, cursor codes, window-title codes), Windows line ends as \\n. keep_colour=True keeps the colour codes (SGR) a program wrote: the window's
+    Terminal tab shows them as text styles (never as HTML); every other code is removed either way."""
+    text = text.replace("\x00", "")
+    text = ANSI.sub((lambda m: m.group(0) if SGR.fullmatch(m.group(0)) else "") if keep_colour else "", text)
+    return text.replace("\r\n", "\n")
 
 
 def _pump(stream, buf: bytearray, cap: int, holder: dict, marker: bool):
@@ -833,7 +839,7 @@ class Terminal:
             finally:
                 self._cleanup(plan)
             seconds = round(time.time() - started, 2)
-            text = clean_output(text)
+            text = clean_output(text, keep_colour=True)       # a program's colours reach the Terminal tab; cursor and title codes do not
             if plan["notice"]:
                 text = (text + "\n" if text else "") + plan["notice"]
             if self.shell.startswith("wsl") and (code in (-1, 4294967295) or "connection attempt failed" in text.lower()

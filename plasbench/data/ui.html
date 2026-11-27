@@ -461,11 +461,49 @@ dialog.pbdlg .stopsw{display:flex;gap:8px;align-items:center;margin:6px 0;font-w
 #cstate:empty{display:none}
 #cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled,#cstate.stalled,#cstate.retrying,#cstate.completed_with_warnings,#cstate.manual_step,#cstate.consent_needed,#cstate.waiting_for_you{color:#e3c27a;border-color:#6b5520}
 #clog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
-/* console colour code, all three tabs: errors red, warnings yellow */
-.c-err,#clog .c-err,#tlog .t-err,#slog .s-bad{color:#ff6b6b;font-weight:600}
-.c-warn,#clog .c-warn,#slog .s-warn{color:#ffd24d}
-#clog .c-err,#clog .c-warn{display:inline-block;width:100%;padding-left:6px;margin-left:-9px;border-left:3px solid}
-#clog .c-err{background:rgba(255,107,107,.08)}#clog .c-warn{background:rgba(255,210,77,.07)}#clog .c-ok{color:#8fd1a5}#clog .c-cmd{color:#8cc3ff}#clog .c-you{color:#d7dce2;font-weight:600}
+/* ---- console colours (termcolor; the scheme is explained in docs/USER_GUIDE.md "Console colours") ----
+   Tokens: the console is dark in both themes, so one set passes 4.5:1 on both console backgrounds (#1f2329 light theme, #121417 dark theme; test/test_terminal_colour.py
+   computes it). Errors, warnings, successes and notes also get a marker (cross, triangle, tick, dot) in a fixed gutter, so colour is never the only signal and no line moves. */
+:root{--tc-err:#ff8a80;--tc-err-bg:rgba(255,138,128,.09);--tc-warn:#e8b54a;--tc-ok:#5fd17a;--tc-info:#7fbfff;--tc-head:#a9d1ff;--tc-dim:#9aa4ae;--tc-cmd:#8cc3ff;
+ --a0:#9aa4ae;--a1:#ff8a80;--a2:#5fd17a;--a3:#e8b54a;--a4:#7fbfff;--a5:#d9a6ff;--a6:#5fd4dc;--a7:#d7dce2;--a8:#b0b8c1;--a9:#ffaaa2;--a10:#86e59b;--a11:#f4cf6a;--a12:#a9d1ff;--a13:#e8c6ff;--a14:#9fe9ef;--a15:#f3f6f9;
+ --ag0:#30363d;--ag1:#6e1d1a;--ag2:#1e4a2a;--ag3:#5a4512;--ag4:#173f6d;--ag5:#4b2a6e;--ag6:#134b50;--ag7:#5b636d;--ag8:#444c56;--ag9:#8c2b25;--ag10:#2b6b3b;--ag11:#79601a;--ag12:#2160a8;--ag13:#6b40a3;--ag14:#1d6d74;--ag15:#8b949e}
+@media (prefers-contrast:more){:root{--term-fg:#f3f6f9;--tc-dim:#c4cbd3;--tc-err:#ffb3ad;--tc-warn:#f6d47a;--tc-ok:#8fe9a4;--tc-info:#b3d9ff;--a0:#c4cbd3}}
+#clog,#tlog,#slog{padding-left:calc(12px + 2.2ch)}
+.tcbox .ln::before{display:inline-block;width:2.2ch;margin-left:-2.2ch;font-weight:700}
+.tcbox:not([data-tc=off]) .ln.lv-err:not(.blk)::before{content:"\2716";color:var(--tc-err)}
+.tcbox:not([data-tc=off]) .ln.lv-warn::before{content:"\25B2";color:var(--tc-warn)}
+.tcbox:not([data-tc=off]) .ln.lv-ok::before{content:"\2714";color:var(--tc-ok)}
+.tcbox:not([data-tc=off]) .ln.lv-info::before{content:"\25CF";color:var(--tc-info)}
+.tcbox:not([data-tc=off]) .ln.lv-err{color:var(--tc-err);background:var(--tc-err-bg)}
+.tcbox:not([data-tc=off]) .lv-err .lw,.tcbox:not([data-tc=off]) .lv-warn .lw,.tcbox:not([data-tc=off]) .lv-ok .lw,.tcbox:not([data-tc=off]) .lv-info .lw{font-weight:700}
+.tcbox:not([data-tc=off]) .lv-warn .lw,.tcbox[data-tc=full] .ln.lv-warn{color:var(--tc-warn)}
+.tcbox:not([data-tc=off]) .lv-ok .lw,.tcbox[data-tc=full] .ln.lv-ok{color:var(--tc-ok)}
+.tcbox:not([data-tc=off]) .lv-info .lw,.tcbox[data-tc=full] .ln.lv-info{color:var(--tc-info)}
+.tcbox:not([data-tc=off]) .lv-head{color:var(--tc-head);font-weight:700}
+.tcbox:not([data-tc=off]) .lv-det{color:var(--tc-dim);font-style:italic}
+.tcbox:not([data-tc=off]) .ts{color:var(--tc-dim)}
+.tcbox:not([data-tc=off]) .lv-cmd{color:var(--tc-cmd)}.tcbox:not([data-tc=off]) .lv-you{font-weight:600}
+/* a program's own colours (ANSI SGR), shown as it asked, on the readable palette above */
+.tcbox .a-b{font-weight:700}.tcbox .a-i{font-style:italic}.tcbox .a-u{text-decoration:underline}.tcbox .a-d{opacity:.78}
+.tcbox .a-f0{color:var(--a0)}.tcbox .a-f1{color:var(--a1)}.tcbox .a-f2{color:var(--a2)}.tcbox .a-f3{color:var(--a3)}.tcbox .a-f4{color:var(--a4)}.tcbox .a-f5{color:var(--a5)}.tcbox .a-f6{color:var(--a6)}.tcbox .a-f7{color:var(--a7)}
+.tcbox .a-f8{color:var(--a8)}.tcbox .a-f9{color:var(--a9)}.tcbox .a-f10{color:var(--a10)}.tcbox .a-f11{color:var(--a11)}.tcbox .a-f12{color:var(--a12)}.tcbox .a-f13{color:var(--a13)}.tcbox .a-f14{color:var(--a14)}.tcbox .a-f15{color:var(--a15)}
+.tcbox .a-g0{background:var(--ag0)}.tcbox .a-g1{background:var(--ag1)}.tcbox .a-g2{background:var(--ag2)}.tcbox .a-g3{background:var(--ag3)}.tcbox .a-g4{background:var(--ag4)}.tcbox .a-g5{background:var(--ag5)}.tcbox .a-g6{background:var(--ag6)}.tcbox .a-g7{background:var(--ag7)}
+.tcbox .a-g8{background:var(--ag8)}.tcbox .a-g9{background:var(--ag9)}.tcbox .a-g10{background:var(--ag10)}.tcbox .a-g11{background:var(--ag11)}.tcbox .a-g12{background:var(--ag12)}.tcbox .a-g13{background:var(--ag13)}.tcbox .a-g14{background:var(--ag14)}.tcbox .a-g15{background:var(--ag15)}
+.tcbox[data-tc=off] .a{color:inherit!important;background:none!important;font-weight:inherit;font-style:inherit;text-decoration:none;opacity:1}
+@media (forced-colors:active){.tcbox .ln::before{forced-color-adjust:none;color:CanvasText}.tcbox .lv-err,.tcbox .lw,.tcbox .lv-head{font-weight:700}}
+/* the Colours menu in the console header */
+#tcmenu{position:relative;flex:none}
+#tcmenu>summary{list-style:none;cursor:pointer;border:1px solid var(--term-line);border-radius:2px;padding:2px 8px;font-size:12px;white-space:nowrap}
+#tcmenu>summary::-webkit-details-marker{display:none}#tcmenu>summary:hover{background:#ffffff12}
+#tcmenu .tcpop{position:absolute;right:0;bottom:calc(100% + 6px);width:min(400px,92vw);background:var(--term-head);color:var(--term-fg);border:1px solid var(--term-line);border-radius:4px;
+ padding:10px 12px;z-index:80;box-shadow:var(--shadow-lg);white-space:normal;font-size:12px}
+#console.min #tcmenu .tcpop,#tcmenu.down .tcpop{bottom:auto;top:calc(100% + 6px)}
+#tcmenu .tcpop label{display:block;font-weight:600;margin-bottom:4px}#tcmenu .tcpop select{width:100%;max-width:none}
+#tcmenu .tcpop p{margin:6px 0;color:var(--term-fg)}#tcmenu .tcnote{color:var(--tc-dim)!important}
+#tclegend{list-style:none;margin:6px 0;padding:0 0 0 2.2ch;font:12px/1.7 var(--mono)}#tclegend li{display:flex;gap:10px;align-items:baseline}
+#tclegend .tcsw{flex:none;min-width:15ch}#tclegend li>span:last-child{font-family:"Segoe UI",system-ui,sans-serif;font-size:12px;color:var(--term-fg)}
+.tclogfile{display:block;white-space:pre-wrap;word-break:break-word;margin:0;padding:8px 12px 8px calc(12px + 2.2ch);background:var(--term-bg);color:var(--term-fg);
+ font:12px/1.5 var(--mono);border-radius:3px;overflow:auto;max-height:calc(100vh - var(--hdr) - var(--cons) - 150px)}
 /* reply row: what the command reads from its "terminal" */
 #cin{display:flex;align-items:center;gap:6px;padding:5px 10px;border-top:1px solid var(--term-line);background:var(--term-head);flex:none}
 #cin .pr{font:12px var(--mono);color:#8cc3ff}
@@ -484,9 +522,9 @@ dialog.pbdlg .stopsw{display:flex;gap:8px;align-items:center;margin:6px 0;font-w
 #console.term .jobonly,#console.sess .jobonly,#console.term #cin,#console.sess #cin{display:none!important}
 #console:not(.term) .termonly{display:none!important}#console:not(.sess) .sessonly{display:none!important}
 #slog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word}
-#slog .s-t{color:#8a939d}#slog .s-job{color:#8cc3ff}#slog .s-ok{color:#8fd1a5}#slog .s-you{color:#e3c27a}#slog .s-term{color:#d7dce2}#slog .s-sys{color:#aab3bd}
+#slog .s-t{color:var(--tc-dim)}#slog .s-job{color:var(--tc-cmd)}#slog .s-you{color:var(--tc-warn)}#slog .s-term{color:var(--term-fg)}#slog .s-sys{color:var(--tc-dim)}
 #tlog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
-#tlog .t-cmd{color:#8cc3ff}#tlog .t-mut{color:#8a939d}
+#tlog .t-cmd{color:var(--tc-cmd)}#tlog .t-mut{color:var(--tc-dim)}
 #tin{display:flex;align-items:flex-end;gap:6px;padding:5px 10px;border-top:1px solid var(--term-line);background:var(--term-head);flex:none}
 #tin select{width:auto;min-height:26px;background:var(--term-bg);color:var(--term-fg);border-color:var(--term-line);font-size:12px;padding:1px 6px}
 #tin .pr{font:12px var(--mono);color:#8cc3ff;white-space:nowrap;max-width:32vw;overflow:hidden;text-overflow:ellipsis}
@@ -1202,14 +1240,20 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
   <button id="ccancel" class="jobonly" hidden><svg class="ico sm"><use href="#i-stop"/></svg>Cancel</button>
   <button id="tclear" class="termonly" title="Clear the terminal screen (the history is kept)">Clear</button>
   <button id="sscript" class="sessonly" title="Download this session as a bash script that repeats its commands, in order"><svg class="ico sm"><use href="#i-down"/></svg>Save as script</button>
+  <details id="tcmenu"><summary title="How the console colours output, and what each colour means">Colours</summary>
+   <div class="tcpop" role="dialog" aria-label="Console colours"><label for="tcmode">Colour the console output</label>
+    <select id="tcmode"><option value="status" title="The status word and a marker coloured; errors in full; output plain">Headers and status (recommended)</option><option value="full" title="Whole lines coloured by type">Full by type</option><option value="off" title="Plain text">Off</option></select>
+    <p id="tcwhy" class="small"></p><ul id="tclegend" class="tcbox" data-tc="status"></ul>
+    <p class="small tcnote">Copy and Save give plain text, without colour codes or markers. The choice is kept in this browser.</p></div></details>
+  <button id="csave" class="jobonly" title="Save the whole output of this job as a plain-text file"><svg class="ico sm"><use href="#i-down"/></svg>Save</button>
   <button id="ccopy"><svg class="ico sm"><use href="#i-copy"/></svg>Copy</button>
   <button id="cfollow" class="jobonly" aria-pressed="true">Follow</button>
   <button id="ctoggle"><svg class="ico sm"><use href="#i-chev"/></svg><span>Expand</span></button>
  </div>
  <div id="cstall" class="jobonly" hidden></div>
- <pre id="clog" class="jobonly" aria-live="polite"></pre>
- <pre id="tlog" class="termonly" aria-live="polite"></pre>
- <pre id="slog" class="sessonly"></pre>
+ <pre id="clog" class="jobonly tcbox" data-tc="status" aria-live="polite"></pre>
+ <pre id="tlog" class="termonly tcbox" data-tc="status" aria-live="polite"></pre>
+ <pre id="slog" class="sessonly tcbox" data-tc="status"></pre>
  <form id="cin" hidden autocomplete="off" aria-label="Answer the running command">
   <span class="pr">›</span><span class="ask" id="cinask">Waiting for your answer:</span>
   <input type="text" id="cintx" placeholder="Type an answer for the running command and press Enter" aria-label="Answer">
@@ -2311,7 +2355,7 @@ document.addEventListener("click", e => {
 });
 const stateWord = s => ({running:"Working", cancelling:"Cancelling", done:"Done", completed:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Needs attention", stalled:"Needs attention", working_quiet:"Working, console quiet", retrying:"Retrying a failed tool", completed_with_warnings:"Done with warnings", manual_step:"Manual step needed", consent_needed:"Consent needed", waiting_for_you:"Waiting for you to finish"})[s] || s;
 function showConsole(id, expand) {
-  if (id && id !== S.consJob) { S.consJob = id; S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; setFollow(true); }
+  if (id && id !== S.consJob) { S.consJob = id; S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; S.cstream = null; setFollow(true); }
   $("#cjob").value = S.consJob || "";
   if (expand) setConsole(true);
   pollConsole(true);
@@ -2328,13 +2372,215 @@ function lineLevel(l) {
   return RX_OK.test(l) ? "ok" : RX_TAG_ERR.test(l) ? "err" : RX_TAG_WARN.test(l) ? "warn"
     : RX_ERR.test(l) ? "err" : RX_WARN.test(l) ? "warn" : "";
 }
-function colorize(text) {
-  // classify the raw line (escaping would turn "->" into "-&gt;"), then escape it for the page
-  return String(text).split("\n").map(raw => { const v = lineLevel(raw), l = esc(raw);
-    return v === "err" ? `<span class="c-err">${l}</span>` : v === "warn" ? `<span class="c-warn">${l}</span>` :
-      v === "ok" || /complete|Wrote/i.test(raw) ? `<span class="c-ok">${l}</span>` :
-      raw.startsWith("$ ") ? `<span class="c-cmd">${l}</span>` : raw.startsWith("[you] ") ? `<span class="c-you">${l}</span>` : l; }).join("\n");
+/* ---- termcolor: begin ----
+   How the console shows command output (Job output, Terminal, Session log and .log files opened in the window). Read by test/test_terminal_colour.py, which runs it under node.
+   1. ANSI: colour codes a program writes (SGR: reset, bold, dim, italic, underline, 16 / 256 / true-colour foreground and background) are SHOWN; every other escape (cursor moves,
+      erase, window title, bracketed paste ...) is removed safely, also when it is split across two reads; a carriage return rewrites the line in place (progress bars).
+      Nothing is ever parsed as HTML: text goes into text nodes, styles into class names, and 256 / true colours into a computed rgb() made readable on the console background.
+   2. Each finished line gets one type, from explicit signals first (the producer's own red / yellow / green, a PlasBench "ERROR:" / "WARNING:" / "NOTE:" prefix, an exit code),
+      then conservative patterns; when unsure the line stays plain (never red by guess). A Python traceback and its frames belong to the failure.
+   3. TC.mode (the "Colours" menu in the console header; saved in this browser): status (default) colours the status word and a marker, errors and failure blocks in full, headers
+      bold, details dim; full colours whole lines by type; off shows plain text. Copy and Save give plain text: no escape codes, no markers. */
+const TC = {mode: "status", MAX_LINES: 50000, CLASSIFY_CHARS: 2000, MAX_PENDING: 256};
+try { const m = localStorage.getItem("pb_tcolour"); if (m === "off" || m === "status" || m === "full") TC.mode = m; } catch (e) { /* the page works without storage */ }
+const TC_TYPES = [   // [type, sample, what it means]: the legend in the console header. Errors, warnings, successes and notes also get a marker, so colour is never the only signal.
+  ["err", "ERROR", "Error: something failed or stopped. The whole line is red, and so is a failure block such as a Python traceback."],
+  ["warn", "WARNING", "Warning: worth reading; the run goes on."],
+  ["ok", "PASS", "Success: passed, completed, done."],
+  ["info", "NOTE", "Information from PlasBench itself."],
+  ["head", "=== Stage ===", "A step or section heading (bold)."],
+  ["det", "What to do: ...", "Detail: why, what to do, hints (grey, italic). Timestamps are grey too."],
+  ["", "output", "What a run and its tools print: plain, in the program's own colours if it uses any."]];
+const TC_MODES = {status: "Headers and status (recommended): the status word and a marker are coloured, errors and failure blocks in full, headings bold, details grey. Output stays plain, so colour points at what needs you.",
+  full: "Full by type: every classified line is coloured whole (warnings amber, successes green, notes blue), errors red, details grey italic.",
+  off: "Off: plain text, no colours or markers (the programs' own colours are not shown either)."};
+// The 16 colours a program can ask for, made readable on the dark console (contrast 4.5 or more, test/test_terminal_colour.py); black is shown grey, not invisible.
+const TC_SGR_FG = {30: 0, 31: 1, 32: 2, 33: 3, 34: 4, 35: 5, 36: 6, 37: 7, 90: 8, 91: 9, 92: 10, 93: 11, 94: 12, 95: 13, 96: 14, 97: 15};
+const TC_SGR_BG = {40: 0, 41: 1, 42: 2, 43: 3, 44: 4, 45: 5, 46: 6, 47: 7, 100: 8, 101: 9, 102: 10, 103: 11, 104: 12, 105: 13, 106: 14, 107: 15};
+const TC_CUBE = [0, 95, 135, 175, 215, 255];
+function tcColour256(n) {
+  if (n < 16) return {idx: n};
+  if (n < 232) { n -= 16; return {rgb: [TC_CUBE[Math.floor(n / 36)], TC_CUBE[Math.floor(n / 6) % 6], TC_CUBE[n % 6]]}; }
+  const g = 8 + (n - 232) * 10; return {rgb: [g, g, g]};
 }
+// WCAG relative luminance and contrast; a colour too dark for the console is mixed toward its foreground until it reads (4.5:1).
+function tcLum(c) { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); }
+function tcContrast(a, b) { const x = tcLum(a), y = tcLum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+const TC_BG = [0x1f, 0x23, 0x29], TC_FG = [0xd7, 0xdc, 0xe2];   // the lighter of the two console backgrounds (light theme), the console text
+function tcReadable(rgb) {
+  let c = rgb.slice(), t = 0;
+  while (tcContrast(c, TC_BG) < 4.5 && t < 1) { t = Math.min(1, t + 0.1); c = rgb.map((v, i) => Math.round(v + (TC_FG[i] - v) * t)); }
+  return c;
+}
+// SGR state -> class names and inline colours (numbers only, never text from the log)
+function tcSgr(st, params) {
+  const p = params === "" ? [0] : params.split(/[;:]/).map(x => x === "" ? 0 : parseInt(x, 10));
+  for (let i = 0; i < p.length; i++) {
+    const n = p[i];
+    if (n === 0 || isNaN(n)) { st.b = st.d = st.i = st.u = false; st.fg = st.bg = null; }
+    else if (n === 1) st.b = true; else if (n === 2) st.d = true; else if (n === 3) st.i = true; else if (n === 4) st.u = true;
+    else if (n === 22) st.b = st.d = false; else if (n === 23) st.i = false; else if (n === 24) st.u = false;
+    else if (n in TC_SGR_FG) st.fg = {idx: TC_SGR_FG[n]}; else if (n in TC_SGR_BG) st.bg = {idx: TC_SGR_BG[n]};
+    else if (n === 39) st.fg = null; else if (n === 49) st.bg = null;
+    else if ((n === 38 || n === 48) && p[i + 1] === 5 && i + 2 < p.length) { const c = tcColour256(Math.max(0, Math.min(255, p[i + 2] | 0))); if (n === 38) st.fg = c; else st.bg = c; i += 2; }
+    else if ((n === 38 || n === 48) && p[i + 1] === 2 && i + 4 < p.length) { const c = {rgb: [p[i + 2], p[i + 3], p[i + 4]].map(v => Math.max(0, Math.min(255, v | 0)))}; if (n === 38) st.fg = c; else st.bg = c; i += 4; }
+  }
+}
+const tcKey = st => [st.b, st.d, st.i, st.u, st.fg && (st.fg.idx ?? st.fg.rgb.join(",")), st.bg && (st.bg.idx ?? st.bg.rgb.join(","))].join("|");
+// The producer's own colour of a line, as a hint: red, yellow or green on the first visible text.
+const TC_HINT = {1: "err", 9: "err", 3: "warn", 11: "warn", 2: "ok", 10: "ok"};
+
+// Line types. Patterns are anchored or bounded and run on at most CLASSIFY_CHARS characters, so a 100,000-character line costs the same as a short one.
+const RX_TS = /^\[\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d\]\s?/;
+const RX_HEAD = /^\s*(?:={3,}|#{3,}|>{3,}|-{4,}|\*{3,})\s*[^=#>*\s-]|^\s*(?:STAGE|Stage) \d+\s*[:(]/;
+const RX_DET = /^\s*(?:What to do|Hint|Tip|Why|Because|Details?|See also|Fix|Next|Log|Logs|DEBUG)\s*:|^\s*\(.*\)\s*$/i;
+const RX_INFO = /^\s*(?:NOTE|INFO|Note)\s*:|^\[PlasBench\]|^\s*AUTO_PARALLEL:|^\s*PIPELINE_OVERLAP/;
+const RX_DONE = /\bcomplete(?:d)?\b|\bWrote\b|\b(?:DONE|SUCCESS|Succeeded)\b/;
+const RX_TB_END = /^[A-Za-z_][\w.]*(?:Error|Exception|Interrupt|Exit)\b/;
+const RX_WORD = {   // the status word of each type, marked in the line (the first one only)
+  err: /\b(?:ERROR|FATAL|FAIL(?:ED|URE)?|Traceback|Killed|[A-Z][A-Za-z]*Error|Exception)\b|\[exit [1-9][0-9]*\]|\bexited [1-9][0-9]*\b|\b(?:failed|error)\b/,
+  warn: /\bWARN(?:ING)?\b|\bwarning\b|\bskipped\b|\bcancell?ed\b|\binterrupted\b|\bDeprecat[a-z]*/i,
+  ok: /\bPASS(?:ED)?\b|^\s*ok\b|\[ok\]|\bcomplete(?:d)?\b|\b(?:DONE|SUCCESS|Succeeded|Wrote)\b|\[exit 0\]/,
+  info: /\bNOTE\b|\bINFO\b|\bNote\b|\[PlasBench\]|AUTO_PARALLEL|PIPELINE_OVERLAP/};
+function tcClassify(raw, hint, tb) {
+  const l = raw.length > TC.CLASSIFY_CHARS ? raw.slice(0, TC.CLASSIFY_CHARS) : raw, body = l.replace(RX_TS, "");
+  if (tb && (/^\s/.test(body) || body === "")) return {lv: "err", blk: true, tb: true};      // the frames of a traceback
+  if (tb && RX_TB_END.test(body)) return {lv: "err", blk: true, tb: false};                   // its last line names the exception
+  if (/^\[exit 0\]/.test(body)) return {lv: "ok"};
+  if (hint === "err" || RX_TAG_ERR.test(l)) return {lv: "err", tb: /Traceback \(most recent call last\)/.test(l)};
+  if (hint === "warn" || RX_TAG_WARN.test(l)) return {lv: "warn"};
+  if (hint === "ok") return {lv: "ok"};
+  if (RX_HEAD.test(body)) return {lv: "head"};
+  const lv = lineLevel(l);
+  if (lv) return {lv, tb: lv === "err" && /Traceback \(most recent call last\)/.test(l)};
+  if (RX_INFO.test(body)) return {lv: "info"};
+  if (RX_DET.test(body)) return {lv: "det"};
+  if (RX_DONE.test(body)) return {lv: "ok"};
+  if (l.startsWith("$ ")) return {lv: "cmd"};
+  if (l.startsWith("[you] ")) return {lv: "you"};
+  return {lv: ""};
+}
+
+// A stream renders text that arrives in pieces into one <pre>. It keeps an escape split across two reads, the colour state, and the line still being written.
+class TermStream {
+  constructor(box) { this.box = box; this.reset(); }
+  reset() { this.pending = ""; this.st = {b: false, d: false, i: false, u: false, fg: null, bg: null}; this.line = null; this.raw = ""; this.hint = ""; this.cr = false; this.tb = false; this.lines = 0; this.cur = null; this.curKey = ""; }
+  clear() { this.box.textContent = ""; this.reset(); }
+  feed(text) {
+    let s = this.pending + String(text ?? ""); this.pending = "";
+    const re = /[\x00-\x08\x0b-\x1f\x7f]|\n/g;   // the next control character (\n included); everything between two of them is plain text
+    let i = 0, m;
+    while (i < s.length) {
+      re.lastIndex = i; m = re.exec(s);
+      const end = m ? m.index : s.length;
+      if (end > i) this.text(s.slice(i, end));
+      if (!m) break;
+      const ch = m[0]; i = end + 1;
+      if (ch === "\n") this.endLine();
+      else if (ch === "\r") { if (i === s.length) { this.pending = "\r"; break; } if (s[i] === "\n") { i++; this.endLine(); } else this.cr = true; }
+      else if (ch === "\x1b") {
+        const rest = s.slice(end, end + TC.MAX_PENDING + 2), r = this.escape(rest);
+        if (r < 0) { if (s.length - end <= TC.MAX_PENDING) { this.pending = s.slice(end); break; } }   // cut in two: wait for the rest (an unterminated one is dropped)
+        else i = end + r;
+      } else if (ch === "\b") { /* backspace: ignored */ }
+      // other control characters are dropped
+    }
+    this.trim();
+  }
+  // -> length of the escape sequence at the start of s (consumed), or -1 when it is incomplete
+  escape(s) {
+    if (s.length < 2) return -1;
+    const c = s[1];
+    if (c === "[") {
+      const m = /^\x1b\[([0-?]*)([ -/]*)([@-~])/.exec(s);
+      if (!m) return /^\x1b\[[0-?]*[ -/]*$/.test(s) ? -1 : 2;     // incomplete, or junk: drop "ESC ["
+      if (m[3] === "m" && !m[2] && /^[0-9;:]*$/.test(m[1])) { tcSgr(this.st, m[1]); this.cur = null; }
+      else if (m[3] === "K" && this.cr) { /* erase line after a carriage return: the rewrite below does it */ }
+      return m[0].length;
+    }
+    if (c === "]" || c === "P" || c === "_" || c === "^") {                // OSC / DCS ...: up to BEL or ESC \ (a window title, a hyperlink: never shown)
+      const j = s.search(/\x07|\x1b\\/); if (j < 0) return -1;
+      return j + (s[j] === "\x07" ? 1 : 2);
+    }
+    if (c === "(" || c === ")" || c === "#" || c === "%") return s.length < 3 ? -1 : 3;
+    return 2;                                                              // ESC 7, ESC 8, ESC =, ESC > ...
+  }
+  ensureLine() {
+    if (!this.line) { this.line = document.createElement("span"); this.line.className = "ln"; this.box.appendChild(this.line); this.lines++; }
+    return this.line;
+  }
+  text(t) {
+    const line = this.ensureLine();
+    if (this.cr) { this.cr = false; line.textContent = ""; this.raw = ""; this.hint = ""; this.cur = null; }   // a carriage return: the line is written again
+    const key = tcKey(this.st);
+    if (!this.hint && this.st.fg && this.st.fg.idx != null && t.trim()) this.hint = TC_HINT[this.st.fg.idx] || "";
+    if (this.raw.length < TC.CLASSIFY_CHARS) this.raw += t.slice(0, TC.CLASSIFY_CHARS - this.raw.length);
+    if (key === "false|false|false|false||") { line.appendChild(document.createTextNode(t)); this.cur = null; return; }
+    if (!this.cur || this.curKey !== key || this.cur.parentNode !== line) {
+      const sp = document.createElement("span"), st = this.st, cls = ["a"];
+      if (st.b) cls.push("a-b"); if (st.d) cls.push("a-d"); if (st.i) cls.push("a-i"); if (st.u) cls.push("a-u");
+      if (st.fg) { if (st.fg.idx != null) cls.push("a-f" + st.fg.idx); else sp.style.color = "rgb(" + tcReadable(st.fg.rgb).join(",") + ")"; }
+      if (st.bg) { if (st.bg.idx != null) cls.push("a-g" + st.bg.idx); else sp.style.backgroundColor = "rgb(" + st.bg.rgb.join(",") + ")"; }
+      sp.className = cls.join(" "); line.appendChild(sp); this.cur = sp; this.curKey = key;
+    }
+    this.cur.appendChild(document.createTextNode(t));
+  }
+  endLine() {
+    const line = this.ensureLine();
+    this.cr = false;
+    const k = tcClassify(this.raw, this.hint, this.tb);
+    this.tb = !!k.tb;
+    tcDecorate(line, k);
+    this.box.appendChild(document.createTextNode("\n"));
+    this.line = null; this.raw = ""; this.hint = ""; this.cur = null;
+  }
+  flush() { if (this.pending === "\r") this.pending = ""; if (this.line && this.raw) { const k = tcClassify(this.raw, this.hint, this.tb); tcDecorate(this.line, k); } }
+  // a very long log keeps its newest MAX_LINES lines on screen (the work per update stays bounded); one note says so
+  trim() {
+    if (this.lines <= TC.MAX_LINES) return;
+    const box = this.box;
+    let note = box.firstChild, drop = this.lines - TC.MAX_LINES + Math.floor(TC.MAX_LINES / 10);
+    if (!(note && note.nodeType === 1 && note.classList.contains("tc-cut"))) {
+      note = document.createElement("span"); note.className = "ln lv-det tc-cut";
+      note.textContent = "(earlier lines are not shown, to keep the console fast; the whole output is in the job's log file, and Save keeps all of it)";
+      box.insertBefore(note, box.firstChild); box.insertBefore(document.createTextNode("\n"), note.nextSibling);
+    }
+    while (drop > 0) {
+      const n = note.nextSibling && note.nextSibling.nextSibling;
+      if (!n || n === this.line) break;
+      if (n.nodeType === 1) { drop--; this.lines--; }
+      box.removeChild(n);
+    }
+  }
+}
+// The line's type as classes; the timestamp is dimmed and the status word marked, on the text nodes only (a word split by a colour change stays as it is).
+function tcDecorate(line, k) {
+  line.className = "ln" + (k.lv ? " lv-" + k.lv : "") + (k.blk ? " blk" : "");
+  const first = line.firstChild;
+  if (!first || first.nodeType !== 3) return;
+  let txt = first.nodeValue, node = first;
+  const ts = RX_TS.exec(txt);
+  if (ts) { const rest = node.splitText(ts[0].length), sp = document.createElement("span"); sp.className = "ts"; line.insertBefore(sp, node); sp.appendChild(node); node = rest; txt = rest.nodeValue; }
+  const rx = !k.blk && RX_WORD[k.lv];
+  if (!rx) return;
+  const w = rx.exec(txt.length > TC.CLASSIFY_CHARS ? txt.slice(0, TC.CLASSIFY_CHARS) : txt);
+  if (!w) return;
+  const mid = node.splitText(w.index); mid.splitText(w[0].length);
+  const sp = document.createElement("span"); sp.className = "lw"; line.insertBefore(sp, mid); sp.appendChild(mid);
+}
+// One-shot text (a Terminal command's output, a .log file): a fragment, never HTML.
+function tcRender(text, box) { const tgt = box || document.createElement("pre"), s = new TermStream(tgt); s.feed(text); if (!/\n$/.test(String(text))) s.flush(); return tgt; }
+// Plain text: what Copy, Save and the assistant get (no escape codes, no markers).
+const RX_ESC_ALL = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b[\]P_^][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()#%].|\x1b[^[\]P_^()#%]/g;
+function tcPlain(text) {
+  return String(text ?? "").replace(RX_ESC_ALL, "").split("\n").map(l => { l = l.replace(/\r$/, ""); const k = l.lastIndexOf("\r");
+    return (k >= 0 ? l.slice(k + 1) : l).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, ""); }).join("\n");
+}
+function tcSetMode(m) {
+  TC.mode = m; try { localStorage.setItem("pb_tcolour", m); } catch (e) { /* not remembered */ }
+  for (const el of document.querySelectorAll("[data-tc]")) el.dataset.tc = m;
+}
+/* ---- termcolor: end ---- */
 /* The console follows new output only while you are at the bottom. Scroll up to read and it stays exactly where you are (the button then says "Jump to latest"); scroll back to the
    bottom, or press the button, and it follows again. A scroll the page makes itself is not mistaken for yours. */
 const SCROLL_NEAR = 40;
@@ -2351,8 +2597,8 @@ async function pollConsole(force) {
   if (!S.consJob || polling) return; polling = true;
   try {
     const j = await api(`jobs/${S.consJob}?offset=${S.consOffset}`);
-    if (j.log) { const clean = j.log.replace(/\x1b\[[0-9;]*m/g, ""); $("#clog").insertAdjacentHTML("beforeend", colorize(clean));
-      S.consOffset = j.offset; S.tail = ((S.tail || "") + clean).slice(-400); }
+    if (j.log) { (S.cstream || (S.cstream = new TermStream($("#clog")))).feed(j.log);   // colours shown, other escapes removed, never parsed as HTML (termcolor above)
+      S.consOffset = j.offset; S.tail = ((S.tail || "") + tcPlain(j.log)).slice(-400); }
     const running = j.state === "running";
     $("#cin").hidden = !running || S.ctab !== "out";
     // A question the command is waiting on: the output ends with a [y/N]-style or "?"/":" prompt and no newline after it.
@@ -2402,7 +2648,25 @@ $("#cin").onsubmit = e => { e.preventDefault(); sendAnswer($("#cintx").value); }
 $("#cin").addEventListener("click", e => { const b = e.target.closest("[data-ans]"); if (b) sendAnswer(b.dataset.ans); });
 $("#cinsec").onchange = e => { $("#cintx").type = e.target.checked ? "password" : "text"; };
 $("#ccancel").onclick = async () => { try { if (!await askCancelRun(S.consJob)) return; await api(`jobs/${S.consJob}/cancel`, {}); toast("Cancelling…"); } catch (e) { toast(e.message, "bad"); } };
-$("#ccopy").onclick = () => copyText(({term: $("#tlog"), sess: $("#slog")}[S.ctab] || $("#clog")).innerText, "Copied");
+$("#ccopy").onclick = () => copyText(({term: $("#tlog"), sess: $("#slog")}[S.ctab] || $("#clog")).textContent, "Copied");   // plain text: no escape codes, no colour markers
+// Save: the job's WHOLE output as plain text (also the part a very long log no longer shows on screen)
+$("#csave").onclick = async () => {
+  if (!S.consJob) return toast("No job is shown", "bad");
+  try {
+    let off = 0, parts = [], j;
+    do { j = await api(`jobs/${S.consJob}?offset=${off}`); parts.push(j.log || ""); off = j.offset; } while (j.log && off < j.size && parts.length < 400);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([tcPlain(parts.join(""))], {type: "text/plain"}));
+    a.download = "plasbench-" + String(j.label || S.consJob).replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 60) + ".log";
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  } catch (e) { toast(e.message, "bad"); }
+};
+// Colours: the menu in the console header (mode, and what each colour means)
+$("#tcmode").value = TC.mode; tcSetMode(TC.mode);
+$("#tcmode").onchange = e => { tcSetMode(e.target.value); $("#tcwhy").textContent = TC_MODES[e.target.value]; };
+$("#tcwhy").textContent = TC_MODES[TC.mode];
+$("#tclegend").replaceChildren(...TC_TYPES.map(([t, g, what]) => { const li = document.createElement("li"), sw = document.createElement("span"), tx = document.createElement("span");
+  sw.className = "ln tcsw" + (t ? " lv-" + t : ""); const w = document.createElement("span"); w.className = ["err", "warn", "ok", "info"].includes(t) ? "lw" : ""; w.textContent = g;
+  sw.append(w); tx.textContent = what; li.append(sw, tx); return li; }));
 $("#cfollow").onclick = () => { if (S.follow) { setFollow(false); } else { setFollow(true); toBottom($("#clog")); } };
 $("#clog").addEventListener("scroll", () => { if (!S._progScroll) setFollow(nearBottom($("#clog"))); }, {passive: true});
 setFollow(true);
@@ -2443,9 +2707,9 @@ $("#tab_term").onclick = () => setCTab("term");
 
 /* ---- session log ---- */
 const SL = {shown: "", count: -1};
-const sessClass = e => e.kind === "job_end" ? ({done: "s-ok", failed: "s-bad"}[e.state] || "s-warn")
-  : e.kind === "terminal" ? (e.exit && e.exit !== 20 && e.exit !== 21 ? "s-bad" : "s-term")
-  : ({job_start: "s-job", job_input: "s-you", job_cancel: "s-warn"})[e.kind] || "s-sys";
+const sessClass = e => e.kind === "job_end" ? ({done: "ln lv-ok", failed: "ln lv-err"}[e.state] || "ln lv-warn")   // the console's colours and markers (termcolor)
+  : e.kind === "terminal" ? (e.exit && e.exit !== 20 && e.exit !== 21 ? "ln lv-err" : "s-term")
+  : ({job_start: "s-job", job_input: "s-you", job_cancel: "ln lv-warn"})[e.kind] || "s-sys";
 const sessName = s => s.id.replace(/^(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)\d\d$/, "$1-$2-$3 $4:$5");
 async function pollSession(force) {
   try {
@@ -2493,7 +2757,7 @@ async function termState() {
       T.loaded = true; T.hist = st.history || []; T.at = T.hist.length;
       tPrint(`<span class="t-mut">${esc(st.enabled ? `${st.about} Folder: ${st.cwd}. cd stays inside the PlasBench folder and the workspace. Long or interactive work: start it from the pages, where its questions are answered in Job output.` : "Terminal unavailable: " + st.note)}</span>\n`);
     }
-  } catch (e) { tPrint(`<span class="t-err">${esc(e.message)}</span>\n`); }
+  } catch (e) { tPrint(`<span class="ln lv-err">${esc(e.message)}</span>\n`); }
 }
 async function termRun() {
   const inp = $("#tcmd"), cmd = inp.value.trim(); if (!cmd) return;
@@ -2502,13 +2766,13 @@ async function termRun() {
   T.hist.push(cmd); T.at = T.hist.length; inp.value = ""; tFit(); inp.disabled = true; $("#trun").disabled = true;
   try {
     const r = await api("terminal/run", {command: cmd});
-    const out = (r.output || "").replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").replace(/\s+$/, "");
-    if (out) tPrint(colorize(out) + "\n");
+    const out = (r.output || "").replace(/\s+$/, "");
+    if (out) { const b = $("#tlog"), stay = nearBottom(b); tcRender(out + "\n", b); if (stay) b.scrollTop = b.scrollHeight; }   // the program's own colours shown; never parsed as HTML
     if (r.exit === 20 || r.exit === 21) tPrint(`<span class="mut">[exit ${r.exit}: ${r.exit === 20 ? "a manual step is needed; nothing failed" : "consent is needed; nothing was changed"}]</span>\n`);   // information, not an error
-    else if (r.exit !== 0) tPrint(`<span class="t-err">[exit ${r.exit}]</span>\n`);
+    else if (r.exit !== 0) tPrint(`<span class="ln lv-err">[exit ${r.exit}]</span>\n`);
     $("#tpr").textContent = r.prompt || $("#tpr").textContent;
     if (/^(cd|chdir|set-location)\b/i.test(cmd)) termState();
-  } catch (e) { tPrint(`<span class="t-err">${esc(e.message)}</span>\n`); }
+  } catch (e) { tPrint(`<span class="ln lv-err">${esc(e.message)}</span>\n`); }
   inp.disabled = false; $("#trun").disabled = false; inp.focus();
 }
 $("#tin").onsubmit = e => { e.preventDefault(); termRun(); };
@@ -6546,7 +6810,7 @@ async function aiWatchJob(card, cmd, id) {
 }
 async function aiSendResult(id, cmd) {
   let j; try { j = await api(`jobs/${id}?offset=0`); if (j.size > 24000) j = await api(`jobs/${id}?offset=${j.size - 24000}`); } catch (e) { return toast(e.message, "bad"); }
-  const tail = (j.log || "").split(/\r?\n/).slice(-40).join("\n");
+  const tail = tcPlain(j.log || "").split(/\r?\n/).slice(-40).join("\n");   // plain text: no colour or cursor codes
   let red; try { red = (await api("ai/redact", {output: tail})).text; } catch (e) { return toast(e.message, "bad"); }
   if (!await askConfirm({title: "Send this result to the assistant?", confirmLabel: "Send", body: "This is what will be sent, after removing your folder names, user name, e-mail addresses, keys and IP addresses. Nothing is sent unless you press Send.", detail: `Exit code: ${j.exit}\n${red}`})) return;
   aiSend("Here is the result of the command. What does it mean and what should I do next?", {result: {command: cmd, exit: j.exit == null ? 0 : j.exit, output: red}});
@@ -7182,12 +7446,14 @@ async function renderDoc(t) {
         body = `<div class="tablewrap" style="max-height:calc(100vh - var(--hdr) - var(--cons) - 150px);border:1px solid var(--line)"><table class="data">
           <thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${shown.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
           <p class="mut small">${rows.length} row${rows.length === 1 ? "" : "s"}${rows.length > shown.length ? `; the first ${shown.length} are shown` : ""}.</p>`;
-      } else body = `<pre class="cmdline" style="display:block;white-space:pre-wrap;max-height:calc(100vh - var(--hdr) - var(--cons) - 150px);overflow:auto">${esc(f.text)}</pre>`;
+      } else if (/\.(log|out|err)$/i.test(f.name)) body = `<pre id="fv_log" class="tclogfile tcbox" data-tc="${esc(TC.mode)}"></pre>`;   // a log: the console's colours (filled below, never as HTML)
+      else body = `<pre class="cmdline" style="display:block;white-space:pre-wrap;max-height:calc(100vh - var(--hdr) - var(--cons) - 150px);overflow:auto">${esc(f.text)}</pre>`;
       box.innerHTML = `<div class="docbar"><h2 class="mono">${esc(f.name)}</h2><span class="tag">${esc(fmtSize(f.size))}${f.truncated ? " · first 2 MB shown" : ""}</span>
           <button class="btn ghost sm" id="fv_ref">${icon("refresh")}Reload</button>
           <button class="btn sec sm" id="fv_dir">${icon("folder")}Open folder</button>
           <button class="btn ghost sm" id="fv_close">${icon("x")}Close</button></div>
         <div class="mut small mono" style="margin:-4px 0 8px;overflow-wrap:anywhere">${esc(f.path)}</div>${body}`;
+      if ($("#fv_log")) tcRender(f.text, $("#fv_log"));
       $("#fv_ref").onclick = () => renderDoc(t); $("#fv_close").onclick = () => mtClose(t.id);
       $("#fv_dir").onclick = () => reveal(f.path.replace(/[\\/][^\\/]+$/, ""));
       return;
