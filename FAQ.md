@@ -1088,7 +1088,13 @@ It was paused, not slow. A real run showed a 4-minute fastp trim as 10,096 s bec
 
 Nothing in your files. A sheet for your own isolates has only `sample_id`, `assembly_accession` (`LOCAL` or `NA`) and `sra_run` (and optionally `organism`), while stage 0 by default requires the curated cohort columns (`REQUIRE_CURATED_METADATA=1`) that a publishable public cohort carries. For your own isolates run `REQUIRE_CURATED_METADATA=0 plasbench run --samples config/local.tsv --local-inputs` (this is the command `plasbench intake check` prints when everything passes), or set `REQUIRE_CURATED_METADATA=0` in Settings. Keep it at 1 for a public cohort sheet. See `docs/INPUT_GUIDE.md`.
 
-### Q80. The console shows colour codes as text, or no colours at all. What do the colours mean now?
+### Q80. Why does a setting such as SHORT_READ_QC_MODE offer a list, and where is "enforce"?
+
+Every setting with a known set of values is a dropdown now, with the same options wherever it appears. The short-read QC gate offers Off, Report (default) and Enforce in Settings, in the
+workflow row and in the wizard; Enforce also excludes an isolate whose reads are a threshold REJECT. A value you typed into `config/local.env` that is not in the list is kept and shown as
+`Custom: <value>`. See `docs/qa/UI_ENUM_FIELDS.md` for the whole list and what was left as free text and why.
+
+### Q81. The console shows colour codes as text, or no colours at all. What do the colours mean now?
 
 The console now shows the colours programs write (and removes cursor and title codes that used to appear as `[K`-style debris), and it gives each line a type: errors red
 with a cross, warnings amber with a triangle, successes green with a tick, PlasBench's notes blue, headings bold, details grey italic; ordinary output stays plain so that the
