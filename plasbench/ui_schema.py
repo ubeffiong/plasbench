@@ -34,6 +34,22 @@ CATEGORIES = [
     ("help", "Help", "Guides and the concept note.", ["docs", "concept-note", "net", "net-bench", "issue-report", "ask", "ai"]),
 ]
 # Shorthand spellings argparse registers as separate choices; the window shows each command once.
+# A command-line option that sets a setting with a known set of values offers the same options as the Settings page (config/setting_options.tsv): option dest -> setting key.
+ARG_SETTINGS = {"read_depth_cap": "READ_DEPTH_CAP_X"}
+
+
+def _options_for(dest):
+    key = ARG_SETTINGS.get(dest)
+    if not key:
+        return None
+    import sys
+    python_dir = str(Path(__file__).resolve().parent.parent / "python")
+    if python_dir not in sys.path:
+        sys.path.insert(0, python_dir)
+    import setting_options
+    return setting_options.load(Path(__file__).resolve().parent.parent).get(key)
+
+
 ALIASES = {"meta": "metagenomics", "beta": "metagenomics", "rebuild-report": "regenerate-visuals"}
 
 
@@ -94,6 +110,9 @@ def _arg(action, group, command=""):
     entry = ui_help.ARGS.get(command, {}).get(action.dest)
     out["choice_help"] = dict((entry or {}).get("choices") or {})
     out["tooltip"] = ui_help.tooltip(entry, out)
+    options = _options_for(action.dest)
+    if options:
+        out["options"], out["setting"] = options, ARG_SETTINGS[action.dest]
     return out
 
 

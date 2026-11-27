@@ -168,6 +168,8 @@ pb_run bash test_stage3_continues.sh
 pb_run bash test_stage3_scratch.sh
 pb_run bash test_slow_step_and_aggregation.sh
 pb_run python3 test_run_status_stages.py
+pb_run python3 test_setting_options.py
+pb_run python3 test_setting_options_browser.py
 pb_run python3 test_work_dir.py
 pb_run python3 test_resource_adapt.py
 pb_run python3 test_annotation_timeouts_and_readiness.py
