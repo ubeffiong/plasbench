@@ -102,6 +102,18 @@ const wOpen = await ev("document.documentElement.scrollWidth"), wClosed = await 
 check("phone width: opening the pane adds no sideways scrolling to the page", wOpen <= wClosed, `${wOpen} open vs ${wClosed} closed (viewport 390; a toast or console toolbar of another feature is the rest)`);
 await ev("setPanelTab('ai'); 1"); await sleep(300);
 await shot("9-phone");
+// one width: the side panel and the AI help resolve to the same width at every viewport width, and swapping them moves nothing
+for (const [w, h] of [[1366, 860], [1024, 768], [390, 844]]) {
+  await send("Emulation.setDeviceMetricsOverride", {width: w, height: h, deviceScaleFactor: 1, mobile: w < 600}); await sleep(400);
+  const closed = await ev("(setDrawer(false), setAiDrawer(false), document.documentElement.scrollWidth)"); await sleep(200);
+  await ev("setDrawer(true); setPanelTab('jobs'); 1"); await sleep(350);
+  const pw = await ev("({w: document.querySelector('#gdrawer').getBoundingClientRect().width, m: getComputedStyle(document.querySelector('.shell')).marginRight, x: document.documentElement.scrollWidth})");
+  await ev("setAiDrawer(true); 1"); await sleep(350);
+  const aw = await ev("({w: document.querySelector('#aidrawer').getBoundingClientRect().width, m: getComputedStyle(document.querySelector('.shell')).marginRight, x: document.documentElement.scrollWidth})");
+  check(`at ${w} px both drawers are ${Math.round(pw.w)} px wide, the page keeps the same room for them, and opening one adds no sideways scroll`,
+        Math.abs(pw.w - aw.w) < 0.5 && pw.m === aw.m && pw.x <= closed && aw.x <= closed, JSON.stringify([closed, pw, aw]));
+}
+await send("Emulation.setDeviceMetricsOverride", {width: 390, height: 844, deviceScaleFactor: 1, mobile: true}); await sleep(300);
 // off switch seen by the page
 await ev("AI.st.enabled = false; $('#aibtn').hidden = true; 1");
 ws.close();

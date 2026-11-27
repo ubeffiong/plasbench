@@ -4,7 +4,7 @@ PlasBench has an assistant in its own right-hand drawer of the window (the **AI 
 
 ## Where it is, and how the pane is laid out
 
-The **AI help** button in the top bar (or Alt+Shift+H) opens the AI help as its own drawer on the right, in the place of the side panel (Studies, Jobs, Git): one drawer at a time. **Panel** brings the side panel back, and the AI help button again brings the AI help back. Hiding a drawer never clears it: the conversation, a half-typed question, the scroll position, the chosen folder, the cards and an answer that is still arriving are all kept, and a dot on the AI help button says that something arrived while it was hidden. Escape or the close button closes the AI drawer and returns to the button. The window remembers which drawer was open.
+The **AI help** button in the top bar (or Alt+Shift+H) opens the AI help as its own drawer on the right, in the place of the side panel (Studies, Jobs, Git): one drawer at a time, both exactly as wide (430 px, or 92% of a narrower screen). **Panel** brings the side panel back, and the AI help button again brings the AI help back. Hiding a drawer never clears it: the conversation, a half-typed question, the scroll position, the chosen folder, the cards and an answer that is still arriving are all kept, and a dot on the AI help button says that something arrived while it was hidden. Escape or the close button closes the AI drawer and returns to the button. The window remembers which drawer was open.
 
 The pane keeps one place for each fact:
 

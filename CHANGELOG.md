@@ -13,6 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- the side panel and the AI help are exactly as wide (27 November 2026)
+- One width token (`--drw`, 430 px or 92% of a narrower screen) for both right-hand drawers and for the room the page keeps free for them, so swapping the side panel and the AI help moves nothing. The side panel was 248 px; its Studies, Jobs and Git content was checked at the new width in headless Edge at three window sizes.
+
 ### Changed -- a calmer AI help pane, in its own drawer (27 November 2026)
 - **Its own drawer.** The AI help is no longer a tab of the side panel: the AI help button opens it in the same right-hand slot, in place of the side panel, and Panel brings the side panel back (one drawer at a time). Hiding keeps everything (conversation, draft, scroll, folder, cards, a running answer); a dot on the button says something arrived. Escape and the close button close it; an old link to the AI tab opens it; the window remembers which drawer was open.
 - **One place for each fact.** Sources are one folded line per answer (full titles, duplicates merged, clickable `[n]`); the "can't see your files" promise is one line with an (i); quick actions, the folder and its remember option are one fold-out; Brief and Remember chats have an (i) saying what they cost and where a chat is stored; the usage lines become one small indicator ("48 left", amber at 5 or fewer, red at none) whose (i) holds them; tokens and model of an answer are in an (i). Command cards are unchanged (pinned by a test). Nothing was removed: `test_ai_pane_tidy.py` checks every former string and control. Details in docs/qa/AI_UI_REVIEW.md.
