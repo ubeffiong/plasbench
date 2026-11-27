@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 232 analysis modules, 28 registered tools and baselines (20 real tools), 223 registered
-outputs, 55 run switches, 521 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 233 analysis modules, 28 registered tools and baselines (20 real tools), 223 registered
+outputs, 55 run switches, 523 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -375,7 +375,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-232 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+233 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -647,6 +647,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `run_profiles.py` | Run profiles: fast, standard and thorough (config/run_profiles.tsv). |
 | `run_sentinel.py` | The run's sentinel: one small background process that lives exactly as long as the run. |
 | `run_status.py` | What is this run doing right now, and why might it look stuck? |
+| `setting_options.py` | The one registry of settings whose valid values are a finite known set (config/setting_options.tsv), and the checks built on it. |
 | `setting_ranges.py` | The one table of what each numeric Scoring-decision setting accepts (config/setting_ranges.tsv), and the checks built on it. |
 | `source_install.py` | Install the source-distributed tools PlasBench can run, pinned, isolated and verified. |
 | `sync_publishing_versions.py` | Bring the version written in the publishing files up to the version in pyproject.toml (run it in the version-bump commit of a release). |

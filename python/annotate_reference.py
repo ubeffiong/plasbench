@@ -240,7 +240,9 @@ def call_amrfinder(reference, timeout, sequences, threads=1):
     return features, {"status": "ok", "version": version, "features": len(features)}
 
 
-ISESCAN_SCOPES = ("plasmids", "all")
+import setting_options  # noqa: E402
+
+ISESCAN_SCOPES = tuple(setting_options.values("ISESCAN_SCOPE"))
 
 
 def read_truth_molecules(truth_path):
