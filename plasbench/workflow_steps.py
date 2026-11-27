@@ -279,10 +279,21 @@ def payload(root, values: dict) -> dict:
     """
     rows = load(root)
     states, out_steps = {}, steps(rows)
+    try:                                    # the same option list the Settings page offers (config/setting_options.tsv)
+        import sys as _sys
+        _py = str(Path(root) / "python")
+        if _py not in _sys.path:
+            _sys.path.insert(0, _py)
+        import setting_options
+        registry = setting_options.load(root)
+    except Exception:  # noqa: BLE001 - a missing table only means no mode dropdowns
+        registry = {}
     for row in rows:
         key = row["setting_key"]
         value = values.get(key) if key else None
         row["value"] = value
+        if key in registry:
+            row["options"] = registry[key]
         row["state"] = state_of(row, value)
         row["changed"] = is_changed(row, value)
         states[row["item_id"]] = row["state"]

@@ -42,6 +42,9 @@ import statistics
 import sys
 from collections import Counter
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import setting_options  # noqa: E402  (the allowed values live in config/setting_options.tsv)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_THRESHOLDS = os.path.join(HERE, "..", "config", "short_read_qc_thresholds.tsv")
 ADAPTERS = ("AGATCGGAAGAGC", "CTGTCTCTTATACACATCT")        # TruSeq (read 1 and 2) and Nextera transposase
@@ -269,7 +272,7 @@ def main(argv=None):
     p.add_argument("--shards", required=True)
     p.add_argument("--out", required=True)
     p.add_argument("--status-out")
-    p.add_argument("--mode", default="report", choices=("off", "report", "enforce"))
+    p.add_argument("--mode", default="report", choices=tuple(setting_options.values("SHORT_READ_QC_MODE")))
     p.set_defaults(fn=cmd_merge)
     a = ap.parse_args(argv)
     return a.fn(a)

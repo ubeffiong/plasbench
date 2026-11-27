@@ -181,7 +181,7 @@ def main(argv=None):
     p = sub.add_parser("select")
     p.add_argument("--sample", required=True)
     p.add_argument("--candidate", action="append", required=True, help="ASSEMBLER=path to its contigs FASTA; repeat for each candidate")
-    p.add_argument("--policy", choices=("fixed", "quality"), default="fixed")
+    p.add_argument("--policy", choices=tuple(__import__("setting_options").values("ASSEMBLY_SELECTION_POLICY")), default="fixed")
     p.add_argument("--primary", required=True, help="the configured assembler (the one `fixed` selects)")
     p.add_argument("--out", required=True)
     p.add_argument("--selected-out", help="write the selected assembler's name here (empty when none is eligible)")

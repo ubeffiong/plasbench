@@ -297,7 +297,7 @@ h1 .tipi,h3 .tipi,h4 .tipi,.hd .tipi{margin-left:8px;vertical-align:middle}[data
 #tipbox[hidden]{display:none}#tipbox p{margin:0 0 6px}#tipbox dl{margin:0 0 6px;display:grid;grid-template-columns:auto 1fr;gap:3px 10px}#tipbox dt{font-weight:600}#tipbox dd{margin:0;color:var(--fg-2)}
 #tipbox .ttl{font-weight:600}#tipbox ul{margin:0 0 6px;padding-left:18px}#tipbox li{margin:2px 0}
 #tipbox .tmeta{color:var(--mut);font-size:12px;margin:2px 0 0}#tipbox .twhen{margin:6px 0 0;padding-top:6px;border-top:1px solid var(--line-2);color:var(--fg-2)}
-.rspanel{margin:8px 0 0;padding:8px 10px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface-2)}.rs-row{font-size:13px}.rs-now{font-size:13px;font-weight:500}.rs-details{margin-top:6px}.rs-details summary{cursor:pointer;font-size:12px;color:var(--muted,inherit)}.rs-hints{margin:2px 0 0;padding-left:18px}.rsbox{margin-top:6px;padding-top:6px;border-top:1px solid var(--term-line)}
+.rspanel{margin:8px 0 0;padding:8px 10px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface-2)}.rs-row{font-size:13px}.optlist{margin:6px 0 0;padding-left:16px;font-size:12px;color:var(--muted,inherit)}.optlist li.on{font-weight:600;color:var(--fg,inherit)}.optnum{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:8px}.optmsg{min-height:1.2em}.wfopt{margin-top:6px}.rs-now{font-size:13px;font-weight:500}.rs-details{margin-top:6px}.rs-details summary{cursor:pointer;font-size:12px;color:var(--muted,inherit)}.rs-hints{margin:2px 0 0;padding-left:18px}.rsbox{margin-top:6px;padding-top:6px;border-top:1px solid var(--term-line)}
 .stallnote{margin:8px 0 0;padding:8px 10px;border:1px solid var(--warn);border-left-width:3px;border-radius:4px;background:var(--surface-2);color:var(--fg);font-size:12.5px;line-height:1.45}
 .stallnote .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.stallnote ul{margin:6px 0 0;padding-left:18px;font-family:var(--mono,monospace);font-size:11.5px;word-break:break-all}
 #cstall{flex:none;padding:6px 12px;background:var(--term-head);color:var(--term-fg);border-bottom:1px solid var(--term-line);font-size:12px;max-height:40%;overflow:auto}
@@ -4320,6 +4320,65 @@ async function loadSettings(force) {
   try { const st = await getSettings(force); $("#set_where").textContent = st.local_env; renderSettings(); } catch (e) { toast(e.message, "bad"); }
   npLoadOffer(true);
 }
+/* ---- Dropdowns for settings with a known set of values (config/setting_options.tsv, python/setting_options.py): ONE control used by Settings, the workflow rows and the wizard ---- */
+SET.mode = SET.mode || {};      // setting key -> "@number" | "@path": the keyword choice whose input is showing
+const optDefault = o => (o.options.find(x => x.default) || {}).value;
+const optLabelOf = (o, v) => { const x = o.options.find(y => y.value === v); return x ? x.label : v; };
+/* What the control shows for a stored value `cur` ("" = nothing saved, so the default applies): {sel, num, path, custom}. */
+function optState(o, cur, mode) {
+  cur = cur == null ? "" : String(cur);
+  if (mode === "@number" && o.number) return {sel: "@number", num: /^-?\d+(\.\d+)?$/.test(cur) ? cur : ""};
+  if (mode === "@path" && o.path) return {sel: "@path", path: cur && !o.options.some(x => x.value === cur) ? cur : ""};
+  if (cur === "") return {sel: ""};
+  if (o.options.some(x => x.value === cur)) return {sel: cur};
+  if (o.number && /^-?\d+(\.\d+)?$/.test(cur)) return {sel: "@number", num: cur};
+  if (o.path && !/^-?\d+(\.\d+)?$/.test(cur)) return {sel: "@path", path: cur};
+  return {sel: "__custom", custom: cur};
+}
+function optProblem(o, text) {
+  if (text === "" || text == null) return "Enter a value.";
+  const n = o.number, v = Number(text);
+  if (!n || isNaN(v)) return "Enter a number.";
+  if (n.min != null && v < n.min) return `The minimum is ${n.min}${n.unit ? " " + n.unit : ""}.`;
+  if (n.max != null && v > n.max) return `The maximum is ${n.max}${n.unit ? " " + n.unit : ""}.`;
+  return "";
+}
+/* The control: a real <select> (labelled by the caller), the number or folder input of a combo when its choice is showing, and the meaning of every option beside it. `idp` makes ids unique. */
+function optControl(o, key, cur, ctx, idp, mode) {
+  const st = optState(o, cur, mode), id = `opt_${idp}_${key}`, defv = optDefault(o), defLabel = defv === undefined ? "" : (optLabelOf(o, defv) || "");
+  const opts = [`<option value="" ${st.sel === "" ? "selected" : ""}>Default${defLabel ? ` (${esc(defLabel)})` : ""}</option>`]
+    .concat(o.options.filter(x => x.value !== "").map(x => `<option value="${esc(x.value)}" ${st.sel === x.value ? "selected" : ""}>${esc(x.label)}${x.default ? " (default)" : ""}</option>`));
+  if (o.number) opts.push(`<option value="@number" ${st.sel === "@number" ? "selected" : ""}>${esc(o.number.label || "Number…")}</option>`);
+  if (o.path) opts.push(`<option value="@path" ${st.sel === "@path" ? "selected" : ""}>${esc(o.path.label || "Folder…")}</option>`);
+  if (st.sel === "__custom") opts.push(`<option value="__custom" selected>Custom: ${esc(st.custom)}</option>`);
+  const numIn = st.sel === "@number" ? `<span class="optnum"><input type="number" data-opt="num" data-optkey="${esc(key)}" data-optctx="${esc(ctx)}" id="${id}_n" aria-label="${esc(key)} as a number" value="${esc(st.num)}"${o.number.min != null ? ` min="${o.number.min}"` : ""}${o.number.max != null ? ` max="${o.number.max}"` : ""} step="${o.number.step || 1}" style="width:110px"> <span class="mut small">${esc(o.number.unit || "")}${o.number.min != null ? `, minimum ${o.number.min}` : ""}</span><span class="bad-t small optmsg" role="alert" id="${id}_m">${st.num === "" ? "Enter a number." : esc(optProblem(o, st.num))}</span></span>` : "";
+  const pathIn = st.sel === "@path" ? `<span class="optnum"><input type="text" data-opt="path" data-optkey="${esc(key)}" data-optctx="${esc(ctx)}" id="${id}_p" aria-label="${esc(key)} folder" value="${esc(st.path)}" placeholder="a folder on this computer" style="min-width:220px"></span>` : "";
+  const shown = st.sel === "" ? (defv === undefined ? null : o.options.find(x => x.value === defv)) : o.options.find(x => x.value === st.sel);
+  const help = `<ul class="optlist">${o.options.filter(x => x.value !== "").map(x => `<li class="${shown && shown.value === x.value ? "on" : ""}"><b>${esc(x.label)}</b> <span class="mono small">${esc(x.value)}</span>${x.default ? ` <span class="tag rec">default</span>` : ""} — ${esc(x.meaning)}</li>`).join("")}${o.number ? `<li><b>${esc(o.number.label || "Number…")}</b> — ${esc(o.number.meaning)}</li>` : ""}${o.path ? `<li><b>${esc(o.path.label || "Folder…")}</b> — ${esc(o.path.meaning)}</li>` : ""}</ul>`;
+  return `<select id="${id}" data-opt="sel" data-optkey="${esc(key)}" data-optctx="${esc(ctx)}" aria-label="${esc(key)}">${opts.join("")}</select>${numIn}${pathIn}${st.sel === "__custom" ? `<div class="help">This saved value is not in the list; it is kept as it is until you choose another.</div>` : ""}${help}`;
+}
+
+/* One handler for every option control (Settings, the workflow rows, the wizard): choosing a listed value stores exactly that value; a combo's keyword choice shows its input; "Custom: ..." keeps the saved value. */
+const optModes = ctx => ctx === "settings" ? SET.mode : (WF.mode = WF.mode || {});
+const optObj = (ctx, key) => ctx === "settings" ? ((S.settings.settings.find(r => r.key === key) || {}).options) : ((wfRows().find(r => r.setting_key === key) || {}).options);
+function optCommit(ctx, key, value) {
+  if (ctx === "settings") { const row = S.settings.settings.find(r => r.key === key); if (value === (row.override ?? "")) delete SET.edits[key]; else SET.edits[key] = value; renderSettings(); }
+  else wfSetOpt(ctx, key, value);
+}
+document.addEventListener("change", e => {
+  const t = e.target; if (!t.dataset || !t.dataset.opt) return;
+  const ctx = t.dataset.optctx, key = t.dataset.optkey, o = optObj(ctx, key); if (!o) return;
+  if (t.dataset.opt === "sel") {
+    const v = t.value; if (v === "__custom") return;
+    if (v === "@number" || v === "@path") { optModes(ctx)[key] = v; if (ctx === "settings") renderSettings(); else if (ctx === "wizard") renderWizard(); else wfRenderAll(); return; }
+    optModes(ctx)[key] = ""; optCommit(ctx, key, v);
+  } else if (t.dataset.opt === "num") { if (!optProblem(o, t.value)) optCommit(ctx, key, t.value); }
+  else if (t.dataset.opt === "path") { if (t.value.trim()) optCommit(ctx, key, t.value.trim()); }
+});
+document.addEventListener("input", e => {
+  const t = e.target; if (!t.dataset || t.dataset.opt !== "num") return;
+  const o = optObj(t.dataset.optctx, t.dataset.optkey), m = document.getElementById(t.id.replace(/_n$/, "_m")), msg = o ? optProblem(o, t.value) : ""; if (m) m.textContent = msg; t.setAttribute("aria-invalid", msg ? "true" : "false");
+});
 function renderSettings() {
   const q = SET.q.toLowerCase(), rows = S.settings.settings;
   const shown = rows.filter(r => (!q || (r.key + " " + r.comment + " " + r.group).toLowerCase().includes(q)) && (!SET.only || r.override != null || r.key in SET.edits));
@@ -4328,7 +4387,8 @@ function renderSettings() {
   $("#setlist").innerHTML = groups.map(g => { const gr = shown.filter(r => r.group === g);
     return `<details class="fgroup" ${q || SET.only || groups.length < 4 ? "open" : ""}><summary>${esc(g)} <span class="n">— ${gr.length}</span></summary><div class="fb">` + gr.map(r => {
       const cur = r.key in SET.edits ? SET.edits[r.key] : (r.override ?? ""), changed = r.key in SET.edits;
-      const ctl = r.kind === "flag" ? `<select data-key="${r.key}"><option value="" ${cur === "" ? "selected" : ""}>default (${esc(r.default)})</option><option value="1" ${cur === "1" ? "selected" : ""}>1 — on</option><option value="0" ${cur === "0" ? "selected" : ""}>0 — off</option></select>`
+      const ctl = r.options ? optControl(r.options, r.key, cur, "settings", "s", SET.mode[r.key])
+        : r.kind === "flag" ? `<select data-key="${r.key}"><option value="" ${cur === "" ? "selected" : ""}>default (${esc(r.default)})</option><option value="1" ${cur === "1" ? "selected" : ""}>1 — on</option><option value="0" ${cur === "0" ? "selected" : ""}>0 — off</option></select>`
         : r.range && r.range.kind !== "flag" ? `<input type="number" data-key="${r.key}" data-rng value="${esc(cur)}"${rangeAttrs(r.range)} placeholder="default: ${esc((r.resolved || r.default).slice(0, 120))}" aria-describedby="rng_${r.key}" ${rangeProblem(r.range, cur) ? 'aria-invalid="true"' : ""}>`
         : `<input type="text" data-key="${r.key}" value="${esc(cur)}" placeholder="default: ${esc((r.resolved || r.default).slice(0, 120))}">`;
       // A location written as shell code in config.sh is shown as the path it means here, and a
@@ -4344,13 +4404,15 @@ $("#set_only").onchange = e => { SET.only = e.target.checked; renderSettings(); 
 $("#setlist").addEventListener("input", e => { const k = e.target.dataset && e.target.dataset.key; if (!k || !("rng" in e.target.dataset)) return;
   const row = S.settings.settings.find(r => r.key === k), msg = rangeProblem(row.range, e.target.value), m = document.getElementById("rng_" + k);
   if (m) m.textContent = msg; e.target.setAttribute("aria-invalid", msg ? "true" : "false"); });
-$("#setlist").addEventListener("change", e => { const k = e.target.dataset.key; if (!k) return;
+$("#setlist").addEventListener("change", e => { const k = e.target.dataset.key; if (!k || e.target.dataset.opt) return;
   const row = S.settings.settings.find(r => r.key === k); const v = e.target.value;
   if (v === (row.override ?? "")) delete SET.edits[k]; else SET.edits[k] = v; renderSettings(); });
-$("#setlist").addEventListener("click", e => { const k = e.target.dataset.clear; if (!k) return; SET.edits[k] = ""; renderSettings(); });
-$("#set_reset").onclick = () => { SET.edits = {}; renderSettings(); };
+$("#setlist").addEventListener("click", e => { const k = e.target.dataset.clear; if (!k) return; SET.edits[k] = ""; SET.mode[k] = ""; renderSettings(); });
+$("#set_reset").onclick = () => { SET.edits = {}; SET.mode = {}; renderSettings(); };
 $("#set_save").onclick = async () => {
   const bad = Object.entries(SET.edits).map(([k, v]) => { const row = S.settings.settings.find(r => r.key === k); return row && row.range && v !== "" ? rangeProblem(row.range, v) && `${k}: ${rangeProblem(row.range, v)}` : ""; }).filter(Boolean);
+  const pending = Object.entries(SET.mode).filter(([k, m]) => m === "@number").map(([k]) => { const row = S.settings.settings.find(r => r.key === k), v = k in SET.edits ? SET.edits[k] : (row.override ?? ""); return row && row.options && optProblem(row.options, v) ? `${k}: ${optProblem(row.options, v)}` : ""; }).filter(Boolean);
+  if (pending.length) { toast(pending[0], "bad"); return; }   // a number choice with no valid number yet
   if (bad.length) { toast(bad[0], "bad"); return; }   // the server refuses the same values; this saves the round trip
   const changes = Object.fromEntries(Object.entries(SET.edits).map(([k, v]) => [k, v === "" ? null : v]));
   try { await api("settings", {changes}); SET.edits = {}; await loadSettings(true); S.env = null; S.tools = null; S.toolsStale = true; toast("Saved for this computer", "ok"); }
@@ -7884,7 +7946,8 @@ function wfStateOf(it, value) {
   if (value === "auto") return "auto";
   return "on";
 }
-function wfIsChanged(it, value) { return it.kind !== "core" && it.kind !== "demo" && wfStateOf(it, value) !== wfDefaultState(it); }
+function wfIsChanged(it, value) { if (it.options && value) { const d = optDefault(it.options); if (d !== undefined && value !== d) return it.kind !== "core" && it.kind !== "demo"; }
+  return it.kind !== "core" && it.kind !== "demo" && wfStateOf(it, value) !== wfDefaultState(it); }
 const wfCounts = s => s === "on" || s === "auto";
 const wfById = rows => Object.fromEntries(rows.map(r => [r.item_id, r]));
 /* The items `id` needs (directly or through others) that are off, nearest first. Core items count as on. */
@@ -8013,7 +8076,7 @@ function wfItemHTML(it, states, ctx, idx, per) {
   else sw = `<button type="button" class="sw" role="switch" aria-checked="${wfCounts(s)}" id="${id}" data-wftoggle="${esc(it.item_id)}" aria-label="${esc(it.label)}: ${s === "auto" ? "auto, runs when its inputs exist" : wfCounts(s) ? "on" : "off"}. Press to turn ${wfCounts(s) ? "off" : "on"}">${wfPill(s)}</button>`;
   const rst = (changed || wfOverridden(it, ctx)) && it.kind !== "core" ? `<button type="button" class="rst" data-wfreset="${esc(it.item_id)}" title="${ctx === "wizard" ? "Use the saved setting for this run" : "Back to the default"}">${ctx === "wizard" ? "use saved" : "default"}</button>` : "";
   return `<li class="wfi ${s}" id="wfi_${esc(id)}">${sw}<div class="tx"><b>${esc(it.label)}</b> ${it.user ? `<span class="tag user">your tool</span> ` : ""}${changed ? `<span class="chgtag" title="Different from its default (${wfDefaultState(it)})">changed</span> ` : ""}${rst}${tipBtn(wfTip(it, per), it.label)}
-    <div class="d">${esc(it.description)}</div><div class="cost">${wfCost(it, per)}</div>${wfBadges(it, states, idx)}${typeof instWorkflow === "function" ? instWorkflow(it) : ""}</div></li>`;
+    <div class="d">${esc(it.description)}</div>${it.options ? `<div class="wfopt"><label class="small" for="opt_w${esc(ctx)}_${esc(it.setting_key)}"><b>Choose</b></label> ${optControl(it.options, it.setting_key, wfOptCur(it, ctx), ctx, "w" + ctx, optModes(ctx)[it.setting_key])}</div>` : ""}<div class="cost">${wfCost(it, per)}</div>${wfBadges(it, states, idx)}${typeof instWorkflow === "function" ? instWorkflow(it) : ""}</div></li>`;
 }
 function wfStepHTML(step, rows, states, ctx, per) {
   const idx = wfById(rows), items = rows.filter(r => r.step_id === step.id), shown = items.filter(r => r.kind !== "demo"), demo = items.filter(r => r.kind === "demo");
@@ -8100,6 +8163,18 @@ async function wfApply(ctx, changes) {          // changes: [[item, "on"|"off"|"
     const row = (S.tools || []).find(t => t.tool === it.item_id && t.run_flag); if (row) row.enabled = wfStateOf(it, WF.vals[k]) !== "off";
   }
   S.settings = null; if (typeof renderToolTable === "function" && S.tools) renderToolTable();
+}
+const wfOptCur = (it, ctx) => { const v = wfValue(it, ctx); return v === optDefault(it.options) ? "" : (v ?? ""); };
+async function wfSetOpt(ctx, key, value) {          // a dropdown choice on a workflow row: the stored value is exactly the option's value
+  const it = wfRows().find(r => r.setting_key === key); if (!it) return;
+  if (ctx === "wizard") {
+    const E = S.wiz; E.wf = E.wf || {}; const saved = wfSaved(it);
+    if (value === "" || value === saved) delete E.wf[key]; else E.wf[key] = value;
+    if (!Object.keys(E.wf).length) delete E.wf;
+    renderWizard(); return;
+  }
+  try { await api("settings", {changes: {[key]: value === "" ? null : value}}); WF.vals[key] = value === "" ? (optDefault(it.options) ?? "") : value; S.settings = null; wfRenderAll(); toast(`${it.label}: ${value === "" ? "back to its default" : optLabelOf(it.options, value)}. Saved for this computer.`, "ok"); }
+  catch (e) { toast(e.message, "bad"); wfRenderAll(); }
 }
 const wfNorm = (it, v) => v === "" || v == null ? wfCfgDefault(it) : v;
 async function wfToggle(host, id, forceTo) {

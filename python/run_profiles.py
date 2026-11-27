@@ -27,9 +27,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TABLE = ROOT / "config" / "run_profiles.tsv"
-PROFILES = ("fast", "standard", "thorough")
+PROFILES = ("fast", "standard", "thorough")   # the options of RUN_PROFILE in config/setting_options.tsv (test_setting_options.py compares them)
 FLAG_VALUES = {"0", "1"}
-CHOICE_VALUES = {"ISESCAN_SCOPE": {"plasmids", "all"}, "MULTIQC_REPORT": {"auto", "on", "off"}}
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import setting_options  # noqa: E402
+
+CHOICE_VALUES = {"ISESCAN_SCOPE": set(setting_options.values("ISESCAN_SCOPE")), "MULTIQC_REPORT": set(setting_options.values("MULTIQC_REPORT"))}
 
 
 def read_table(path=TABLE):

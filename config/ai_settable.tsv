@@ -70,7 +70,7 @@ INSTALL_MISSING_TOOLS	flag	0|1	INSTALL_MISSING_TOOLS=1: stage 0 installs any ena
 ASSEMBLER_AUTO_RETRY	flag	0|1	1	low
 CAP_THREADS_TO_CPUS	flag	0|1	1	low
 READ_SOURCE	choice	auto|sra|ena	Where reads are downloaded from (auto, sra, ena)	low
-MULTIQC_REPORT	choice	auto|0|1	Build the optional MultiQC companion (auto, 0, 1)	low
+MULTIQC_REPORT	choice	auto|on|off	Build the optional MultiQC companion (auto, on, off)	low
 UPDATE_CHECK	choice	auto|off	Look for a newer PlasBench release (auto or off)	low
 ASSEMBLER	choice	spades|unicycler	Short-read assembler (spades or unicycler)	low
 SHORT_READ_QC_MODE	choice	report|off	Short-read QC gate: report or off	low

@@ -1,0 +1,95 @@
+# The one registry of settings whose valid values are a finite known set (or keywords plus a number or folder). The window's dropdowns (Settings, the workflow rows, the wizard), the server's
+# save check and the validators that can read it all use this table; test/test_setting_options.py fails when it differs from the code that really validates the value.
+# kind: enum = exactly these values; combo = these keywords plus @number (a validated number, with unit/min/max/step) or @path (a folder). value empty = the unset/empty choice.
+# default = yes marks the value the code uses when the setting is not set. source = the code that decides what is valid. See docs/qa/UI_ENUM_FIELDS.md.
+key	kind	value	label	meaning	default	source	number_unit	number_min	number_max	number_step
+SHORT_READ_QC_MODE	enum	off	Off	Skip the short-read QC gate.		python/short_read_qc.py --mode choices				
+SHORT_READ_QC_MODE	enum	report	Report	Measure the reads, decide PASS, WARN or REJECT and flag it; exclude only an integrity failure (unreadable, truncated, empty, malformed or unequal files).	yes	python/short_read_qc.py --mode choices				
+SHORT_READ_QC_MODE	enum	enforce	Enforce	Also exclude an isolate whose reads are a threshold REJECT (status rejected, never scored as a tool failure).		python/short_read_qc.py --mode choices				
+ASSEMBLY_SELECTION_MODE	enum	off	Off	Do not measure or select among candidate assemblies.		scripts/03_assemble.sh (off, report, enforce)				
+ASSEMBLY_SELECTION_MODE	enum	report	Report	Measure every candidate and record the policy's choice, but act on nothing.	yes	scripts/03_assemble.sh (off, report, enforce)				
+ASSEMBLY_SELECTION_MODE	enum	enforce	Enforce	The chosen assembly is the one the tools run on; an isolate with no eligible assembly is excluded (status rejected).		scripts/03_assemble.sh (off, report, enforce)				
+ASSEMBLY_SELECTION_POLICY	enum	fixed	Fixed	Use the assembler you configured (ASSEMBLER).	yes	python/assembly_selection.py --policy choices				
+ASSEMBLY_SELECTION_POLICY	enum	quality	Quality	Highest N50 among the eligible assemblies, then fewest contigs. Never sees the truth or a score.		python/assembly_selection.py --policy choices				
+READ_SOURCE	enum	auto	Auto	ENA first (chunked, resumable, checksum-verified); the SRA Toolkit only when ENA has no paired FASTQ for the run or fails after its retries.	yes	scripts/01_download.sh (auto, sra, ena)				
+READ_SOURCE	enum	sra	SRA Toolkit only	Always use prefetch and fasterq-dump.		scripts/01_download.sh (auto, sra, ena)				
+READ_SOURCE	enum	ena	ENA only	Always use the ENA downloader; never the SRA Toolkit.		scripts/01_download.sh (auto, sra, ena)				
+UPDATE_CHECK	enum	auto	Auto	When the window starts and at most once a day, one public request to GitHub's release list (nothing about you or this computer is sent).	yes	plasbench/updatecheck.py (auto, off)				
+UPDATE_CHECK	enum	off	Off	Only when you press Check for updates.		plasbench/updatecheck.py (auto, off)				
+ASSEMBLER	enum	spades	SPAdes	The short-read assembler.	yes	plasbench/cli.py --assembler choices				
+ASSEMBLER	enum	unicycler	Unicycler	SPAdes plus a polishing step; slower.		plasbench/cli.py --assembler choices				
+FLYE_READ_TYPE	enum	nano-raw	Nanopore raw	Older Oxford Nanopore reads (about 10 to 20% error).		plasbench/cli.py --flye-read-type choices				
+FLYE_READ_TYPE	enum	nano-hq	Nanopore high quality	Recent Oxford Nanopore reads (Guppy 5 or later, under 5% error).	yes	plasbench/cli.py --flye-read-type choices				
+FLYE_READ_TYPE	enum	pacbio-raw	PacBio raw	PacBio continuous long reads.		plasbench/cli.py --flye-read-type choices				
+FLYE_READ_TYPE	enum	pacbio-hifi	PacBio HiFi	PacBio HiFi (circular consensus) reads.		plasbench/cli.py --flye-read-type choices				
+ANALYSIS_TRACK	enum	short_read	Short reads	Tools that work from Illumina short reads.	yes	python/tool_capabilities.py ANALYSIS_TRACKS				
+ANALYSIS_TRACK	enum	long_read	Long reads	Tools that work from long reads.		python/tool_capabilities.py ANALYSIS_TRACKS				
+ANALYSIS_TRACK	enum	hybrid	Hybrid	Tools that use short and long reads together.		python/tool_capabilities.py ANALYSIS_TRACKS				
+ANALYSIS_TRACK_FILTER	enum		Every track	Score every enabled tool under its own track in one run.	yes	python/tool_capabilities.py ANALYSIS_TRACKS (empty = every enabled tool under its own track)				
+ANALYSIS_TRACK_FILTER	enum	short_read	Short reads	Only the short-read tools.		python/tool_capabilities.py ANALYSIS_TRACKS (empty = every enabled tool under its own track)				
+ANALYSIS_TRACK_FILTER	enum	long_read	Long reads	Only the long-read tools.		python/tool_capabilities.py ANALYSIS_TRACKS (empty = every enabled tool under its own track)				
+ANALYSIS_TRACK_FILTER	enum	hybrid	Hybrid	Only the hybrid tools.		python/tool_capabilities.py ANALYSIS_TRACKS (empty = every enabled tool under its own track)				
+DECISION_PROFILE	enum	accuracy_first	Accuracy first	The original formula: F1 weighs most (0.45), then plasmid recovery (0.18).	yes	plasbench/cli.py --decision-profile choices				
+DECISION_PROFILE	enum	amr_surveillance	AMR surveillance	Weighs plasmid recovery most (0.35) and penalises failed runs more.		plasbench/cli.py --decision-profile choices				
+DECISION_PROFILE	enum	rapid_screening	Rapid screening	Lower F1 weight and a larger resource penalty, so cheaper tools rank higher.		plasbench/cli.py --decision-profile choices				
+RUN_PROFILE	enum	standard	Standard	Today's behaviour.	yes	python/run_profiles.py PROFILES				
+RUN_PROFILE	enum	fast	Fast	Switches off optional analyses that never change the leaderboard (ISEScan, ranking-stability and rank-sensitivity sweeps, performance drivers, MultiQC, and more).		python/run_profiles.py PROFILES				
+RUN_PROFILE	enum	thorough	Thorough	Turns optional extras on (ISEScan over the chromosome too, difficulty descriptors, QUAST, depth anomalies, the replicon baseline).		python/run_profiles.py PROFILES				
+TRUTH_LABEL_SCHEME	enum	ncbi	NCBI labels	Labels from the NCBI sequence report (the pre-registered primary scheme).	yes	config/prereg.tsv choices (python/prereg_admin.py)				
+TRUTH_LABEL_SCHEME	enum	nonchromosomal	Everything but the chromosome	Every replicon but the main chromosome counts as a plasmid (a sensitivity scheme).		config/prereg.tsv choices (python/prereg_admin.py)				
+TRUTH_LABEL_SCHEME	enum	evidence	Evidence-confirmed	Replicon labels confirmed by evidence; ambiguous replicons are excluded (a sensitivity scheme).		config/prereg.tsv choices (python/prereg_admin.py)				
+HEADLINE_REFERENCE_INDEPENDENCE	enum	independent	Independent only	The headline uses only isolates whose reference is independent of the reads.	yes	config/prereg.tsv choices (python/prereg_admin.py)				
+HEADLINE_REFERENCE_INDEPENDENCE	enum	any	Any reference	The headline also counts isolates whose reference is not independent.		config/prereg.tsv choices (python/prereg_admin.py)				
+HEADLINE_INDEPENDENCE	enum	independent	Independent	The truth is independent of the benchmark's reads.	yes	config/prereg.tsv choices (python/prereg_admin.py)				
+HEADLINE_INDEPENDENCE	enum	partially_independent	Partly independent	The truth is only partly independent of the reads.		config/prereg.tsv choices (python/prereg_admin.py)				
+HEADLINE_INDEPENDENCE	enum	dependent	Dependent	The truth was built from the same reads.		config/prereg.tsv choices (python/prereg_admin.py)				
+HEADLINE_INDEPENDENCE	enum	unknown	Unknown	It is not known whether the truth is independent.		config/prereg.tsv choices (python/prereg_admin.py)				
+PLASBENCH_CI_METHOD	enum	percentile	Percentile	Plain percentile bootstrap interval.		config/prereg.tsv choices (python/prereg_admin.py)				
+PLASBENCH_CI_METHOD	enum	cluster_t	Cluster t	Study-clustered bootstrap-t interval.	yes	config/prereg.tsv choices (python/prereg_admin.py)				
+PLASBENCH_CI_METHOD	enum	bootstrap_t	Bootstrap t	Bootstrap-t interval.		config/prereg.tsv choices (python/prereg_admin.py)				
+PLASBENCH_CI_METHOD_STRATIFIED	enum	percentile	Percentile	Plain percentile bootstrap interval.		config/prereg.tsv choices (python/prereg_admin.py)				
+PLASBENCH_CI_METHOD_STRATIFIED	enum	cluster_t	Cluster t	Study-clustered bootstrap-t interval.		config/prereg.tsv choices (python/prereg_admin.py)				
+PLASBENCH_CI_METHOD_STRATIFIED	enum	bootstrap_t	Bootstrap t	Bootstrap-t interval.	yes	config/prereg.tsv choices (python/prereg_admin.py)				
+MULTIQC_REPORT	enum	auto	Auto	Run MultiQC only when it is installed.	yes	python/run_multiqc.py (auto, on, off)				
+MULTIQC_REPORT	enum	on	On	Always try, and warn when MultiQC is missing.		python/run_multiqc.py (auto, on, off)				
+MULTIQC_REPORT	enum	off	Off	Never.		python/run_multiqc.py (auto, on, off)				
+ISESCAN_SCOPE	enum	plasmids	Plasmids only	ISEScan searches only the replicons the truth labels plasmid; the chromosome is recorded as not searched.	yes	python/annotate_reference.py ISESCAN_SCOPES				
+ISESCAN_SCOPE	enum	all	Every sequence	ISEScan searches the chromosome too (much slower).		python/annotate_reference.py ISESCAN_SCOPES				
+STATS_VALIDATION_MODE	enum	smoke	Smoke	A few scenarios and 100 replicates: seconds, indicative.	yes	python/simulate_validation.py SETTINGS				
+STATS_VALIDATION_MODE	enum	full	Full	Every scenario and 1,000 replicates: minutes, the evidence.		python/simulate_validation.py SETTINGS				
+DISSIMILARITY_REPEATS	enum	aware	Repeat-aware	A contig that sits in several bins is paired as PlasEval does (branch and bound).	yes	python/bin_agreement.py --repeats choices				
+DISSIMILARITY_REPEATS	enum	drop	Drop repeats	Keep only the first copy of each contig (the earlier behaviour).		python/bin_agreement.py --repeats choices				
+LEAKAGE_CUTOFF_POLICY	enum	per_tool	Per tool	Compare each genome with each tool's own database date.	yes	python/flag_database_overlap.py --policy choices				
+LEAKAGE_CUTOFF_POLICY	enum	fixed_date	Fixed date	Compare every database-using tool with one cutoff date (LEAKAGE_CUTOFF_DATE).		python/flag_database_overlap.py --policy choices				
+LEAKAGE_DATE_BASIS	enum	earliest_public	Earliest public	The earlier of the assembly release and the first read run's year.	yes	python/flag_database_overlap.py LEAKAGE_DATE_BASES				
+LEAKAGE_DATE_BASIS	enum	assembly	Assembly release	The assembly's release date.		python/flag_database_overlap.py LEAKAGE_DATE_BASES				
+LEAKAGE_DATE_BASIS	enum	read	First read run	The year of the first paired read run.		python/flag_database_overlap.py LEAKAGE_DATE_BASES				
+RUN_PUBLISHED_COMPARISON	enum	auto	Auto	Put the results beside a paper's own when the cohort holds isolates of a published benchmark.	yes	scripts/06_aggregate.sh (auto, off)				
+RUN_PUBLISHED_COMPARISON	enum	off	Off	Never write the published comparison.		scripts/06_aggregate.sh (auto, off)				
+RUN_PLSDB_NOVELTY	enum	auto	Auto	Run the PLSDB novelty split when PLSDB_FASTA exists.	yes	scripts/06_aggregate.sh (auto, off)				
+RUN_PLSDB_NOVELTY	enum	off	Off	Never.		scripts/06_aggregate.sh (auto, off)				
+RUN_PLASEVAL_GATE	enum	auto	Auto	Run the PlasEval comparison gate when PlasEval is available.	yes	scripts/06_aggregate.sh (auto, on, off)				
+RUN_PLASEVAL_GATE	enum	on	On	Always run it.		scripts/06_aggregate.sh (auto, on, off)				
+RUN_PLASEVAL_GATE	enum	off	Off	Never.		scripts/06_aggregate.sh (auto, on, off)				
+PROTEIN_ANNOTATION_ENGINE	enum	bakta	Bakta	Protein annotation with Bakta (needs its database).	yes	python/annotate_proteins.py --engine choices				
+PROTEIN_ANNOTATION_ENGINE	enum	prokka	Prokka	Protein annotation with Prokka.		python/annotate_proteins.py --engine choices				
+PROTEIN_ANNOTATION_ENGINE	enum	none	None	No protein annotation engine.		python/annotate_proteins.py --engine choices				
+PLASBENCH_RUNTIME	enum	conda	Conda	Tools run from the plasbench conda environment on this computer.	yes	plasbench/cli.py runtime choices				
+PLASBENCH_RUNTIME	enum	docker	Docker	Commands that need the tools run inside a container of the PlasBench image.		plasbench/cli.py runtime choices				
+PLASBENCH_DOCKER_PULL	enum	missing	When missing	Pull the image only when it is not on this computer.	yes	plasbench/docker_runtime.py PULL_POLICIES				
+PLASBENCH_DOCKER_PULL	enum	always	Always	Pull the image before every run.		plasbench/docker_runtime.py PULL_POLICIES				
+PLASBENCH_DOCKER_PULL	enum	never	Never	Never pull; fail if the image is missing.		plasbench/docker_runtime.py PULL_POLICIES				
+MINIMAP2_PRESET	enum	asm5	asm5	Assembly to reference, under 5% divergence.	yes	minimap2 -x assembly presets (scripts/05_score.sh passes it to -x)				
+MINIMAP2_PRESET	enum	asm10	asm10	Assembly to reference, under 10% divergence.		minimap2 -x assembly presets (scripts/05_score.sh passes it to -x)				
+MINIMAP2_PRESET	enum	asm20	asm20	Assembly to reference, under 20% divergence.		minimap2 -x assembly presets (scripts/05_score.sh passes it to -x)				
+TRUTH_LONG_READ_PRESET	enum	map-ont	map-ont	Oxford Nanopore reads to the reference.	yes	minimap2 -x read presets (scripts/02_truth.sh passes it to -x)				
+TRUTH_LONG_READ_PRESET	enum	map-hifi	map-hifi	PacBio HiFi reads to the reference.		minimap2 -x read presets (scripts/02_truth.sh passes it to -x)				
+TRUTH_LONG_READ_PRESET	enum	map-pb	map-pb	PacBio continuous long reads to the reference.		minimap2 -x read presets (scripts/02_truth.sh passes it to -x)				
+READ_DEPTH_CAP_X	combo	off	Off (whole files)	Download whole read files; never cut a run to a depth.		python/depth_cap.py parse_cap (off, none, no, false, whole, 0, or a number)				
+READ_DEPTH_CAP_X	combo	@number	Number...	Fetch only enough read pairs for about this depth (x coverage of the reference).		python/depth_cap.py parse_cap (off, none, no, false, whole, 0, or a number)	x coverage	1		1
+WORK_DIR	combo	auto	Auto	A local fast folder when the data folder is on a slow mount, else in place.	yes	python/work_dir.py resolve (auto, data, or a folder)				
+WORK_DIR	combo	data	In the data folder	Always work in place.		python/work_dir.py resolve (auto, data, or a folder)				
+WORK_DIR	combo	@path	Folder...	Work in a folder you choose (never a memory-backed one).		python/work_dir.py resolve (auto, data, or a folder)	folder			
+DOWNLOAD_TMP_DIR	combo	auto	Auto	A local fast folder when the data folder is on a slow mount, else the data folder.	yes	python/download_scratch.py resolve (auto, data, or a folder)				
+DOWNLOAD_TMP_DIR	combo	data	In the data folder	Always download into the data folder.		python/download_scratch.py resolve (auto, data, or a folder)				
+DOWNLOAD_TMP_DIR	combo	@path	Folder...	Download into a folder you choose (never a memory-backed one).		python/download_scratch.py resolve (auto, data, or a folder)	folder			
