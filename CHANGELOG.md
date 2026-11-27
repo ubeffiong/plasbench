@@ -13,6 +13,8 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- the side panel and the AI help are exactly as wide (27 November 2026)
+- One width token (`--drw`, 430 px or 92% of a narrower screen) for both right-hand drawers and for the room the page keeps free for them, so swapping the side panel and the AI help moves nothing. The side panel was 248 px; its Studies, Jobs and Git content was checked at the new width in headless Edge at three window sizes.
 ### Fixed -- the tool fingerprint, the feature matrix and the 3D landscape are compact and no longer overlap (27 November 2026)
 Presentation only: no number, rank or score changes.
 - **Cause of the oversized fingerprint and the overlapping feature-matrix titles.** The tool fingerprint and the presence/absence matrix both used the class prefix `fp-` (`.fp-root`, `.fp-svg`, `.fp-main`, `.fp-panel`, ...), so each figure's style sheet restyled the other: the radar tiles were stretched to several times their size and overlapped, so a click or tap reached the tile under the pointer rather than the tile drawn there (16 of 20 probe points hit the wrong tile on the old sample report). The fingerprint now uses `fpr-`, every tile clips to its own box, and a test fails when two figure style sheets define the same class name.

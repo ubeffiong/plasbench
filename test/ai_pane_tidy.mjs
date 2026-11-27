@@ -89,6 +89,7 @@ check("an old link to the AI tab opens the AI drawer", /if \(t === "ai"\) \{ set
 check("Escape closes the AI drawer (after any open tooltip, popover or dialog)", /\$\("#aidrawer"\)\.addEventListener\("keydown"/.test(page) && /\$\("#tipbox"\)\.hidden/.test(page));
 check("the stored state is restored (the AI drawer or the side panel, never both)", /localStorage\.getItem\("pb_ai_open"\) === "1"\) AI\.reopen = true; else if/.test(page));
 check("no dangling reference to the old AI tab (gd-ai, the ai tab of setPanelTab)", !/gd-ai/.test(page) && !/\["studies", "jobs", "git", "ai"\]/.test(page));
+check("both drawers use the one width token, and so does the space kept free for them", /#gdrawer,#aidrawer\{[^}]*width:var\(--drw\)/.test(page) && /body\.gd-open \.shell,body\.ai-open \.shell\{margin-right:var\(--drw\)\}/.test(page) && !/--gdw|--aiw/.test(page));
 const bad = results.filter(x => !x).length;
 console.log(bad ? `${bad} FAILED` : "ALL PANE TIDY CHECKS PASSED");
 process.exit(bad ? 1 : 0);

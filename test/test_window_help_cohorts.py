@@ -142,7 +142,7 @@ def main():
           and 'e.key === "G"' in script and all(f'gdSec("gd_{k}"' in script for k in
                                                ("changes", "commit", "branches", "remote", "files", "history")))
     check("drawer collapses and remembers it", "pb_gd_open" in script and "gd-open" in page)
-    check("the page makes room for the drawer on wide screens", "body.gd-open .shell{margin-right:var(--gdw)}" in page)
+    check("the page makes room for either drawer on wide screens, by the one shared width", "body.gd-open .shell,body.ai-open .shell{margin-right:var(--drw)}" in page)
     from plasbench import gitops
     if gitops.find_git():
         repo = tmp / "repo"
@@ -178,7 +178,7 @@ def main():
         except exc:
             check(f"refused: {Path(bad).name}", True)
     os.environ.pop("PLASBENCH_WORKSPACE", None)
-    check("side panel is as wide as the navigation rail", ":root{--gdw:248px}" in page and "--railw:248px" in page)
+    check("the side panel and the AI help share one width token", ":root{--drw:min(430px,92vw)}" in page and "#gdrawer,#aidrawer{" in page and "width:var(--drw)" in page and "--gdw" not in page and "--aiw" not in page)
     check("main-area tabs: the page plus documents, closable", 'id="mtabs"' in page and 'id="v_doc"' in page
           and "function openDoc" in script and "function mtClose" in script and "auxclick" in script)
     check("diffs and commits open as tabs", 'openDoc({kind: "diff"' in script and 'openDoc({kind: "commit"' in script)
