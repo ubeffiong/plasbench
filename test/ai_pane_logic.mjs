@@ -7,8 +7,8 @@ const results = [];
 const check = (name, ok, detail = "") => { results.push(ok); console.log((ok ? "  ok    " : "  FAIL  ") + name + (ok ? "" : `  [${detail}]`)); };
 const grabFn = name => { const i = html.indexOf(`\nfunction ${name}(`); if (i < 0) throw new Error("missing " + name); const j = html.indexOf("\n}\n", i); return html.slice(i + 1, j + 2); };
 const grabConst = name => { const m = html.match(new RegExp(`^const ${name} = .*$`, "m")); if (!m) throw new Error("missing const " + name); return m[0]; };
-const src = [grabConst("esc"), grabConst("icon"), grabConst("aiKb"), "const AI_WHERE = {window: 'w', terminal: 't'}; const AI_PLAIN_WHERE = 'x';", ...["md", "aiActionCard", "aiAskCard", "aiScanCard", "aiPlanCard", "aiUiCard", "aiToolCard", "aiMsgHtml", "aiDestHtml", "aiIsoHtml", "aiCheckHtml", "aiIntakeCard", "aiLabelsCard", "aiCheckCard", "aiDigestHtml"].map(grabFn),
-  "globalThis.T = {esc, md, aiActionCard, aiAskCard, aiScanCard, aiPlanCard, aiUiCard, aiToolCard, aiMsgHtml, aiKb, aiIntakeCard, aiLabelsCard, aiCheckCard};"].join("\n");
+const src = [grabConst("esc"), grabConst("icon"), grabConst("aiKb"), grabConst("dattr"), grabConst("aiTip"), "const AI_WHERE = {window: 'w', terminal: 't'}; const AI_PLAIN_WHERE = 'x';", ...["md", "aiActionCard", "aiAskCard", "aiScanCard", "aiPlanCard", "aiUiCard", "aiToolCard", "aiMsgHtml", "aiDestHtml", "aiIsoHtml", "aiCheckHtml", "aiIntakeCard", "aiLabelsCard", "aiCheckCard", "aiDigestHtml", "tipBtn", "aiSourcesHtml", "aiAnswerTip", "aiDeclHtml", "aiFootHtml"].map(grabFn),
+  "globalThis.T = {esc, md, aiActionCard, aiAskCard, aiScanCard, aiPlanCard, aiUiCard, aiToolCard, aiMsgHtml, aiKb, aiIntakeCard, aiLabelsCard, aiCheckCard, aiSourcesHtml, aiDeclHtml, aiFootHtml};"].join("\n");
 const ctx = vm.createContext({console}); vm.runInContext(src, ctx);
 const T = ctx.T;
 const corpus = ["<script>PWN()</script>", "<img src=x onerror=PWN()>", "\"><b id=PWN>", "' onmouseover='PWN()", "\" onfocus=\"PWN()\" autofocus x=\"", "<svg onload=PWN()>", "<iframe src=javascript:PWN()>", "javascript:PWN()",
@@ -57,6 +57,10 @@ for (const p of corpus) {
           candidates: [p, p], organism: p, organism_guess: p, truth: p, needs_review: 1, issues: [{level: "warn", text: p, code: p}], ops: [{kind: p, from: [p], to: p, how: p}]}]}}, 0),
     labels: T.aiLabelsCard({data: {sample: p, rows: [{sequence_id: p, raw_id: p, length: 3, header: p, label: "REVIEW"}]}, note: p}, 0),
     check: T.aiCheckCard({dest: {where: "shared", sheet: p}, check: {ok: false, error: p, samples: [], fixable: 0, repaired: []}, err: p, note: p}, 0),
+    sources: T.aiSourcesHtml([{n: 1, src: p, anchor: p, title: p}, {n: 2, src: p, anchor: p, title: p}]),
+    decl: T.aiDeclHtml(p),
+    foot: T.aiFootHtml({used_today: {requests: 1, tokens: 2}, cap: 3, signed_in: true, needs_key: true}, p, {usage: {prompt: p, completion: p}, free_requests: {remaining: p, limit: p}}),
+    answer: T.aiMsgHtml({role: "bot", content: p, usage: {total: p, prompt: p, completion: p}, model: p, provider: p}, 0),
     digest: T.aiMsgHtml({role: "bot", content: p, digest: {text: p, tokens: 3, resume: true}, failedJob: p}, 0),
   };
   for (const [k, o] of Object.entries(outs)) {

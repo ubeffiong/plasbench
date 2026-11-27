@@ -23,7 +23,7 @@ def check(label, good, detail=""):
 print("elements")
 for ident in ("aibtn", "gdp_ai", "ai_tools", "ai_prov", "ai_model", "ai_brief", "ai_remember", "ai_new", "ai_state", "ai_log", "ai_starters", "ai_form", "ai_in", "ai_send", "ai_stop", "ai_foot", "ai_live"):
     check(f"#{ident} appears exactly once", len(re.findall(r'id="%s"' % ident, html)) == 1)
-check("the AI tab is in the drawer's tab list", 'data-pt="ai"' in html)
+check("the AI help is its own drawer (not a tab of the side panel), opened by the AI help button", 'data-pt="ai"' not in html and 'id="aidrawer"' in html and 'aria-controls="aidrawer"' in html)
 check("the log is a live region with a name", re.search(r'id="ai_log" role="log" aria-live="polite" aria-label="[^"]+"', html))
 check("the composer has an accessible label and Enter sends, Shift+Enter does not", 'aria-label="Your question (Enter sends, Shift+Enter adds a line)"' in html and 'e.key === "Enter" && !e.shiftKey' in html)
 check("the shortcut is Alt+Shift+H and the button names it", "Alt+Shift+H" in html and 'e.altKey && e.shiftKey' in html)
