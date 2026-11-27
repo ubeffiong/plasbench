@@ -9,7 +9,7 @@ source:
   # The release archive (attached to the GitHub Release together with its .sha256 file), not GitHub's auto-generated tag tarball: its checksum is published and checked
   # by the Release workflow. For a new version: download plasbench-<version>.tar.gz and read the value from plasbench-<version>.tar.gz.sha256.
   url: https://github.com/ubeffiong/plasbench/releases/download/v{{ version }}/plasbench-{{ version }}.tar.gz
-  sha256: 17f2fd142897a84acbf2fe263a8f42832ba26ef9a0e2571231f2be40b9409750
+  sha256: 68159b5642b5d752d22b9ee532d5a1328191e870ffc8200ff88677ab4adf3c50
 
 build:
   noarch: generic
