@@ -68,6 +68,10 @@ while IFS=$'\t' read -r SAMPLE _; do
         python3 "$PY/score_plasmids.py" --truth "$TRUTH" --paf "$PAF" --pred-fasta "$PRED" \
             "${ARGS[@]}" --per-plasmid-out "$SDIR/${TOOL}.per_plasmid.tsv" \
             --sample "$SAMPLE" --tool "$TOOL" --out "$SCORES"
+        # Candidate multiplicity, the same script and outputs as stage 5 (scripts/05_score.sh): descriptive, it never changes the score above.
+        python3 "$PY/candidate_multiplicity.py" --truth "$TRUTH" --paf "$PAF" --pred-fasta "$PRED" --sample "$SAMPLE" --tool "$TOOL" \
+            --out-plasmids "$SDIR/${TOOL}.multiplicity.tsv" --out-candidates "$SDIR/${TOOL}.multiplicity_candidates.tsv" \
+            --out-intervals "$SDIR/${TOOL}.multiplicity_intervals.tsv" 2>/dev/null || true
 
         BINS="$SDIR/pred_${TOOL}.bins.tsv"
         CONTIG_BIN_ARGS=()
@@ -196,6 +200,13 @@ python3 "$PY/database_provenance.py" collect --tool-status "$STATUS" --out "$DEM
 python3 "$PY/assembly_adequacy.py" merge --data-dir "$DEMO" --out "$DEMO/benchmark.assembly_adequacy.tsv"
 python3 "$PY/copy_number.py" merge --results-dir "$DEMO" --out "$DEMO/benchmark.copy_number.tsv"
 python3 "$PY/bin_agreement.py" matrix --results-dir "$DEMO" --data-dir "$DEMO" --out "$DEMO/benchmark.tool_agreement.tsv"
+# The advisory jobs of stage 6 (scripts/06_aggregate.sh) that the demo used to leave out, so the sample report shows the same sections as a real run:
+# candidate multiplicity, ranking stability and the reference-evidence audit.
+python3 "$PY/merge_tables.py" --results-dir "$DEMO" --suffix .multiplicity.tsv --out "$DEMO/benchmark.candidate_multiplicity.tsv"
+python3 "$PY/merge_tables.py" --results-dir "$DEMO" --suffix .multiplicity_candidates.tsv --out "$DEMO/benchmark.candidates.tsv"
+python3 "$PY/merge_tables.py" --results-dir "$DEMO" --suffix .multiplicity_intervals.tsv --out "$DEMO/benchmark.candidate_intervals.tsv"
+python3 "$PY/ranking_stability.py" --scores "$SCORES" --sample-sheet "$SAMPLES" --out-prefix "$DEMO/benchmark" || true
+python3 "$PY/reference_evidence_audit.py" --results-dir "$DEMO" --out "$DEMO/benchmark.reference_evidence_audit.tsv" || true
 # Scoring specification layers, same scripts as stage 6.
 python3 "$PY/label_schemes.py" collect --data-dir "$DEMO" --out "$DEMO/benchmark.label_schemes.tsv" \
     --summary-out "$DEMO/benchmark.label_scheme_summary.tsv"
@@ -249,6 +260,7 @@ python3 "$PY/build_html_report.py" \
     --leave-taxon-out "$DEMO/benchmark.leave_taxon_out.tsv" \
     --amr-placement "$DEMO/benchmark.amr_placement.tsv" \
     --contig-crosscheck "$DEMO/benchmark.contig_crosscheck.tsv" \
+    --cohort-qc-flags "$DEMO/benchmark.cohort_qc_flags.tsv" \
     --embed-dashboard \
     --out "$DEMO/benchmark.report.html"
 

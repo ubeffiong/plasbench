@@ -140,7 +140,7 @@ def tile_svg(label, values, colour, dash, track):
     avail = sum(v is not None for v in values)
     desc = ("A small radar on a 0 to 1 scale: " + "; ".join(f"{AXES[k][0]} {v:.2f}" for k, v in enumerate(values) if v is not None)) if poly else \
         f"Fewer than {MIN_AXES} axes are available for this tool, so no polygon is drawn."
-    out = [f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 {BOX} {BOX}' width='{TILE_PX}' height='{TILE_PX}' role='img' class='fp-svg' "
+    out = [f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 {BOX} {BOX}' width='{TILE_PX}' height='{TILE_PX}' role='img' class='fpr-svg' "
            f"aria-label='{sv.esc(name + '. ' + desc)}' preserveAspectRatio='xMidYMid meet'><title>{sv.esc(name)}</title>", frame()]
     if poly:
         out.append(f"<polygon points='{poly}' fill='{colour}' fill-opacity='.16' stroke='{colour}' stroke-width='1.8' stroke-linejoin='round' stroke-dasharray='{dash}'/>")
@@ -210,17 +210,17 @@ def track_html(block, track_model, data, colour):
     for (row, values), t in zip(entries, track_model["tools"]):
         c, d = colour[row["tool"]]
         sub = (f"rank {t['rank']} of {track_model['of']}" if t["rank"] else "not ranked") + f" &middot; {t['naxes']}/{len(AXES)} axes"
-        tiles.append(f"<div class='fp-tile' data-id='{sv.esc(t['id'])}' data-track='{sv.esc(block['track'])}'>{tile_svg(row['label'], values, c, d, block['track'])}"
-                     f"<span class='fp-name'><i style='background:{c}'></i>{sv.esc(row['label'])}</span><span class='fp-sub'>{sub}</span></div>")
-    return (f"<div class='fp-track' data-track='{sv.esc(block['track'])}'><h3>{sv.esc(track_model['label'])} <small>{len(entries)} tool{'s' if len(entries) != 1 else ''}</small></h3>"
-            f"<div class='fp-grid' role='group' aria-label='Fingerprints, {sv.esc(track_model['label'])} track'>{''.join(tiles)}</div>"
+        tiles.append(f"<div class='fpr-tile' data-id='{sv.esc(t['id'])}' data-track='{sv.esc(block['track'])}'>{tile_svg(row['label'], values, c, d, block['track'])}"
+                     f"<span class='fpr-name'><i style='background:{c}'></i>{sv.esc(row['label'])}</span><span class='fpr-sub'>{sub}</span></div>")
+    return (f"<div class='fpr-track' data-track='{sv.esc(block['track'])}'><h3>{sv.esc(track_model['label'])} <small>{len(entries)} tool{'s' if len(entries) != 1 else ''}</small></h3>"
+            f"<div class='fpr-grid' role='group' aria-label='Fingerprints, {sv.esc(track_model['label'])} track'>{''.join(tiles)}</div>"
             f"{numbers_table(block, cols_by_id, index, entries)}</div>")
 
 
 def key_html():
     items = "".join(f"<li><b>{CODES[col]}</b> {sv.esc(label)}{' &dagger; unvalidated' if col == 'SVP' else ''}</li>" for label, col, _m, _i in AXES)
-    return (f"<ul class='fp-key' aria-label='Axis codes'>{items}</ul>"
-            "<p class='fp-scale'>Scale (every tile): 0 at the centre, 0.5 at the inner ring, 1 at the rim; further out is better. "
+    return (f"<ul class='fpr-key' aria-label='Axis codes'>{items}</ul>"
+            "<p class='fpr-scale'>Scale (every tile): 0 at the centre, 0.5 at the inner ring, 1 at the rim; further out is better. "
             "A missing axis is skipped, never zero.</p>")
 
 
@@ -237,10 +237,10 @@ def build_section(data):
     colour = tool_colours(data)
     payload = model(data)
     tracks = "".join(track_html(b, t, data, colour) for b, t in zip(data["blocks"], payload["tracks"]))
-    host = (f"<div class='fp-root' id='fp-root'>{key_html()}<div class='fp-main'><div class='fp-stage'>{tracks}"
-            "<div class='fp-tip' id='fp-tip' role='tooltip' hidden></div></div>"
-            "<aside class='fp-panel' id='fp-panel' aria-label='Tool fingerprint panel' hidden></aside></div></div>"
-            + json_script("fp-data", payload))
+    host = (f"<div class='fpr-root' id='fpr-root'>{key_html()}<div class='fpr-main'><div class='fpr-stage'>{tracks}"
+            "<div class='fpr-tip' id='fpr-tip' role='tooltip' hidden></div></div>"
+            "<aside class='fpr-panel' id='fpr-panel' aria-label='Tool fingerprint panel' hidden></aside></div></div>"
+            + json_script("fpr-data", payload))
     return rc.section(SECTION_ID, TITLE, LEAD, rc.Raw(host), group="Figures"), asset("fig_fingerprint_style.html") + asset("fig_fingerprint_core.html") + asset("fig_fingerprint_ui.html")
 
 
