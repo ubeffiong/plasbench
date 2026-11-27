@@ -558,18 +558,16 @@ dialog.pbdlg .stopsw{display:flex;gap:8px;align-items:center;margin:6px 0;font-w
 }
 
 /* ---------- source control drawer (right-hand side, every page) ---------- */
-#gdrawer,#aidrawer{position:fixed;top:var(--hdr);right:0;bottom:var(--cons);width:var(--gdw);z-index:66;background:var(--surface);border-left:1px solid var(--line);
+#gdrawer,#aidrawer{position:fixed;top:var(--hdr);right:0;bottom:var(--cons);width:var(--drw);z-index:66;background:var(--surface);border-left:1px solid var(--line);
  display:flex;flex-direction:column;transform:translateX(100%);transition:transform .16s ease;box-shadow:none}
-#aidrawer{width:var(--aiw)}#gdrawer[aria-hidden=true],#aidrawer[aria-hidden=true]{visibility:hidden}
+#gdrawer[aria-hidden=true],#aidrawer[aria-hidden=true]{visibility:hidden}
 body.gd-open #gdrawer,body.ai-open #aidrawer{transform:none;visibility:visible}
-:root{--aiw:min(430px,92vw)}
+:root{--drw:min(430px,92vw)}   /* ONE width for both right-hand drawers (the side panel and the AI help), and for the space kept free for them: swapping them never moves anything */
 #ai_head{display:flex;align-items:center;gap:8px;padding:0 4px 0 10px;min-height:36px;border-bottom:1px solid var(--line);background:var(--surface-2);flex:none;font-size:12.5px}
 #ai_head .grow{flex:1}#gdp_ai{flex:1;display:flex;flex-direction:column;min-height:0}
 .aidot{width:8px;height:8px;border-radius:50%;background:var(--primary);display:inline-block;margin-left:2px}.aidot[hidden]{display:none}
-:root{--gdw:248px}   /* the same width as the navigation rail on the left */
-@media (min-width:1280px){body.gd-open .shell{margin-right:var(--gdw)}body.gd-open #toasts{right:calc(var(--gdw) + 16px)}body.ai-open .shell{margin-right:var(--aiw)}body.ai-open #toasts{right:calc(var(--aiw) + 16px)}}
+@media (min-width:1280px){body.gd-open .shell,body.ai-open .shell{margin-right:var(--drw)}body.gd-open #toasts,body.ai-open #toasts{right:calc(var(--drw) + 16px)}}
 @media (max-width:1279px){body.gd-open #gdrawer,body.ai-open #aidrawer{box-shadow:var(--shadow-lg)}}
-@media (max-width:640px){:root{--gdw:min(320px,92vw)}}
 #gd_head{display:flex;align-items:stretch;border-bottom:1px solid var(--line);background:var(--surface-2);flex:none;min-height:36px}
 #gd_tabs{display:flex;flex:1;min-width:0}
 #gd_tabs button{flex:1;min-width:0;display:inline-flex;align-items:center;justify-content:center;gap:5px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--mut);font:inherit;font-size:12.5px;cursor:pointer;padding:0 4px;white-space:nowrap}
