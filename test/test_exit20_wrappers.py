@@ -70,7 +70,7 @@ def main():
     check("scripts/lib.sh: another code still reads as a failure", "failed with exit code 9" in other, other)
 
     ui = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
-    check("the terminal page prints exit 20 and 21 as information, not as an error", 'r.exit === 20 || r.exit === 21' in ui and "t-err" in ui)
+    check("the terminal page prints exit 20 and 21 as information, not as an error", 'r.exit === 20 || r.exit === 21' in ui and 'class="ln lv-err">[exit ${r.exit}]' in ui)
     check("the window labels the two states", "consent_needed" in ui and "manual_step" in ui)
 
     print("ALL EXIT-20 WRAPPER TESTS PASSED" if not FAILED else f"FAILED: {FAILED}")
