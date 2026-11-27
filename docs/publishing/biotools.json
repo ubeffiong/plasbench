@@ -4,7 +4,7 @@
   "biotoolsCURIE": "biotools:plasbench",
   "description": "PlasBench benchmarks plasmid-reconstruction tools against complete-reference truth. Every tool, whether a classifier, a binner or a re-assembler, is reduced to one predicted-plasmid FASTA that is projected back onto the reference, so base-level precision, recall and F1 sit beside plasmid-level recovery and structural measures, with the evidence tier of every reference recorded. It downloads or imports isolates, builds the truth, assembles short reads, runs the installed tools, scores them and writes an offline HTML report. Command line and a local browser window; Docker or conda.",
   "homepage": "https://github.com/ubeffiong/plasbench",
-  "version": ["0.5.7"],
+  "version": ["0.5.8"],
   "toolType": ["Command-line tool", "Web application", "Workflow"],
   "operatingSystem": ["Linux", "Mac", "Windows"],
   "language": ["Python", "Bash"],
@@ -51,9 +51,9 @@
     {"url": "https://github.com/ubeffiong/plasbench/issues", "type": ["Issue tracker"]}
   ],
   "download": [
-    {"url": "https://github.com/ubeffiong/plasbench/releases/tag/v0.5.7", "type": "Software package", "version": "0.5.7"},
-    {"url": "https://github.com/ubeffiong/plasbench/releases/download/v0.5.7/plasbench-0.5.7.tar.gz", "type": "Source code", "version": "0.5.7", "note": "SHA-256 in plasbench-0.5.7.tar.gz.sha256 on the same release."},
-    {"url": "https://github.com/ubeffiong/plasbench/pkgs/container/plasbench", "type": "Container file", "version": "0.5.7", "note": "ghcr.io/ubeffiong/plasbench:v0.5.7"},
+    {"url": "https://github.com/ubeffiong/plasbench/releases/tag/v0.5.8", "type": "Software package", "version": "0.5.8"},
+    {"url": "https://github.com/ubeffiong/plasbench/releases/download/v0.5.8/plasbench-0.5.8.tar.gz", "type": "Source code", "version": "0.5.8", "note": "SHA-256 in plasbench-0.5.8.tar.gz.sha256 on the same release."},
+    {"url": "https://github.com/ubeffiong/plasbench/pkgs/container/plasbench", "type": "Container file", "version": "0.5.8", "note": "ghcr.io/ubeffiong/plasbench:v0.5.8"},
     {"url": "https://github.com/ubeffiong/plasbench/tree/main/galaxy", "type": "Tool wrapper (Galaxy)", "note": "Align, score and aggregate steps."}
   ],
   "documentation": [
