@@ -182,7 +182,7 @@ HELP = {
     "fig-radar": H(
         "Each tool's strengths and weaknesses as one shape, per analysis track.",
         "The same numbers as the tool heatmap: accuracy, recovery, reconstruction, structure, verified sequence, efficiency and reliability.",
-        "One axis per question, 0 at the centre and 1 at the rim; a polygon joins a tool's values. Runtime is drawn as its scorecard score over 100.",
+        "One axis per question, 0 at the centre and 1 at the rim; a polygon joins a tool's values. Runtime is drawn as its scorecard score over 100. The S / M / L buttons change the tile size; click or press Enter on a tile for its panel.",
         "A tool that reaches far on every axis is strong all round; a dent shows where it is weak.",
         "Shows trade-offs, for example a fast tool that reconstructs little, that a single ranking hides.",
         "An axis that is not available is skipped, never drawn as zero. Polygon area is not a score and ranks nothing; the table beneath is the record."),

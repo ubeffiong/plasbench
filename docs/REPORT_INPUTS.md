@@ -71,7 +71,7 @@ The table has one row for every file the report reads (the registry in `python/r
 | `{sample}/{sample2}.mob_classifier.provenance.json` | mob_to_gplas_classifier.py | 5 scoring | predictions, reference and truth tables | re-run stage 5 (scripts/05_score.sh) from the predictions, reference and truth | none | enriches | none |
 | `{sample}/report_inputs.json` | keep_report_inputs.py | 5 scoring | the kept inputs | rewritten by keep_report_inputs.py (stage 5, or --only keep) | none | enriches | `method` |
 
-## Per sample and tool (33 files)
+## Per sample and tool (36 files)
 
 | File | Written by | Stage | Needs | Rebuild from | --only | Role | Sections |
 |---|---|---|---|---|---|---|---|
@@ -108,6 +108,9 @@ The table has one row for every file the report reads (the registry in `python/r
 | `{sample}/{tool}.proteins.provenance.json` | annotate_proteins.py | 5 scoring | predictions, reference and truth tables | re-run stage 5 (scripts/05_score.sh) from the predictions, reference and truth | none | enriches | none |
 | `{sample}/{tool}.replicon_hits.tsv` | 04_run_tools.sh | 4 tools | reads or assemblies, the tool and its database | re-run the tool (stage 4, scripts/04_run_tools.sh); it cannot be rebuilt from other files | none | enriches | none |
 | `{sample}/{tool}.prediction_summary.tsv` | keep_report_inputs.py | 5 scoring | the predictions (pred_<tool>.plasmid.fasta) | pred_<tool>.plasmid.fasta via keep_report_inputs.py (written at the end of stage 5) | none | enriches | `method` |
+| `{sample}/{tool}.multiplicity.tsv` | candidate_multiplicity.py | 5 scoring | predictions, reference and truth tables | re-run stage 5 (scripts/05_score.sh) from the predictions, reference and truth | none | enriches | `learn-multiplicity` |
+| `{sample}/{tool}.multiplicity_candidates.tsv` | candidate_multiplicity.py | 5 scoring | predictions, reference and truth tables | re-run stage 5 (scripts/05_score.sh) from the predictions, reference and truth | none | enriches | `learn-multiplicity` |
+| `{sample}/{tool}.multiplicity_intervals.tsv` | candidate_multiplicity.py | 5 scoring | predictions, reference and truth tables | re-run stage 5 (scripts/05_score.sh) from the predictions, reference and truth | none | enriches | `learn-multiplicity` |
 
 ## Per run (results folder top level) (109 files)
 

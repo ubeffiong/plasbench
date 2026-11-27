@@ -482,7 +482,7 @@ def _mx_outcomes(tool, counts):
 
 def multiplicity_section(plasmids, candidates, intervals):
     lead = ("Does a tool return one clean record per plasmid, or several overlapping or mixed ones? Click a tool for its plasmids and tracks. "
-            "<strong>Descriptive: it never changes a score, and extra candidates cannot raise the primary endpoint.</strong>")
+            "<strong>Descriptive: it never changes a score.</strong> Extra candidates cannot raise the primary endpoint.")
     if not plasmids:
         return section("learn-multiplicity", "Reconstruction multiplicity", lead, note(
             "Not run: benchmark.candidate_multiplicity.tsv was not produced (RUN_CANDIDATE_MULTIPLICITY=0, or stage 5 has not run)."))
@@ -536,10 +536,10 @@ def multiplicity_section(plasmids, candidates, intervals):
                          + (f"<p class='small'>The first 300 of {len(group)} plasmids; the full table is benchmark.candidate_multiplicity.tsv.</p>" if len(group) > 300 else ""))
         mine = [r for r in chosen if r["tool"] == tool]
         tracks = "".join(
-            f"<details class='mx-track'><summary>{esc(r['sample'])} / {esc(r['plasmid'])}: {esc(r['n_touching'])} records touch it, outcome {esc(r['outcome'].replace('_', ' '))}</summary>"
+            f"<details class='mx-track' data-closed='1'><summary>{esc(r['sample'])} / {esc(r['plasmid'])}: {esc(r['n_touching'])} records touch it, outcome {esc(r['outcome'].replace('_', ' '))}</summary>"
             f"<figure class='binfig'>{track_figure(r, by_plasmid[(r['sample'], r['tool'], r['plasmid'])])}</figure></details>" for r in mine)
         tool_rows.append(
-            f"<details class='mx-tool'><summary class='mx-row'><span class='mx-name'>{esc(tool)}</span>{_mx_composition(tool, comp.get(tool, {'length': 0, 'plasmid': 0, 'chrom': 0, 'redundant': 0}))}"
+            f"<details class='mx-tool' data-closed='1'><summary class='mx-row'><span class='mx-name'>{esc(tool)}</span>{_mx_composition(tool, comp.get(tool, {'length': 0, 'plasmid': 0, 'chrom': 0, 'redundant': 0}))}"
             f"{_mx_dumbbell(tool, best, comb, len(group))}{_mx_outcomes(tool, outcomes[tool])}"
             f"<span class='mx-txt'>coverage {best:.2f} &rarr; {comb:.2f}; {(n_cand or 0):.1f} candidates per plasmid; {100 * (red or 0):.0f}% redundant</span></summary>"
             f"<div class='mx-body'><p class='small'>{esc(reading)}</p>{plasmid_table}"
@@ -553,13 +553,13 @@ def multiplicity_section(plasmids, candidates, intervals):
     full = ""
     figs = [composition_chart(comp), coverage_chart(plasmids)]
     if any(figs):
-        full = ("<details class='mx-all'><summary>Full-size charts</summary>"
+        full = ("<details class='mx-all' data-closed='1'><summary>Full-size charts</summary>"
                 + "".join(f"<figure class='binfig'><div style='overflow-x:auto'>{f}</div></figure>" for f in figs if f) + "</details>")
     if not chosen:
         full += note("No plasmid in this run has more than one candidate touching it, so there are no tracks to draw.", caution=False)
     return section("learn-multiplicity", "Reconstruction multiplicity", lead,
                    "<div class='mx'>" + heads + "".join(tool_rows) + key + "</div>"
-                   + "<details class='mx-all'><summary>All values (one row per tool)</summary>" + table + "</details>" + full)
+                   + "<details class='mx-all' data-closed='1'><summary>All values (one row per tool)</summary>" + table + "</details>" + full)
 
 
 def stability_section(summary, study_rows=None, species_rows=None):

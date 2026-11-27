@@ -96,7 +96,7 @@ function markSel() {
   } else {
     var pos = null; G.pos.forEach(function (p) { if (p.i === S.sel.b) { pos = p; } });
     if (!pos) { return; }
-    box.setAttribute('x', pos.x + S.sel.f * 8); box.setAttribute('y', 20); box.setAttribute('width', 8); box.setAttribute('height', G.height - 40);
+    box.setAttribute('x', pos.x + S.sel.f * 8); box.setAttribute('y', 20); box.setAttribute('width', 8); box.setAttribute('height', G.height - 40 - G.tith);
   }
   if (svg) { svg.appendChild(box); }
 }
