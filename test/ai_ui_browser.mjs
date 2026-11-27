@@ -51,9 +51,9 @@ await ev("document.querySelector('#ai_in').value = 'How do I check my installati
 check("the answer streams in and finishes", await until("!!document.querySelector('#ai_log .aimsg.bot .aimeta') && document.querySelector('#ai_stop').hidden", 30000));
 check("  the answer is rendered (escaped Markdown), with the model and token count in its (i)", /tokens/.test(await ev("document.querySelector('#ai_log .aimeta .tipi').dataset.tip")) && /plasbench status/.test(await ev("document.querySelector('#ai_log').innerText")));
 check("  source chips are shown", await ev("document.querySelectorAll('#ai_log .aisrc button').length >= 1"));
-check("  an action card with the command, where to run it, and three buttons", await ev("(() => { const c = document.querySelector('#ai_log .aicard2'); return !!c && /plasbench status/.test(c.querySelector('.cmdbox').innerText) && /Run it here/.test(c.textContent) && c.querySelectorAll('button').length === 3; })()"));
+check("  an action card with the command, where to run it, and three buttons", await ev("(() => { const c = document.querySelector('#ai_log .aicard2'); return !!c && /plasbench status/.test(c.querySelector('.cmdbox').innerText) && /Run it here/.test(c.innerText) && c.querySelectorAll('button').length === 3; })()"));
 check("  nothing has run yet (no job)", (await (await fetch(url.split("/?")[0] + "/healthz")).ok) && await ev("api('jobs').then(r => r.jobs.filter(j => /AI help/.test(j.label || '')).length === 0)"));
-check("  a free badge, tokens and today's count in the footer", /free/.test(await ev("document.querySelector('#ai_foot').innerText")) && /Today: 1 requests/.test(await ev("document.querySelector('#ai_foot').innerText")), await ev("document.querySelector('#ai_foot').innerText"));
+check("  a free badge and a small usage indicator in the footer; today's requests and tokens are in its (i)", /free/.test(await ev("document.querySelector('#ai_foot').innerText")) && /Today: 1 requests, [\d,]+ tokens/.test(await ev("document.querySelector('#ai_foot .tipi').dataset.tip")) && !/Today: 1 requests/.test(await ev("document.querySelector('#ai_foot').innerText")), await ev("document.querySelector('#ai_foot').innerText"));
 await shot("4-answer");
 // Run -> consent dialog with the exact command; cancel first
 await click("#ai_log .aicard2 [data-aiact=run]");

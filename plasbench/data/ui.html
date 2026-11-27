@@ -575,13 +575,11 @@ body.gd-open #gdrawer,body.ai-open #aidrawer{transform:none;visibility:visible}
 .aicite:hover,.aicite:focus-visible{text-decoration:underline}
 #ai_qa{flex:none;padding:2px 8px 4px;font-size:12px}#ai_qa>summary{cursor:pointer;color:var(--fg-2);padding:2px 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 #ai_qa>summary{list-style:none}#ai_qa>summary::-webkit-details-marker{display:none}#ai_qa>summary::before{content:"\25B8";font-size:11px;color:var(--mut)}#ai_qa[open]>summary::before{content:"\25BE"}#ai_qa[open]>summary{margin-bottom:2px}
-.aitog{display:inline-flex;align-items:center;gap:2px}
+.aitog{display:inline-flex;align-items:center;gap:2px}.aiuse{font-size:11px;border:1px solid var(--line);border-radius:9px;padding:0 7px;color:var(--fg-2)}.aiuse.warn{border-color:var(--warn);color:var(--warn);background:var(--warn-soft);font-weight:600}.aiuse.bad{border-color:var(--bad);color:var(--bad);background:var(--bad-soft);font-weight:600}
 #ai_decl{display:flex;align-items:center;gap:4px}
 .aifolder{position:relative}.aipop{position:static;display:inline-block}.aipop:not([open])>.aipop-b{display:none}.aipop>summary{list-style:none;cursor:pointer;border:1px solid var(--line);border-radius:3px;padding:0 6px;min-height:24px;display:inline-flex;align-items:center;color:var(--fg-2)}
 .aipop>summary::-webkit-details-marker{display:none}
 .aipop-b{position:absolute;z-index:40;left:8px;right:8px;top:calc(100% + 2px);max-width:360px;padding:8px 10px;background:var(--surface);border:1px solid var(--line);border-radius:4px;box-shadow:var(--shadow-lg);font-size:12px;line-height:1.4}
-.aimore{flex-basis:100%}.aimore>summary{cursor:pointer;color:var(--mut);font-size:12px;width:max-content}.aimore-b{padding:4px 0 0}
-.aicard2.act .ch b{font-weight:600;min-width:0;overflow-wrap:anywhere}
 .aimeta{font-size:11px;color:var(--mut);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .aibadge{font-size:10.5px;border-radius:9px;padding:0 7px;border:1px solid var(--ok);color:var(--ok);background:var(--ok-soft)}
 .aibadge.local{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
@@ -6406,7 +6404,7 @@ function aiRender() {
     const failed = aiContext().last_failure;
     starters.innerHTML = (failed && !AI.pre ? `<button type="button" data-aiflow="why_failed">Why did my last run fail?</button>` : "") + ["How do I install and run my first benchmark?", "How do I prepare my own isolates and sample sheet?", "What do F1, precision and recall mean here?", "My run looks stuck. What do I check?"]
       .map(q => `<button type="button" data-aiq="${esc(q)}">${esc(q)}</button>`).join("");
-    if (failed && !AI.pre) { AI.pre = null; api("ai/validate", {cmd: "plasbench diagnose", where: "window", risk: "safe"}).then(v => { aiDot(true); v.lead = "You have a failed run: find out why"; v.why = "This check is safe and changes nothing: it reads the latest run and says what went wrong."; AI.pre = v; aiRender(); }).catch(() => {}); }
+    if (failed && !AI.pre) { AI.pre = null; api("ai/validate", {cmd: "plasbench diagnose", where: "window", risk: "safe"}).then(v => { aiDot(true); v.why = "Reads the latest run and says what went wrong. It changes nothing."; AI.pre = v; aiRender(); }).catch(() => {}); }
   } else starters.innerHTML = "";
   $("#ai_send").disabled = AI.busy; $("#ai_stop").hidden = !AI.busy; $("#ai_send").hidden = AI.busy;
   aiRenderFolder();
@@ -6428,13 +6426,17 @@ function aiToolTips() {
   if (r && !r.innerHTML) r.innerHTML = aiTip("Remember chats", "Keeps the last 30 messages of this chat in this browser (its local storage on this computer), so they come back after a reload. Off by default. Nothing is stored on a server; turning it off deletes the stored chat. Folder cards are not kept.", "Remember chats");
 }
 function aiFootHtml(st, p, l) {
-  const u = st.used_today || {}, fr = l && l.free_requests && l.free_requests.remaining != null ? l.free_requests : null;
-  const left = fr ? `${fr.remaining}${fr.limit ? " of " + fr.limit : ""} free requests left today` : "";
-  const detail = [`Counted on this computer today: ${u.requests || 0} requests, ${(u.tokens || 0).toLocaleString()} tokens${st.cap ? " of " + st.cap.toLocaleString() : ""}.`,
-    l ? `Last answer: ${l.usage.prompt} in / ${l.usage.completion} out${l.usage.estimated ? " (est.)" : ""}.` : "", left ? left + "." : ""].filter(Boolean).join(" ");
+  // one small usage indicator; its (i) holds the three lines it replaces, with the figures exactly as counted (nothing is invented: a line whose figure is not known is left out).
+  // When the free requests are nearly used up (5 or fewer) or used up, the indicator itself turns amber or red with the number, so a refusal is no surprise.
+  const u = st.used_today || {}, fr = l && l.free_requests && l.free_requests.remaining != null && l.free_requests.remaining !== "" ? l.free_requests : null;
+  const lines = [`Today: ${u.requests || 0} requests, ${(u.tokens || 0).toLocaleString()} tokens${st.cap ? " of " + st.cap.toLocaleString() : ""}`];
+  if (l && l.usage) lines.push(`Last: ${l.usage.prompt} in / ${l.usage.completion} out${l.usage.estimated ? " (est.)" : ""}`);
+  if (fr) lines.push(`${fr.remaining}${fr.limit ? " of " + fr.limit : ""} free requests left today`);
+  const n = fr ? Number(fr.remaining) : NaN, lvl = fr && !isNaN(n) ? (n <= 0 ? "bad" : n <= 5 ? "warn" : "") : "";
+  const label = fr ? (lvl === "bad" ? "No free requests left today" : `${fr.remaining} left`) : `${u.requests || 0} today`;
+  const tip = tipBtn({plain: true, title: "Usage", summary: "Counted on this computer.", bullets: lines}, "usage: " + lines.join("; "));
   return `<span class="aibadge ${p === "local" ? "local" : ""}">${p === "local" ? "stays on this computer" : p === "huggingface" ? "your Hugging Face credits" : "free"}</span>`
-    + `<span>Today: ${u.requests || 0} requests</span>${aiTip("Usage", detail, "usage today")}`
-    + (fr && Number(fr.remaining) <= 5 ? `<span class="warn-t">${esc(left)}</span>` : "")
+    + `<span class="aiuse ${lvl}" id="ai_use" data-level="${lvl || "ok"}" title="${esc(lines.join("\n"))}">${esc(label)}</span>${tip}`
     + (st.signed_in && st.needs_key ? `<button class="btn sec sm" id="ai_signout" title="Delete the stored key from this computer">Sign out</button>` : "");
 }
 function aiSourcesHtml(sources) {
@@ -6475,13 +6477,10 @@ function aiQaOpen() {
 function aiActionCard(a, mi, i) {
   const where = AI_WHERE[a.where] || AI_PLAIN_WHERE;
   const termOk = a.ok && (a.where === "window" || a.where === "terminal");
-  const why = String(a.why || ""), cut = !a.lead && why.length > 110;
-  const lead = a.lead || (why ? (cut ? why.slice(0, Math.max(40, why.lastIndexOf(" ", 105))) + "…" : why) : "Suggested command");
-  const primary = a.runnable ? `<button class="btn sm" data-aiact="run">${icon("play")}Run in PlasBench</button>` : `<button class="btn sm" data-aiact="copy">${icon("copy")}Copy</button>`;
-  return `<div class="aicard2 act" data-m="${mi}" data-i="${i}" role="group" aria-label="Suggested command"><div class="ch"><b><span class="vh">Suggested command: </span>${esc(lead)}</b><span class="risk ${esc(a.risk)}">${esc(String(a.risk).replace("_", " "))}</span></div><div class="cb">
-    <div class="cmdbox">${esc(a.cmd)}</div>${a.runnable ? "" : `<div class="no">Not runnable here: ${esc(a.reason)}</div>`}
-    <div class="acts">${primary}<details class="aimore"><summary>Details</summary><div class="aimore-b"><div class="where">Run it here: ${esc(where)}</div>${why && (a.lead || cut) ? `<div class="why">${esc(why)}</div>` : ""}
-      <div class="acts">${a.runnable ? `<button class="btn sec sm" data-aiact="copy">${icon("copy")}Copy</button>` : ""}${termOk ? `<button class="btn sec sm" data-aiact="term">${icon("term")}Open Terminal tab</button>` : ""}</div></div></details></div>
+  return `<div class="aicard2" data-m="${mi}" data-i="${i}"><div class="ch"><b>Suggested command</b><span class="risk ${esc(a.risk)}">${esc(String(a.risk).replace("_", " "))}</span></div><div class="cb">
+    <div class="cmdbox">${esc(a.cmd)}</div><div class="where">Run it here: ${esc(where)}</div>${a.why ? `<div class="why">${esc(a.why)}</div>` : ""}
+    ${a.runnable ? "" : `<div class="no">Not runnable here: ${esc(a.reason)}</div>`}
+    <div class="acts">${a.runnable ? `<button class="btn sm" data-aiact="run">${icon("play")}Run in PlasBench</button>` : ""}<button class="btn sec sm" data-aiact="copy">${icon("copy")}Copy</button>${termOk ? `<button class="btn sec sm" data-aiact="term">${icon("term")}Open Terminal tab</button>` : ""}</div>
     <div class="runstate" aria-live="polite"></div></div></div>`;
 }
 function aiAskCard(a, mi, i) {
@@ -6520,7 +6519,7 @@ function aiRenderLog() {
   const log = $("#ai_log"); if (!log) return;
   const near = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
   let h = AI.msgs.map((m, i) => aiMsgHtml(m, i)).join("");
-  if (!AI.msgs.length && AI.pre && AI.st && AI.st.consent) h = `<div class="aimsg bot">${aiActionCard(AI.pre, -1, 0)}</div>`;
+  if (!AI.msgs.length && AI.pre && AI.st && AI.st.consent) h = `<div class="aimsg bot"><div class="aibody"><p>You have a failed run. This check is safe and changes nothing:</p></div>${aiActionCard(AI.pre, -1, 0)}</div>`;
   if (!AI.msgs.length && !AI.pre) h = `<div class="mut small" style="padding:6px">${AI.st && AI.st.consent && (!AI.st.needs_key || AI.st.signed_in) ? "Ask about installing, running, inputs, metrics, the workflow, settings or an error message. Answers come from PlasBench's own guides." : ""}</div>`;
   log.innerHTML = h; aiDecorate(log); aiCite(log);
   { const st = $("#ai_starters"); if (st) st.style.display = AI.msgs.length ? "none" : ""; aiQaOpen(); }
@@ -6665,7 +6664,7 @@ $("#ai_model").onchange = e => aiLS("model_" + aiProv(), e.target.value);
 $("#ai_prov").onchange = async e => { AI.prov = e.target.value; AI.note = ""; await aiStatus(true); fillProv(); await aiLoadModels(); aiRender(); };
 $("#gdp_ai").addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
-  const d = [...document.querySelectorAll("#gdp_ai details.aipop[open], #gdp_ai details.aimore[open]")].pop(); if (!d) return;
+  const d = [...document.querySelectorAll("#gdp_ai details.aipop[open]")].pop(); if (!d) return;
   e.stopPropagation(); d.open = false; const sm = d.querySelector("summary"); if (sm) sm.focus();
 });
 document.addEventListener("click", e => { document.querySelectorAll("#gdp_ai details.aipop[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; }); });

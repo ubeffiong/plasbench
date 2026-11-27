@@ -16,25 +16,22 @@ const T = ctx.T;
 // what a person can reach: visible text, the text inside folded <details>, and the tooltip text (data-tip, unescaped)
 const reach = h => h.replace(/data-tip="([^"]*)"/g, (_, t) => " " + t.replace(/&quot;/g, '"').replace(/&amp;/g, "&") + " ").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 
-// (d) the command card
-const pre = {cmd: "plasbench diagnose", where: "window", risk: "safe", ok: true, runnable: true, reason: "", lead: "You have a failed run: find out why",
-  why: "This check is safe and changes nothing: it reads the latest run and says what went wrong."};
-const c = T.aiActionCard(pre, -1, 0), cr = reach(c);
-for (const t of ["You have a failed run", "This check is safe and changes nothing", "Suggested command", "plasbench diagnose", "Run it here: In PlasBench's Terminal tab (bottom panel), or press Run in PlasBench",
-  "Reads the latest run".toLowerCase().slice(0, 0) + "reads the latest run and says what went wrong", "Run in PlasBench", "Copy", "Open Terminal tab"])
-  check(`failed-run card still carries "${t.slice(0, 60)}"`, cr.includes(t), cr);
-check("the risk badge is in the card's always-visible head, not in the fold", /<div class="ch">.*<span class="risk safe">safe<\/span><\/div>/.test(c.split("<details")[0].replace(/\n/g, " ")));
-check("ONE primary button is outside the fold (Run in PlasBench); Copy and Open Terminal tab are inside Details", (c.split("<details")[0].match(/class="btn sm"/g) || []).length === 1 && /<details class="aimore">[\s\S]*data-aiact="copy"[\s\S]*data-aiact="term"/.test(c));
+// (d) the command card stays exactly as designed (the owner's decision): same heading, badge, command, where-to-run line, explanation, three buttons, order and consent path
+const pinned = fs.readFileSync(new URL("./fixtures/ai_action_card.js", import.meta.url), "utf8").replace(/\r\n/g, "\n").trim();
+check("the command card's code is exactly the pinned design (test/fixtures/ai_action_card.js)", grabFn("aiActionCard").trim() === pinned);
+const pre = {cmd: "plasbench diagnose", where: "window", risk: "safe", ok: true, runnable: true, reason: "", why: "Reads the latest run and says what went wrong. It changes nothing."};
+const c = T.aiActionCard(pre, -1, 0);
+const order = ["Suggested command", '<span class="risk safe">safe</span>', "plasbench diagnose", "Run it here: In PlasBench's Terminal tab (bottom panel), or press Run in PlasBench",
+  "Reads the latest run and says what went wrong. It changes nothing.", "Run in PlasBench</button>", "Copy</button>", "Open Terminal tab</button>"];
+const at = order.map(t => reach(c).indexOf(t));
+check("the failed-run card shows, in this order: Suggested command, safe, the command, Run it here ..., the explanation, Run in PlasBench, Copy, Open Terminal tab", at.every(x => x >= 0) && at.every((x, k) => !k || x > at[k - 1]), JSON.stringify(at));
+check("no part of the card is folded or in a tooltip", !/<details|class="tipi"/.test(c));
+check("the empty chat still introduces it with the same sentence", html.includes("<p>You have a failed run. This check is safe and changes nothing:</p>"));
 for (const risk of ["changes_files", "destructive"]) {
-  const d = T.aiActionCard({cmd: "plasbench install-tools core", where: "window", risk, ok: true, runnable: true, reason: "", why: "Installs the core tools."}, 0, 0);
-  check(`a ${risk} card shows its badge in the head`, d.split("<details")[0].includes(`<span class="risk ${risk}">${risk.replace("_", " ")}</span>`));
+  const d = T.aiActionCard({cmd: "plasbench install-tools core", where: "window", risk, ok: true, runnable: true, reason: "", why: "x"}, 0, 0);
+  check(`a ${risk} card shows its badge`, d.includes(`<span class="risk ${risk}">${risk.replace("_", " ")}</span>`));
 }
-const nr = T.aiActionCard({cmd: "plasbench ui", where: "powershell", risk: "safe", ok: true, runnable: false, reason: "it belongs in Windows PowerShell", why: "x"}, 0, 0);
-check("a card that cannot run here says why in plain sight, and its one button is Copy", nr.split("<details")[0].includes("Not runnable here: it belongs in Windows PowerShell") && /class="btn sm" data-aiact="copy"/.test(nr.split("<details")[0]));
-const long = "Lists every tool and database that is switched on, says which are missing, and offers to install them after you confirm; nothing is installed without that confirmation.";
-const lc = reach(T.aiActionCard({cmd: "plasbench check", where: "window", risk: "safe", ok: true, runnable: true, reason: "", why: long}, 0, 0));
-check("a long reason leads in one line and stays complete under Details", lc.includes(long) && /…/.test(lc));
-const consent = (() => { const i = html.indexOf("\nasync function aiAct("); return html.slice(i, html.indexOf("\n}\n", i)); })();
+const consent = (() => { const k = html.indexOf("\nasync function aiAct("); return html.slice(k, html.indexOf("\n}\n", k)); })();
 check("Run in PlasBench still goes through the server check, the extra confirmation and the consent dialog", /api\("ai\/validate"/.test(consent) && /needs_extra_confirm/.test(consent) && /confirmRun\(/.test(consent));
 
 // (a) sources
@@ -66,8 +63,17 @@ const tt = grabFn("aiToolTips");
 check("their tooltips say what each does and costs (tokens, where it is stored)", /600 tokens/.test(tt) && /local storage on this computer/.test(tt));
 
 // the footer and the answer's meta line
-const foot = reach(T.aiFootHtml({used_today: {requests: 3, tokens: 4200}, cap: 200000, signed_in: true, needs_key: true}, "openrouter", {usage: {prompt: 900, completion: 120, estimated: false}, free_requests: {remaining: 4, limit: 50}}));
-check("footer: the badge and today's count stay visible; tokens, the last answer and free requests left are in the (i)", ["free", "Today: 3 requests", "4,200 tokens of 200,000", "900 in / 120 out", "4 of 50 free requests left today", "Sign out"].every(t => foot.includes(t)), foot);
+const FS = {used_today: {requests: 3, tokens: 6042}, cap: 0, signed_in: true, needs_key: true};
+const foot = T.aiFootHtml(FS, "openrouter", {usage: {prompt: 1581, completion: 375, estimated: false}, free_requests: {remaining: 48, limit: 50}}), fr = reach(foot);
+check("usage: one small indicator ('48 left') in plain sight, beside the free badge and Sign out", /<span class="aiuse " id="ai_use" data-level="ok"[^>]*>48 left<\/span>/.test(foot) && fr.includes("free") && fr.includes("Sign out"), foot);
+check("usage: the (i) holds the three lines unchanged in meaning", ["Today: 3 requests, 6,042 tokens", "Last: 1581 in / 375 out", "48 of 50 free requests left today"].every(x => fr.includes(x)), fr);
+check("usage: the (i) is a tooltip button (opens on hover, focus and tap; aria-describedby the role=tooltip box)", /class="tipi"[^>]*aria-describedby="tipbox"/.test(foot) && /<div id="tipbox" role="tooltip"/.test(html));
+const few = T.aiFootHtml(FS, "openrouter", {usage: {prompt: 1, completion: 1}, free_requests: {remaining: 4, limit: 50}});
+check("nearly used up (5 or fewer): the indicator itself turns amber with the number, without hover", /class="aiuse warn"[^>]*data-level="warn"[^>]*>4 left</.test(few), few);
+const none = T.aiFootHtml(FS, "openrouter", {usage: {prompt: 1, completion: 1}, free_requests: {remaining: 0, limit: 50}});
+check("used up: the indicator itself turns red and says so, without hover", /class="aiuse bad"[^>]*data-level="bad"[^>]*>No free requests left today</.test(none) && reach(none).includes("0 of 50 free requests left today"), none);
+const unk = reach(T.aiFootHtml({used_today: {requests: 2, tokens: 10}}, "local", null));
+check("no free-request limit known: that line is left out, nothing invented; the indicator shows today's requests", !/free requests left/.test(unk) && unk.includes(">2 today<") && unk.includes("Today: 2 requests, 10 tokens"), unk);
 const meta = reach(T.aiMsgHtml({role: "bot", content: "x", usage: {total: 1020, prompt: 900, completion: 120}, model: "stub/free-a:free", provider: "openrouter", free: true}, 0));
 check("an answer keeps its model, token count and free/credits in its (i), and the two votes", ["stub/free-a:free", "1020 tokens", "a free model", "Helpful", "Not helpful"].every(t => meta.includes(t)));
 
