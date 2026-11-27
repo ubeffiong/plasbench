@@ -4,7 +4,7 @@
 .ls *{box-sizing:border-box}
 .ls-live .ls-static{display:none}
 .ls-static{border:1px solid var(--line,#d9e1da);background:var(--card,#fff);border-radius:8px;padding:10px}
-.ls-static svg{display:block;width:100%;height:auto;max-width:900px;margin:0 auto}
+.ls-static svg{display:block;width:100%;height:auto;max-width:640px;margin:0 auto}
 .ls-wall{fill:var(--paper,#f6f8f4);fill-opacity:.55;stroke:var(--line,#d9e1da);stroke-width:1}
 .ls-sd{fill:none}
 .ls-badge{fill:var(--ink,#17231d)}
@@ -23,12 +23,14 @@
 .ls-stage-wrap{min-width:0;padding:8px 12px 10px}
 .ls-quick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
 .ls-stage{position:relative;background:var(--card,#fff);border:1px solid var(--line,#d9e1da);border-radius:8px;overflow:hidden}
-.ls-svgbox svg{display:block;width:100%;height:auto;max-height:80vh}
+.ls-svgbox svg{display:block;width:100%;height:auto;max-height:300px}
+.ls:not(.ls-big) .ls-note{display:none}
+.ls-big .ls-svgbox svg{max-height:80vh}
 .ls-svgbox .v3-svg{touch-action:none;cursor:grab;user-select:none}
 .ls-tip{position:absolute;z-index:5;max-width:320px;pointer-events:none;background:var(--ink,#17231d);color:#fff;border-radius:6px;padding:8px 10px;font:12px/1.4 Arial,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3)}
 .ls-tip span{color:#c9e3d3}
 .ls-tip em{display:block;margin-top:4px;color:#d9e7de;font-size:11px}
-.ls-legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px}
+.ls-legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px}
 .ls-lg{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
 .ls-lt{font:700 11px Arial,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#627067)}
 .ls-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid #b9c5bd;border-radius:14px;background:#fff;padding:3px 10px;font:12px Arial,sans-serif;cursor:pointer;color:var(--ink,#17231d)}

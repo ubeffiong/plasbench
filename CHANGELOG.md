@@ -13,6 +13,14 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed -- the tool fingerprint, the feature matrix and the 3D landscape are compact and no longer overlap (27 November 2026)
+Presentation only: no number, rank or score changes.
+- **Cause of the oversized fingerprint and the overlapping feature-matrix titles.** The tool fingerprint and the presence/absence matrix both used the class prefix `fp-` (`.fp-root`, `.fp-svg`, `.fp-main`, `.fp-panel`, ...), so each figure's style sheet restyled the other: the radar tiles were stretched to several times their size and overlapped, so a click or tap reached the tile under the pointer rather than the tile drawn there (16 of 20 probe points hit the wrong tile on the old sample report). The fingerprint now uses `fpr-`, every tile clips to its own box, and a test fails when two figure style sheets define the same class name.
+- **Fingerprint.** About 150 px tiles in a grid (the figure is about half its former height), with S / M / L tile-size buttons; keyboard and touch work on the tile under the pointer at every size, scroll position, page zoom and device pixel ratio (checked in a real browser).
+- **Feature matrix.** The group titles ("Replicon type", "Insertion sequences", ...) are drawn slanted in a header band of their own, so long titles and long feature lists never overlap each other, the labels or the rows; the footnote is no longer cut off; on a phone the matrix scrolls sideways instead of shrinking to unreadable text.
+- **3D landscape ("Accuracy, completeness and structural fidelity").** Starts compact (the setup panel closed, the chart at most 300 px high) with a Larger view button for the full-size chart; the setup panel opens as before.
+- **Sample report and real runs.** The demo now runs the same advisory jobs as stage 5/6 (candidate multiplicity, ranking stability, reference-evidence audit) and passes the cohort QC flags, so the sample report shows the compact multiplicity section, ranking stability and reference evidence instead of "Not run" notes. `test/test_report_parity.py` builds a report with the pipeline's own argument list from `results_real_cohort1` and fails when its sections, their order or headings diverge from the sample for any reason other than missing optional inputs (each missing section must be listed under "Not run in this run" with its reason); the one opt-in difference is the interactive cohort dashboard (`REPORT_EMBED_DASHBOARD=1`).
+
 ## [0.5.7] - 2026-11-25
 
 Faster, calmer runs; a resumable ENA-first downloader with `READ_DEPTH_CAP_X`; per-caller annotation switches and installs; an AI help that prepares isolates, checks sample sheets and troubleshoots runs; interactive report sections; publishing files for Galaxy, bio.tools, WorkflowHub and F1000Research. Details are in the entries below.

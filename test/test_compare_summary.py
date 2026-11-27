@@ -211,10 +211,10 @@ cands = [{"sample": "S1", "tool": "toolA", "candidate": "A", "length": "60000", 
 ints = [{"sample": "S1", "tool": "toolA", "plasmid": "P1", "plasmid_length": "100000", "candidate": "A", "start": "0", "end": "60000", "relationship": "primary"},
         {"sample": "S1", "tool": "toolA", "plasmid": "P1", "plasmid_length": "100000", "candidate": "B", "start": "55000", "end": "90000", "relationship": "complementary_fragment"}]
 html = rv.multiplicity_section(plasmids, cands, ints)
-check("multiplicity: one fixed-height row per tool, each a closed drill-down", html.count("<details class='mx-tool'>") == 2 and "<details class='mx-tool' open" not in html)
+check("multiplicity: one fixed-height row per tool, each a closed drill-down", html.count("<details class='mx-tool' data-closed='1'>") == 2 and "<details class='mx-tool' open" not in html)
 check("multiplicity: each row carries its composition bar, coverage dumbbell and outcome bar with accessible names", html.count("class='mx-bar'") == 2 and html.count("class='mx-dumb'") == 2
       and html.count("class='mx-bar mx-oc'") == 2 and "role='img'" in html)
-check("multiplicity: the per-plasmid table and the tracks are inside the drill-down, tracks closed and height-limited", "<details class='mx-track'>" in html and "mx-scroll" in html
+check("multiplicity: the per-plasmid table and the tracks are inside the drill-down, tracks closed and height-limited", "<details class='mx-track' data-closed='1'>" in html and "mx-scroll" in html
       and ".mx-track svg{display:block;width:100%;max-height:250px}" in rv.CSS)
 check("multiplicity: the full-size charts and the all-values table are kept, closed", "Full-size charts" in html and "All values (one row per tool)" in html and "<td>toolA</td><td>2</td>" in html)
 check("multiplicity: a plasmid never becomes zero when a value is missing (no 'nan' in the page)", "nan" not in html.lower().replace("candidates", ""))

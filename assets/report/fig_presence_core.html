@@ -4,7 +4,7 @@
 (function (root) {
 'use strict';
 var Z = 1.959963984540054, NOT_REC = 'not recorded';
-var DW = 70, TW = 9, TG = 6, FW = 8, BGAP = 14, BARH = 46, LABH = 78;
+var DW = 70, TW = 9, TG = 6, FW = 8, BGAP = 14, BARH = 46, LABH = 78, TITH = 58;   /* TITH: header band for the group titles, drawn slanted so that long titles never overlap */
 var OUT_NAME = {r: 'recovered', p: 'partly recovered', m: 'missed', '-': 'no value for this tool'};
 var TRACK_COLOURS = ['#0072B2', '#D55E00', '#009E73', '#E69F00', '#CC79A7', '#56B4E9', '#882255', '#117733', '#999933', '#44AA99'];
 
@@ -74,7 +74,9 @@ function rowFeatures(data, row) {
 function geometry(data, amr) {
   var n = data.rows.length, rh = rowHeight(n), blocks = shownBlocks(data, amr), top = 20 + BARH + LABH, xT = DW + 6, xM = xT + data.tracks.length * (TW + 1) + TG;
   var x = xM, pos = blocks.map(function (x0) { var o = {x: x, w: x0.b.f.length * FW, i: x0.i}; x += o.w + BGAP; return o; });
-  return {n: n, rh: rh, blocks: blocks, top: top, xT: xT, xM: xM, pos: pos, width: x + 20, height: top + n * rh + 40};
+  var need = x + 20;
+  pos.forEach(function (p) { var t = data.blocks[p.i].l.length * 5.2 * 0.77 + p.x + 8; if (t > need) { need = t; } });
+  return {n: n, rh: rh, blocks: blocks, top: top, xT: xT, xM: xM, pos: pos, width: Math.ceil(need), height: top + n * rh + 40 + TITH, tith: TITH};
 }
 function svg(data, opts) {
   opts = opts || {};
@@ -83,6 +85,8 @@ function svg(data, opts) {
   o.push('<svg class="fp-svg" viewBox="0 0 ' + G.width + ' ' + G.height + '" role="group" aria-label="Presence and absence matrix, ' + G.n + ' plasmids" font-family="Arial,Helvetica,sans-serif">');
   o.push('<defs><pattern id="fp-hatch-l" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4" height="4" fill="#e0e0e0"/><line x1="0" y1="0" x2="0" y2="4" stroke="#777" stroke-width="1.2"/></pattern>' +
     '<pattern id="fp-part-l" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="3" fill="#cfe3f3"/><line x1="0" y1="0" x2="0" y2="3" stroke="#0072B2" stroke-width="1.5"/></pattern></defs>');
+  o.push('<g transform="translate(0,' + TITH + ')">');
+  var titles = [];
   if (data.clustered && data.tree.length && (!opts.order || opts.order === 'cluster')) {
     var hmax = 0; data.tree.forEach(function (m) { if (m[2] > hmax) { hmax = m[2]; } }); hmax = hmax || 1;
     var node = {}, d = [];
@@ -104,7 +108,7 @@ function svg(data, opts) {
   });
   G.pos.forEach(function (p, pi) {
     var b = data.blocks[p.i], ann = annotated(data, b);
-    o.push('<text class="fp-t" x="' + (p.x + p.w / 2) + '" y="11" font-size="10" font-weight="bold" text-anchor="middle">' + esc(b.l) + '</text>');
+    titles.push('<text class="fp-t" transform="translate(' + (p.x + 1) + ',' + (TITH + 16) + ') rotate(-40)" font-size="9" font-weight="bold">' + esc(b.l) + '<title>' + esc(b.l) + '</title></text>');
     b.na.forEach(function (r) { o.push('<rect x="' + p.x + '" y="' + (top + rank[r] * rh) + '" width="' + p.w + '" height="' + rh + '" fill="url(#fp-hatch-l)"/>'); });
     b.f.forEach(function (f, fi) {
       var fx = p.x + fi * FW, pv = prevalence(data, b, fi);
@@ -136,7 +140,7 @@ function svg(data, opts) {
     o.push('<g class="fp-row" role="button" tabindex="-1" data-r="' + r + '" data-k="' + k + '" aria-label="' + esc('Plasmid ' + data.rows[r][1] + ' from ' + data.rows[r][0]) + '"><rect x="0" y="' + (top + k * rh) + '" width="' + G.width + '" height="' + rh + '" fill="transparent"/></g>');
   });
   o.push('<rect class="fp-sel" id="fp-selbox" x="0" y="0" width="0" height="0" fill="none" stroke-width="1.4" pointer-events="none"/>');
-  o.push('</svg>');
+  o.push('</g>' + titles.join('') + '</svg>');
   return {svg: o.join(''), order: order, geometry: G};
 }
 function quote(x) { var Q = String.fromCharCode(34); x = String(x); return x.indexOf(Q) >= 0 || x.indexOf(',') >= 0 || x.indexOf(String.fromCharCode(10)) >= 0 ? Q + x.split(Q).join(Q + Q) + Q : x; }
