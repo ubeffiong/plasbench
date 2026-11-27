@@ -482,7 +482,7 @@ def _mx_outcomes(tool, counts):
 
 def multiplicity_section(plasmids, candidates, intervals):
     lead = ("Does a tool return one clean record per plasmid, or several overlapping or mixed ones? Click a tool for its plasmids and tracks. "
-            "<strong>Descriptive: it never changes a score, and extra candidates cannot raise the primary endpoint.</strong>")
+            "<strong>Descriptive: it never changes a score.</strong> Extra candidates cannot raise the primary endpoint.")
     if not plasmids:
         return section("learn-multiplicity", "Reconstruction multiplicity", lead, note(
             "Not run: benchmark.candidate_multiplicity.tsv was not produced (RUN_CANDIDATE_MULTIPLICITY=0, or stage 5 has not run)."))
