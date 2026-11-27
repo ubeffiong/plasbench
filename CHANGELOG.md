@@ -13,6 +13,11 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- dropdowns for every setting with a known set of values (27 November 2026)
+- One registry (`config/setting_options.tsv`, `python/setting_options.py`) holds the options of 33 settings; Settings, the workflow rows and wizard, and the command forms draw the same dropdown
+  with each option's meaning beside it. Keyword-plus-number or folder settings (`READ_DEPTH_CAP_X`, `WORK_DIR`, `DOWNLOAD_TMP_DIR`) are combos. A saved value outside the list is shown as
+  `Custom: <value>` and kept. The server refuses a new value outside the list. `MULTIQC_REPORT` in the assistant's allow-list is now `auto|on|off`. Audit: `docs/qa/UI_ENUM_FIELDS.md`.
+
 ## [0.5.7] - 2026-11-25
 
 Faster, calmer runs; a resumable ENA-first downloader with `READ_DEPTH_CAP_X`; per-caller annotation switches and installs; an AI help that prepares isolates, checks sample sheets and troubleshoots runs; interactive report sections; publishing files for Galaxy, bio.tools, WorkflowHub and F1000Research. Details are in the entries below.

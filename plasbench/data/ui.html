@@ -4351,26 +4351,40 @@ function optControl(o, key, cur, ctx, idp, mode) {
   if (o.number) opts.push(`<option value="@number" ${st.sel === "@number" ? "selected" : ""}>${esc(o.number.label || "Number…")}</option>`);
   if (o.path) opts.push(`<option value="@path" ${st.sel === "@path" ? "selected" : ""}>${esc(o.path.label || "Folder…")}</option>`);
   if (st.sel === "__custom") opts.push(`<option value="__custom" selected>Custom: ${esc(st.custom)}</option>`);
-  const numIn = st.sel === "@number" ? `<span class="optnum"><input type="number" data-opt="num" data-optkey="${esc(key)}" data-optctx="${esc(ctx)}" id="${id}_n" aria-label="${esc(key)} as a number" value="${esc(st.num)}"${o.number.min != null ? ` min="${o.number.min}"` : ""}${o.number.max != null ? ` max="${o.number.max}"` : ""} step="${o.number.step || 1}" style="width:110px"> <span class="mut small">${esc(o.number.unit || "")}${o.number.min != null ? `, minimum ${o.number.min}` : ""}</span><span class="bad-t small optmsg" role="alert" id="${id}_m">${st.num === "" ? "Enter a number." : esc(optProblem(o, st.num))}</span></span>` : "";
-  const pathIn = st.sel === "@path" ? `<span class="optnum"><input type="text" data-opt="path" data-optkey="${esc(key)}" data-optctx="${esc(ctx)}" id="${id}_p" aria-label="${esc(key)} folder" value="${esc(st.path)}" placeholder="a folder on this computer" style="min-width:220px"></span>` : "";
+  const live = ctx === "form";     // a command-line form is not re-rendered: its inputs exist and are shown or hidden
+  const numIn = o.number && (live || st.sel === "@number") ? `<span class="optnum" ${st.sel === "@number" ? "" : "hidden"}><input type="number" data-opt="num" data-optkey="${esc(key)}" data-optctx="${esc(ctx)}" id="${id}_n" aria-label="${esc(key)} as a number" value="${esc(st.num)}"${o.number.min != null ? ` min="${o.number.min}"` : ""}${o.number.max != null ? ` max="${o.number.max}"` : ""} step="${o.number.step || 1}" style="width:110px"> <span class="mut small">${esc(o.number.unit || "")}${o.number.min != null ? `, minimum ${o.number.min}` : ""}</span><span class="bad-t small optmsg" role="alert" id="${id}_m">${st.num === "" ? "Enter a number." : esc(optProblem(o, st.num))}</span></span>` : "";
+  const pathIn = o.path && (live || st.sel === "@path") ? `<span class="optnum" ${st.sel === "@path" ? "" : "hidden"}><input type="text" data-opt="path" data-optkey="${esc(key)}" data-optctx="${esc(ctx)}" id="${id}_p" aria-label="${esc(key)} folder" value="${esc(st.path)}" placeholder="a folder on this computer" style="min-width:220px"></span>` : "";
   const shown = st.sel === "" ? (defv === undefined ? null : o.options.find(x => x.value === defv)) : o.options.find(x => x.value === st.sel);
   const help = `<ul class="optlist">${o.options.filter(x => x.value !== "").map(x => `<li class="${shown && shown.value === x.value ? "on" : ""}"><b>${esc(x.label)}</b> <span class="mono small">${esc(x.value)}</span>${x.default ? ` <span class="tag rec">default</span>` : ""} — ${esc(x.meaning)}</li>`).join("")}${o.number ? `<li><b>${esc(o.number.label || "Number…")}</b> — ${esc(o.number.meaning)}</li>` : ""}${o.path ? `<li><b>${esc(o.path.label || "Folder…")}</b> — ${esc(o.path.meaning)}</li>` : ""}</ul>`;
   return `<select id="${id}" data-opt="sel" data-optkey="${esc(key)}" data-optctx="${esc(ctx)}" aria-label="${esc(key)}">${opts.join("")}</select>${numIn}${pathIn}${st.sel === "__custom" ? `<div class="help">This saved value is not in the list; it is kept as it is until you choose another.</div>` : ""}${help}`;
 }
 
 /* One handler for every option control (Settings, the workflow rows, the wizard): choosing a listed value stores exactly that value; a combo's keyword choice shows its input; "Custom: ..." keeps the saved value. */
+const FORM_OPTS = {};     // command-line option dest -> options (the same registry entry the Settings page uses)
 const optModes = ctx => ctx === "settings" ? SET.mode : (WF.mode = WF.mode || {});
-const optObj = (ctx, key) => ctx === "settings" ? ((S.settings.settings.find(r => r.key === key) || {}).options) : ((wfRows().find(r => r.setting_key === key) || {}).options);
+const optObj = (ctx, key) => ctx === "form" ? FORM_OPTS[key] : ctx === "settings" ? ((S.settings.settings.find(r => r.key === key) || {}).options) : ((wfRows().find(r => r.setting_key === key) || {}).options);
 function optCommit(ctx, key, value) {
-  if (ctx === "settings") { const row = S.settings.settings.find(r => r.key === key); if (value === (row.override ?? "")) delete SET.edits[key]; else SET.edits[key] = value; renderSettings(); }
+  if (ctx === "settings") { const row = S.settings.settings.find(r => r.key === key); if (value === (row.override ?? "")) delete SET.edits[key]; else SET.edits[key] = value; setTimeout(renderSettings, 0); }   // deferred: a number box that loses focus fires its change while the list is being replaced
   else wfSetOpt(ctx, key, value);
 }
 document.addEventListener("change", e => {
   const t = e.target; if (!t.dataset || !t.dataset.opt) return;
   const ctx = t.dataset.optctx, key = t.dataset.optkey, o = optObj(ctx, key); if (!o) return;
+  if (ctx === "form") {          // a command-line form: no re-render; the hidden mirror carries the value to the form's own store
+    const box = t.closest(".field"), mirror = box.querySelector("input[type=hidden][data-dest]"), fire = v => { mirror.value = v; mirror.dispatchEvent(new Event("change", {bubbles: true})); };
+    const num = box.querySelector('[data-opt="num"]'), path = box.querySelector('[data-opt="path"]');
+    if (t.dataset.opt === "sel") {
+      if (t.value === "__custom") return;
+      if (num) num.closest(".optnum").hidden = t.value !== "@number"; if (path) path.closest(".optnum").hidden = t.value !== "@path";
+      if (t.value === "@number") { if (num && !optProblem(o, num.value)) fire(num.value); else fire(""); } else if (t.value === "@path") fire(path && path.value.trim() ? path.value.trim() : "");
+      else fire(t.value);
+    } else if (t.dataset.opt === "num") fire(optProblem(o, t.value) ? "" : t.value);
+    else if (t.dataset.opt === "path") fire(t.value.trim());
+    return;
+  }
   if (t.dataset.opt === "sel") {
     const v = t.value; if (v === "__custom") return;
-    if (v === "@number" || v === "@path") { optModes(ctx)[key] = v; if (ctx === "settings") renderSettings(); else if (ctx === "wizard") renderWizard(); else wfRenderAll(); return; }
+    if (v === "@number" || v === "@path") { optModes(ctx)[key] = v; if (ctx === "settings") setTimeout(renderSettings, 0); else if (ctx === "wizard") setTimeout(renderWizard, 0); else setTimeout(wfRenderAll, 0); return; }
     optModes(ctx)[key] = ""; optCommit(ctx, key, v);
   } else if (t.dataset.opt === "num") { if (!optProblem(o, t.value)) optCommit(ctx, key, t.value); }
   else if (t.dataset.opt === "path") { if (t.value.trim()) optCommit(ctx, key, t.value.trim()); }
@@ -4621,6 +4635,7 @@ function fieldHTML(a, values, prefix) {
     ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${esc(ph)}"><button type="button" class="btn sec sm" data-browse="${id}" data-dir="${/dir|folder/.test(a.dest) ? 1 : 0}">Browse</button>`;
   }
   else if (a.kind === "list") ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(Array.isArray(v) ? v.join(" ") : v ?? "")}" placeholder="space separated${a.choices ? ": " + esc(a.choices.join(" ")) : ""}">`;
+  else if (a.options) { FORM_OPTS[a.dest] = a.options; ctl = `<input type="hidden" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}"><span class="optform">${optControl(a.options, a.dest, v ?? "", "form", prefix)}</span>`; }
   else ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${a.default != null && a.default !== "" ? "default " + esc(a.default) : ""}">`;
   return `<div class="field ${changed ? "changed" : ""}"><label for="${id}">${esc(argLabel(a))}${a.required ? `<span class="req">*</span>` : ""} <code>${esc(a.positional ? "<" + a.dest + ">" : flag)}</code>${tipBtn(a.tooltip, argLabel(a))}</label>
     <div class="ctl">${ctl}<button type="button" class="btn ghost sm reset" data-reset="${a.dest}" title="Back to the default">Reset</button></div>${a.help && !a.tooltip ? `<div class="help">${esc(a.help)}</div>` : ""}${dbStatusHTML(a.dest)}</div>`;
@@ -7946,8 +7961,7 @@ function wfStateOf(it, value) {
   if (value === "auto") return "auto";
   return "on";
 }
-function wfIsChanged(it, value) { if (it.options && value) { const d = optDefault(it.options); if (d !== undefined && value !== d) return it.kind !== "core" && it.kind !== "demo"; }
-  return it.kind !== "core" && it.kind !== "demo" && wfStateOf(it, value) !== wfDefaultState(it); }
+function wfIsChanged(it, value) { return it.kind !== "core" && it.kind !== "demo" && wfStateOf(it, value) !== wfDefaultState(it); }
 const wfCounts = s => s === "on" || s === "auto";
 const wfById = rows => Object.fromEntries(rows.map(r => [r.item_id, r]));
 /* The items `id` needs (directly or through others) that are off, nearest first. Core items count as on. */
@@ -8076,7 +8090,7 @@ function wfItemHTML(it, states, ctx, idx, per) {
   else sw = `<button type="button" class="sw" role="switch" aria-checked="${wfCounts(s)}" id="${id}" data-wftoggle="${esc(it.item_id)}" aria-label="${esc(it.label)}: ${s === "auto" ? "auto, runs when its inputs exist" : wfCounts(s) ? "on" : "off"}. Press to turn ${wfCounts(s) ? "off" : "on"}">${wfPill(s)}</button>`;
   const rst = (changed || wfOverridden(it, ctx)) && it.kind !== "core" ? `<button type="button" class="rst" data-wfreset="${esc(it.item_id)}" title="${ctx === "wizard" ? "Use the saved setting for this run" : "Back to the default"}">${ctx === "wizard" ? "use saved" : "default"}</button>` : "";
   return `<li class="wfi ${s}" id="wfi_${esc(id)}">${sw}<div class="tx"><b>${esc(it.label)}</b> ${it.user ? `<span class="tag user">your tool</span> ` : ""}${changed ? `<span class="chgtag" title="Different from its default (${wfDefaultState(it)})">changed</span> ` : ""}${rst}${tipBtn(wfTip(it, per), it.label)}
-    <div class="d">${esc(it.description)}</div>${it.options ? `<div class="wfopt"><label class="small" for="opt_w${esc(ctx)}_${esc(it.setting_key)}"><b>Choose</b></label> ${optControl(it.options, it.setting_key, wfOptCur(it, ctx), ctx, "w" + ctx, optModes(ctx)[it.setting_key])}</div>` : ""}<div class="cost">${wfCost(it, per)}</div>${wfBadges(it, states, idx)}${typeof instWorkflow === "function" ? instWorkflow(it) : ""}</div></li>`;
+    <div class="d">${esc(it.description)}</div>${it.options && typeof optControl === "function" ? `<div class="wfopt"><label class="small" for="opt_w${esc(ctx)}_${esc(it.setting_key)}"><b>Choose</b></label> ${optControl(it.options, it.setting_key, wfOptCur(it, ctx), ctx, "w" + ctx, optModes(ctx)[it.setting_key])}</div>` : ""}<div class="cost">${wfCost(it, per)}</div>${wfBadges(it, states, idx)}${typeof instWorkflow === "function" ? instWorkflow(it) : ""}</div></li>`;
 }
 function wfStepHTML(step, rows, states, ctx, per) {
   const idx = wfById(rows), items = rows.filter(r => r.step_id === step.id), shown = items.filter(r => r.kind !== "demo"), demo = items.filter(r => r.kind === "demo");

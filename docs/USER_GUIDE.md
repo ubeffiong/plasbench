@@ -1457,6 +1457,14 @@ The stage 2 and 3 loops print one summary line for isolates whose reference or r
   the recommender evaluation, per-dimension tables, bin agreement, candidate multiplicity, MultiQC) and prints what it turned off and what that saves; `thorough` turns extras on. The profile is in the run manifest and the report's run metadata. The table is `config/run_profiles.tsv`; a setting you set yourself always wins.
 * **CPU figures** in `plasbench status` and the window are shown as cores ("about 4.8 of 6 CPU cores busy (79% of this computer)"); the raw summed percentage (100% = one core) is in the JSON (`cpu_percent`, with `cores_busy`, `cpu_cores`, `cpu_share_of_computer`).
 
+## Settings with a list of choices
+
+A setting whose valid values are a known set (for example `SHORT_READ_QC_MODE`: Off, Report, Enforce; `READ_SOURCE`; `RUN_PROFILE`; `MULTIQC_REPORT`) is a dropdown in Settings, in the workflow rows
+and wizard, and in the command forms, with what each choice does printed beside it and the default marked. Some are a dropdown of keywords plus a number or a folder: `READ_DEPTH_CAP_X` is `Off`
+or a number of x coverage (minimum 1), `WORK_DIR` and `DOWNLOAD_TMP_DIR` are `Auto`, `In the data folder` or a folder you choose. Choosing Default removes your saved value. A value you edited by
+hand into `config/local.env` that is not in the list is shown as `Custom: <value>` and kept until you pick another. The list of every such setting and where its options come from is
+`docs/qa/UI_ENUM_FIELDS.md`.
+
 ## Stopping PlasBench: closing the window, Quit, Quit everything, `plasbench stop`
 
 Closing the window vs quitting PlasBench. These are different things, and closing a window never stops anything.
