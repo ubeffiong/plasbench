@@ -521,12 +521,17 @@ dialog.pbdlg .stopsw{display:flex;gap:8px;align-items:center;margin:6px 0;font-w
 }
 
 /* ---------- source control drawer (right-hand side, every page) ---------- */
-#gdrawer{position:fixed;top:var(--hdr);right:0;bottom:var(--cons);width:var(--gdw);z-index:66;background:var(--surface);border-left:1px solid var(--line);
+#gdrawer,#aidrawer{position:fixed;top:var(--hdr);right:0;bottom:var(--cons);width:var(--gdw);z-index:66;background:var(--surface);border-left:1px solid var(--line);
  display:flex;flex-direction:column;transform:translateX(100%);transition:transform .16s ease;box-shadow:none}
-body.gd-open #gdrawer{transform:none}
+#aidrawer{width:var(--aiw)}#gdrawer[aria-hidden=true],#aidrawer[aria-hidden=true]{visibility:hidden}
+body.gd-open #gdrawer,body.ai-open #aidrawer{transform:none;visibility:visible}
+:root{--aiw:min(430px,92vw)}
+#ai_head{display:flex;align-items:center;gap:8px;padding:0 4px 0 10px;min-height:36px;border-bottom:1px solid var(--line);background:var(--surface-2);flex:none;font-size:12.5px}
+#ai_head .grow{flex:1}#gdp_ai{flex:1;display:flex;flex-direction:column;min-height:0}
+.aidot{width:8px;height:8px;border-radius:50%;background:var(--primary);display:inline-block;margin-left:2px}.aidot[hidden]{display:none}
 :root{--gdw:248px}   /* the same width as the navigation rail on the left */
-@media (min-width:1280px){body.gd-open .shell{margin-right:var(--gdw)}body.gd-open #toasts{right:calc(var(--gdw) + 16px)}}
-@media (max-width:1279px){body.gd-open #gdrawer{box-shadow:var(--shadow-lg)}}
+@media (min-width:1280px){body.gd-open .shell{margin-right:var(--gdw)}body.gd-open #toasts{right:calc(var(--gdw) + 16px)}body.ai-open .shell{margin-right:var(--aiw)}body.ai-open #toasts{right:calc(var(--aiw) + 16px)}}
+@media (max-width:1279px){body.gd-open #gdrawer,body.ai-open #aidrawer{box-shadow:var(--shadow-lg)}}
 @media (max-width:640px){:root{--gdw:min(320px,92vw)}}
 #gd_head{display:flex;align-items:stretch;border-bottom:1px solid var(--line);background:var(--surface-2);flex:none;min-height:36px}
 #gd_tabs{display:flex;flex:1;min-width:0}
@@ -537,7 +542,6 @@ body.gd-open #gdrawer{transform:none}
 #gd_head .gd-ib{align-self:center;margin:0 4px}
 
 /* ---------- AI help tab of the side panel ---------- */
-body.gd-ai{--gdw:min(430px,92vw)}
 #gdp_ai{min-height:0}
 #ai_tools{display:flex;gap:4px;flex-wrap:wrap;align-items:center;padding:4px 8px;border-bottom:1px solid var(--line-2);font-size:11.5px;color:var(--mut);flex:none}
 #ai_tools select{max-width:150px;font-size:11.5px;min-height:24px}
@@ -563,9 +567,19 @@ body.gd-ai{--gdw:min(430px,92vw)}
 .aimsg.bot pre{position:relative;margin:6px 0;padding:6px 8px;background:var(--term-bg);color:var(--term-fg);overflow-x:auto;border-radius:3px}
 .aimsg.bot pre code{background:transparent;border:0;color:inherit;padding:0;white-space:pre}
 .aipre-hd{display:flex;gap:6px;align-items:center;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:6px}
-.aisrc{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
-.aisrc button{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--surface);color:var(--fg-2);border-radius:10px;padding:1px 8px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.aisrc button:hover,.aisrc button:focus-visible{border-color:var(--primary);color:var(--primary)}
+.aisrc{margin-top:6px;font-size:11.5px}.aisrc>summary{cursor:pointer;color:var(--mut);width:max-content;max-width:100%}
+.aisrc ul{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:2px}
+.aisrc button{font:inherit;font-size:11.5px;text-align:left;border:0;background:transparent;color:var(--fg-2);padding:2px 0;cursor:pointer;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.aisrc button:hover,.aisrc button:focus-visible{color:var(--primary);text-decoration:underline}.aisrc .mut{font-size:11px}
+.aicite{font:inherit;font-size:.82em;vertical-align:super;line-height:1;border:0;background:transparent;color:var(--primary);padding:0 1px;cursor:pointer}
+.aicite:hover,.aicite:focus-visible{text-decoration:underline}
+#ai_qa{flex:none;padding:2px 8px 4px;font-size:12px}#ai_qa>summary{cursor:pointer;color:var(--fg-2);padding:2px 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#ai_qa>summary{list-style:none}#ai_qa>summary::-webkit-details-marker{display:none}#ai_qa>summary::before{content:"\25B8";font-size:11px;color:var(--mut)}#ai_qa[open]>summary::before{content:"\25BE"}#ai_qa[open]>summary{margin-bottom:2px}
+.aitog{display:inline-flex;align-items:center;gap:2px}.aiuse{font-size:11px;border:1px solid var(--line);border-radius:9px;padding:0 7px;color:var(--fg-2)}.aiuse.warn{border-color:var(--warn);color:var(--warn);background:var(--warn-soft);font-weight:600}.aiuse.bad{border-color:var(--bad);color:var(--bad);background:var(--bad-soft);font-weight:600}
+#ai_decl{display:flex;align-items:center;gap:4px}
+.aifolder{position:relative}.aipop{position:static;display:inline-block}.aipop:not([open])>.aipop-b{display:none}.aipop>summary{list-style:none;cursor:pointer;border:1px solid var(--line);border-radius:3px;padding:0 6px;min-height:24px;display:inline-flex;align-items:center;color:var(--fg-2)}
+.aipop>summary::-webkit-details-marker{display:none}
+.aipop-b{position:absolute;z-index:40;left:8px;right:8px;top:calc(100% + 2px);max-width:360px;padding:8px 10px;background:var(--surface);border:1px solid var(--line);border-radius:4px;box-shadow:var(--shadow-lg);font-size:12px;line-height:1.4}
 .aimeta{font-size:11px;color:var(--mut);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .aibadge{font-size:10.5px;border-radius:9px;padding:0 7px;border:1px solid var(--ok);color:var(--ok);background:var(--ok-soft)}
 .aibadge.local{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
@@ -827,7 +841,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
  <span id="instchipwrap" hidden><button class="instchip" id="instchip" type="button" aria-controls="insttoast"><span class="rt-spin" aria-hidden="true"></span><span id="instchiptx">Installing</span></button><span data-tipid="install_chip"></span></span>
  <span class="pill" id="jobpill" hidden><span class="pulse"></span><span id="jobpilltx">1 job running</span></span>
  <button class="tbtn" id="gdbtn" aria-pressed="false" title="Side panel: Studies, Jobs and Git (Ctrl+Shift+G opens Git)"><svg class="ico sm"><use href="#i-sidebar"/></svg><span>Panel</span><span class="badge" id="gdbadge" hidden></span></button>
- <button class="tbtn" id="aibtn" hidden title="AI help: ask about PlasBench, with commands you can run (Alt+Shift+H)"><svg class="ico sm"><use href="#i-help"/></svg><span>AI help</span></button>
+ <button class="tbtn" id="aibtn" hidden aria-expanded="false" aria-controls="aidrawer" title="AI help: ask about PlasBench, with commands you can run (Alt+Shift+H). It opens in place of the side panel."><svg class="ico sm"><use href="#i-help"/></svg><span>AI help</span><span class="aidot" id="aidot" hidden aria-label="new in the AI help"></span></button>
  <button class="tbtn netind" id="netind" title="Checking the internet connection…" aria-label="Internet status: checking"><span class="nd" aria-hidden="true"></span><span class="nl">Checking…</span></button>
  <div class="menuwrap" id="morewrap"><button class="tbtn" id="morebtn" aria-haspopup="true" aria-expanded="false" aria-controls="moremenu" title="More: updates, help, reload the page, light or dark theme" aria-label="More"><svg class="ico sm"><use href="#i-more"/></svg><span class="updot" id="upd_dot" hidden title="A newer PlasBench release is available"></span></button>
   <div class="menu" id="moremenu" hidden>
@@ -1155,8 +1169,7 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
  <div id="gd_head"><div id="gd_tabs" role="tablist" aria-label="Side panel">
    <button data-pt="studies" role="tab" title="Your studies as a folder tree: reports, tables, logs"><svg class="ico sm"><use href="#i-folder"/></svg>Studies</button>
    <button data-pt="jobs" role="tab" title="Commands started from this window, newest first"><svg class="ico sm"><use href="#i-list"/></svg>Jobs<span class="badge" id="pjbadge" hidden></span></button>
-   <button data-pt="ai" role="tab" hidden title="Ask about PlasBench: answers from its own guides, with commands you can run (Alt+Shift+H)"><svg class="ico sm"><use href="#i-help"/></svg>AI help</button>
-   <button data-pt="git" role="tab" title="Source control of the chosen study: changes, commit, branches, remote, files, history"><svg class="ico sm"><use href="#i-git"/></svg>Git<span class="badge" id="gdtabbadge" hidden></span></button></div>
+    <button data-pt="git" role="tab" title="Source control of the chosen study: changes, commit, branches, remote, files, history"><svg class="ico sm"><use href="#i-git"/></svg>Git<span class="badge" id="gdtabbadge" hidden></span></button></div>
   <button class="gd-ib" id="gd_close" title="Close the panel (Ctrl+Shift+G)" aria-label="Close the panel"><svg class="ico sm"><use href="#i-x"/></svg></button></div>
  <div class="gdpane" id="gdp_git">
   <div class="gd-tools"><span>Source control</span><span class="grow"></span>
@@ -1173,13 +1186,18 @@ select[data-st=on]{border-left:4px solid var(--on)}select[data-st=off]{border-le
    <a class="gd-ib" href="#workspace" title="Open Workspace &amp; studies" aria-label="Open Workspace and studies"><svg class="ico sm"><use href="#i-ext"/></svg></a></div>
   <ul class="tree" id="ps_list" role="tree" aria-label="Studies"></ul>
   <div class="gd-tools" style="border-top:1px solid var(--line-2);border-bottom:0"><a class="btn sm" href="#wizard" style="flex:1;justify-content:center"><svg class="ico sm"><use href="#i-plus"/></svg>New benchmark</a></div></div>
- <div class="gdpane" id="gdp_ai" hidden>
-  <div id="ai_tools"><select id="ai_prov" aria-label="Provider" title="Which provider answers" hidden></select><select id="ai_model" aria-label="Model" title="Which model answers"></select>
-   <label title="Ask for short answers (fewer tokens)"><input type="checkbox" id="ai_brief">Brief</label>
-   <label title="Keep this chat in this browser only (off by default)"><input type="checkbox" id="ai_remember">Remember chats</label>
-   <span data-tipid="ai_privacy"></span><span class="grow"></span>
+</aside>
+<aside id="aidrawer" aria-label="AI help" aria-hidden="true" inert>
+ <div id="ai_head"><b>AI help</b><span class="small mut">Alt+Shift+H</span><span class="grow"></span>
+  <button class="gd-ib" id="ai_close" title="Close the AI help (Escape)" aria-label="Close the AI help"><svg class="ico sm"><use href="#i-x"/></svg></button></div>
+ <div class="gdpane" id="gdp_ai">
+  <div id="ai_tools"><select id="ai_prov" aria-label="Provider" title="Which provider answers" hidden></select><select id="ai_model" aria-label="Model" title="Which model answers"></select><span data-tipid="ai_privacy"></span>
+   <span class="aitog"><label><input type="checkbox" id="ai_brief">Brief</label><span id="ai_brief_tip"></span></span>
+   <span class="aitog"><label><input type="checkbox" id="ai_remember">Remember chats</label><span id="ai_remember_tip"></span></span>
+   <span class="grow"></span>
    <button class="gd-ib" id="ai_new" title="New chat" aria-label="New chat"><svg class="ico sm"><use href="#i-plus"/></svg></button></div>
-  <div id="ai_folder" hidden></div><div id="ai_quick" hidden aria-label="Guided help"></div>
+  <details id="ai_qa" hidden><summary><span>Quick actions</span><span id="ai_qa_chip" class="small mut"></span></summary>
+   <div id="ai_folder" hidden></div><div id="ai_quick" hidden aria-label="Guided help"></div></details>
   <div id="ai_state"></div>
   <div id="ai_log" role="log" aria-live="polite" aria-label="AI help conversation" tabindex="0"></div>
   <div id="ai_starters"></div>
@@ -6175,19 +6193,21 @@ const gdLetter = f => f.conflict ? ["C", "!"] : f.untracked ? ["Q", "U"] : null;
 function gdState(id) { try { const v = localStorage.getItem("pb_gd_" + id); return v == null ? null : v === "1"; } catch { return null; } }
 const PT = {active: "studies"};
 try { PT.active = localStorage.getItem("pb_pt") || "studies"; } catch {}
+if (!["studies", "jobs", "git"].includes(PT.active)) PT.active = "studies";
 function setPanelTab(t) {
-  PT.active = ["studies", "jobs", "git", "ai"].includes(t) ? t : "studies";
+  if (t === "ai") { setAiDrawer(true); return; }      // the AI help is its own drawer now; an old link or a stored "ai" tab opens it
+  PT.active = ["studies", "jobs", "git"].includes(t) ? t : "studies";
   try { localStorage.setItem("pb_pt", PT.active); } catch {}
   $$("#gd_tabs [data-pt]").forEach(b => { const on = b.dataset.pt === PT.active; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
-  for (const t of ["studies", "jobs", "git", "ai"]) $("#gdp_" + t).hidden = t !== PT.active;
-  document.body.classList.toggle("gd-ai", PT.active === "ai" && GD.open);
+  for (const t of ["studies", "jobs", "git"]) $("#gdp_" + t).hidden = t !== PT.active;
   if (GD.open) panelLoad();
 }
-function panelLoad(quiet) { if (PT.active === "git") loadDrawer(quiet); else if (PT.active === "jobs") renderPanelJobs(); else if (PT.active === "ai") aiOnShow(quiet); else loadPanelStudies(); }
+function panelLoad(quiet) { if (PT.active === "git") loadDrawer(quiet); else if (PT.active === "jobs") renderPanelJobs(); else loadPanelStudies(); }
 $("#gd_tabs").onclick = e => { const b = e.target.closest("[data-pt]"); if (b) setPanelTab(b.dataset.pt); };
 function setDrawer(open, remember = true) {
-  GD.open = open; document.body.classList.toggle("gd-open", open); document.body.classList.toggle("gd-ai", open && PT.active === "ai");
-  $("#gdrawer").setAttribute("aria-hidden", open ? "false" : "true");
+  if (open && AI.open) setAiDrawer(false, {remember, keepFocus: true});      // one right drawer at a time: the side panel replaces the AI help
+  GD.open = open; document.body.classList.toggle("gd-open", open);
+  $("#gdrawer").setAttribute("aria-hidden", open ? "false" : "true"); $("#gdrawer").inert = !open;
   $("#gdbtn").setAttribute("aria-pressed", open ? "true" : "false");
   if (remember) try { localStorage.setItem("pb_gd_open", open ? "1" : "0"); } catch {}
   clearInterval(GD.timer);
@@ -6304,6 +6324,8 @@ $("#gd_body").addEventListener("click", async e => {
 });
 $("#gdbtn").onclick = () => setDrawer(!GD.open);
 $("#gd_close").onclick = () => setDrawer(false);
+$("#ai_close").onclick = () => setAiDrawer(false);
+$("#aidrawer").addEventListener("keydown", e => { if (e.key === "Escape" && AI.open && $("#tipbox").hidden && !document.querySelector("dialog[open]")) { e.preventDefault(); setAiDrawer(false); } });
 /* ===================================================================================================
    AI help (the AI help tab of the side panel). Server side: plasbench/ai_help.py. Nothing is sent anywhere until the person signs in, accepts the notice and asks.
    The model's text is DATA: it is shown through md() (escape first), and a command in it only ever becomes a card whose buttons the server has validated; Run goes through confirmRun.
@@ -6319,8 +6341,9 @@ async function aiStatus(detect) {
   try { AI.st = await api(`ai/status?provider=${encodeURIComponent(aiProv())}&detect=${detect ? 1 : 0}`); } catch { AI.st = null; return null; }
   if (!AI.prov && AI.st.suggested) AI.prov = AI.st.suggested;
   const on = !!AI.st.enabled;
-  $("#aibtn").hidden = !on; $("#gd_tabs [data-pt=ai]").hidden = !on;
-  if (!on && PT.active === "ai") setPanelTab("studies");
+  $("#aibtn").hidden = !on;
+  if (!on && AI.open) setAiDrawer(false);
+  if (on && AI.reopen) { AI.reopen = false; if (!GD.open) setAiDrawer(true, {remember: false}); }
   return AI.st;
 }
 async function aiBoot() { await aiStatus(false); }
@@ -6347,7 +6370,8 @@ async function aiLoadModels() {
 }
 function aiRender() {
   const st = AI.st, box = $("#ai_state"), p = aiProv();
-  { const decl = $("#ai_decl"); if (decl) decl.textContent = (st && st.disclosure && st.disclosure.declaration_short) || "I can't see your files (FASTQ, FASTA, results, logs). I only know PlasBench's guides and what you type or send me."; }
+  { const decl = $("#ai_decl"); if (decl) { const full = (st && st.disclosure && st.disclosure.declaration_short) || "I can't see your files (FASTQ, FASTA, results, logs). I only know PlasBench's guides and what you type or send me."; if (decl.dataset.full !== full) { decl.innerHTML = aiDeclHtml(full); decl.dataset.full = full; } } }
+  aiToolTips();
   if (!st) { box.innerHTML = `<div class="aicard bad">AI help could not reach this window's server. Reload the page.</div>`; return; }
   const d = st.disclosure || {}, prow = (st.providers || []).find(r => r.id === p) || {};
   let html = "";
@@ -6378,23 +6402,77 @@ function aiRender() {
   const starters = $("#ai_starters");
   if (open && !AI.msgs.length) {
     const failed = aiContext().last_failure;
-    starters.innerHTML = (failed ? `<button type="button" data-aiflow="why_failed">Why did my last run fail?</button>` : "") + ["How do I install and run my first benchmark?", "How do I prepare my own isolates and sample sheet?", "What do F1, precision and recall mean here?", "My run looks stuck. What do I check?"]
+    starters.innerHTML = (failed && !AI.pre ? `<button type="button" data-aiflow="why_failed">Why did my last run fail?</button>` : "") + ["How do I install and run my first benchmark?", "How do I prepare my own isolates and sample sheet?", "What do F1, precision and recall mean here?", "My run looks stuck. What do I check?"]
       .map(q => `<button type="button" data-aiq="${esc(q)}">${esc(q)}</button>`).join("");
-    if (failed && !AI.pre) { AI.pre = null; api("ai/validate", {cmd: "plasbench diagnose", where: "window", risk: "safe"}).then(v => { v.why = "Reads the latest run and says what went wrong. It changes nothing."; AI.pre = v; aiRenderLog(); }).catch(() => {}); }
+    if (failed && !AI.pre) { AI.pre = null; api("ai/validate", {cmd: "plasbench diagnose", where: "window", risk: "safe"}).then(v => { aiDot(true); v.why = "Reads the latest run and says what went wrong. It changes nothing."; AI.pre = v; aiRender(); }).catch(() => {}); }
   } else starters.innerHTML = "";
   $("#ai_send").disabled = AI.busy; $("#ai_stop").hidden = !AI.busy; $("#ai_send").hidden = AI.busy;
   aiRenderFolder();
-  const u = st.used_today || {}, l = AI.last;
-  $("#ai_foot").innerHTML = `<span class="aibadge ${p === "local" ? "local" : ""}">${p === "local" ? "stays on this computer" : p === "huggingface" ? "your Hugging Face credits" : "free"}</span>`
-    + `<span title="Counted on this computer today">Today: ${u.requests || 0} requests, ${(u.tokens || 0).toLocaleString()} tokens${st.cap ? " of " + st.cap.toLocaleString() : ""}</span>`
-    + (l ? `<span>Last: ${l.usage.prompt} in / ${l.usage.completion} out${l.usage.estimated ? " (est.)" : ""}</span>` : "")
-    + (l && l.free_requests && l.free_requests.remaining != null ? `<span>${esc(l.free_requests.remaining)}${l.free_requests.limit ? " of " + esc(l.free_requests.limit) : ""} free requests left today</span>` : "")
-    + (st.signed_in && st.needs_key ? `<button class="btn sec sm" id="ai_signout" title="Delete the stored key from this computer">Sign out</button>` : "");
+  $("#ai_foot").innerHTML = aiFootHtml(st, p, AI.last);
   aiRenderLog();
 }
 function aiContext() {
   const failed = (S.jobs || []).filter(j => j.state === "failed" || j.state === "interrupted").sort((a, b) => (b.started || 0) - (a.started || 0))[0];
   return failed ? {last_failure: `${(failed.argv || [])[0] || "a command"} ${failed.state}${failed.exit != null ? " (exit " + failed.exit + ")" : ""}`} : {};
+}
+const aiTip = (title, summary, label) => tipBtn({plain: true, title, summary}, label);
+function aiDeclHtml(full) {
+  // one short line; the full promise is in the (i) (hover, keyboard focus and tap open it) and, for screen readers and search, in the line itself
+  return `<span>The assistant can't see your files</span>${aiTip("What the assistant can see", full, "what the assistant can see")}<span class="vh">${esc(full)}</span>`;
+}
+function aiToolTips() {
+  const b = $("#ai_brief_tip"), r = $("#ai_remember_tip");
+  if (b && !b.innerHTML) b.innerHTML = aiTip("Brief", "Asks for answers of at most five short lines. An answer is then capped at 600 tokens instead of 2,000, so it costs fewer tokens and free limits last longer.", "Brief");
+  if (r && !r.innerHTML) r.innerHTML = aiTip("Remember chats", "Keeps the last 30 messages of this chat in this browser (its local storage on this computer), so they come back after a reload. Off by default. Nothing is stored on a server; turning it off deletes the stored chat. Folder cards are not kept.", "Remember chats");
+}
+function aiFootHtml(st, p, l) {
+  // one small usage indicator; its (i) holds the three lines it replaces, with the figures exactly as counted (nothing is invented: a line whose figure is not known is left out).
+  // When the free requests are nearly used up (5 or fewer) or used up, the indicator itself turns amber or red with the number, so a refusal is no surprise.
+  const u = st.used_today || {}, fr = l && l.free_requests && l.free_requests.remaining != null && l.free_requests.remaining !== "" ? l.free_requests : null;
+  const lines = [`Today: ${u.requests || 0} requests, ${(u.tokens || 0).toLocaleString()} tokens${st.cap ? " of " + st.cap.toLocaleString() : ""}`];
+  if (l && l.usage) lines.push(`Last: ${l.usage.prompt} in / ${l.usage.completion} out${l.usage.estimated ? " (est.)" : ""}`);
+  if (fr) lines.push(`${fr.remaining}${fr.limit ? " of " + fr.limit : ""} free requests left today`);
+  const n = fr ? Number(fr.remaining) : NaN, lvl = fr && !isNaN(n) ? (n <= 0 ? "bad" : n <= 5 ? "warn" : "") : "";
+  const label = fr ? (lvl === "bad" ? "No free requests left today" : `${fr.remaining} left`) : `${u.requests || 0} today`;
+  const tip = tipBtn({plain: true, title: "Usage", summary: "Counted on this computer.", bullets: lines}, "usage: " + lines.join("; "));
+  return `<span class="aibadge ${p === "local" ? "local" : ""}">${p === "local" ? "stays on this computer" : p === "huggingface" ? "your Hugging Face credits" : "free"}</span>`
+    + `<span class="aiuse ${lvl}" id="ai_use" data-level="${lvl || "ok"}" title="${esc(lines.join("\n"))}">${esc(label)}</span>${tip}`
+    + (st.signed_in && st.needs_key ? `<button class="btn sec sm" id="ai_signout" title="Delete the stored key from this computer">Sign out</button>` : "");
+}
+function aiSourcesHtml(sources) {
+  // one collapsed line per answer; identical sources (same file and section) are listed once with all their numbers
+  const groups = [], by = {};
+  for (const s of sources) { const k = s.src + "#" + (s.anchor || ""); if (!by[k]) { by[k] = {s, ns: []}; groups.push(by[k]); } by[k].ns.push(s.n); }
+  return `<details class="aisrc"><summary>Sources (${groups.length})</summary><ul>${groups.map(g => `<li><button type="button" data-aisrc="${esc(g.s.src)}" data-anchor="${esc(g.s.anchor || "")}" title="Open ${esc(g.s.src)}">[${g.ns.join(", ")}] ${esc(g.s.title || g.s.src)} <span class="mut">${esc(g.s.src)}</span></button></li>`).join("")}</ul></details>`;
+}
+function aiCite(root) {
+  // the [n] markers of an answer become small buttons: the title (hover) and the accessible name give the full source title, a click opens it
+  root.querySelectorAll(".aimsg.bot[data-m] .aibody").forEach(body => {
+    const m = AI.msgs[+body.parentNode.dataset.m]; if (!m || !(m.sources || []).length) return;
+    const by = {}; m.sources.forEach(s => { by[s.n] = s; });
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, {acceptNode: n => n.parentNode.closest("pre,code,a,button") || !/\[\d{1,2}\]/.test(n.nodeValue) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT});
+    const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(n => {
+      const frag = document.createDocumentFragment(); let last = 0; const t = n.nodeValue;
+      t.replace(/\[(\d{1,2})\]/g, (all, k, at) => {
+        const s = by[+k]; if (!s) return all;
+        frag.appendChild(document.createTextNode(t.slice(last, at)));
+        const b = document.createElement("button"); b.type = "button"; b.className = "aicite"; b.textContent = "[" + k + "]";
+        b.dataset.aisrc = s.src; b.dataset.anchor = s.anchor || ""; b.title = s.title || s.src; b.setAttribute("aria-label", `Source ${k}: ${s.title || s.src}`);
+        frag.appendChild(b); last = at + all.length; return all;
+      });
+      if (last) { frag.appendChild(document.createTextNode(t.slice(last))); n.parentNode.replaceChild(frag, n); }
+    });
+  });
+}
+function aiAnswerTip(m) {
+  const kind = m.provider === "local" ? "a model on this computer" : m.free === false ? "paid credits" : "a free model";
+  return aiTip("About this answer", `${m.model || "the model"} (${kind}). ${m.usage.total} tokens${m.usage.estimated ? " (estimated)" : ""}: ${m.usage.prompt != null ? m.usage.prompt + " in, " + m.usage.completion + " out" : ""}.`, "about this answer");
+}
+function aiQaOpen() {
+  // Quick actions: open on an empty chat, folded once the conversation has started, unless the person opened or closed it themselves
+  const qa = $("#ai_qa"); if (!qa || AI.qaTouched) return;
+  AI.qaWant = !AI.msgs.length; if (qa.open !== AI.qaWant) qa.open = AI.qaWant;
 }
 function aiActionCard(a, mi, i) {
   const where = AI_WHERE[a.where] || AI_PLAIN_WHERE;
@@ -6423,9 +6501,9 @@ function aiMsgHtml(m, mi) {
   (m.ui || []).forEach((u, i) => { h += aiUiCard(u, mi, i); });
   (m.fileplans || []).forEach((fp, i) => { h += `<div class="aicard2"><div class="ch"><b>Proposed file changes</b></div><div class="cb">${fp.error ? `<div class="no">${esc(fp.error)}</div>` : `<button class="btn sm" data-aif="reviewplan" data-i="${i}">Review the plan (nothing changes yet)</button>`}</div></div>`; });
   if (m.truncated && !m.error) h += `<div class="aimeta"><span>The answer was cut off (the model's length limit or a lost connection).</span><button class="btn sec sm" type="button" data-aicont="1">Continue</button></div>`;
-  if (m.sources && m.sources.length && !m.error) h += `<div class="aisrc">${m.sources.map(s => `<button type="button" data-aisrc="${esc(s.src)}" data-anchor="${esc(s.anchor)}" title="${esc(s.title)}">[${s.n}] ${esc(s.src.replace(/^docs\//, ""))}${s.anchor ? " › " + esc(s.title.split(" > ").pop().slice(0, 28)) : ""}</button>`).join("")}</div>`;
+  if (m.sources && m.sources.length && !m.error) h += aiSourcesHtml(m.sources);
   if (m.link) h += `<div class="aimeta"><a href="${esc(m.link)}" target="_blank" rel="noopener">More information</a></div>`;
-  if (m.usage) h += `<div class="aimeta"><span class="aibadge ${m.provider === "local" ? "local" : m.free === false ? "credits" : ""}">${m.provider === "local" ? "local" : m.free === false ? "credits" : "free"}</span><span>${esc(m.model || "")}</span><span>${m.usage.total} tokens${m.usage.estimated ? " (est.)" : ""}</span>
+  if (m.usage) h += `<div class="aimeta">${aiAnswerTip(m)}
       <button class="aithumb ${m.vote === 1 ? "on" : ""}" data-aivote="1" title="Helpful (kept only in this browser)" aria-label="Helpful">&#128077;</button><button class="aithumb ${m.vote === -1 ? "on" : ""}" data-aivote="-1" title="Not helpful (kept only in this browser)" aria-label="Not helpful">&#128078;</button></div>`;
   return h + `</div>`;
 }
@@ -6433,7 +6511,7 @@ function aiDecorate(root) {
   $$("pre", root).forEach(pre => {
     if (pre.dataset.dec || pre.classList.contains("aipre-plain")) return; pre.dataset.dec = "1";
     const hd = document.createElement("div"); hd.className = "aipre-hd";
-    hd.innerHTML = `<span>${AI_PLAIN_WHERE}</span><button class="btn sec sm" data-aicopy="1">${icon("copy")}Copy</button>`;
+    hd.innerHTML = `<span>Your own terminal${aiTip("Where this runs", AI_PLAIN_WHERE + ". Only the command cards with Run in PlasBench run here, after you confirm.", "where this runs")}</span><button class="btn sec sm" data-aicopy="1">${icon("copy")}Copy</button>`;
     pre.parentNode.insertBefore(hd, pre);
   });
 }
@@ -6443,8 +6521,8 @@ function aiRenderLog() {
   let h = AI.msgs.map((m, i) => aiMsgHtml(m, i)).join("");
   if (!AI.msgs.length && AI.pre && AI.st && AI.st.consent) h = `<div class="aimsg bot"><div class="aibody"><p>You have a failed run. This check is safe and changes nothing:</p></div>${aiActionCard(AI.pre, -1, 0)}</div>`;
   if (!AI.msgs.length && !AI.pre) h = `<div class="mut small" style="padding:6px">${AI.st && AI.st.consent && (!AI.st.needs_key || AI.st.signed_in) ? "Ask about installing, running, inputs, metrics, the workflow, settings or an error message. Answers come from PlasBench's own guides." : ""}</div>`;
-  log.innerHTML = h; aiDecorate(log);
-  { const st = $("#ai_starters"), q = $("#ai_quick"); if (st) st.style.display = AI.msgs.length ? "none" : ""; if (q) q.classList.toggle("compact", AI.msgs.length > 0); }
+  log.innerHTML = h; aiDecorate(log); aiCite(log);
+  { const st = $("#ai_starters"); if (st) st.style.display = AI.msgs.length ? "none" : ""; aiQaOpen(); }
   if (near) log.scrollTop = log.scrollHeight;
 }
 function aiSaveChat() { if (!AI.remember) return; aiLS("chat", JSON.stringify(AI.msgs.filter(m => !m.kind).slice(-30).map(m => ({role: m.role, content: m.content, sources: m.sources, error: m.error, usage: m.usage, model: m.model, provider: m.provider, free: m.free})))); }
@@ -6484,7 +6562,7 @@ async function aiSend(text, extra) {
   } catch (e) {
     if (e.name === "AbortError") { bot.content = (bot.content || "") + "\n\n(stopped)"; }
     else { bot.error = true; bot.content = e.message; if (e.data) { bot.link = e.data.link || ""; aiAfterError(e.data); } }
-  } finally { AI.busy = false; AI.ctl = null; $("#ai_live").textContent = bot.error ? "The assistant could not answer" : "The assistant finished"; aiSaveChat(); aiRender(); aiAttachPlans(bot); }
+  } finally { AI.busy = false; AI.ctl = null; $("#ai_live").textContent = bot.error ? "The assistant could not answer" : "The assistant finished"; aiSaveChat(); aiRender(); aiAttachPlans(bot); aiDot(true); }
 }
 function aiAfterError(d) {
   if (d.kind === "signin") { if (AI.st) AI.st.signed_in = false; aiStatus(false).then(aiRender); }
@@ -6553,23 +6631,44 @@ async function aiSendResult(id, cmd) {
 }
 async function aiOpenSource(src, anchor) {
   try { if (!S.docs) S.docs = (await api("docs")).docs; } catch {}
-  if ((S.docs || []).some(d => d.name === src)) { S.aiAnchor = anchor || ""; go("help", src); if (window.innerWidth < 1280) setDrawer(false); return; }
+  if ((S.docs || []).some(d => d.name === src)) { S.aiAnchor = anchor || ""; go("help", src); if (window.innerWidth < 1280) setAiDrawer(false); return; }
   showMessage({title: "Source", body: `This part of the answer comes from ${src}, which is not one of the guides listed on the Guides page.`});
 }
 
 /* ---- wiring ---- */
-function aiOpen() { PT.active = "ai"; if (GD.open && document.body.classList.contains("gd-ai")) { setDrawer(false); return; } if (GD.open) setPanelTab("ai"); else setDrawer(true); }
+function aiOpen() { setAiDrawer(!AI.open); }
+/* The AI help is its own right-hand drawer, in the same slot as the side panel: opening one closes the other. Hidden, never destroyed: the conversation, a draft, the scroll,
+   the chosen folder, cards and a running answer stay as they are, and a dot on the AI help button says something arrived while it was hidden. */
+function setAiDrawer(open, o = {}) {
+  if (open && !(AI.st && AI.st.enabled) && $("#aibtn").hidden) return;
+  if (open && GD.open) setDrawer(false, o.remember !== false);
+  const was = AI.open; AI.open = !!open;
+  document.body.classList.toggle("ai-open", AI.open);
+  const d = $("#aidrawer"); d.setAttribute("aria-hidden", AI.open ? "false" : "true"); d.inert = !AI.open;
+  $("#aibtn").setAttribute("aria-expanded", AI.open ? "true" : "false"); $("#aibtn").setAttribute("aria-pressed", AI.open ? "true" : "false");
+  if (o.remember !== false) try { localStorage.setItem("pb_ai_open", AI.open ? "1" : "0"); if (AI.open) localStorage.setItem("pb_gd_open", "0"); } catch {}
+  if (AI.open) { aiDot(false); if (!was) aiOnShow(false); }
+  else if (was && !o.keepFocus && d.contains(document.activeElement)) $("#aibtn").focus();
+}
+function aiDot(on) { const d = $("#aidot"); if (d) d.hidden = !on || !!AI.open; }
 $("#aibtn").onclick = aiOpen;
 addEventListener("keydown", e => { if (e.altKey && e.shiftKey && (e.key === "H" || e.key === "h")) { e.preventDefault(); if (!$("#aibtn").hidden) aiOpen(); } });
 $("#ai_form").onsubmit = e => { e.preventDefault(); aiSend($("#ai_in").value); };
 $("#ai_in").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); aiSend($("#ai_in").value); } });
 $("#ai_in").addEventListener("input", aiFit);
 $("#ai_stop").onclick = () => { if (AI.ctl) AI.ctl.abort(); };
-$("#ai_new").onclick = () => { if (AI.ctl) AI.ctl.abort(); AI.msgs = []; AI.pre = null; AI.last = null; aiSaveChat(); aiRender(); };
+$("#ai_new").onclick = () => { if (AI.ctl) AI.ctl.abort(); AI.msgs = []; AI.pre = null; AI.last = null; AI.qaTouched = false; aiSaveChat(); aiRender(); };
 $("#ai_brief").onchange = e => aiLS("brief", e.target.checked ? "1" : "0");
 $("#ai_remember").onchange = e => { AI.remember = e.target.checked; aiLS("remember", AI.remember ? "1" : "0"); if (AI.remember) aiSaveChat(); else aiLS("chat", "[]"); };
 $("#ai_model").onchange = e => aiLS("model_" + aiProv(), e.target.value);
 $("#ai_prov").onchange = async e => { AI.prov = e.target.value; AI.note = ""; await aiStatus(true); fillProv(); await aiLoadModels(); aiRender(); };
+$("#gdp_ai").addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  const d = [...document.querySelectorAll("#gdp_ai details.aipop[open]")].pop(); if (!d) return;
+  e.stopPropagation(); d.open = false; const sm = d.querySelector("summary"); if (sm) sm.focus();
+});
+document.addEventListener("click", e => { document.querySelectorAll("#gdp_ai details.aipop[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; }); });
+$("#ai_qa").addEventListener("toggle", () => { if ($("#ai_qa").open !== AI.qaWant) AI.qaTouched = true; });
 $("#gdp_ai").addEventListener("change", e => {
   const w = e.target.closest && e.target.closest("[data-idest=where]"); if (!w) return;
   const card = w.closest(".aicard2"), st = card && card.querySelector("[data-idest=study]"); if (st) st.closest("label").hidden = w.value !== "study";
@@ -6596,7 +6695,7 @@ $("#gdp_ai").addEventListener("click", async e => {
     if (k === "undo" && mm) return aiUndo(mm, af.dataset.j);
     if (k === "reviewplan") return aiReviewPlan(af, +af.dataset.i);
     if (k === "savetool" && mm) return aiSaveTool(mm);
-    if (k === "opentool") { go("addtool"); if (window.innerWidth < 1280) setDrawer(false); return; }
+    if (k === "opentool") { go("addtool"); if (window.innerWidth < 1280) setAiDrawer(false); return; }
     if (mm && ["iapply", "iplan", "ishare", "checkagain"].includes(k)) { const card = af.closest(".aicard2"); if (k === "iapply") return aiIntakeApply(mm, card); if (k === "ishare") return aiIntakeShare(mm, card);
       if (k === "checkagain") { aiIntakeRead(card, mm); return aiCheckRun(mm); } aiIntakeRead(card, mm); return aiIntakePlan(mm); }
     if (k === "iundo" && mm) { if (!await askConfirm({title: "Undo the staging?", confirmLabel: "Undo", body: "The files PlasBench placed are removed (only those unchanged since) and the sample sheet goes back to how it was. Your original files were never changed."})) return;
@@ -6632,21 +6731,23 @@ AI.grant = null; AI.scan = null; AI.remember = AI.remember || false;
 const aiFlowQuick = [["setup_isolates", "Set up my isolates from a folder"], ["check_sheet", "Check my sample sheet"], ["why_failed", "Why did my run fail?"], ["where_run", "Where is my run?"], ["install_tools", "Install the tools I need"], ["add_tool", "Add my own tool"]];
 function aiFolderHtml() {
   const g = AI.grant;
-  if (!g) return `<div class="aifolder"><button type="button" class="btn sec sm" data-aif="choose" title="PlasBench itself reads names, sizes and the first lines of the folder and shows you what it found. Nothing goes to the assistant until you press Share.">${icon("folder")}Choose a folder</button>
-    <label class="small mut" title="Keep this folder chosen in future sessions (stored in your home folder, ~/.plasbench/ai/grants.json)"><input type="checkbox" id="ai_remfolder"> remember</label></div>`;
+  if (!g) return `<div class="aifolder"><button type="button" class="btn sec sm" data-aif="choose">${icon("folder")}Choose a folder</button>${aiTip("Choose a folder", "PlasBench itself reads names, sizes and the first lines of the folder and shows you what it found. Nothing goes to the assistant until you press Share.", "choose a folder")}
+    <details class="aipop"><summary aria-label="Folder options" title="Folder options">&#8943;</summary><div class="aipop-b"><label><input type="checkbox" id="ai_remfolder"> remember</label><div class="small mut">Keep this folder chosen in future sessions (stored in your home folder, ~/.plasbench/ai/grants.json). Revoke forgets it.</div></div></details></div>`;
   return `<div class="aifolder"><span class="aichip" title="PlasBench reads and writes only inside this folder">${icon("folder")}<b>${esc(g.name)}</b>${g.remember ? " (remembered)" : ""}</span>
     <button type="button" class="btn sec sm" data-aif="scan">Look inside</button><button type="button" class="btn ghost sm" data-aif="revoke" aria-label="Revoke access to the folder ${esc(g.name)}">Revoke</button></div>`;
 }
 function aiQuickHtml() { return aiFlowQuick.map(([k, t]) => `<button type="button" data-aiflow="${k}">${esc(t)}</button>`).join(""); }
 function aiRenderFolder() {
   const open = !!(AI.st && AI.st.consent && (!AI.st.needs_key || AI.st.signed_in));
-  const f = $("#ai_folder"), q = $("#ai_quick"); if (!f) return;
-  f.hidden = !open; q.hidden = !open;
+  const f = $("#ai_folder"), q = $("#ai_quick"), qa = $("#ai_qa"); if (!f) return;
+  f.hidden = !open; q.hidden = !open; if (qa) qa.hidden = !open;
   if (!open) return;
   if (!f.dataset.sig || f.dataset.sig !== JSON.stringify(AI.grant)) { f.innerHTML = aiFolderHtml(); f.dataset.sig = JSON.stringify(AI.grant); }
   if (!q.innerHTML) q.innerHTML = aiQuickHtml();
+  const chip = $("#ai_qa_chip"); if (chip) chip.textContent = AI.grant ? "· folder: " + AI.grant.name : "";
+  aiQaOpen();
 }
-const aiPush = m => { AI.msgs.push(Object.assign({role: "bot", content: ""}, m)); aiRenderLog(); return AI.msgs[AI.msgs.length - 1]; };
+const aiPush = m => { AI.msgs.push(Object.assign({role: "bot", content: ""}, m)); aiRenderLog(); aiDot(true); return AI.msgs[AI.msgs.length - 1]; };
 const aiKb = n => n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : n < 1073741824 ? (n / 1048576).toFixed(1) + " MB" : (n / 1073741824).toFixed(1) + " GB";
 async function aiChooseFolder() {
   const remember = !!($("#ai_remfolder") && $("#ai_remfolder").checked);
@@ -6670,7 +6771,7 @@ function aiScanCard(m, mi) {
     ${s.samples.length ? `<div class="small mut">Samples: ${esc(s.samples.slice(0, 8).join(", "))}${s.samples.length > 8 ? " and " + (s.samples.length - 8) + " more" : ""}</div>` : ""}
     ${probs ? `<div class="why">Problems found:</div><ul class="small">${probs}</ul>` : `<div class="ok-t">No problems found.</div>`}
     <details><summary>Exactly what Share would send (about ${m.tokens} tokens)</summary><pre class="aipre-plain">${esc(m.summary)}</pre></details>
-    <div class="acts"><button class="btn sm" data-aif="share">Share this summary with the assistant</button><button class="btn sec sm" data-aif="scan">Look again</button>${s.pairs.length ? `<button class="btn sec sm" data-aif="flow-setup">Set up a run from this folder</button>` : ""}${s.sheets.some(x => x.problems.length) ? `<button class="btn sec sm" data-aif="flow-sheet">Fix my sample sheet</button>` : ""}</div>
+    <div class="acts"><button class="btn sm" data-aif="share">Share this summary with the assistant</button><button class="btn sec sm" data-aif="scan">Look again</button>${s.pairs.length ? `<button class="btn sec sm" data-aif="flow-setup">Set up my isolates from this folder</button>` : ""}${s.sheets.some(x => x.problems.length) ? `<button class="btn sec sm" data-aif="flow-sheet">Fix my sample sheet</button>` : ""}</div>
     <div class="runstate" aria-live="polite"></div></div></div></div>`;
 }
 async function aiShare() {
@@ -6738,7 +6839,7 @@ async function aiRunUi(card) {
   let v; try { v = (await api("ai/ui/validate", {ui: Object.assign({ui: u.ui}, uiAskBack(u))})); } catch (e) { return toast(e.message, "bad"); }
   if (!v.ok) { aiRunNote(card, "Not allowed: " + esc(v.reason)); return; }
   const p = v.params;
-  if (v.ui === "go") { go(p.target, p.sub); if (window.innerWidth < 1280) setDrawer(false); return aiRunNote(card, "Opened."); }
+  if (v.ui === "go") { go(p.target, p.sub); if (window.innerWidth < 1280) setAiDrawer(false); return aiRunNote(card, "Opened."); }
   if (v.ui === "flow") return aiStartFlow(p.name);
   if (v.ui === "setting") {
     if (!await askConfirm({title: "Change this setting?", confirmLabel: "Change", body: v.desc, facts: [["Setting", p.key], ["Now", p.old || "(default)"], ["New", p.value]]})) return;
@@ -6766,7 +6867,7 @@ async function aiPrefill(fields, card) {
   const V = W.values;
   if (f.cohort) V.cohort = f.cohort; if (f.samples) V.samples = f.samples; if (f.study) V.study = f.study; if (f.max_isolates) V.max_isolates = f.max_isolates;
   if (f.isolate_order !== undefined) V.isolate_order = f.isolate_order; if (f.local_inputs !== undefined) V.local_inputs = f.local_inputs;
-  W.step = 0; go("wizard"); if (window.innerWidth < 1280) setDrawer(false);
+  W.step = 0; go("wizard"); if (window.innerWidth < 1280) setAiDrawer(false);
   aiRunNote(card, "The New benchmark form is filled in. Nothing has been started: review the command on the last step.");
 }
 /* ---- guided flows: the steps and the checks are code; they work without a model ---- */
@@ -7346,7 +7447,7 @@ $("#ps_ref").onclick = () => loadPanelStudies();
 if (!MT.tabs.some(t => t.kind === "page")) { MT.tabs.unshift({kind: "page", view: "home", id: "page|home"}); mtSave(); }
 mtOnRoute(curView());
 
-try { if (localStorage.getItem("pb_gd_open") === "1") setDrawer(true, false); } catch {}
+try { if (localStorage.getItem("pb_ai_open") === "1") AI.reopen = true; else if (localStorage.getItem("pb_gd_open") === "1") setDrawer(true, false); } catch {}
 $$("#gd_tabs [data-pt]").forEach(b => b.classList.toggle("on", b.dataset.pt === PT.active));
 
 $("#g_ref").onclick = () => loadGit();

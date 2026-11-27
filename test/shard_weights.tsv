@@ -519,3 +519,4 @@ test_ai_intake.py	12.0
 test_ai_intake_routes.py	10.0
 test_annotation_retry.py	1.0
 test_resume_retry.sh	12.0
+test_ai_pane_tidy.py	1.0
