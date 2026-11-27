@@ -13,6 +13,10 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-11-27
+
+Console colours by information type with a Colours menu; the AI help in its own drawer with a calmer pane; both right-hand drawers the same width; dropdowns for every setting with a known set of values; compact fingerprint, feature matrix and 3D landscape without overlap, and a sample report that matches a real run. Details are in the entries below.
+
 ### Changed -- the console shows programs' colours and colours lines by what they are (27 November 2026)
 - **Why it ignored colour codes:** the window removed only the colour codes from job output (so a program's colours were thrown away), left other terminal codes in as debris (`[K`), printed a progress bar's every rewrite, and coloured whole lines by a guess per 256 KB piece (a line split between two pieces could get two colours); the Terminal tab's server removed every code.
 - **Now:** colour codes are rendered as text styles (16, 256 and 24-bit, bold, dim, italic, underline; too-dark colours are lightened to stay readable), every other code is removed, a carriage return rewrites the line, an escape split across two reads is kept whole, and nothing in a log is parsed as HTML. Lines get a type from explicit signals first (the program's red / yellow / green, `ERROR:` / `WARNING:` / `NOTE:`, exit codes), then cautious patterns: errors and tracebacks red, warnings amber, successes green, notes blue, headings bold, details grey italic, output plain. Markers (cross, triangle, tick, dot) keep it readable without colour; all colours reach 4.5:1 contrast. **Colours** in the console header: Headers and status (default), Full by type, Off, with a legend. Copy, the new **Save** (the whole job output) and what is sent to the AI help are plain text. The console keeps the newest 50,000 lines of a very long log. `PLASBENCH_COLOR=0/1` is accepted beside never/always.
@@ -27,10 +31,6 @@ Presentation only: no number, rank or score changes.
 - **Feature matrix.** The group titles ("Replicon type", "Insertion sequences", ...) are drawn slanted in a header band of their own, so long titles and long feature lists never overlap each other, the labels or the rows; the footnote is no longer cut off; on a phone the matrix scrolls sideways instead of shrinking to unreadable text.
 - **3D landscape ("Accuracy, completeness and structural fidelity").** Starts compact (the setup panel closed, the chart at most 300 px high) with a Larger view button for the full-size chart; the setup panel opens as before.
 - **Sample report and real runs.** The demo now runs the same advisory jobs as stage 5/6 (candidate multiplicity, ranking stability, reference-evidence audit) and passes the cohort QC flags, so the sample report shows the compact multiplicity section, ranking stability and reference evidence instead of "Not run" notes. `test/test_report_parity.py` builds a report with the pipeline's own argument list from `results_real_cohort1` and fails when its sections, their order or headings diverge from the sample for any reason other than missing optional inputs (each missing section must be listed under "Not run in this run" with its reason); the one opt-in difference is the interactive cohort dashboard (`REPORT_EMBED_DASHBOARD=1`).
-
-## [0.5.7] - 2026-11-25
-
-Faster, calmer runs; a resumable ENA-first downloader with `READ_DEPTH_CAP_X`; per-caller annotation switches and installs; an AI help that prepares isolates, checks sample sheets and troubleshoots runs; interactive report sections; publishing files for Galaxy, bio.tools, WorkflowHub and F1000Research. Details are in the entries below.
 
 ### Changed -- dropdowns for every setting with a known set of values (27 November 2026)
 - One registry (`config/setting_options.tsv`, `python/setting_options.py`) holds the options of 33 settings; Settings, the workflow rows and wizard, and the command forms draw the same dropdown
