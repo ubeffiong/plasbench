@@ -456,7 +456,7 @@ dialog.pbdlg .stopsw{display:flex;gap:8px;align-items:center;margin:6px 0;font-w
 #chead button{background:transparent;border:1px solid var(--term-line);color:var(--term-fg);border-radius:2px;padding:2px 8px;font:inherit;font-size:12px;cursor:pointer;display:inline-flex;gap:5px;align-items:center}
 #chead button:hover{background:#ffffff12}
 #chead button,#chead select{white-space:nowrap;flex:none}
-@media (max-width:640px){#chead{overflow-x:auto;scrollbar-width:thin}#chead .grow{flex:0 0 4px}}
+@media (max-width:900px){#chead{overflow-x:auto;scrollbar-width:thin}#chead .grow{flex:0 0 4px}}
 #cstate{font-size:11.5px;padding:0 6px;line-height:18px;border-radius:2px;border:1px solid var(--term-line);color:#aab3bd}
 #cstate:empty{display:none}
 #cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled,#cstate.stalled,#cstate.retrying,#cstate.completed_with_warnings,#cstate.manual_step,#cstate.consent_needed,#cstate.waiting_for_you{color:#e3c27a;border-color:#6b5520}
@@ -468,7 +468,7 @@ dialog.pbdlg .stopsw{display:flex;gap:8px;align-items:center;margin:6px 0;font-w
  --a0:#9aa4ae;--a1:#ff8a80;--a2:#5fd17a;--a3:#e8b54a;--a4:#7fbfff;--a5:#d9a6ff;--a6:#5fd4dc;--a7:#d7dce2;--a8:#b0b8c1;--a9:#ffaaa2;--a10:#86e59b;--a11:#f4cf6a;--a12:#a9d1ff;--a13:#e8c6ff;--a14:#9fe9ef;--a15:#f3f6f9;
  --ag0:#30363d;--ag1:#6e1d1a;--ag2:#1e4a2a;--ag3:#5a4512;--ag4:#173f6d;--ag5:#4b2a6e;--ag6:#134b50;--ag7:#5b636d;--ag8:#444c56;--ag9:#8c2b25;--ag10:#2b6b3b;--ag11:#79601a;--ag12:#2160a8;--ag13:#6b40a3;--ag14:#1d6d74;--ag15:#8b949e}
 @media (prefers-contrast:more){:root{--term-fg:#f3f6f9;--tc-dim:#c4cbd3;--tc-err:#ffb3ad;--tc-warn:#f6d47a;--tc-ok:#8fe9a4;--tc-info:#b3d9ff;--a0:#c4cbd3}}
-#clog,#tlog,#slog{padding-left:calc(12px + 2.2ch)}
+#console #clog,#console #tlog,#console #slog{padding-left:calc(12px + 2.2ch)}
 .tcbox .ln::before{display:inline-block;width:2.2ch;margin-left:-2.2ch;font-weight:700}
 .tcbox:not([data-tc=off]) .ln.lv-err:not(.blk)::before{content:"\2716";color:var(--tc-err)}
 .tcbox:not([data-tc=off]) .ln.lv-warn::before{content:"\25B2";color:var(--tc-warn)}
@@ -495,9 +495,8 @@ dialog.pbdlg .stopsw{display:flex;gap:8px;align-items:center;margin:6px 0;font-w
 #tcmenu{position:relative;flex:none}
 #tcmenu>summary{list-style:none;cursor:pointer;border:1px solid var(--term-line);border-radius:2px;padding:2px 8px;font-size:12px;white-space:nowrap}
 #tcmenu>summary::-webkit-details-marker{display:none}#tcmenu>summary:hover{background:#ffffff12}
-#tcmenu .tcpop{position:absolute;right:0;bottom:calc(100% + 6px);width:min(400px,92vw);background:var(--term-head);color:var(--term-fg);border:1px solid var(--term-line);border-radius:4px;
+#tcmenu .tcpop{position:fixed;right:8px;bottom:40px;width:min(400px,92vw);background:var(--term-head);color:var(--term-fg);border:1px solid var(--term-line);border-radius:4px;
  padding:10px 12px;z-index:80;box-shadow:var(--shadow-lg);white-space:normal;font-size:12px}
-#console.min #tcmenu .tcpop,#tcmenu.down .tcpop{bottom:auto;top:calc(100% + 6px)}
 #tcmenu .tcpop label{display:block;font-weight:600;margin-bottom:4px}#tcmenu .tcpop select{width:100%;max-width:none}
 #tcmenu .tcpop p{margin:6px 0;color:var(--term-fg)}#tcmenu .tcnote{color:var(--tc-dim)!important}
 #tclegend{list-style:none;margin:6px 0;padding:0 0 0 2.2ch;font:12px/1.7 var(--mono)}#tclegend li{display:flex;gap:10px;align-items:baseline}
@@ -2665,6 +2664,15 @@ $("#csave").onclick = async () => {
 $("#tcmode").value = TC.mode; tcSetMode(TC.mode);
 $("#tcmode").onchange = e => { tcSetMode(e.target.value); $("#tcwhy").textContent = TC_MODES[e.target.value]; };
 $("#tcwhy").textContent = TC_MODES[TC.mode];
+// the menu is fixed to the window (the header scrolls sideways on a narrow window and would clip it): placed under or over its button, whichever has room
+function tcPlace() {
+  if (!$("#tcmenu").open) return;
+  const r = $("#tcmenu > summary").getBoundingClientRect(), pop = $("#tcmenu .tcpop"), w = pop.offsetWidth || 400;
+  pop.style.right = "auto"; pop.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + "px";
+  if (r.top > innerHeight / 2) { pop.style.top = "auto"; pop.style.bottom = (innerHeight - r.top + 6) + "px"; } else { pop.style.bottom = "auto"; pop.style.top = (r.bottom + 6) + "px"; }
+}
+$("#tcmenu").addEventListener("toggle", tcPlace); addEventListener("resize", tcPlace);
+document.addEventListener("click", e => { if ($("#tcmenu").open && !e.target.closest("#tcmenu")) $("#tcmenu").open = false; });
 $("#tclegend").replaceChildren(...TC_TYPES.map(([t, g, what]) => { const li = document.createElement("li"), sw = document.createElement("span"), tx = document.createElement("span");
   sw.className = "ln tcsw" + (t ? " lv-" + t : ""); const w = document.createElement("span"); w.className = ["err", "warn", "ok", "info"].includes(t) ? "lw" : ""; w.textContent = g;
   sw.append(w); tx.textContent = what; li.append(sw, tx); return li; }));
