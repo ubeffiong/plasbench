@@ -1183,7 +1183,7 @@ plasbench test && plasbench demo
 - **[Section 4](#4-cohort-studies--every-manipulation-end-to-end)** — running and
   building cohort studies, and every option available.
 - [Reporting an issue](#reporting-an-issue) — what to send when something fails (and `plasbench issue-report`, one paste of diagnostics).
-- [`docs/AI_HELP.md`](docs/AI_HELP.md) — the AI help in the window's side panel (and `plasbench ask`): answers from these guides with free models, the exact command and where to run it, and a button that runs it after you confirm.
+- [`docs/AI_HELP.md`](docs/AI_HELP.md) — the AI help in its own drawer of the window (and `plasbench ask`): answers from these guides with free models, the exact command and where to run it, and a button that runs it after you confirm.
 - `plasbench --help`, `plasbench run --help` — the full option list.
 - `plasbench docs --topic outputs`, `plasbench docs --topic troubleshooting` — the same
   guide in the terminal.

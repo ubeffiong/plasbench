@@ -1,6 +1,19 @@
 # AI help
 
-PlasBench has an assistant in the side panel of the window (the **AI help** tab, the **AI help** button in the top bar, or Alt+Shift+H) and on the command line (`plasbench ask`). It answers questions about PlasBench from PlasBench's own guides, suggests the exact command to run, tells you where to run it, and can run a safe command for you after you press a button and confirm it. It never runs anything by itself.
+PlasBench has an assistant in its own right-hand drawer of the window (the **AI help** button in the top bar, or Alt+Shift+H; it takes the place of the side panel with Studies, Jobs and Git, and **Panel** brings that back) and on the command line (`plasbench ask`). It answers questions about PlasBench from PlasBench's own guides, suggests the exact command to run, tells you where to run it, and can run a safe command for you after you press a button and confirm it. It never runs anything by itself.
+
+## Where it is, and how the pane is laid out
+
+The **AI help** button in the top bar (or Alt+Shift+H) opens the AI help as its own drawer on the right, in the place of the side panel (Studies, Jobs, Git): one drawer at a time. **Panel** brings the side panel back, and the AI help button again brings the AI help back. Hiding a drawer never clears it: the conversation, a half-typed question, the scroll position, the chosen folder, the cards and an answer that is still arriving are all kept, and a dot on the AI help button says that something arrived while it was hidden. Escape or the close button closes the AI drawer and returns to the button. The window remembers which drawer was open.
+
+The pane keeps one place for each fact:
+
+* The top line has the provider and the model, **Brief** and **Remember chats** (each with an (i) that says what it does and costs: Brief caps an answer at 600 tokens instead of 2,000; Remember chats keeps the last 30 messages in this browser's local storage, nowhere else), and **New chat**.
+* **Quick actions** is one fold-out: open on an empty chat, folded once the conversation has started (it then remembers whether you opened or closed it). It holds **Choose a folder** (its **remember** option is in the ⋯ next to it) or the chosen folder's chip with **Look inside** and **Revoke**, and the guided flows. The chosen folder's name is also shown on the fold-out's own line.
+* Under each answer, **Sources (n)** is one folded line that opens to the list of sources with their full titles (a source cited twice is listed once with both numbers); the [n] markers in the answer are small buttons whose label is the full title and which open the source. The model, the tokens and whether it was free are in the answer's (i), next to the two votes.
+* A command card leads with one line (why it matters), shows the command and its risk badge (safe, changes files, destructive) and ONE button (**Run in PlasBench**, or **Copy** when it cannot run here, with the reason in plain sight). Where to run it, the full explanation, **Copy** and **Open Terminal tab** are under **Details**. Run still goes through the same check and the consent dialog.
+* The promise "The assistant can't see your files" is one line with an (i) holding the full sentence; the footer shows the free/local badge and today's number of requests, with the tokens, the last answer's size and the free requests left in its (i) (the free requests left are shown in plain sight when 5 or fewer remain).
+* Every (i) opens on hover, on keyboard focus and on tap, and Escape closes it; every fold-out is a real `<details>`.
 
 ## What the assistant can and cannot see
 
@@ -51,7 +64,7 @@ What Hugging Face's pricing page says (checked 21 November 2026): free accounts 
 
 ### A model on this computer
 
-Install [Ollama](https://ollama.com) or LM Studio, load a model, and open the AI help tab: the provider switch then offers *This computer*. Nothing is sent anywhere. Small local models follow instructions less reliably, so the assistant's commands pass the same strict checks as always.
+Install [Ollama](https://ollama.com) or LM Studio, load a model, and open the AI help: the provider switch then offers *This computer*. Nothing is sent anywhere. Small local models follow instructions less reliably, so the assistant's commands pass the same strict checks as always.
 
 ### Providers considered
 

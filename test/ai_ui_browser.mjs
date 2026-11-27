@@ -20,10 +20,10 @@ await send("Page.enable"); await send("Runtime.enable"); await send("Page.bringT
 await send("Emulation.setDeviceMetricsOverride", {width: 1500, height: 900, deviceScaleFactor: 1, mobile: false});
 await send("Page.navigate", {url: url + "#home"});
 check("the top bar has an AI help button", await until("!!document.querySelector('#aibtn') && !document.querySelector('#aibtn').hidden", 30000));
-check("the drawer has an AI help tab", await ev("!!document.querySelector('#gd_tabs [data-pt=ai]') && !document.querySelector('#gd_tabs [data-pt=ai]').hidden"));
+check("the side panel has no AI tab: the AI help is its own drawer", await ev("!document.querySelector('#gd_tabs [data-pt=ai]') && !!document.querySelector('#aidrawer #gdp_ai')"));
 check("nothing was asked or sent on page load (no request to the stub)", (await (await fetch(url.split("/?")[0] + "/healthz")).text()) === "ok");
 await click("#aibtn");
-check("the button opens the drawer on the AI tab, wider than the Git tab", await until("document.body.classList.contains('gd-open') && document.body.classList.contains('gd-ai') && !document.querySelector('#gdp_ai').hidden"));
+check("the button opens the AI drawer (aria-expanded), and the side panel is closed", await until("document.body.classList.contains('ai-open') && !document.body.classList.contains('gd-open') && document.querySelector('#aibtn').getAttribute('aria-expanded') === 'true'"));
 check("the notice asks for 'I understand' before anything", await until("!!document.querySelector('#ai_consent')"));
 check("  it says what is sent, and the free-model caveat", /What is sent/.test(await ev("document.querySelector('#ai_state').innerText")) && /train/.test(await ev("document.querySelector('#ai_state').innerText")));
 check("  the composer is hidden until then", await ev("document.querySelector('#ai_form').hidden"));
@@ -49,9 +49,9 @@ await shot("3-signed-in");
 // ask
 await ev("document.querySelector('#ai_in').value = 'How do I check my installation and tools?'; document.querySelector('#ai_form').requestSubmit(); 1");
 check("the answer streams in and finishes", await until("!!document.querySelector('#ai_log .aimsg.bot .aimeta') && document.querySelector('#ai_stop').hidden", 30000));
-check("  the answer is rendered (escaped Markdown), with the model and token count", /tokens/.test(await ev("document.querySelector('#ai_log').innerText")) && /plasbench status/.test(await ev("document.querySelector('#ai_log').innerText")));
+check("  the answer is rendered (escaped Markdown), with the model and token count in its (i)", /tokens/.test(await ev("document.querySelector('#ai_log .aimeta .tipi').dataset.tip")) && /plasbench status/.test(await ev("document.querySelector('#ai_log').innerText")));
 check("  source chips are shown", await ev("document.querySelectorAll('#ai_log .aisrc button').length >= 1"));
-check("  an action card with the command, where to run it, and three buttons", await ev("(() => { const c = document.querySelector('#ai_log .aicard2'); return !!c && /plasbench status/.test(c.querySelector('.cmdbox').innerText) && /Run it here/.test(c.innerText) && c.querySelectorAll('button').length === 3; })()"));
+check("  an action card with the command, where to run it, and three buttons", await ev("(() => { const c = document.querySelector('#ai_log .aicard2'); return !!c && /plasbench status/.test(c.querySelector('.cmdbox').innerText) && /Run it here/.test(c.textContent) && c.querySelectorAll('button').length === 3; })()"));
 check("  nothing has run yet (no job)", (await (await fetch(url.split("/?")[0] + "/healthz")).ok) && await ev("api('jobs').then(r => r.jobs.filter(j => /AI help/.test(j.label || '')).length === 0)"));
 check("  a free badge, tokens and today's count in the footer", /free/.test(await ev("document.querySelector('#ai_foot').innerText")) && /Today: 1 requests/.test(await ev("document.querySelector('#ai_foot').innerText")), await ev("document.querySelector('#ai_foot').innerText"));
 await shot("4-answer");
@@ -79,10 +79,16 @@ check("a code block in an answer has Copy and a where-to-run caption (and no Run
 check("model text is escaped: markup in an answer is not executed", await ev(`(() => { AI.msgs.push({role: "bot", content: "<img src=x onerror=window.__pwn=1> <script>window.__pwn=1</script>", sources: []}); aiRenderLog(); return !window.__pwn && !document.querySelector('#ai_log img'); })()`));
 await shot("7-cards");
 // shortcut and keyboard
-await click("#gd_close");
-check("the drawer closes", await until("!document.body.classList.contains('gd-open')"));
+await ev("document.querySelector('#ai_in').value = 'a draft I am still typing'; 1");
+await click("#gdbtn");
+check("the Panel button replaces the AI drawer with the side panel (one drawer at a time)", await until("document.body.classList.contains('gd-open') && !document.body.classList.contains('ai-open')"));
+await click("#aibtn");
+check("the AI help button replaces the side panel again, and the draft and the conversation are still there", await until("document.body.classList.contains('ai-open') && !document.body.classList.contains('gd-open')") && await ev("document.querySelector('#ai_in').value === 'a draft I am still typing' && document.querySelectorAll('#ai_log .aimsg').length >= 2"));
+await ev("document.querySelector('#ai_in').focus(); 1");
+for (const type of ["keyDown", "keyUp"]) await send("Input.dispatchKeyEvent", {type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27});
+check("Escape closes the AI drawer and focus goes back to the AI help button", await until("!document.body.classList.contains('ai-open') && document.activeElement === document.querySelector('#aibtn')"));
 for (const type of ["keyDown", "keyUp"]) await send("Input.dispatchKeyEvent", {type, key: "H", code: "KeyH", modifiers: 1 | 8, windowsVirtualKeyCode: 72});
-check("Alt+Shift+H opens the AI help directly", await until("document.body.classList.contains('gd-open') && document.body.classList.contains('gd-ai')"));
+check("Alt+Shift+H opens the AI help directly", await until("document.body.classList.contains('ai-open')"));
 check("the conversation is a live region with an accessible name", await ev("(() => { const l = document.querySelector('#ai_log'); return l.getAttribute('role') === 'log' && l.getAttribute('aria-live') === 'polite' && !!l.getAttribute('aria-label'); })()"));
 check("the composer has a label and Enter sends (Shift+Enter does not)", await ev("(() => { const i = document.querySelector('#ai_in'); return !!i.getAttribute('aria-label'); })()"));
 // theme and phone
@@ -91,10 +97,10 @@ await ev("document.documentElement.dataset.theme = 'light'; 1");
 await send("Emulation.setDeviceMetricsOverride", {width: 390, height: 844, deviceScaleFactor: 1, mobile: true}); await sleep(600);
 await ev("setConsole(false); 1");   // collapse the console: its own toolbar is not part of this pane
 await sleep(400);
-check("phone width: the pane fits inside the screen and nothing in it spills sideways", await ev("(() => { const d = document.querySelector('#gdrawer').getBoundingClientRect(); const bad = [...document.querySelectorAll('#gdp_ai *')].filter(e => e.offsetParent !== null && e.getBoundingClientRect().right > d.right + 1); return d.right <= innerWidth + 1 && !bad.length; })()"));
-const wOpen = await ev("document.documentElement.scrollWidth"), wClosed = await ev("(setDrawer(false), document.documentElement.scrollWidth)");
+check("phone width: the pane fits inside the screen and nothing in it spills sideways", await ev("(() => { const d = document.querySelector('#aidrawer').getBoundingClientRect(); const bad = [...document.querySelectorAll('#gdp_ai *')].filter(e => e.offsetParent !== null && e.getBoundingClientRect().right > d.right + 1); return d.right <= innerWidth + 1 && !bad.length; })()"));
+const wOpen = await ev("document.documentElement.scrollWidth"), wClosed = await ev("(setAiDrawer(false), document.documentElement.scrollWidth)");
 check("phone width: opening the pane adds no sideways scrolling to the page", wOpen <= wClosed, `${wOpen} open vs ${wClosed} closed (viewport 390; a toast or console toolbar of another feature is the rest)`);
-await ev("setPanelTab('ai'); setDrawer(true); 1"); await sleep(300);
+await ev("setPanelTab('ai'); 1"); await sleep(300);
 await shot("9-phone");
 // off switch seen by the page
 await ev("AI.st.enabled = false; $('#aibtn').hidden = true; 1");
