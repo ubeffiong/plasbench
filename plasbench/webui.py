@@ -60,6 +60,16 @@ SERVABLE = {".html": "text/html; charset=utf-8", ".pdf": "application/pdf", ".ts
             ".fasta": "text/plain; charset=utf-8", ".fa": "text/plain; charset=utf-8", ".gz": "application/gzip",
             ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".zip": "application/zip"}
 MAX_LOG_CHUNK = 256 * 1024
+
+
+def utf8_cut(raw: bytes) -> int:
+    """How many bytes at the end of `raw` are the start of a UTF-8 character that continues in the next read (0 when it ends on a whole character)."""
+    for back in range(1, min(4, len(raw)) + 1):
+        byte = raw[-back]
+        if byte & 0xC0 != 0x80:                          # a lead byte (or ASCII): how long is its character?
+            need = 1 if byte < 0x80 else 2 if byte >> 5 == 0b110 else 3 if byte >> 4 == 0b1110 else 4 if byte >> 3 == 0b11110 else 1
+            return back if need > back else 0
+    return 0
 REPORT_CSP = ("default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; "
               "font-src data:; form-action 'none'; frame-ancestors 'self'; "
               "sandbox allow-scripts allow-downloads allow-popups allow-popups-to-escape-sandbox")
@@ -1483,7 +1493,11 @@ class Jobs:
             size = os.path.getsize(log)
             with open(log, "rb") as handle:
                 handle.seek(max(0, offset))
-                text = handle.read(MAX_LOG_CHUNK).decode("utf-8", "replace")
+                raw = handle.read(MAX_LOG_CHUNK)
+            raw = raw[:len(raw) - utf8_cut(raw)] if len(raw) == MAX_LOG_CHUNK else raw   # never split a character between two reads (it showed as U+FFFD twice)
+            text = raw.decode("utf-8", "replace")
+            return dict(job, log=text, offset=min(size, max(0, offset) + len(raw)), size=size, display_state=self.display_state(job),
+                        idle_seconds=jobrunner.idle_seconds(str(self.dir), job_id) if job.get("state") == "running" else None)
         return dict(job, log=text, offset=min(size, max(0, offset) + MAX_LOG_CHUNK), size=size, display_state=self.display_state(job),
                     idle_seconds=jobrunner.idle_seconds(str(self.dir), job_id) if job.get("state") == "running" else None)
 

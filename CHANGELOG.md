@@ -13,6 +13,11 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- the console shows programs' colours and colours lines by what they are (27 November 2026)
+- **Why it ignored colour codes:** the window removed only the colour codes from job output (so a program's colours were thrown away), left other terminal codes in as debris (`[K`), printed a progress bar's every rewrite, and coloured whole lines by a guess per 256 KB piece (a line split between two pieces could get two colours); the Terminal tab's server removed every code.
+- **Now:** colour codes are rendered as text styles (16, 256 and 24-bit, bold, dim, italic, underline; too-dark colours are lightened to stay readable), every other code is removed, a carriage return rewrites the line, an escape split across two reads is kept whole, and nothing in a log is parsed as HTML. Lines get a type from explicit signals first (the program's red / yellow / green, `ERROR:` / `WARNING:` / `NOTE:`, exit codes), then cautious patterns: errors and tracebacks red, warnings amber, successes green, notes blue, headings bold, details grey italic, output plain. Markers (cross, triangle, tick, dot) keep it readable without colour; all colours reach 4.5:1 contrast. **Colours** in the console header: Headers and status (default), Full by type, Off, with a legend. Copy, the new **Save** (the whole job output) and what is sent to the AI help are plain text. The console keeps the newest 50,000 lines of a very long log. `PLASBENCH_COLOR=0/1` is accepted beside never/always.
+- Tests: `test_terminal_colour.py` (renderer under node: SGR, split escapes, CR, hostile input, classifier, plain text, 200,000 lines, contrast), `test_terminal_colour_browser.py` (real window, `PLASBENCH_BROWSER_TESTS=1`).
+
 ### Changed -- the side panel and the AI help are exactly as wide (27 November 2026)
 - One width token (`--drw`, 430 px or 92% of a narrower screen) for both right-hand drawers and for the room the page keeps free for them, so swapping the side panel and the AI help moves nothing. The side panel was 248 px; its Studies, Jobs and Git content was checked at the new width in headless Edge at three window sizes.
 ### Fixed -- the tool fingerprint, the feature matrix and the 3D landscape are compact and no longer overlap (27 November 2026)

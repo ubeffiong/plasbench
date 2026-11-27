@@ -1093,3 +1093,10 @@ Nothing in your files. A sheet for your own isolates has only `sample_id`, `asse
 Every setting with a known set of values is a dropdown now, with the same options wherever it appears. The short-read QC gate offers Off, Report (default) and Enforce in Settings, in the
 workflow row and in the wizard; Enforce also excludes an isolate whose reads are a threshold REJECT. A value you typed into `config/local.env` that is not in the list is kept and shown as
 `Custom: <value>`. See `docs/qa/UI_ENUM_FIELDS.md` for the whole list and what was left as free text and why.
+
+### Q81. The console shows colour codes as text, or no colours at all. What do the colours mean now?
+
+The console now shows the colours programs write (and removes cursor and title codes that used to appear as `[K`-style debris), and it gives each line a type: errors red
+with a cross, warnings amber with a triangle, successes green with a tick, PlasBench's notes blue, headings bold, details grey italic; ordinary output stays plain so that the
+coloured lines stand out. **Colours** in the console header changes it (Headers and status, Full by type, Off) and explains each colour. Copy and Save give plain text.
+The scheme and its reasons are in the User Guide, "Console colours".

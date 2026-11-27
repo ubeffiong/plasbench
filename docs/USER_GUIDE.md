@@ -1413,6 +1413,31 @@ sample/tool execution, warnings, output locations, and the final leaderboard.
 Long-running runs do not yet estimate total completion time; use log timestamps
 and `results/tool_status.tsv` to monitor progress.
 
+### Console colours: what each colour means, and why so few
+
+The console (Job output, Terminal, Session log) and a `.log` file opened in the window use one scheme. **Colour marks what needs you; the output itself stays plain.**
+
+| Type | How it is shown | Decided by |
+|---|---|---|
+| Error | the whole line red, a cross marker, the status word bold; a Python traceback and its frames are red too | the program's own red, PlasBench's `ERROR:`, `Traceback`, `...Error:`, `FAILED`, a non-zero `[exit N]` |
+| Warning | an amber triangle and the status word amber | the program's own yellow, `WARNING:`, `warning:`, skipped, cancelled |
+| Success | a green tick and the status word green | the program's own green, `PASS`, `ok`, `[ok]`, complete(d), `[exit 0]` |
+| Note | a blue dot and the word blue | PlasBench's `NOTE:` / `INFO:` and the runner's own lines |
+| Heading | bold, accent colour | `=== ... ===`, `### ...`, `>>>>> STAGE N :` |
+| Detail | grey italic | "What to do:", "Hint:", "Why:", a line in parentheses; timestamps are grey (not italic) |
+| Output | the console's normal text, in the program's own colours if it uses any | everything else |
+
+Explicit signals decide first (the producer's colour, a PlasBench level word, an exit code), then cautious patterns; a line that matches nothing stays plain, never red by guess.
+Why not colour every line by type: a run prints thousands of output lines, and when most of the screen is coloured, colour stops pointing at anything; italic is kept for the
+short explanatory lines because it is harder to read in a monospaced font. The markers mean colour is never the only signal (red and green also differ in shape and weight,
+for colour-blind readers); every colour reads at 4.5:1 or more on the console (7:1 when the system asks for more contrast), and Windows high-contrast mode keeps the markers.
+
+**Colours** in the console header switches between *Headers and status* (the default, above), *Full by type* (whole lines coloured: warnings amber, successes green, notes
+blue) and *Off* (plain text), with a legend. The choice is kept in this browser. Programs' own colour codes are shown (16, 256 and 24-bit colours, bold, italic, underline);
+other terminal codes (cursor moves, erasing, window titles) are removed, a progress bar that rewrites its line shows its last state, and nothing in a log is ever treated as
+HTML. **Copy** and **Save** (the job's whole output) give plain text without codes or markers. In a terminal, PlasBench colours its own warnings and errors only when
+the output is a terminal; `NO_COLOR=1` or `PLASBENCH_COLOR=0` turns that off, `PLASBENCH_COLOR=1` forces it.
+
 ## My run looks stuck
 
 First look, in a second terminal: `plasbench status` (add `--study NAME` for another study) says the state (RUNNING, FINISHED, STOPPED), the stage, the isolate and the step it is in
