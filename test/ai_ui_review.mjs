@@ -114,7 +114,7 @@ await ev("document.documentElement.removeAttribute('data-theme'); document.docum
 await ev("document.querySelector('#ai_in').focus(); 1");
 await send("Input.dispatchKeyEvent", {type: "keyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9}); await send("Input.dispatchKeyEvent", {type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9});
 check(A, "Tab from the composer reaches the next control (no keyboard trap)", await ev("document.activeElement.id !== 'ai_in'"));
-check(A, "a card's button is activated by keyboard: Enter on a focused quick chip starts the flow", await ev("(() => { const b = document.querySelector('#ai_quick [data-aiflow=why_failed]'); b.focus(); return document.activeElement === b && b.tagName === 'BUTTON'; })()"));
+check(A, "a card's button is activated by keyboard: Enter on a focused quick chip starts the flow", await ev("(() => { document.querySelector('#ai_qa').open = true; const b = document.querySelector('#ai_quick [data-aiflow=why_failed]'); b.focus(); return document.activeElement === b && b.tagName === 'BUTTON'; })()"));
 // double click on a one-shot button
 await ev("AI.msgs = []; aiRenderLog(); 1");
 await ev(`(async () => { const v = await api("ai/ui/validate", {ui: {ui: "go", target: "runs"}}); AI.msgs.push({role: "bot", content: "x", ui: [v]}); aiRenderLog(); })()`);
@@ -166,11 +166,11 @@ await send("Page.reload");
 check(A, "reloading during a stream leaves the window working (the pane opens again)", await until("!!document.querySelector('#aibtn') && !document.querySelector('#aibtn').hidden", 30000));
 // escape / focus return
 await ev("document.querySelector('#aibtn').focus(); 1");
-if (!(await ev("document.body.classList.contains('gd-open')"))) await click("#aibtn");
+if (!(await ev("document.body.classList.contains('ai-open')"))) await click("#aibtn");
 await sleep(500);
-const open1 = await ev("document.body.classList.contains('gd-open')");
-await ev("document.querySelector('#gd_close').click(); 1"); await sleep(300);
-check(A, "closing the drawer closes the pane (and it can be opened again by button and by Alt+Shift+H)", open1 && !(await ev("document.body.classList.contains('gd-open')")));
+const open1 = await ev("document.body.classList.contains('ai-open')");
+await ev("document.querySelector('#ai_close').click(); 1"); await sleep(300);
+check(A, "closing the AI drawer closes the pane (and it can be opened again by button and by Alt+Shift+H)", open1 && !(await ev("document.body.classList.contains('ai-open')")));
 check(A, "no uncaught page error during the whole pass", errors.length === 0, errors[0]);
 fs.writeFileSync(`${shots && shots !== "-" ? shots : "."}/ui-review-results.json`, JSON.stringify(rows, null, 1));
 const bad = rows.filter(r => !r.ok).length;

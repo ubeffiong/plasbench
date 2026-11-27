@@ -13,6 +13,10 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- a calmer AI help pane, in its own drawer (27 November 2026)
+- **Its own drawer.** The AI help is no longer a tab of the side panel: the AI help button opens it in the same right-hand slot, in place of the side panel, and Panel brings the side panel back (one drawer at a time). Hiding keeps everything (conversation, draft, scroll, folder, cards, a running answer); a dot on the button says something arrived. Escape and the close button close it; an old link to the AI tab opens it; the window remembers which drawer was open.
+- **One place for each fact.** Sources are one folded line per answer (full titles, duplicates merged, clickable `[n]`); the "can't see your files" promise is one line with an (i); quick actions, the folder and its remember option are one fold-out; Brief and Remember chats have an (i) saying what they cost and where a chat is stored; the usage lines become one small indicator ("48 left", amber at 5 or fewer, red at none) whose (i) holds them; tokens and model of an answer are in an (i). Command cards are unchanged (pinned by a test). Nothing was removed: `test_ai_pane_tidy.py` checks every former string and control. Details in docs/qa/AI_UI_REVIEW.md.
+
 ## [0.5.7] - 2026-11-25
 
 Faster, calmer runs; a resumable ENA-first downloader with `READ_DEPTH_CAP_X`; per-caller annotation switches and installs; an AI help that prepares isolates, checks sample sheets and troubleshoots runs; interactive report sections; publishing files for Galaxy, bio.tools, WorkflowHub and F1000Research. Details are in the entries below.

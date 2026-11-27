@@ -79,7 +79,7 @@ It is Ubuntu-first. On Windows it runs in WSL 2 (Ubuntu) or with Docker Desktop'
 ## The window
 
 <!-- source: plasbench/data/ui.html (navigation: home, setup, workspace, cohorts, isolates, wizard, runs, jobs, tools, addtool, prereg, git, commands, settings, help) -->
-Pages: Home, Setup, Workspace and studies, Cohorts, Your own isolates, New benchmark (a four-step wizard that ends in the exact command), Runs, Jobs, Tools, Add a tool, Pre-registration, Version control, Commands, Settings, Guides. The AI help is the last tab of the side panel (Alt+Shift+H). Settings are saved for this computer in `config/local.env`.
+Pages: Home, Setup, Workspace and studies, Cohorts, Your own isolates, New benchmark (a four-step wizard that ends in the exact command), Runs, Jobs, Tools, Add a tool, Pre-registration, Version control, Commands, Settings, Guides. The AI help is its own right-hand drawer (the AI help button, Alt+Shift+H): it takes the place of the side panel (Studies, Jobs, Git), and Panel brings that back. Settings are saved for this computer in `config/local.env`.
 
 ## What the assistant can do
 
