@@ -44,8 +44,8 @@ function mount(host, data) {
   try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
   var hs = L.decodeHash(location.hash);
   var S = {vals: Object.assign(L.defaults(), hs.vals), hidden: hs.hidden || L.defaultHidden(), tab: hs.tab || 'axes', sel: null, cam: hs.cam || {yaw: -32, pitch: 26, zoom: 1, persp: 1}, scene: null,
-    open: true, sort: {col: 0, dir: 1}, filter: '', auto: false, touched: false, moved: false};
-  try { if (localStorage.getItem(LS_KEY) === '0') S.open = false; } catch (e) { /* storage blocked */ }
+    open: false, big: false, sort: {col: 0, dir: 1}, filter: '', auto: false, touched: false, moved: false};
+  try { if (localStorage.getItem(LS_KEY) === '1') S.open = true; } catch (e) { /* storage blocked */ }
   var uid = 'lsx' + (++SEQ);
   host.innerHTML =
     '<div class="ls-head"><div class="ls-sum" role="status" aria-live="polite"></div><button type="button" class="ls-btn" data-act="panel" aria-expanded="true" aria-controls="' + uid + 'p">Setup panel</button></div>' +
@@ -54,7 +54,8 @@ function mount(host, data) {
     '<button type="button" class="ls-btn" data-preset="side" title="Completeness across, structural fidelity up">Side</button>' +
     '<button type="button" class="ls-btn" data-preset="top" title="Looking down: accuracy across, completeness up">Top</button>' +
     '<button type="button" class="ls-btn" data-preset="flat" title="Flat orthographic accuracy by completeness view (structural fidelity hidden)">Flat: accuracy x completeness</button>' +
-    '<button type="button" class="ls-btn" data-act="reset">Reset view</button></div>' +
+    '<button type="button" class="ls-btn" data-act="reset">Reset view</button>' +
+    '<button type="button" class="ls-btn ls-size" data-act="size" aria-pressed="false" title="Switch between the compact chart (about 300 px high) and the full-size chart">Larger view</button></div>' +
     '<div class="ls-banner"></div><div class="ls-stage" tabindex="0" aria-label="3D scatter of accuracy, completeness and structural fidelity. Arrow keys rotate, plus and minus zoom, R resets."><div class="ls-svgbox"></div><div class="ls-tip" role="status" hidden></div></div>' +
     '<div class="ls-legend" role="group" aria-label="Legend (click an entry to show or hide it)"></div><div class="ls-key"></div>' +
     '<p class="ls-note">Illustrative 3D projection of metrics: the axes are metrics, not a physical structure. * Alignment-derived, unvalidated.</p></div>' +
@@ -228,7 +229,8 @@ function mount(host, data) {
   function csvName(n) { return 'plasbench-landscape-' + n; }
   function act(a, b) {
     var m = S.scene.model;
-    if (a === 'panel') { S.open = !S.open; sync(); try { localStorage.setItem(LS_KEY, S.open ? '1' : '0'); } catch (e) {} }
+    if (a === 'size') { S.big = !S.big; host.classList.toggle('ls-big', S.big); b.setAttribute('aria-pressed', String(S.big)); b.textContent = S.big ? 'Compact view' : 'Larger view'; schedule(); }
+    else if (a === 'panel') { S.open = !S.open; sync(); try { localStorage.setItem(LS_KEY, S.open ? '1' : '0'); } catch (e) {} }
     else if (a === 'reset') { S.sel = null; setView(-32, 26, 1); drawPanel(); }
     else if (a === 'in') { S.cam.zoom = Math.min(5, S.cam.zoom * 1.2); paint(); schedule(); }
     else if (a === 'out') { S.cam.zoom = Math.max(0.4, S.cam.zoom / 1.2); paint(); schedule(); }

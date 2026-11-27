@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 233 analysis modules, 28 registered tools and baselines (20 real tools), 220 registered
-outputs, 55 run switches, 524 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 233 analysis modules, 28 registered tools and baselines (20 real tools), 223 registered
+outputs, 55 run switches, 525 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -658,7 +658,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 7. Every output file and where the report shows it
 
-220 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
+223 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
 
 | Output | Written by | Report section | Shown | What it holds |
 |---|---|---|---|---|
@@ -869,6 +869,9 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `{sample}/{tool}.dissim.tsv` | bin_agreement.py | learn-agreement | partly | Bin dissimilarity: Merged into scores and summarised. |
 | `{sample}/{tool}.feature_preservation.tsv` | feature_preservation.py | feature-preservation | partly | Feature preservation: Merged into benchmark.feature_preservation. |
 | `{sample}/{tool}.missing_regions.tsv` | alignment_accuracy.py | accuracy-dimension | partly | Truth regions the tool missed: Merged into benchmark.missing_regions. |
+| `{sample}/{tool}.multiplicity.tsv` | candidate_multiplicity.py | learn-multiplicity | partly | Per-sample candidates per plasmid: Merged into benchmark.candidate_multiplicity.tsv, which the section shows. |
+| `{sample}/{tool}.multiplicity_candidates.tsv` | candidate_multiplicity.py | learn-multiplicity | partly | Per-sample predicted records: Merged into benchmark.candidates.tsv, which the section shows. |
+| `{sample}/{tool}.multiplicity_intervals.tsv` | candidate_multiplicity.py | learn-multiplicity | partly | Per-sample candidate intervals: Merged into benchmark.candidate_intervals.tsv, which the section drew as tracks. |
 | `{sample}/{tool}.ngoc.tsv` | feature_preservation.py | feature-preservation | partly | Gene order conservation: Merged into benchmark.ngoc. |
 | `{sample}/{tool}.per_plasmid.tsv` | score_plasmids.py | per-plasmid-detail | shown | Result for each truth plasmid: One row per truth plasmid and tool, with filters. |
 | `{sample}/{tool}.plaseval.{any}` | bin_agreement.py | None | partly | PlasEval export files: For the external PlasEval tool. It is listed in the Artifact explorer only. |

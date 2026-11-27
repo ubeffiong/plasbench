@@ -278,6 +278,9 @@ def row_height(n):
     return max(3, min(12, 560 // max(1, n)))
 
 
+TITH = 58     # header band for the group titles (drawn slanted so that long titles never overlap)
+
+
 def static_svg(payload, amr_mode="amr_class"):
     """The complete static figure: dendrogram, tracks, prevalence bars, matrix. Truth only (no tool overlay)."""
     rows = payload["rows"]
@@ -290,13 +293,15 @@ def static_svg(payload, amr_mode="amr_class"):
     x_mat = x_tracks + len(tracks) * (TW + 1) + TG
     widths = [len(b["f"]) * FW for b in blocks]
     width = x_mat + sum(widths) + BGAP * len(blocks) + 12
-    height = top + n * rh + 24
+    height = top + n * rh + 24 + TITH
+    width = max(width, int(max([x_mat + sum(widths[:k]) + BGAP * k + len(b['l']) * 5.2 * 0.77 + 8 for k, b in enumerate(blocks)] + [660])) + 1)
     pos = {r: k for k, r in enumerate(payload["order"])}
     o = [f"<svg class='fp-svg' viewBox='0 0 {width} {height}' role='img' aria-labelledby='fp-st-t fp-st-d' xmlns='http://www.w3.org/2000/svg' font-family='Arial,Helvetica,sans-serif'>",
          "<title id='fp-st-t'>Presence and absence of features on the truth plasmids</title>",
          f"<desc id='fp-st-d'>{n} truth plasmids in rows clustered by feature profile; {len(blocks)} blocks of features in columns. Blue is present, blank is absent, hatched is not annotated.</desc>",
          "<defs><pattern id='fp-hatch' width='4' height='4' patternUnits='userSpaceOnUse' patternTransform='rotate(45)'><rect width='4' height='4' fill='#e0e0e0'/>"
-         "<line x1='0' y1='0' x2='0' y2='4' stroke='#777' stroke-width='1.2'/></pattern></defs>"]
+         "<line x1='0' y1='0' x2='0' y2='4' stroke='#777' stroke-width='1.2'/></pattern></defs>", f"<g transform='translate(0,{TITH})'>"]
+    titles = []
     # dendrogram
     if payload["clustered"] and payload["tree"]:
         hmax = max(m[2] for m in payload["tree"]) or 1.0
@@ -320,7 +325,7 @@ def static_svg(payload, amr_mode="amr_class"):
     # blocks
     x = x_mat
     for b, w in zip(blocks, widths):
-        o.append(f"<text x='{x + w / 2}' y='11' font-size='10' font-weight='bold' text-anchor='middle' fill='currentColor'>{rc.esc(b['l'])}</text>")
+        titles.append(f"<text transform='translate({x + 1},{TITH + 16}) rotate(-40)' font-size='9' font-weight='bold' fill='currentColor'>{rc.esc(b['l'])}<title>{rc.esc(b['l'])}</title></text>")
         na = set(b["na"])
         for i in sorted(na):
             o.append(f"<rect x='{x}' y='{top + pos[i] * rh}' width='{w}' height='{rh}' fill='url(#fp-hatch)'><title>{rc.esc(rows[i][1])}: not annotated for {rc.esc(b['l'])}</title></rect>")
@@ -337,8 +342,8 @@ def static_svg(payload, amr_mode="amr_class"):
                 o.append(f"<rect x='{fx + .5}' y='{top + pos[i] * rh}' width='{FW - 1}' height='{max(1, rh - .6):.1f}' fill='#0072B2'/>")
         o.append(f"<line x1='{x}' x2='{x + w}' y1='{20 + BARH}' y2='{20 + BARH}' stroke='#777' stroke-width='.5'/>")
         x += w + BGAP
-    o.append(f"<text x='{x_mat}' y='{height - 6}' font-size='9' fill='currentColor'>Bars: share of annotated plasmids carrying the feature (full height = 100%). Blue = present, blank = absent, hatched = not annotated.</text>")
-    o.append("</svg>")
+    o.append(f"<text x='4' y='{height - TITH - 6}' font-size='9' fill='currentColor'>Bars: share of annotated plasmids carrying the feature (full height = 100%). Blue = present, blank = absent, hatched = not annotated.</text>")
+    o.append("</g>" + "".join(titles) + "</svg>")
     return "".join(o)
 
 
@@ -381,8 +386,9 @@ def build_section(results_dir, data_dir, scores_path):
     if omitted:
         cap += f"<p class='fp-note'>{omitted} less common features are not drawn (at most {MAX_FEATURES_PER_BLOCK} per block, the most prevalent first).</p>"
     fold = f"<details class='rpt-collapsible fp-table' data-closed><summary>Table: every plasmid with its features</summary>{table_html(data)}</details>"
-    body = (ff.json_script("fp-data", data) + ff.asset("fig_presence_style.html") + ff.asset("fig_presence_core.html") + ff.asset("fig_presence_ui.html") +
-            f"<div class='fp-root' id='fp-root'><div class='fp-static'>{cap}</div></div>{fold}")
+    # The figure first, its data and scripts after it: the script looks the root up by id when it runs, so a script placed before the root never started the live figure.
+    body = (f"<div class='fp-root' id='fp-root'><div class='fp-static'>{cap}</div></div>{fold}" + ff.json_script("fp-data", data) + ff.asset("fig_presence_style.html")
+            + ff.asset("fig_presence_core.html") + ff.asset("fig_presence_ui.html"))
     return rc.section(SID, TITLE, LEAD, body, group="Figures")
 
 

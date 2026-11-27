@@ -287,6 +287,7 @@ test_report_classifier_section.py	0.3
 test_report_collapse.py	0.7
 test_report_compare_table.py	19.7
 test_compare_summary.py	18.0
+test_report_parity.py	45.0
 test_report_composition.py	0.3
 test_report_condense.py	2.0
 test_report_feature_manifest.py	30.7
