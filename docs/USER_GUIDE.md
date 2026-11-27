@@ -1398,7 +1398,7 @@ Settings (environment variables, also in the window's Settings): `PLASBENCH_OFFL
 
 ## AI help
 
-The **AI help** tab of the side panel (the **AI help** button in the top bar, or Alt+Shift+H) answers questions about PlasBench from PlasBench's own guides, settings, command line and failure signatures, cites its sources, and proposes commands with the place to run each: PlasBench's Terminal tab, Windows PowerShell (not inside Ubuntu), your Ubuntu (WSL) terminal. It uses free models only; the provider switch offers OpenRouter (sign up or sign in in a small pop-up), Hugging Face (when `AI_HF_CLIENT_ID` is set) and a model on your own computer (Ollama or LM Studio, nothing leaves the computer).
+The **AI help** drawer (the **AI help** button in the top bar, or Alt+Shift+H; it takes the place of the side panel, and **Panel** brings the side panel back) answers questions about PlasBench from PlasBench's own guides, settings, command line and failure signatures, cites its sources, and proposes commands with the place to run each: PlasBench's Terminal tab, Windows PowerShell (not inside Ubuntu), your Ubuntu (WSL) terminal. It uses free models only; the provider switch offers OpenRouter (sign up or sign in in a small pop-up), Hugging Face (when `AI_HF_CLIENT_ID` is set) and a model on your own computer (Ollama or LM Studio, nothing leaves the computer).
 
 - Nothing is sent before you sign in, read the notice and ask. A question sends the question, a few guide excerpts and a short setup line; never paths, your user name, e-mail address or data. Command output is sent only when you press **Send result**, after you have seen the redacted text.
 - A suggested command is a card with **Run in PlasBench** (only when the checks pass; it opens the usual confirmation with the exact command and never runs by itself), **Copy** and **Open Terminal tab**. Commands that install, upgrade or stop get one more confirmation.
@@ -1412,6 +1412,31 @@ Console output is timestamped. It announces selected stages, each active stage,
 sample/tool execution, warnings, output locations, and the final leaderboard.
 Long-running runs do not yet estimate total completion time; use log timestamps
 and `results/tool_status.tsv` to monitor progress.
+
+### Console colours: what each colour means, and why so few
+
+The console (Job output, Terminal, Session log) and a `.log` file opened in the window use one scheme. **Colour marks what needs you; the output itself stays plain.**
+
+| Type | How it is shown | Decided by |
+|---|---|---|
+| Error | the whole line red, a cross marker, the status word bold; a Python traceback and its frames are red too | the program's own red, PlasBench's `ERROR:`, `Traceback`, `...Error:`, `FAILED`, a non-zero `[exit N]` |
+| Warning | an amber triangle and the status word amber | the program's own yellow, `WARNING:`, `warning:`, skipped, cancelled |
+| Success | a green tick and the status word green | the program's own green, `PASS`, `ok`, `[ok]`, complete(d), `[exit 0]` |
+| Note | a blue dot and the word blue | PlasBench's `NOTE:` / `INFO:` and the runner's own lines |
+| Heading | bold, accent colour | `=== ... ===`, `### ...`, `>>>>> STAGE N :` |
+| Detail | grey italic | "What to do:", "Hint:", "Why:", a line in parentheses; timestamps are grey (not italic) |
+| Output | the console's normal text, in the program's own colours if it uses any | everything else |
+
+Explicit signals decide first (the producer's colour, a PlasBench level word, an exit code), then cautious patterns; a line that matches nothing stays plain, never red by guess.
+Why not colour every line by type: a run prints thousands of output lines, and when most of the screen is coloured, colour stops pointing at anything; italic is kept for the
+short explanatory lines because it is harder to read in a monospaced font. The markers mean colour is never the only signal (red and green also differ in shape and weight,
+for colour-blind readers); every colour reads at 4.5:1 or more on the console (7:1 when the system asks for more contrast), and Windows high-contrast mode keeps the markers.
+
+**Colours** in the console header switches between *Headers and status* (the default, above), *Full by type* (whole lines coloured: warnings amber, successes green, notes
+blue) and *Off* (plain text), with a legend. The choice is kept in this browser. Programs' own colour codes are shown (16, 256 and 24-bit colours, bold, italic, underline);
+other terminal codes (cursor moves, erasing, window titles) are removed, a progress bar that rewrites its line shows its last state, and nothing in a log is ever treated as
+HTML. **Copy** and **Save** (the job's whole output) give plain text without codes or markers. In a terminal, PlasBench colours its own warnings and errors only when
+the output is a terminal; `NO_COLOR=1` or `PLASBENCH_COLOR=0` turns that off, `PLASBENCH_COLOR=1` forces it.
 
 ## My run looks stuck
 

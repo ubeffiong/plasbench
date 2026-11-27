@@ -61,6 +61,7 @@ test_compute_difficulty_features.py	0.3
 test_computer_info.py	0.3
 test_console_colours.py	2.7
 test_terminal_colour.py	6.0
+test_terminal_colour_browser.py	0.3
 test_container_hygiene.py	0.3
 test_contig_chimeric.py	0.3
 test_contig_crosscheck.py	0.7
@@ -519,3 +520,4 @@ test_ai_intake.py	12.0
 test_ai_intake_routes.py	10.0
 test_annotation_retry.py	1.0
 test_resume_retry.sh	12.0
+test_ai_pane_tidy.py	1.0
