@@ -40,7 +40,7 @@ check("the program's own colours are shown (16, 256 and true colour)", await ev(
 check("the progress line shows only its last state", await ev(`document.getElementById("clog").textContent.includes(" [##########] 100%") && !document.getElementById("clog").textContent.includes("40%")`));
 // the Colours menu
 await ev(`document.getElementById("tcmenu").open = true; 1`);
-check("the Colours menu opens with the mode and a legend of 7 types", await ev(`document.getElementById("tcmode").value === TC.mode && document.querySelectorAll("#tclegend li").length === 7`));
+check("the Colours menu opens with the mode and a legend of 7 types", await until(`document.getElementById("tcmode").value === TC.mode && document.querySelectorAll("#tclegend li").length === 7`));
 for (const theme of ["dark", "light"]) {
   await ev(`document.documentElement.dataset.theme = "${theme}"; 1`);
   for (const w of [1280, 700]) {

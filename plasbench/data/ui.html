@@ -2689,11 +2689,14 @@ function tcPlace() {
   pop.style.right = "auto"; pop.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + "px";
   if (r.top > innerHeight / 2) { pop.style.top = "auto"; pop.style.bottom = (innerHeight - r.top + 6) + "px"; } else { pop.style.bottom = "auto"; pop.style.top = (r.bottom + 6) + "px"; }
 }
-$("#tcmenu").addEventListener("toggle", tcPlace); addEventListener("resize", tcPlace);
+$("#tcmenu").addEventListener("toggle", () => { if ($("#tcmenu").open) tcLegend(); tcPlace(); }); addEventListener("resize", tcPlace);
 document.addEventListener("click", e => { if ($("#tcmenu").open && !e.target.closest("#tcmenu")) $("#tcmenu").open = false; });
-$("#tclegend").replaceChildren(...TC_TYPES.map(([t, g, what]) => { const li = document.createElement("li"), sw = document.createElement("span"), tx = document.createElement("span");
+function tcLegend() {   // built when the menu first opens (nothing to build at load)
+  if ($("#tclegend").childElementCount) return;
+  $("#tclegend").replaceChildren(...TC_TYPES.map(([t, g, what]) => { const li = document.createElement("li"), sw = document.createElement("span"), tx = document.createElement("span");
   sw.className = "ln tcsw" + (t ? " lv-" + t : ""); const w = document.createElement("span"); w.className = ["err", "warn", "ok", "info"].includes(t) ? "lw" : ""; w.textContent = g;
   sw.append(w); tx.textContent = what; li.append(sw, tx); return li; }));
+}
 $("#cfollow").onclick = () => { if (S.follow) { setFollow(false); } else { setFollow(true); toBottom($("#clog")); } };
 $("#clog").addEventListener("scroll", () => { if (!S._progScroll) setFollow(nearBottom($("#clog"))); }, {passive: true});
 setFollow(true);
