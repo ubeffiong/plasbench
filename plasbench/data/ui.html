@@ -2432,7 +2432,7 @@ const TC_HINT = {1: "err", 9: "err", 3: "warn", 11: "warn", 2: "ok", 10: "ok"};
 
 // Line types. Patterns are anchored or bounded and run on at most CLASSIFY_CHARS characters, so a 100,000-character line costs the same as a short one.
 const RX_TS = /^\[\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d\]\s?/;
-const RX_HEAD = /^\s*(?:={3,}|#{3,}|>{3,}|-{4,}|\*{3,})\s*[^=#>*\s-]|^\s*(?:STAGE|Stage) \d+\s*[:(]/;
+const RX_HEAD = /^\s*(?:={3,}|#{3,}|>{3,}|-{4,}|\*{3,})\s*[^=#>*\s-]|^\s*STAGE \d+\s*:/;
 const RX_DET = /^\s*(?:What to do|Hint|Tip|Why|Because|Details?|See also|Fix|Next|Log|Logs|DEBUG)\s*:|^\s*\(.*\)\s*$/i;
 const RX_INFO = /^\s*(?:NOTE|INFO|Note)\s*:|^\[PlasBench\]|^\s*AUTO_PARALLEL:|^\s*PIPELINE_OVERLAP/;
 const RX_DONE = /\bcomplete(?:d)?\b|\bWrote\b|\b(?:DONE|SUCCESS|Succeeded)\b/;
@@ -2545,12 +2545,13 @@ class TermStream {
       note.textContent = "(earlier lines are not shown, to keep the console fast; the whole output is in the job's log file, and Save keeps all of it)";
       box.insertBefore(note, box.firstChild); box.insertBefore(document.createTextNode("\n"), note.nextSibling);
     }
-    while (drop > 0) {
-      const n = note.nextSibling && note.nextSibling.nextSibling;
-      if (!n || n === this.line) break;
-      if (n.nodeType === 1) { drop--; this.lines--; }
-      box.removeChild(n);
-    }
+    // walk past the oldest lines, then remove them in one range (one DOM operation, not one per line)
+    let n = note.nextSibling.nextSibling, last = null, k = 0;
+    while (n && n !== this.line && k < drop) { if (n.nodeType === 1) k++; last = n; n = n.nextSibling; }
+    if (n && n !== this.line && n.nodeType === 3) last = n;              // the line end after the last line removed
+    if (!last) return;
+    const r = document.createRange(); r.setStartAfter(note.nextSibling); r.setEndAfter(last); r.deleteContents();
+    this.lines -= k;
   }
 }
 // The line's type as classes; the timestamp is dimmed and the status word marked, on the text nodes only (a word split by a colour change stays as it is).

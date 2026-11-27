@@ -330,7 +330,7 @@ run_with_heartbeat() {
 # colours them itself). NO_COLOR (https://no-color.org) or PLASBENCH_COLOR=never (also 0, off, no) turns colour off;
 # PLASBENCH_COLOR=always (also 1, on, yes) forces it.
 case "${PLASBENCH_COLOR:-auto}" in 0|off|no|false) PLASBENCH_COLOR=never ;; 1|on|yes|true) PLASBENCH_COLOR=always ;; esac
-if[[ "${PLASBENCH_COLOR:-auto}" == "always" ]] \
+if [[ "${PLASBENCH_COLOR:-auto}" == "always" ]] \
    || { [[ -t 2 && -z "${NO_COLOR:-}" && "${PLASBENCH_COLOR:-auto}" != "never" && "${TERM:-}" != "dumb" ]]; }; then
     _C_WARN=$'\033[33m'; _C_ERR=$'\033[1;31m'; _C_OFF=$'\033[0m'
 else

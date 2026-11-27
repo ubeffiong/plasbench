@@ -22,7 +22,7 @@ def check(label, good, detail=""):
 
 check("the poll scrolls only when following (no unconditional jump to the end)", 'if (S.follow) toBottom($("#clog"));' in html and '$("#clog").scrollTop = $("#clog").scrollHeight' not in html)
 check("a scroll by the person turns following off or on by position", '$("#clog").addEventListener("scroll", () => { if (!S._progScroll) setFollow(nearBottom($("#clog"))); }' in html)
-check("a new job follows again", 'S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; setFollow(true); }' in html)
+check("a new job follows again", 'S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; S.cstream = null; setFollow(true); }' in html)
 check("the button reads 'Jump to latest' when not following and jumps then follows", "Jump to latest" in html and 'setFollow(true); toBottom($("#clog"));' in html)
 check("the Terminal output follows only near the bottom, but always shows a command you typed", "stay = nearBottom(b) || html.indexOf('class=\"t-cmd\"') >= 0" in html)
 node = shutil.which("node")

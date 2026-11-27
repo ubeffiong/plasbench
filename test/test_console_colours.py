@@ -45,9 +45,9 @@ CASES = [
 
 def main():
     page = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
-    check("errors are red and warnings yellow in the console palette",
-          ".c-err,#clog .c-err,#tlog .t-err,#slog .s-bad{color:#ff6b6b" in page and ".c-warn,#clog .c-warn,#slog .s-warn{color:#ffd24d" in page)
-    check("the Terminal tab colours command output", "tPrint(colorize(out)" in page)
+    check("errors are red and warnings amber in the console palette (tokens; test_terminal_colour.py checks their contrast)",
+          ".tcbox:not([data-tc=off]) .ln.lv-err{color:var(--tc-err)" in page and ".tcbox[data-tc=full] .ln.lv-warn{color:var(--tc-warn)}" in page)
+    check("the Terminal tab colours command output", 'tcRender(out + "\\n", b)' in page)
     check("the page has no stray control characters", not re.search(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", page))
     node = shutil.which("node")
     if node:
